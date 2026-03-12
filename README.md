@@ -36,6 +36,20 @@ The workflow is OIDC-only and uses:
 
 Manual runs default to `dry_run=true` so you can verify corpus prep and data-source discovery before mutating Bedrock.
 
+## Central Valkey Monitor
+
+This repo also includes a centralized monitor workflow at [`.github/workflows/monitor-valkey-daily.yml`](/Users/sarthagg/IdeaProjects/valkey-ci-bot/.github/workflows/monitor-valkey-daily.yml).
+
+It runs from this repo, watches new scheduled `Daily` runs in `valkey-io/valkey`, and sends newly failed runs through the existing fix pipeline using the local config at [`.github/valkey-daily-bot.yml`](/Users/sarthagg/IdeaProjects/valkey-ci-bot/.github/valkey-daily-bot.yml).
+
+Required GitHub configuration for this repo:
+
+- secret: `AWS_ROLE_ARN`
+- either secret: `VALKEY_GITHUB_TOKEN`
+- or variable: `VALKEY_GITHUB_APP_ID` plus secret: `VALKEY_GITHUB_APP_PRIVATE_KEY`
+
+Manual dispatch defaults to `dry_run=true`. Dry runs do not advance the monitor watermark.
+
 ## PR review bot
 
 The repository also includes a reusable PR reviewer workflow at `.github/workflows/review-pr.yml`.

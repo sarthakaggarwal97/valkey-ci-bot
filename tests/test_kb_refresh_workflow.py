@@ -47,7 +47,7 @@ def test_refresh_workflow_runs_refresh_script() -> None:
         if step["name"] == "Refresh Bedrock knowledge bases"
     )
     run_script = run_step["run"]
-    assert "scripts/bedrock_kb_refresh.py" in run_script
+    assert "-m scripts.bedrock_kb_refresh" in run_script
     assert "--dry-run" in run_script
     assert "--missing-only" in run_script
     assert "--skip-web-sync" in run_script

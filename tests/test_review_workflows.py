@@ -50,6 +50,13 @@ def test_review_workflow_checks_out_bot_repository() -> None:
     assert role_step["with"]["role-to-assume"] == "${{ secrets.AWS_ROLE_ARN }}"
     assert role_step["with"]["aws-region"] == "${{ inputs.aws_region }}"
 
+    review_step = next(
+        step
+        for step in workflow["jobs"]["review"]["steps"]
+        if step["name"] == "Run PR reviewer"
+    )
+    assert "python -m scripts.pr_review_main" in review_step["run"]
+
 
 def test_example_pr_review_caller_passes_bot_checkout_inputs() -> None:
     workflow = _load_yaml(REPO_ROOT / "examples/pr-review-caller-workflow.yml")

@@ -70,7 +70,7 @@ jobs:
         env:
           AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
         run: |
-          python scripts/main.py \
+          python -m scripts.main \
             --repo "${{ github.event.workflow_run.repository.full_name || github.repository }}" \
             --run-id "${{ github.event.workflow_run.id }}" \
             --config "${{ inputs.config_path }}" \
@@ -82,7 +82,7 @@ jobs:
         env:
           AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
         run: |
-          python scripts/main.py \
+          python -m scripts.main \
             --repo "${{ github.repository }}" \
             --config "${{ inputs.config_path }}" \
             --token "${{ github.token }}" \

@@ -50,6 +50,13 @@ def test_analyze_workflow_checks_out_bot_repository() -> None:
     assert role_step["with"]["role-to-assume"] == "${{ secrets.AWS_ROLE_ARN }}"
     assert role_step["with"]["aws-region"] == "${{ inputs.aws_region }}"
 
+    analyze_step = next(
+        step
+        for step in workflow["jobs"]["run-pipeline"]["steps"]
+        if step["name"] == "Run analysis pipeline"
+    )
+    assert "python -m scripts.main" in analyze_step["run"]
+
 
 def test_example_caller_passes_bot_checkout_inputs() -> None:
     workflow = _load_yaml(REPO_ROOT / "examples/caller-workflow.yml")

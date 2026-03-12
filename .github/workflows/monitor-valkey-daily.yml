@@ -1,0 +1,118 @@
+name: Monitor Valkey Daily Failures
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List candidate Daily runs without processing them or advancing state."
+        required: false
+        default: true
+        type: boolean
+      max_runs:
+        description: "Maximum recent Daily runs to inspect."
+        required: false
+        default: "14"
+        type: string
+      verbose:
+        description: "Enable verbose monitor logging."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: monitor-valkey-daily
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      MONITOR_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+      MONITOR_MAX_RUNS: ${{ github.event.inputs.max_runs || '14' }}
+      MONITOR_VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
+    steps:
+      - name: Check out bot repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate target repository authentication inputs
+        if: ${{ secrets.VALKEY_GITHUB_TOKEN == '' && (vars.VALKEY_GITHUB_APP_ID == '' || secrets.VALKEY_GITHUB_APP_PRIVATE_KEY == '') }}
+        run: |
+          echo "Configure either VALKEY_GITHUB_TOKEN or VALKEY_GITHUB_APP_ID plus VALKEY_GITHUB_APP_PRIVATE_KEY." >&2
+          exit 1
+
+      - name: Create target repository GitHub App token
+        id: app-token
+        if: ${{ secrets.VALKEY_GITHUB_TOKEN == '' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.VALKEY_GITHUB_APP_ID }}
+          private-key: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
+          owner: valkey-io
+          repositories: valkey
+          permission-actions: read
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+
+      - name: Select target repository token
+        id: target-token
+        shell: bash
+        run: |
+          if [[ -n "${{ secrets.VALKEY_GITHUB_TOKEN }}" ]]; then
+            echo "token=${{ secrets.VALKEY_GITHUB_TOKEN }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials from OIDC role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: valkey-daily-monitor-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Monitor and process Valkey Daily failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            -m scripts.monitor_workflow_runs
+            --target-repo "valkey-io/valkey"
+            --workflow-file "daily.yml"
+            --config ".github/valkey-daily-bot.yml"
+            --target-token "${{ steps.target-token.outputs.token }}"
+            --state-token "${{ github.token }}"
+            --state-repo "${{ github.repository }}"
+            --max-runs "${MONITOR_MAX_RUNS}"
+            --aws-region "${AWS_REGION}"
+          )
+
+          if [[ "${MONITOR_DRY_RUN}" == "true" ]]; then
+            args+=(--dry-run)
+          fi
+
+          if [[ "${MONITOR_VERBOSE}" == "true" ]]; then
+            args+=(--verbose)
+          fi
+
+          python "${args[@]}"

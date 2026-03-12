@@ -97,9 +97,11 @@ MULTI_FILE_PATCH = """\
 """
 
 
-def _make_mock_repo():
+def _make_mock_repo(full_name: str = "owner/repo", owner_login: str = "owner"):
     """Create a mock GitHub repo with the methods PRManager needs."""
     repo = MagicMock()
+    repo.full_name = full_name
+    repo.owner.login = owner_login
 
     base_ref = MagicMock()
     base_ref.object.sha = "aabbccdd11223344"
@@ -414,6 +416,45 @@ class TestCreatePR:
         assert {
             element._InputGitTreeElement__path for element in tree_elements
         } == {"src/foo.c", "src/bar.c"}
+
+    def test_falls_back_to_fork_when_upstream_write_is_denied(self):
+        upstream_repo = _make_mock_repo(full_name="owner/repo", owner_login="owner")
+        fork_repo = _make_mock_repo(full_name="forker/repo", owner_login="forker")
+        upstream_repo.create_git_ref.side_effect = GithubException(
+            403,
+            {"message": "Resource not accessible by integration"},
+        )
+        upstream_repo.create_fork.return_value = fork_repo
+        mgr, repo, store = _make_pr_manager(repo=upstream_repo)
+        report = _make_failure_report()
+        root_cause = _make_root_cause()
+
+        url = mgr.create_pr(SAMPLE_PATCH, report, root_cause, "unstable")
+
+        assert url == "https://github.com/owner/repo/pull/42"
+        upstream_repo.create_fork.assert_called_once()
+        fork_repo.create_git_ref.assert_called_once()
+        fork_repo.create_git_commit.assert_called_once()
+        upstream_repo.create_pull.assert_called_once()
+        assert upstream_repo.create_pull.call_args.kwargs["head"].startswith("forker:bot/fix/")
+        fp = _compute_fingerprint(report)
+        assert store.entries[fp].pr_url == url
+
+    def test_reuses_existing_open_pr_for_same_head(self):
+        mgr, repo, store = _make_pr_manager()
+        existing_pr = MagicMock()
+        existing_pr.number = 42
+        existing_pr.html_url = "https://github.com/owner/repo/pull/42"
+        repo.get_pulls.return_value = [existing_pr]
+        report = _make_failure_report()
+        root_cause = _make_root_cause()
+
+        url = mgr.create_pr(SAMPLE_PATCH, report, root_cause, "unstable")
+
+        assert url == existing_pr.html_url
+        repo.create_pull.assert_not_called()
+        fp = _compute_fingerprint(report)
+        assert store.entries[fp].pr_url == existing_pr.html_url
 
 
 class TestForkPRSkip:

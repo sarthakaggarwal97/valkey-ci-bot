@@ -71,7 +71,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(scripts/bedrock_kb_refresh.py --region "${AWS_REGION}")
+          args=(-m scripts.bedrock_kb_refresh --region "${AWS_REGION}")
 
           if [[ "${KB_REFRESH_DRY_RUN}" == "true" ]]; then
             args+=(--dry-run)

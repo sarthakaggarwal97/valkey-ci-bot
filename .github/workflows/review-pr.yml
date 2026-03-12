@@ -69,7 +69,7 @@ jobs:
         env:
           AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
         run: |
-          python scripts/pr_review_main.py \
+          python -m scripts.pr_review_main \
             --repo "${{ github.repository }}" \
             --config "${{ inputs.config_path }}" \
             --mode "${{ inputs.mode }}" \

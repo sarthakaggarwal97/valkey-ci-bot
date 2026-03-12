@@ -1,0 +1,79 @@
+bedrock:
+  model_id: "us.anthropic.claude-opus-4-6-v1"
+  max_input_tokens: 100000
+  max_output_tokens: 4096
+
+retrieval:
+  enabled: true
+  code_knowledge_base_id: "OHQMPN9RCG"
+  docs_knowledge_base_id: "NAKLE24DH9"
+  max_results_per_knowledge_base: 3
+  max_chars_per_result: 1200
+  max_total_chars: 5000
+
+limits:
+  max_failures_per_run: 5
+  max_prs_per_day: 3
+  max_open_bot_prs: 2
+
+monitored_workflows:
+  - daily.yml
+
+project:
+  language: "C"
+  build_system: "Make"
+  description: "Valkey is an open-source, high-performance key/value datastore."
+  test_frameworks:
+    - gtest
+    - tcl
+    - sentinel
+    - cluster
+  source_dirs:
+    - src/
+  test_dirs:
+    - tests/
+  test_to_source_patterns:
+    - test_path: "tests/unit/{name}.tcl"
+      source_path: "src/{name}.c"
+    - test_path: "tests/unit/{name}.cc"
+      source_path: "src/{name}.c"
+
+validation_profiles:
+  - job_name_pattern: "^test-ubuntu-jemalloc$|^test-ubuntu-arm$|^test-ubuntu-io-threads$|^test-ubuntu-reclaim-cache$|^reply-schemas-validator$"
+    install_commands:
+      - "sudo apt-get update"
+      - "sudo apt-get install -y pkg-config libgtest-dev libgmock-dev tcl8.6 tclx"
+    build_commands:
+      - "make all-with-unit-tests SERVER_CFLAGS='-Werror'"
+
+  - job_name_pattern: "^test-ubuntu-tls$|^test-ubuntu-tls-io-threads$"
+    install_commands:
+      - "sudo apt-get update"
+      - "sudo apt-get install -y pkg-config libgtest-dev libgmock-dev tcl8.6 tclx libssl-dev"
+    build_commands:
+      - "make BUILD_TLS=yes all-with-unit-tests SERVER_CFLAGS='-Werror'"
+
+  - job_name_pattern: "^test-ubuntu-libc-malloc$"
+    install_commands:
+      - "sudo apt-get update"
+      - "sudo apt-get install -y pkg-config libgtest-dev libgmock-dev tcl8.6 tclx"
+    build_commands:
+      - "make MALLOC=libc all-with-unit-tests SERVER_CFLAGS='-Werror'"
+
+  - job_name_pattern: "^test-sanitizer-address$"
+    install_commands:
+      - "sudo apt-get update"
+      - "sudo apt-get install -y pkg-config libgtest-dev libgmock-dev tcl8.6 tclx"
+    env:
+      SANITIZER: "address"
+    build_commands:
+      - "make SANITIZER=address all-with-unit-tests SERVER_CFLAGS='-Werror'"
+
+  - job_name_pattern: "^test-sanitizer-undefined$"
+    install_commands:
+      - "sudo apt-get update"
+      - "sudo apt-get install -y pkg-config libgtest-dev libgmock-dev tcl8.6 tclx"
+    env:
+      SANITIZER: "undefined"
+    build_commands:
+      - "make SANITIZER=undefined all-with-unit-tests SERVER_CFLAGS='-Werror'"

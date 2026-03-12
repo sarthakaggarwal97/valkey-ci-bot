@@ -14,6 +14,8 @@ from scripts.models import FailureReport, RootCauseReport
 
 if TYPE_CHECKING:
     from github import Github
+    from github.PullRequest import PullRequest
+    from github.Repository import Repository
     from scripts.summary import PRSummaryComment
 
 logger = logging.getLogger(__name__)
@@ -123,6 +125,14 @@ def _build_workflow_run_url(
     return f"https://github.com/{repo_name}"
 
 
+def _is_permission_denied_for_branch_creation(exc: Exception) -> bool:
+    """Return whether branch creation failed due to missing upstream write access."""
+    if not isinstance(exc, GithubException):
+        return False
+    message = str(exc).lower()
+    return exc.status in {403, 404} or "resource not accessible" in message
+
+
 class PRManager:
     """Creates branches, commits patches, and opens pull requests."""
 
@@ -176,19 +186,33 @@ class PRManager:
             # 1. Create branch from the failing commit SHA and verify the target branch exists.
             repo.get_git_ref(f"heads/{target_branch}")
             base_sha = failure_report.commit_sha
-            repo.create_git_ref(
-                ref=f"refs/heads/{branch_name}",
-                sha=base_sha,
-            )
-            logger.info(
-                "Created branch %s from commit %s for base %s",
-                branch_name, base_sha[:12], target_branch,
-            )
+            write_repo = repo
+            pr_head = branch_name
+            try:
+                self._create_branch(write_repo, branch_name, base_sha)
+                logger.info(
+                    "Created branch %s from commit %s for base %s",
+                    branch_name, base_sha[:12], target_branch,
+                )
+            except Exception as exc:
+                if not _is_permission_denied_for_branch_creation(exc):
+                    raise
+                write_repo, pr_head = self._create_fork_branch(
+                    repo,
+                    branch_name,
+                    base_sha,
+                )
+                logger.info(
+                    "Created fallback fork branch %s in %s for base %s",
+                    branch_name,
+                    write_repo.full_name,
+                    target_branch,
+                )
 
             # 2. Apply patch by creating/updating files via the Git Data API
             #    Parse the unified diff to extract file changes and commit them.
             commit_message = _build_commit_message(failure_report, root_cause)
-            self._apply_patch_and_commit(repo, branch_name, base_sha, patch, commit_message)
+            self._apply_patch_and_commit(write_repo, branch_name, base_sha, patch, commit_message)
 
             # 3. Build PR body
             workflow_run_url = _build_workflow_run_url(
@@ -204,12 +228,14 @@ class PRManager:
                 title = f"[bot-fix] Fix failure in {failure_report.job_name}"
 
             # 4. Open PR
-            pr = repo.create_pull(
-                title=title,
-                body=pr_body,
-                head=branch_name,
-                base=target_branch,
-            )
+            pr = self._find_existing_open_pr(repo, pr_head, target_branch)
+            if pr is None:
+                pr = repo.create_pull(
+                    title=title,
+                    body=pr_body,
+                    head=pr_head,
+                    base=target_branch,
+                )
             logger.info("Opened PR #%d: %s", pr.number, pr.html_url)
 
             # 5. Apply bot-fix label (Req 6.5)
@@ -275,6 +301,54 @@ class PRManager:
                 )
             raise RuntimeError(f"pr-creation-failed: {exc}") from exc
 
+    def _create_branch(
+        self,
+        repo: "Repository",
+        branch_name: str,
+        base_sha: str,
+    ) -> None:
+        """Create the working branch when it does not already exist."""
+        try:
+            repo.create_git_ref(
+                ref=f"refs/heads/{branch_name}",
+                sha=base_sha,
+            )
+        except GithubException as exc:
+            if exc.status == 422:
+                return
+            raise
+
+    def _create_fork_branch(
+        self,
+        upstream_repo: "Repository",
+        branch_name: str,
+        base_sha: str,
+    ) -> tuple["Repository", str]:
+        """Create or reuse a writable fork branch and return its PR head spec."""
+        fork_repo = upstream_repo.create_fork()
+        self._create_branch(fork_repo, branch_name, base_sha)
+        owner = getattr(getattr(fork_repo, "owner", None), "login", "")
+        if not owner:
+            raise RuntimeError("fork repo owner could not be determined")
+        return fork_repo, f"{owner}:{branch_name}"
+
+    def _find_existing_open_pr(
+        self,
+        repo: "Repository",
+        pr_head: str,
+        target_branch: str,
+    ) -> "PullRequest | None":
+        """Return an existing open PR for the same head/base pair if present."""
+        head_filter = pr_head
+        if ":" not in head_filter:
+            owner = getattr(getattr(repo, "owner", None), "login", "")
+            if owner:
+                head_filter = f"{owner}:{pr_head}"
+        pulls = repo.get_pulls(state="open", base=target_branch, head=head_filter)
+        for pr in pulls:
+            return pr
+        return None
+
     def post_summary_comment(
         self,
         pr_url: str,
@@ -306,7 +380,7 @@ class PRManager:
 
     def _apply_patch_and_commit(
         self,
-        repo,
+        repo: "Repository",
         branch_name: str,
         base_sha: str,
         patch: str,
