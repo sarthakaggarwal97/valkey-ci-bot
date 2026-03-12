@@ -515,26 +515,26 @@ def _build_user_prompt(
     if context.results:
         parts.append("\n## Structured Results")
         parts.append("```json")
-        parts.append(_truncate(json.dumps(context.results, indent=2), 3500))
+        parts.append(_truncate(json.dumps(context.results, indent=2), 10_000))
         parts.append("```")
 
     if context.scenario_yaml:
         parts.append("\n## Scenario DSL")
         parts.append("```yaml")
-        parts.append(_truncate(context.scenario_yaml, 2000))
+        parts.append(_truncate(context.scenario_yaml, 5000))
         parts.append("```")
 
     if context.node_logs:
         parts.append("\n## Node Log Excerpts")
-        for name, text in list(context.node_logs.items())[:4]:
+        for name, text in list(context.node_logs.items())[:8]:
             parts.append(f"### {name}")
             parts.append("```text")
-            parts.append(_truncate(_strip_ansi(text), 1200))
+            parts.append(_truncate(_strip_ansi(text), 12_000))
             parts.append("```")
     elif context.raw_job_log:
         parts.append("\n## Workflow Log Excerpt")
         parts.append("```text")
-        parts.append(_truncate(_normalize_job_log(context.raw_job_log), 2000))
+        parts.append(_truncate(_normalize_job_log(context.raw_job_log), 20_000))
         parts.append("```")
 
     if retrieved_context:

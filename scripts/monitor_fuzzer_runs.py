@@ -232,6 +232,10 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                 reproduction_hint=analysis.reproduction_hint,
                 issue_url=issue_url,
                 issue_action=issue_action,
+                anomaly_details=[
+                    f"[{a.severity}] {a.title}: {a.evidence}"
+                    for a in analysis.anomalies[:10]
+                ] if analysis.anomalies else None,
             )
         )
         new_last_seen = max(new_last_seen, run.id)

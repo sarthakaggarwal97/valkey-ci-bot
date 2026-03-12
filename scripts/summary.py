@@ -349,6 +349,7 @@ class FuzzerRunSummaryRow:
     reproduction_hint: str | None = None
     issue_url: str | None = None
     issue_action: str | None = None
+    anomaly_details: list[str] | None = None
 
 
 @dataclass
@@ -394,7 +395,12 @@ class FuzzerWorkflowSummary:
         for row in self.rows:
             lines.append("")
             lines.append(f"### Run {row.run_id}")
+            lines.append(f"- Status: **{row.overall_status}** ({row.conclusion})")
             lines.append(f"- Summary: {row.summary}")
+            if row.anomaly_details:
+                lines.append("- Anomalies:")
+                for detail in row.anomaly_details:
+                    lines.append(f"  - {detail}")
             if row.reproduction_hint:
                 lines.append(f"- Reproduction: `{row.reproduction_hint}`")
             if row.issue_url:

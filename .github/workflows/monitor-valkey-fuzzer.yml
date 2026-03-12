@@ -2,7 +2,7 @@ name: Monitor Valkey Fuzzer Runs
 
 on:
   schedule:
-    - cron: "41 * * * *"
+    - cron: "41 */4 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -13,7 +13,7 @@ on:
       max_runs:
         description: "Maximum recent fuzzer runs to inspect."
         required: false
-        default: "6"
+        default: "1"
         type: string
       verbose:
         description: "Enable verbose monitor logging."
@@ -38,7 +38,7 @@ jobs:
     env:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       MONITOR_DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || github.event.inputs.dry_run || 'true' }}
-      MONITOR_MAX_RUNS: ${{ github.event.inputs.max_runs || '6' }}
+      MONITOR_MAX_RUNS: ${{ github.event.inputs.max_runs || '1' }}
       MONITOR_VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
       VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
       VALKEY_GITHUB_APP_ID: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
