@@ -48,6 +48,7 @@ def test_fuzzer_monitor_workflow_uses_oidc_and_app_token_support() -> None:
     assert app_token_step["with"]["repositories"] == "valkey-fuzzer"
     assert app_token_step["with"]["permission-actions"] == "read"
     assert app_token_step["with"]["permission-contents"] == "read"
+    assert app_token_step["with"]["permission-issues"] == "write"
     assert configure_step["uses"] == "aws-actions/configure-aws-credentials@v5"
 
 

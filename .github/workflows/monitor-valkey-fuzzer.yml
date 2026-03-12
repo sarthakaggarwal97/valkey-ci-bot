@@ -76,6 +76,7 @@ jobs:
           repositories: valkey-fuzzer
           permission-actions: read
           permission-contents: read
+          permission-issues: write
 
       - name: Select target repository token
         id: target-token

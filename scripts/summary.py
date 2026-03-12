@@ -347,6 +347,8 @@ class FuzzerRunSummaryRow:
     normal_signal_count: int
     summary: str
     reproduction_hint: str | None = None
+    issue_url: str | None = None
+    issue_action: str | None = None
 
 
 @dataclass
@@ -367,12 +369,16 @@ class FuzzerWorkflowSummary:
             return "\n".join(lines)
 
         lines.append(
-            "| Run | Conclusion | Status | Scenario | Seed | Anomalies | Normal Signals |"
+            "| Run | Conclusion | Status | Scenario | Seed | Anomalies | Normal Signals | Issue |"
         )
         lines.append(
-            "|-----|------------|--------|----------|------|-----------|----------------|"
+            "|-----|------------|--------|----------|------|-----------|----------------|-------|"
         )
         for row in self.rows:
+            issue_cell = ""
+            if row.issue_url:
+                label = row.issue_action or "issue"
+                issue_cell = f"[{label}]({row.issue_url})"
             lines.append(
                 "| "
                 f"[{row.run_id}]({row.run_url}) | "
@@ -381,7 +387,8 @@ class FuzzerWorkflowSummary:
                 f"{row.scenario_id or 'unknown'} | "
                 f"{row.seed or 'unknown'} | "
                 f"{row.anomaly_count} | "
-                f"{row.normal_signal_count} |"
+                f"{row.normal_signal_count} | "
+                f"{issue_cell} |"
             )
 
         for row in self.rows:
@@ -390,6 +397,10 @@ class FuzzerWorkflowSummary:
             lines.append(f"- Summary: {row.summary}")
             if row.reproduction_hint:
                 lines.append(f"- Reproduction: `{row.reproduction_hint}`")
+            if row.issue_url:
+                lines.append(
+                    f"- Issue: [{row.issue_action or 'issue'}]({row.issue_url})"
+                )
         lines.append("")
         return "\n".join(lines)
 

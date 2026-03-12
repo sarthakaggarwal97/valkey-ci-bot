@@ -36,6 +36,7 @@ def _run(run_id: int, conclusion: str) -> MagicMock:
 
 
 @patch("scripts.monitor_fuzzer_runs._make_bedrock_client")
+@patch("scripts.monitor_fuzzer_runs.FuzzerIssuePublisher")
 @patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
 @patch("scripts.monitor_fuzzer_runs.Github")
 @patch("scripts.monitor_fuzzer_runs.MonitorStateStore")
@@ -43,6 +44,7 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
     mock_state_store_cls,
     mock_github_cls,
     mock_analyzer_cls,
+    mock_issue_publisher_cls,
     mock_make_bedrock_client,
 ) -> None:
     state_store = mock_state_store_cls.return_value
@@ -54,6 +56,10 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
     repo.get_workflow.return_value = workflow
     mock_github_cls.return_value.get_repo.return_value = repo
     mock_make_bedrock_client.return_value = (MagicMock(), None)
+    mock_issue_publisher_cls.return_value.upsert_issue.return_value = (
+        "created",
+        "https://github.com/valkey-io/valkey-fuzzer/issues/1",
+    )
 
     analyzer = mock_analyzer_cls.return_value
     analyzer.analyze_workflow_run.side_effect = [
@@ -88,7 +94,10 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
     assert [item["run_id"] for item in result["runs"]] == [101, 102]
     assert [item["action"] for item in result["runs"]] == ["analyzed", "analyzed"]
     assert analyzer.analyze_workflow_run.call_count == 2
+    assert "issue_action" not in result["runs"][0]
+    assert result["runs"][1]["issue_action"] == "created"
     assert result["has_anomalies"] is True
+    mock_issue_publisher_cls.return_value.upsert_issue.assert_called_once()
     state_store.mark_seen.assert_called_once_with(
         "valkey-io/valkey-fuzzer:fuzzer-run.yml:schedule",
         last_seen_run_id=102,
@@ -100,6 +109,7 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
 
 
 @patch("scripts.monitor_fuzzer_runs._make_bedrock_client")
+@patch("scripts.monitor_fuzzer_runs.FuzzerIssuePublisher")
 @patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
 @patch("scripts.monitor_fuzzer_runs.Github")
 @patch("scripts.monitor_fuzzer_runs.MonitorStateStore")
@@ -107,6 +117,7 @@ def test_monitor_dry_run_does_not_analyze_or_advance_state(
     mock_state_store_cls,
     mock_github_cls,
     mock_analyzer_cls,
+    mock_issue_publisher_cls,
     mock_make_bedrock_client,
 ) -> None:
     state_store = mock_state_store_cls.return_value
@@ -123,5 +134,6 @@ def test_monitor_dry_run_does_not_analyze_or_advance_state(
 
     assert result["runs"][0]["action"] == "would-analyze"
     mock_analyzer_cls.return_value.analyze_workflow_run.assert_not_called()
+    mock_issue_publisher_cls.return_value.upsert_issue.assert_not_called()
     state_store.mark_seen.assert_not_called()
     state_store.save.assert_not_called()

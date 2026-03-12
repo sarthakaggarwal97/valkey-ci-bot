@@ -20,6 +20,7 @@ from github import Auth, Github
 from scripts.bedrock_client import BedrockClient
 from scripts.bedrock_retriever import BedrockRetriever
 from scripts.config import BotConfig, load_config
+from scripts.fuzzer_issue_publisher import FuzzerIssuePublisher
 from scripts.fuzzer_run_analyzer import FuzzerRunAnalyzer
 from scripts.models import fuzzer_run_analysis_to_dict
 from scripts.monitor_state_store import MonitorStateStore
@@ -146,6 +147,7 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
         retriever=retriever,
         retrieval_config=config.retrieval,
     )
+    issue_publisher = FuzzerIssuePublisher(target_gh)
     monitor_key = _build_monitor_key(args.target_repo, args.workflow_file, args.event)
     state_store = MonitorStateStore(state_gh, args.state_repo)
     state_store.load()
@@ -194,6 +196,24 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
 
         run_result["action"] = "analyzed"
         run_result["analysis"] = fuzzer_run_analysis_to_dict(analysis)
+        issue_action: str | None = None
+        issue_url: str | None = None
+        if analysis.overall_status == "anomalous":
+            try:
+                issue_action, issue_url = issue_publisher.upsert_issue(
+                    args.target_repo,
+                    analysis,
+                )
+                run_result["issue_action"] = issue_action
+                run_result["issue_url"] = issue_url
+            except Exception as exc:
+                logger.warning(
+                    "Failed to create/update anomaly issue for run %s: %s",
+                    run.id,
+                    exc,
+                )
+                run_result["issue_action"] = "issue-error"
+                run_result["issue_error"] = str(exc)
         run_results.append(run_result)
         result["has_anomalies"] = (
             bool(result["has_anomalies"]) or analysis.overall_status != "normal"
@@ -210,6 +230,8 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                 normal_signal_count=len(analysis.normal_signals),
                 summary=analysis.summary,
                 reproduction_hint=analysis.reproduction_hint,
+                issue_url=issue_url,
+                issue_action=issue_action,
             )
         )
         new_last_seen = max(new_last_seen, run.id)

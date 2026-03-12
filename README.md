@@ -80,6 +80,7 @@ The fuzzer monitor is analysis-only:
 
 - it does not open pull requests
 - it distinguishes expected chaos behavior from anomalous behavior
+- it automatically creates or updates a GitHub issue in `valkey-io/valkey-fuzzer` when a run is classified as `anomalous`
 - it writes the analysis to the workflow summary
 - it uploads the raw `fuzzer-monitor-result.json` payload as a workflow artifact
 
