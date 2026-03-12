@@ -7,6 +7,7 @@ Model selection is configured in YAML, not in secrets:
 
 - `examples/config.yml` controls the CI failure bot model through `bedrock.model_id`
 - `examples/pr-review-config.yml` controls the PR reviewer model through `reviewer.models.*`
+- both configs also support optional `retrieval` settings for explicit Bedrock Knowledge Base lookup
 
 AWS authentication is wired for GitHub Actions OIDC by default:
 
@@ -23,7 +24,7 @@ Local development:
 
 The repository also includes a reusable PR reviewer workflow at `.github/workflows/review-pr.yml`.
 
-It reviews pull requests through the GitHub API without checking out PR head code in the privileged workflow. The reviewer can:
+It reviews pull requests through the GitHub API without checking out PR head code in the privileged workflow. The reviewer uses direct Bedrock runtime calls, and can optionally inject explicit Bedrock KB retrieval into prompts. The reviewer can:
 
 - post or update a PR summary comment
 - generate optional release notes

@@ -12,6 +12,7 @@ import boto3
 from github import Github
 
 from scripts.bedrock_client import BedrockClient, BedrockError
+from scripts.bedrock_retriever import BedrockRetriever
 from scripts.config import BotConfig, ProjectContext, load_config, load_config_text
 from scripts.failure_detector import FailureDetector
 from scripts.failure_store import FailureStore
@@ -576,8 +577,19 @@ def run_pipeline(
     if aws_region:
         bedrock_kwargs["client"] = boto3.client("bedrock-runtime", region_name=aws_region)
     bedrock_client = BedrockClient(config, rate_limiter=rate_limiter, **bedrock_kwargs)
+    retriever = None
+    retrieval_enabled = config.retrieval.enabled and any([
+        config.retrieval.code_knowledge_base_id,
+        config.retrieval.docs_knowledge_base_id,
+    ])
+    if retrieval_enabled:
+        retriever = BedrockRetriever(
+            boto3.client("bedrock-agent-runtime", region_name=aws_region),
+        )
     root_cause_analyzer = RootCauseAnalyzer(bedrock_client, gh)
+    root_cause_analyzer.with_retriever(retriever, config.retrieval)
     fix_generator = FixGenerator(bedrock_client, config)
+    fix_generator.with_retriever(retriever, config.retrieval)
 
     # Build validation runner and PR manager (allow injection for testing)
     if validation_runner is None:

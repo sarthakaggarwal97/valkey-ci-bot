@@ -36,6 +36,18 @@ class ValidationProfile:
 
 
 @dataclass
+class RetrievalConfig:
+    """Optional Bedrock Knowledge Base retrieval settings."""
+
+    enabled: bool = False
+    code_knowledge_base_id: str = ""
+    docs_knowledge_base_id: str = ""
+    max_results_per_knowledge_base: int = 3
+    max_chars_per_result: int = 1200
+    max_total_chars: int = 5000
+
+
+@dataclass
 class BotConfig:
     """Top-level bot configuration with sensible defaults."""
     bedrock_model_id: str = "us.anthropic.claude-opus-4-6-v1"
@@ -55,6 +67,7 @@ class BotConfig:
     daily_token_budget: int = 1_000_000
     project: ProjectContext = field(default_factory=ProjectContext)
     validation_profiles: list[ValidationProfile] = field(default_factory=list)
+    retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
 
 
 @dataclass
@@ -90,6 +103,7 @@ class ReviewerConfig:
     max_output_tokens: int = 4096
     project: ProjectContext = field(default_factory=ProjectContext)
     models: ReviewerModels = field(default_factory=ReviewerModels)
+    retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
 
     @property
     def bedrock_model_id(self) -> str:
@@ -173,6 +187,34 @@ def _merge_reviewer_models(data: dict) -> ReviewerModels:
     )
 
 
+def _merge_retrieval(data: dict) -> RetrievalConfig:
+    """Build RetrievalConfig from a raw dict."""
+    defaults = RetrievalConfig()
+    return RetrievalConfig(
+        enabled=_coerce_bool(data.get("enabled"), defaults.enabled),
+        code_knowledge_base_id=_coerce_str(
+            data.get("code_knowledge_base_id"),
+            defaults.code_knowledge_base_id,
+        ),
+        docs_knowledge_base_id=_coerce_str(
+            data.get("docs_knowledge_base_id"),
+            defaults.docs_knowledge_base_id,
+        ),
+        max_results_per_knowledge_base=_coerce_int(
+            data.get("max_results_per_knowledge_base"),
+            defaults.max_results_per_knowledge_base,
+        ),
+        max_chars_per_result=_coerce_int(
+            data.get("max_chars_per_result"),
+            defaults.max_chars_per_result,
+        ),
+        max_total_chars=_coerce_int(
+            data.get("max_total_chars"),
+            defaults.max_total_chars,
+        ),
+    )
+
+
 def _coerce_str(value: Any, default: str) -> str:
     """Return a string value or the provided default."""
     return value if isinstance(value, str) else default
@@ -249,6 +291,7 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
     bedrock = raw.get("bedrock", {}) if isinstance(raw.get("bedrock"), dict) else {}
     limits = raw.get("limits", {}) if isinstance(raw.get("limits"), dict) else {}
     fix_gen = raw.get("fix_generation", {}) if isinstance(raw.get("fix_generation"), dict) else {}
+    retrieval = raw.get("retrieval", {}) if isinstance(raw.get("retrieval"), dict) else {}
 
     return BotConfig(
         bedrock_model_id=_coerce_str(
@@ -302,6 +345,7 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
         ),
         project=_merge_project(raw.get("project", {})) if isinstance(raw.get("project"), dict) else defaults.project,
         validation_profiles=_merge_validation_profiles(raw.get("validation_profiles", [])) if isinstance(raw.get("validation_profiles"), list) else defaults.validation_profiles,
+        retrieval=_merge_retrieval(retrieval),
     )
 
 
@@ -355,6 +399,7 @@ def load_reviewer_config_data(raw: Any, *, source: str = "<memory>") -> Reviewer
     defaults = ReviewerConfig()
     models = root.get("models", {}) if isinstance(root.get("models"), dict) else {}
     project = root.get("project", {}) if isinstance(root.get("project"), dict) else {}
+    retrieval = root.get("retrieval", {}) if isinstance(root.get("retrieval"), dict) else {}
 
     return ReviewerConfig(
         enabled=_coerce_bool(root.get("enabled"), defaults.enabled),
@@ -434,6 +479,7 @@ def load_reviewer_config_data(raw: Any, *, source: str = "<memory>") -> Reviewer
         ),
         project=_merge_project(project) if project else defaults.project,
         models=_merge_reviewer_models(models),
+        retrieval=_merge_retrieval(retrieval),
     )
 
 

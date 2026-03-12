@@ -14,6 +14,7 @@ import boto3
 from github import Github
 
 from scripts.bedrock_client import BedrockClient, BedrockError, PromptClient
+from scripts.bedrock_retriever import BedrockRetriever
 from scripts.code_reviewer import CodeReviewer
 from scripts.comment_publisher import CommentPublisher
 from scripts.config import ReviewerConfig, load_reviewer_config, load_reviewer_config_text
@@ -184,6 +185,15 @@ def run(argv: list[str] | None = None) -> int:
         client=bedrock_runtime,
         rate_limiter=rate_limiter,
     )
+    retriever = None
+    retrieval_enabled = config.retrieval.enabled and any([
+        config.retrieval.code_knowledge_base_id,
+        config.retrieval.docs_knowledge_base_id,
+    ])
+    if retrieval_enabled:
+        retriever = BedrockRetriever(
+            boto3.client("bedrock-agent-runtime", region_name=args.aws_region or None),
+        )
     fetcher = PRContextFetcher(gh, github_retries=config.github_retries)
     publisher = CommentPublisher(gh, github_retries=config.github_retries)
     state_store = ReviewStateStore(gh, repo_name)
@@ -231,7 +241,11 @@ def run(argv: list[str] | None = None) -> int:
                 fetcher.hydrate_contents(pr_context, relevant_paths),
                 relevant_paths,
             )
-            reply = ReviewChat(bedrock_client).reply(
+            reply = ReviewChat(
+                bedrock_client,
+                retriever=retriever,
+                retrieval_config=config.retrieval,
+            ).reply(
                 chat_context,
                 thread,
                 event.body or "",
@@ -250,7 +264,11 @@ def run(argv: list[str] | None = None) -> int:
 
         summary_comment_id = current_state.summary_comment_id if current_state else None
         try:
-            summary_result = PRSummarizer(bedrock_client).summarize(
+            summary_result = PRSummarizer(
+                bedrock_client,
+                retriever=retriever,
+                retrieval_config=config.retrieval,
+            ).summarize(
                 review_context,
                 config,
             )
@@ -278,7 +296,11 @@ def run(argv: list[str] | None = None) -> int:
                     review_context,
                     current_state.last_reviewed_head_sha if current_state else None,
                 )
-                reviewer = CodeReviewer(bedrock_client)
+                reviewer = CodeReviewer(
+                    bedrock_client,
+                    retriever=retriever,
+                    retrieval_config=config.retrieval,
+                )
                 if reviewer.classify_simple_change(diff_scope.files) and not config.review_simple_changes:
                     detail = "simple-change" if diff_scope.files else "no-new-files"
                     summary.add_result("review", "skipped", detail)

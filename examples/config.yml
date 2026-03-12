@@ -20,6 +20,19 @@ bedrock:
   max_output_tokens: 4096
 
 # ---------------------------------------------------------------------------
+# Optional Bedrock Knowledge Base retrieval
+# ---------------------------------------------------------------------------
+retrieval:
+  # Enable repo-wide retrieval to supplement the exact logs/files already sent
+  # to the model. This is useful for subsystem and docs context.
+  enabled: false
+  code_knowledge_base_id: "YOUR_CODE_KB_ID"
+  docs_knowledge_base_id: "YOUR_DOCS_KB_ID"
+  max_results_per_knowledge_base: 3
+  max_chars_per_result: 1200
+  max_total_chars: 5000
+
+# ---------------------------------------------------------------------------
 # Safety limits
 # ---------------------------------------------------------------------------
 limits:

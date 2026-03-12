@@ -19,6 +19,13 @@ reviewer:
   bedrock_timeout_ms: 120000
   bedrock_concurrency_limit: 2
   github_concurrency_limit: 6
+  retrieval:
+    enabled: false
+    code_knowledge_base_id: "YOUR_CODE_KB_ID"
+    docs_knowledge_base_id: "YOUR_DOCS_KB_ID"
+    max_results_per_knowledge_base: 3
+    max_chars_per_result: 1200
+    max_total_chars: 5000
   path_filters:
     - "!dist/**"
     - "!vendor/**"

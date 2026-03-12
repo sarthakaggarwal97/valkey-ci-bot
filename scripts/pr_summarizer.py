@@ -6,7 +6,8 @@ import json
 from typing import Any
 
 from scripts.bedrock_client import PromptClient
-from scripts.config import ReviewerConfig
+from scripts.bedrock_retriever import BedrockRetriever
+from scripts.config import RetrievalConfig, ReviewerConfig
 from scripts.models import PullRequestContext, SummaryResult
 
 _SYSTEM_PROMPT = """You summarize pull requests for maintainers.
@@ -50,11 +51,26 @@ def _render_file_context(pr: PullRequestContext, *, max_chars: int = 12_000) -> 
     return "\n\n".join(chunks)
 
 
+def _build_retrieval_query(pr: PullRequestContext) -> str:
+    """Build a retrieval query for PR summarization."""
+    lines = [pr.title, pr.body]
+    lines.extend(changed_file.path for changed_file in pr.files)
+    return "\n".join(filter(None, lines))
+
+
 class PRSummarizer:
     """Generates PR walkthroughs and optional release notes."""
 
-    def __init__(self, bedrock_client: PromptClient) -> None:
+    def __init__(
+        self,
+        bedrock_client: PromptClient,
+        *,
+        retriever: BedrockRetriever | None = None,
+        retrieval_config: RetrievalConfig | None = None,
+    ) -> None:
         self._bedrock = bedrock_client
+        self._retriever = retriever
+        self._retrieval_config = retrieval_config or RetrievalConfig()
 
     def summarize(
         self,
@@ -67,6 +83,13 @@ class PRSummarizer:
             if config.disable_release_notes
             else "Include concise release notes for end-user-visible changes."
         )
+        retrieved_context = ""
+        if self._retriever is not None:
+            retrieved_context = self._retriever.render_for_prompt(
+                _build_retrieval_query(pr),
+                self._retrieval_config,
+                section_title="Retrieved Valkey Context",
+            )
         user_prompt = f"""Summarize this pull request.
 
 Title: {pr.title}
@@ -75,6 +98,8 @@ Description:
 
 Changed files:
 {_render_file_context(pr)}
+
+{retrieved_context}
 
 Return JSON with this schema:
 {{

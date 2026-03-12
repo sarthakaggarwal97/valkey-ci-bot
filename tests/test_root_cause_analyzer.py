@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, PropertyMock
 import pytest
 
 from scripts.bedrock_client import BedrockClient, BedrockError
-from scripts.config import BotConfig, ProjectContext
+from scripts.config import BotConfig, ProjectContext, RetrievalConfig
 from scripts.models import FailureReport, ParsedFailure, RootCauseReport
 from scripts.root_cause_analyzer import (
     RootCauseAnalyzer,
@@ -293,6 +293,12 @@ class TestBuildUserPrompt:
         prompt = _build_user_prompt(report, {})
         assert "some raw log output" in prompt
 
+    def test_includes_retrieved_context(self):
+        report = _make_failure_report()
+        prompt = _build_user_prompt(report, {}, "## Retrieved Valkey Context\nsnippet")
+        assert "Retrieved Valkey Context" in prompt
+        assert "snippet" in prompt
+
 
 # ---------------------------------------------------------------------------
 # Unit tests: RootCauseAnalyzer.identify_relevant_files
@@ -421,6 +427,26 @@ class TestAnalyze:
         call_args = mock_bedrock.invoke.call_args
         user_prompt = call_args[0][1]
         assert "test code" in user_prompt
+
+    def test_includes_retrieved_context_when_retriever_is_configured(self):
+        response = _make_bedrock_response()
+        analyzer, mock_bedrock, _ = _make_analyzer(bedrock_response=response)
+        mock_retriever = MagicMock()
+        mock_retriever.render_for_prompt.return_value = (
+            "## Retrieved Valkey Context\nsentinel failover notes"
+        )
+        analyzer.with_retriever(
+            mock_retriever,
+            RetrievalConfig(enabled=True, code_knowledge_base_id="CODEKB"),
+        )
+        report = _make_failure_report(raw_log_excerpt="failover timeout")
+        report._repo_name = "valkey-io/valkey"
+
+        analyzer.analyze(report, ProjectContext())
+
+        user_prompt = mock_bedrock.invoke.call_args[0][1]
+        assert "Retrieved Valkey Context" in user_prompt
+        assert "sentinel failover notes" in user_prompt
 
     def test_analysis_failed_report_structure(self):
         """Verify the analysis-failed report has the expected shape."""

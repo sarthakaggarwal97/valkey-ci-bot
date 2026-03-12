@@ -83,6 +83,14 @@ full_config_strategy = st.fixed_dictionaries({
         "max_validation_retries": st.integers(min_value=0, max_value=10),
     }),
     "monitored_workflows": st.lists(workflow_file, min_size=1, max_size=6),
+    "retrieval": st.fixed_dictionaries({
+        "enabled": st.booleans(),
+        "code_knowledge_base_id": safe_word,
+        "docs_knowledge_base_id": safe_word,
+        "max_results_per_knowledge_base": positive_int,
+        "max_chars_per_result": positive_int,
+        "max_total_chars": positive_int,
+    }),
     "project": project_context_strategy,
     "validation_profiles": st.lists(validation_profile_strategy, min_size=0, max_size=4),
 })
@@ -126,6 +134,14 @@ def test_config_round_trip_all_fields(config_data: dict) -> None:
         # Monitored workflows
         assert cfg.monitored_workflows == config_data["monitored_workflows"]
 
+        # Retrieval section
+        assert cfg.retrieval.enabled == config_data["retrieval"]["enabled"]
+        assert cfg.retrieval.code_knowledge_base_id == config_data["retrieval"]["code_knowledge_base_id"]
+        assert cfg.retrieval.docs_knowledge_base_id == config_data["retrieval"]["docs_knowledge_base_id"]
+        assert cfg.retrieval.max_results_per_knowledge_base == config_data["retrieval"]["max_results_per_knowledge_base"]
+        assert cfg.retrieval.max_chars_per_result == config_data["retrieval"]["max_chars_per_result"]
+        assert cfg.retrieval.max_total_chars == config_data["retrieval"]["max_total_chars"]
+
         # Project context
         proj = config_data["project"]
         assert cfg.project.language == proj["language"]
@@ -168,6 +184,7 @@ def test_missing_config_returns_defaults() -> None:
     assert cfg.max_failures_per_run == defaults.max_failures_per_run
     assert cfg.max_open_bot_prs == defaults.max_open_bot_prs
     assert cfg.daily_token_budget == defaults.daily_token_budget
+    assert cfg.retrieval == defaults.retrieval
 
     # Project defaults
     default_proj = ProjectContext()
@@ -269,6 +286,7 @@ def test_invalid_yaml_returns_full_defaults(invalid_content: str) -> None:
         assert cfg.max_failures_per_run == defaults.max_failures_per_run
         assert cfg.max_open_bot_prs == defaults.max_open_bot_prs
         assert cfg.daily_token_budget == defaults.daily_token_budget
+        assert cfg.retrieval == defaults.retrieval
         assert cfg.project.language == ProjectContext().language
         assert cfg.project.build_system == ProjectContext().build_system
         assert cfg.validation_profiles == []
@@ -308,6 +326,7 @@ def test_unrecognized_fields_ignored_with_defaults(extra_fields: dict) -> None:
         assert cfg.max_failures_per_run == defaults.max_failures_per_run
         assert cfg.max_open_bot_prs == defaults.max_open_bot_prs
         assert cfg.daily_token_budget == defaults.daily_token_budget
+        assert cfg.retrieval == defaults.retrieval
         assert cfg.project.language == ProjectContext().language
         assert cfg.validation_profiles == []
     finally:
@@ -390,6 +409,11 @@ def test_invalid_scalar_types_fall_back_to_defaults() -> None:
             "confidence_threshold": ["high"],
         },
         "monitored_workflows": "ci.yml",
+        "retrieval": {
+            "enabled": "true",
+            "code_knowledge_base_id": ["bad"],
+            "max_results_per_knowledge_base": "3",
+        },
         "project": {
             "test_frameworks": "gtest",
             "source_dirs": "src/",
@@ -420,6 +444,7 @@ def test_invalid_scalar_types_fall_back_to_defaults() -> None:
         assert cfg.max_patch_files == defaults.max_patch_files
         assert cfg.confidence_threshold == defaults.confidence_threshold
         assert cfg.monitored_workflows == defaults.monitored_workflows
+        assert cfg.retrieval == defaults.retrieval
         assert cfg.project.test_frameworks == defaults.project.test_frameworks
         assert cfg.project.source_dirs == defaults.project.source_dirs
         assert cfg.project.test_to_source_patterns == defaults.project.test_to_source_patterns

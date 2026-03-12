@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from scripts.code_reviewer import CodeReviewer
-from scripts.config import ReviewerConfig
+from scripts.config import RetrievalConfig, ReviewerConfig
 from scripts.models import (
     ChangedFile,
     DiffScope,
@@ -134,3 +134,79 @@ def test_code_reviewer_raises_on_unparseable_response() -> None:
 
     with pytest.raises(ValueError, match="Unparseable review response"):
         reviewer.review(_context(), scope, config)
+
+
+def test_pr_summarizer_includes_retrieved_context() -> None:
+    bedrock = MagicMock()
+    bedrock.invoke.return_value = """
+    {
+      "walkthrough": "Updates failover handling.",
+      "file_groups_markdown": "- Core: failover logic",
+      "release_notes": "Improves failover handling."
+    }
+    """
+    retriever = MagicMock()
+    retriever.render_for_prompt.return_value = "## Retrieved Valkey Context\nsentinel docs"
+    summarizer = PRSummarizer(
+        bedrock,
+        retriever=retriever,
+        retrieval_config=RetrievalConfig(enabled=True, docs_knowledge_base_id="DOCSKB"),
+    )
+
+    summarizer.summarize(_context(), ReviewerConfig())
+
+    user_prompt = bedrock.invoke.call_args[0][1]
+    assert "Retrieved Valkey Context" in user_prompt
+    assert "sentinel docs" in user_prompt
+
+
+def test_code_reviewer_includes_retrieved_context() -> None:
+    bedrock = MagicMock()
+    bedrock.invoke.return_value = '{"findings":[]}'
+    retriever = MagicMock()
+    retriever.render_for_prompt.return_value = "## Retrieved Valkey Context\nserver notes"
+    reviewer = CodeReviewer(
+        bedrock,
+        retriever=retriever,
+        retrieval_config=RetrievalConfig(enabled=True, code_knowledge_base_id="CODEKB"),
+    )
+    scope = DiffScope(
+        base_sha="base123",
+        head_sha="head456",
+        files=_context().files,
+        incremental=False,
+    )
+
+    reviewer.review(_context(), scope, ReviewerConfig(max_review_comments=5))
+
+    user_prompt = bedrock.invoke.call_args[0][1]
+    assert "Retrieved Valkey Context" in user_prompt
+    assert "server notes" in user_prompt
+
+
+def test_review_chat_includes_retrieved_context() -> None:
+    bedrock = MagicMock()
+    bedrock.invoke.return_value = "Answer"
+    retriever = MagicMock()
+    retriever.render_for_prompt.return_value = "## Retrieved Valkey Context\nthread notes"
+    chat = ReviewChat(
+        bedrock,
+        retriever=retriever,
+        retrieval_config=RetrievalConfig(enabled=True, docs_knowledge_base_id="DOCSKB"),
+    )
+
+    chat.reply(
+        _context(),
+        ReviewThread(
+            comment_id=1,
+            path="src/failover.c",
+            line=14,
+            conversation=["Can you suggest a test?"],
+        ),
+        "/reviewbot can you suggest a test?",
+        ReviewerConfig(),
+    )
+
+    user_prompt = bedrock.invoke.call_args[0][1]
+    assert "Retrieved Valkey Context" in user_prompt
+    assert "thread notes" in user_prompt

@@ -13,7 +13,8 @@ import re
 from typing import Any
 
 from scripts.bedrock_client import BedrockClient, BedrockError
-from scripts.config import ProjectContext
+from scripts.bedrock_retriever import BedrockRetriever
+from scripts.config import ProjectContext, RetrievalConfig
 from scripts.models import FailureReport, ParsedFailure, RootCauseReport
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,7 @@ def _apply_test_to_source_patterns(
 def _build_user_prompt(
     failure_report: FailureReport,
     source_contents: dict[str, str],
+    retrieved_context: str = "",
 ) -> str:
     """Build the user prompt sent to Bedrock for root cause analysis."""
     parts: list[str] = []
@@ -161,7 +163,29 @@ def _build_user_prompt(
         for path, content in source_contents.items():
             parts.append(f"\n### {path}\n```\n{content}\n```")
 
+    if retrieved_context:
+        parts.append(f"\n{retrieved_context}")
+
     return "\n".join(parts)
+
+
+def _build_retrieval_query(failure_report: FailureReport) -> str:
+    """Build a retrieval query for repo-wide Valkey context."""
+    lines = [
+        failure_report.workflow_name,
+        failure_report.job_name,
+        failure_report.raw_log_excerpt or "",
+    ]
+    for parsed_failure in failure_report.parsed_failures:
+        lines.extend([
+            parsed_failure.failure_identifier,
+            parsed_failure.test_name or "",
+            parsed_failure.file_path,
+            parsed_failure.error_message,
+            parsed_failure.assertion_details or "",
+            parsed_failure.stack_trace or "",
+        ])
+    return "\n".join(filter(None, lines))
 
 
 def _parse_bedrock_response(raw: str) -> RootCauseReport:
@@ -203,6 +227,18 @@ class RootCauseAnalyzer:
     def __init__(self, bedrock_client: BedrockClient, github_client: Any):
         self._bedrock = bedrock_client
         self._github = github_client
+        self._retriever: BedrockRetriever | None = None
+        self._retrieval_config = RetrievalConfig()
+
+    def with_retriever(
+        self,
+        retriever: BedrockRetriever | None,
+        retrieval_config: RetrievalConfig | None,
+    ) -> RootCauseAnalyzer:
+        """Attach optional retrieval support to the analyzer."""
+        self._retriever = retriever
+        self._retrieval_config = retrieval_config or RetrievalConfig()
+        return self
 
     # ------------------------------------------------------------------
     # Public API
@@ -250,7 +286,19 @@ class RootCauseAnalyzer:
         all_flaky_indicators = list(dict.fromkeys(all_flaky_indicators))
 
         # 4. Build prompt and call Bedrock
-        user_prompt = _build_user_prompt(failure_report, source_contents)
+        retrieved_context = ""
+        if self._retriever is not None:
+            retrieved_context = self._retriever.render_for_prompt(
+                _build_retrieval_query(failure_report),
+                self._retrieval_config,
+                section_title="Retrieved Valkey Context",
+            )
+
+        user_prompt = _build_user_prompt(
+            failure_report,
+            source_contents,
+            retrieved_context,
+        )
 
         try:
             raw_response = self._bedrock.invoke(_SYSTEM_PROMPT, user_prompt)

@@ -7,7 +7,8 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from scripts.bedrock_client import PromptClient
-from scripts.config import ReviewerConfig
+from scripts.bedrock_retriever import BedrockRetriever
+from scripts.config import RetrievalConfig, ReviewerConfig
 from scripts.models import ChangedFile, DiffScope, PullRequestContext, ReviewFinding
 
 _SYSTEM_PROMPT = """You are a strict code reviewer.
@@ -84,11 +85,30 @@ def _serialize_scope(scope: DiffScope, *, max_chars: int = 18_000) -> str:
     return "\n\n".join(chunks)
 
 
+def _build_retrieval_query(pr: PullRequestContext, diff_scope: DiffScope) -> str:
+    """Build a retrieval query for detailed review context."""
+    lines = [pr.title, pr.body]
+    for changed_file in diff_scope.files:
+        lines.extend([
+            changed_file.path,
+            changed_file.patch or "",
+        ])
+    return "\n".join(filter(None, lines))
+
+
 class CodeReviewer:
     """Generates focused review findings for risky code changes."""
 
-    def __init__(self, bedrock_client: PromptClient) -> None:
+    def __init__(
+        self,
+        bedrock_client: PromptClient,
+        *,
+        retriever: BedrockRetriever | None = None,
+        retrieval_config: RetrievalConfig | None = None,
+    ) -> None:
         self._bedrock = bedrock_client
+        self._retriever = retriever
+        self._retrieval_config = retrieval_config or RetrievalConfig()
 
     def classify_simple_change(self, files: list[ChangedFile]) -> bool:
         """Return ``True`` for changes that are likely trivial."""
@@ -111,6 +131,13 @@ class CodeReviewer:
         if not diff_scope.files:
             return []
 
+        retrieved_context = ""
+        if self._retriever is not None:
+            retrieved_context = self._retriever.render_for_prompt(
+                _build_retrieval_query(pr, diff_scope),
+                self._retrieval_config,
+                section_title="Retrieved Valkey Context",
+            )
         user_prompt = f"""Review this pull request and return only actionable findings.
 
 PR title: {pr.title}
@@ -119,6 +146,8 @@ PR description:
 
 Review scope:
 {_serialize_scope(diff_scope)}
+
+{retrieved_context}
 
 Return JSON in one of these shapes:
 [

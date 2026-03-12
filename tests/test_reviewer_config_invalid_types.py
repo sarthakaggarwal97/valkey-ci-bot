@@ -17,6 +17,11 @@ def test_reviewer_config_invalid_types_fall_back_to_defaults() -> None:
                 "daily_token_budget": "1000000",
                 "bedrock_retries": "5",
                 "github_retries": "5",
+                "retrieval": {
+                    "enabled": "true",
+                    "code_knowledge_base_id": ["bad"],
+                    "max_results_per_knowledge_base": "2",
+                },
                 "models": {
                     "light_model_id": ["bad"],
                     "temperature": "0.2",
@@ -38,6 +43,7 @@ def test_reviewer_config_invalid_types_fall_back_to_defaults() -> None:
     assert config.daily_token_budget == defaults.daily_token_budget
     assert config.bedrock_retries == defaults.bedrock_retries
     assert config.github_retries == defaults.github_retries
+    assert config.retrieval == defaults.retrieval
     assert config.models.light_model_id == defaults.models.light_model_id
     assert config.models.temperature == defaults.models.temperature
     assert config.project.test_frameworks == defaults.project.test_frameworks

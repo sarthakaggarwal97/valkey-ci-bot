@@ -14,7 +14,8 @@ import tempfile
 from pathlib import Path
 
 from scripts.bedrock_client import BedrockClient, BedrockError
-from scripts.config import BotConfig
+from scripts.bedrock_retriever import BedrockRetriever
+from scripts.config import BotConfig, RetrievalConfig
 from scripts.models import RootCauseReport
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ def _meets_confidence_threshold(confidence: str, threshold: str) -> bool:
 def _build_user_prompt(
     root_cause: RootCauseReport,
     source_files: dict[str, str],
+    retrieved_context: str = "",
     apply_error: str | None = None,
     validation_error: str | None = None,
 ) -> str:
@@ -80,6 +82,9 @@ def _build_user_prompt(
         for path, content in source_files.items():
             parts.append(f"\n### {path}\n```\n{content}\n```")
 
+    if retrieved_context:
+        parts.append(f"\n{retrieved_context}")
+
     if apply_error:
         parts.append("\n## Previous Attempt Failed")
         parts.append(
@@ -97,6 +102,20 @@ def _build_user_prompt(
         parts.append(f"Validation output:\n{validation_error}")
 
     return "\n".join(parts)
+
+
+def _build_retrieval_query(
+    root_cause: RootCauseReport,
+    source_files: dict[str, str],
+) -> str:
+    """Build a retrieval query for broader fix-generation context."""
+    lines = [
+        root_cause.description,
+        root_cause.rationale,
+        " ".join(root_cause.files_to_change),
+        " ".join(source_files.keys()),
+    ]
+    return "\n".join(filter(None, lines))
 
 
 def _validate_patch_applies(diff: str, source_files: dict[str, str]) -> tuple[bool, str]:
@@ -148,6 +167,18 @@ class FixGenerator:
         self._bedrock = bedrock_client
         self._config = config
         self.last_attempt_count = 0
+        self._retriever: BedrockRetriever | None = None
+        self._retrieval_config = RetrievalConfig()
+
+    def with_retriever(
+        self,
+        retriever: BedrockRetriever | None,
+        retrieval_config: RetrievalConfig | None,
+    ) -> FixGenerator:
+        """Attach optional retrieval support to fix generation."""
+        self._retriever = retriever
+        self._retrieval_config = retrieval_config or RetrievalConfig()
+        return self
 
     def generate(
         self,
@@ -185,12 +216,19 @@ class FixGenerator:
         )
         max_attempts = self._config.max_retries_fix + 1  # initial + retries
         apply_error: str | None = None
+        retrieved_context = ""
+        if self._retriever is not None:
+            retrieved_context = self._retriever.render_for_prompt(
+                _build_retrieval_query(root_cause, source_files),
+                self._retrieval_config,
+                section_title="Retrieved Valkey Context",
+            )
 
         for attempt in range(max_attempts):
             self.last_attempt_count = attempt + 1
             # Build prompt (include apply error feedback on retries)
             user_prompt = _build_user_prompt(
-                root_cause, source_files, apply_error,
+                root_cause, source_files, retrieved_context, apply_error,
                 validation_error=validation_error if attempt == 0 else None,
             )
 

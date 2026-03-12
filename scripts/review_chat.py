@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from scripts.bedrock_client import PromptClient
-from scripts.config import ReviewerConfig
+from scripts.bedrock_retriever import BedrockRetriever
+from scripts.config import RetrievalConfig, ReviewerConfig
 from scripts.models import PullRequestContext, ReviewThread
 
 _SYSTEM_PROMPT = """You answer follow-up PR review questions.
@@ -16,11 +17,30 @@ def _normalize_prompt(prompt: str) -> str:
     return cleaned or "Please answer the latest pull request review question."
 
 
+def _build_retrieval_query(
+    pr: PullRequestContext,
+    thread: ReviewThread,
+    prompt: str,
+) -> str:
+    """Build a retrieval query for review-chat context."""
+    lines = [pr.title, pr.body, thread.path or "", prompt]
+    lines.extend(thread.conversation)
+    return "\n".join(filter(None, lines))
+
+
 class ReviewChat:
     """Generates review-chat replies from diff and thread context."""
 
-    def __init__(self, bedrock_client: PromptClient) -> None:
+    def __init__(
+        self,
+        bedrock_client: PromptClient,
+        *,
+        retriever: BedrockRetriever | None = None,
+        retrieval_config: RetrievalConfig | None = None,
+    ) -> None:
         self._bedrock = bedrock_client
+        self._retriever = retriever
+        self._retrieval_config = retrieval_config or RetrievalConfig()
 
     def reply(
         self,
@@ -36,6 +56,13 @@ class ReviewChat:
                 if changed_file.path == thread.path:
                     file_context = f"Path: {changed_file.path}\nPatch:\n{changed_file.patch or ''}\n\nContents:\n{changed_file.contents or ''}"
                     break
+        retrieved_context = ""
+        if self._retriever is not None:
+            retrieved_context = self._retriever.render_for_prompt(
+                _build_retrieval_query(pr, thread, prompt),
+                self._retrieval_config,
+                section_title="Retrieved Valkey Context",
+            )
 
         user_prompt = f"""Answer this pull request review question.
 
@@ -51,6 +78,8 @@ Question:
 
 Relevant file context:
 {file_context}
+
+{retrieved_context}
 """
         return self._bedrock.invoke(
             _SYSTEM_PROMPT,

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from scripts.config import ReviewerConfig
+from scripts.config import RetrievalConfig, ReviewerConfig
 from scripts.models import (
     ChangedFile,
     PullRequestContext,
@@ -170,6 +170,159 @@ def test_run_review_mode_posts_summary_and_review(
     publisher.upsert_summary.assert_called_once()
     publisher.publish_review_comments.assert_called_once()
     state_store.save.assert_called_once()
+
+
+@patch("scripts.pr_review_main.boto3.client")
+@patch("scripts.pr_review_main.Github")
+@patch("scripts.pr_review_main.RateLimiter")
+@patch("scripts.pr_review_main.ReviewStateStore")
+@patch("scripts.pr_review_main.CommentPublisher")
+@patch("scripts.pr_review_main.PRContextFetcher")
+def test_run_review_mode_wires_retriever_when_enabled(
+    mock_fetcher_cls,
+    mock_publisher_cls,
+    mock_state_store_cls,
+    mock_rate_limiter_cls,
+    mock_github_cls,
+    mock_boto_client,
+    tmp_path,
+) -> None:
+    payload = {
+        "repository": {"full_name": "owner/repo"},
+        "sender": {"login": "alice"},
+        "pull_request": {"number": 11, "body": "Details"},
+    }
+    event_path = _event_file(tmp_path, payload)
+
+    fetcher = mock_fetcher_cls.return_value
+    fetcher.fetch.return_value = _context()
+    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
+    fetcher.build_diff_scope.return_value = MagicMock(files=_context().files)
+
+    mock_publisher_cls.return_value.upsert_summary.return_value = 99
+    mock_publisher_cls.return_value.publish_review_comments.return_value = []
+    mock_state_store_cls.return_value.load.return_value = None
+    mock_rate_limiter_cls.return_value.load.return_value = None
+    mock_rate_limiter_cls.return_value.save.return_value = None
+    mock_github_cls.return_value = MagicMock()
+    mock_boto_client.side_effect = [MagicMock(), MagicMock()]
+
+    config = ReviewerConfig()
+    config.retrieval = RetrievalConfig(enabled=True, code_knowledge_base_id="CODEKB")
+
+    with patch(
+        "scripts.pr_review_main._load_runtime_reviewer_config",
+        return_value=config,
+    ), patch(
+        "scripts.pr_review_main.PRSummarizer"
+    ) as mock_summarizer_cls, patch(
+        "scripts.pr_review_main.CodeReviewer"
+    ) as mock_reviewer_cls:
+        mock_summarizer_cls.return_value.summarize.return_value = SummaryResult(
+            walkthrough="Summary",
+            file_groups_markdown="- Core",
+            release_notes="Release note",
+        )
+        mock_reviewer_cls.return_value.classify_simple_change.return_value = False
+        mock_reviewer_cls.return_value.review.return_value = []
+
+        exit_code = run(
+            [
+                "--repo",
+                "owner/repo",
+                "--mode",
+                "review",
+                "--token",
+                "token",
+                "--event-name",
+                "pull_request_target",
+                "--event-path",
+                str(event_path),
+                "--aws-region",
+                "us-east-1",
+            ]
+        )
+
+    assert exit_code == 0
+    mock_boto_client.assert_any_call("bedrock-runtime", region_name="us-east-1")
+    mock_boto_client.assert_any_call("bedrock-agent-runtime", region_name="us-east-1")
+    assert mock_summarizer_cls.call_args.kwargs["retriever"] is not None
+    assert mock_reviewer_cls.call_args.kwargs["retriever"] is not None
+
+
+@patch("scripts.pr_review_main.boto3.client")
+@patch("scripts.pr_review_main.Github")
+@patch("scripts.pr_review_main.RateLimiter")
+@patch("scripts.pr_review_main.ReviewStateStore")
+@patch("scripts.pr_review_main.CommentPublisher")
+@patch("scripts.pr_review_main.PRContextFetcher")
+def test_run_review_mode_skips_retriever_client_without_kb_ids(
+    mock_fetcher_cls,
+    mock_publisher_cls,
+    mock_state_store_cls,
+    mock_rate_limiter_cls,
+    mock_github_cls,
+    mock_boto_client,
+    tmp_path,
+) -> None:
+    payload = {
+        "repository": {"full_name": "owner/repo"},
+        "sender": {"login": "alice"},
+        "pull_request": {"number": 11, "body": "Details"},
+    }
+    event_path = _event_file(tmp_path, payload)
+
+    fetcher = mock_fetcher_cls.return_value
+    fetcher.fetch.return_value = _context()
+    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
+    fetcher.build_diff_scope.return_value = MagicMock(files=_context().files)
+
+    mock_publisher_cls.return_value.upsert_summary.return_value = 99
+    mock_publisher_cls.return_value.publish_review_comments.return_value = []
+    mock_state_store_cls.return_value.load.return_value = None
+    mock_rate_limiter_cls.return_value.load.return_value = None
+    mock_rate_limiter_cls.return_value.save.return_value = None
+    mock_github_cls.return_value = MagicMock()
+    mock_boto_client.return_value = MagicMock()
+
+    config = ReviewerConfig()
+    config.retrieval.enabled = True
+
+    with patch(
+        "scripts.pr_review_main._load_runtime_reviewer_config",
+        return_value=config,
+    ), patch(
+        "scripts.pr_review_main.PRSummarizer"
+    ) as mock_summarizer_cls, patch(
+        "scripts.pr_review_main.CodeReviewer"
+    ) as mock_reviewer_cls:
+        mock_summarizer_cls.return_value.summarize.return_value = SummaryResult(
+            walkthrough="Summary",
+            file_groups_markdown="- Core",
+            release_notes="Release note",
+        )
+        mock_reviewer_cls.return_value.classify_simple_change.return_value = False
+        mock_reviewer_cls.return_value.review.return_value = []
+
+        exit_code = run(
+            [
+                "--repo",
+                "owner/repo",
+                "--mode",
+                "review",
+                "--token",
+                "token",
+                "--event-name",
+                "pull_request_target",
+                "--event-path",
+                str(event_path),
+                "--aws-region",
+                "us-east-1",
+            ]
+        )
+
+    assert exit_code == 0
+    mock_boto_client.assert_called_once_with("bedrock-runtime", region_name="us-east-1")
 
 
 @patch("scripts.pr_review_main.boto3.client")

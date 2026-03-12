@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from scripts.bedrock_client import BedrockError
-from scripts.config import BotConfig
+from scripts.config import BotConfig, RetrievalConfig
 from scripts.fix_generator import (
     FixGenerator,
     _build_user_prompt,
@@ -150,6 +150,12 @@ class TestBuildUserPrompt:
         prompt = _build_user_prompt(rc, {})
         assert "Previous Attempt Failed" not in prompt
 
+    def test_includes_retrieved_context(self):
+        rc = _make_root_cause()
+        prompt = _build_user_prompt(rc, {}, "## Retrieved Valkey Context\nreplication notes")
+        assert "Retrieved Valkey Context" in prompt
+        assert "replication notes" in prompt
+
 
 # ---------------------------------------------------------------------------
 # FixGenerator.generate — confidence gating
@@ -274,6 +280,25 @@ class TestPatchValidation:
         second_call_args = mock_bedrock.invoke.call_args_list[1]
         user_prompt = second_call_args[0][1]
         assert "corrupt patch" in user_prompt
+
+    def test_includes_retrieved_context_when_retriever_is_configured(self):
+        gen, mock_bedrock = _make_generator()
+        mock_retriever = MagicMock()
+        mock_retriever.render_for_prompt.return_value = (
+            "## Retrieved Valkey Context\nreplication subsystem notes"
+        )
+        gen.with_retriever(
+            mock_retriever,
+            RetrievalConfig(enabled=True, code_knowledge_base_id="CODEKB"),
+        )
+        rc = _make_root_cause()
+
+        with patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
+            gen.generate(rc, {"src/server.c": "void handle_request(void) {}"})
+
+        user_prompt = mock_bedrock.invoke.call_args[0][1]
+        assert "Retrieved Valkey Context" in user_prompt
+        assert "replication subsystem notes" in user_prompt
 
 
 # ---------------------------------------------------------------------------
