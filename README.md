@@ -20,6 +20,22 @@ Local development:
 - fill in your own `GITHUB_TOKEN`, `AWS_REGION`, and `AWS_PROFILE`
 - source `.env.local` manually before running scripts
 
+## Retrieval KB Refresh
+
+The retrieval-backed setup also includes [`.github/workflows/refresh-bedrock-kb.yml`](/Users/sarthagg/IdeaProjects/valkey-ci-bot/.github/workflows/refresh-bedrock-kb.yml).
+
+It refreshes the existing Valkey code and docs knowledge bases used by retrieval:
+
+- code KB: `OHQMPN9RCG`
+- docs KB: `NAKLE24DH9`
+
+The workflow is OIDC-only and uses:
+
+- GitHub secret: `AWS_ROLE_ARN`
+- GitHub variable: `AWS_REGION`
+
+Manual runs default to `dry_run=true` so you can verify corpus prep and data-source discovery before mutating Bedrock.
+
 ## PR review bot
 
 The repository also includes a reusable PR reviewer workflow at `.github/workflows/review-pr.yml`.

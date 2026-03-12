@@ -1,0 +1,92 @@
+name: Refresh Bedrock KB
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Prepare corpus and resolve data sources without mutating Bedrock."
+        required: false
+        default: true
+        type: boolean
+      missing_only:
+        description: "Only ingest files not already present in the code KB."
+        required: false
+        default: false
+        type: boolean
+      skip_web_sync:
+        description: "Skip the Valkey docs web crawl for this run."
+        required: false
+        default: false
+        type: boolean
+      verbose:
+        description: "Enable verbose refresh logging."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: refresh-bedrock-kb
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      KB_REFRESH_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+      KB_REFRESH_MISSING_ONLY: ${{ github.event.inputs.missing_only || 'false' }}
+      KB_REFRESH_SKIP_WEB_SYNC: ${{ github.event.inputs.skip_web_sync || 'false' }}
+      KB_REFRESH_VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
+    steps:
+      - name: Check out bot repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Configure AWS credentials from OIDC role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: valkey-kb-refresh-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Refresh Bedrock knowledge bases
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(scripts/bedrock_kb_refresh.py --region "${AWS_REGION}")
+
+          if [[ "${KB_REFRESH_DRY_RUN}" == "true" ]]; then
+            args+=(--dry-run)
+          fi
+
+          if [[ "${KB_REFRESH_MISSING_ONLY}" == "true" ]]; then
+            args+=(--missing-only)
+          fi
+
+          if [[ "${KB_REFRESH_SKIP_WEB_SYNC}" == "true" ]]; then
+            args+=(--skip-web-sync)
+          fi
+
+          if [[ "${KB_REFRESH_VERBOSE}" == "true" ]]; then
+            args+=(--verbose)
+          fi
+
+          python "${args[@]}"
