@@ -68,6 +68,57 @@ class RootCauseReport:
     rationale: str
     is_flaky: bool
     flakiness_indicators: list[str] | None = None
+    failure_streak: int = 0
+    total_failure_observations: int = 0
+    last_known_good_sha: str | None = None
+    first_bad_sha: str | None = None
+
+
+@dataclass
+class FailureObservation:
+    """One pass/fail observation for a stable failure identity."""
+
+    outcome: str  # "pass" or "fail"
+    observed_at: str
+    commit_sha: str
+    workflow_run_id: int | None
+    workflow_name: str
+    workflow_file: str
+    job_name: str
+    matrix_params: dict[str, str]
+    failure_identifier: str
+    test_name: str | None = None
+    error_signature: str = ""
+    file_path: str = ""
+    fingerprint: str | None = None
+
+
+@dataclass
+class FailureHistoryEntry:
+    """Observation timeline for a stable workflow/job/test identity."""
+
+    key: str
+    workflow_file: str
+    job_name: str
+    matrix_params: dict[str, str]
+    failure_identifier: str
+    test_name: str | None
+    observations: list[FailureObservation] = field(default_factory=list)
+
+
+@dataclass
+class FailureHistorySummary:
+    """Derived summary for recent pass/fail observations."""
+
+    key: str
+    total_observations: int
+    failure_count: int
+    pass_count: int
+    consecutive_failures: int
+    last_outcome: str
+    latest_failure_sha: str | None
+    last_known_good_sha: str | None
+    first_bad_sha: str | None
 
 
 @dataclass
@@ -228,6 +279,10 @@ def root_cause_report_from_dict(data: dict) -> RootCauseReport:
         rationale=str(data.get("rationale", "")),
         is_flaky=bool(data.get("is_flaky", False)),
         flakiness_indicators=data.get("flakiness_indicators"),
+        failure_streak=int(data.get("failure_streak", 0)),
+        total_failure_observations=int(data.get("total_failure_observations", 0)),
+        last_known_good_sha=data.get("last_known_good_sha"),
+        first_bad_sha=data.get("first_bad_sha"),
     )
 
 

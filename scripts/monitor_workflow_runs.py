@@ -15,7 +15,9 @@ if __package__ in {None, ""}:
 
 from github import Auth, Github
 
-from scripts.config import BotConfig
+from scripts.config import BotConfig, load_config
+from scripts.failure_detector import FailureDetector
+from scripts.failure_store import FailureStore
 from scripts.main import run_pipeline
 from scripts.rate_limiter import RateLimiter
 from scripts.monitor_state_store import MonitorStateStore
@@ -110,15 +112,66 @@ def _fetch_recent_completed_runs(args: MonitorArgs, last_seen_run_id: int) -> li
     return fresh_runs
 
 
+def _load_local_bot_config(config_path: str) -> BotConfig:
+    """Load local bot config when present, else fall back to defaults."""
+    path = Path(config_path)
+    if not path.exists():
+        return BotConfig()
+    return load_config(path)
+
+
+def _record_successful_job_observations(
+    *,
+    target_gh: Github,
+    state_gh: Github,
+    target_repo: str,
+    state_repo: str,
+    workflow_run_id: int,
+    workflow_name: str,
+    workflow_file: str,
+    commit_sha: str,
+    max_history_entries: int,
+) -> None:
+    """Persist inferred pass observations for successful jobs in a run."""
+    repo = target_gh.get_repo(target_repo)
+    workflow_run = repo.get_workflow_run(workflow_run_id)
+    store = FailureStore(
+        target_gh,
+        target_repo,
+        state_github_client=state_gh,
+        state_repo_full_name=state_repo,
+    )
+    store.load()
+    changed = False
+    for job in workflow_run.jobs():
+        if job.conclusion != "success":
+            continue
+        store.record_success_observation(
+            workflow_name=workflow_name,
+            workflow_file=workflow_file,
+            job_name=job.name or "",
+            matrix_params=FailureDetector.extract_matrix_params(job.name or ""),
+            commit_sha=commit_sha,
+            workflow_run_id=workflow_run_id,
+            max_entries=max_history_entries,
+        )
+        changed = True
+    if changed:
+        store.save()
+
+
 def monitor(args: MonitorArgs) -> dict[str, object]:
     """Monitor new workflow runs and process newly failed ones."""
+    target_gh = Github(auth=Auth.Token(args.target_token))
+    state_gh = Github(auth=Auth.Token(args.state_token))
+    config = _load_local_bot_config(args.config_path)
     monitor_key = _build_monitor_key(
         args.target_repo,
         args.workflow_file,
         args.event,
     )
     state_store = MonitorStateStore(
-        Github(auth=Auth.Token(args.state_token)),
+        state_gh,
         args.state_repo,
     )
     state_store.load()
@@ -149,6 +202,18 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
             }
 
             if run.conclusion != "failure":
+                if not args.dry_run:
+                    _record_successful_job_observations(
+                        target_gh=target_gh,
+                        state_gh=state_gh,
+                        target_repo=args.target_repo,
+                        state_repo=args.state_repo,
+                        workflow_run_id=run.id,
+                        workflow_name=getattr(run, "name", "") or "",
+                        workflow_file=args.workflow_file,
+                        commit_sha=run.head_sha,
+                        max_history_entries=max(1, config.max_history_entries_per_test),
+                    )
                 run_result["action"] = "skip-non-failure"
                 run_results.append(run_result)
                 new_last_seen = max(new_last_seen, run.id)
@@ -158,6 +223,18 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                 run_result["action"] = "would-process-failure"
                 run_results.append(run_result)
                 continue
+
+            _record_successful_job_observations(
+                target_gh=target_gh,
+                state_gh=state_gh,
+                target_repo=args.target_repo,
+                state_repo=args.state_repo,
+                workflow_run_id=run.id,
+                workflow_name=getattr(run, "name", "") or "",
+                workflow_file=args.workflow_file,
+                commit_sha=run.head_sha,
+                max_history_entries=max(1, config.max_history_entries_per_test),
+            )
 
             try:
                 reports = run_pipeline(
@@ -184,7 +261,7 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
     result["new_last_seen_run_id"] = new_last_seen
     queue_state = RateLimiter(
         BotConfig(),
-        state_github_client=Github(auth=Auth.Token(args.state_token)),
+        state_github_client=state_gh,
         state_repo_full_name=args.state_repo,
     )
     queue_state.load()

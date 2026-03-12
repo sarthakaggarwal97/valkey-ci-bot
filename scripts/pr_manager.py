@@ -98,6 +98,39 @@ def _build_pr_body(
     # Confidence level
     lines.append(f"## Confidence: {root_cause.confidence}\n")
 
+    total_failures = (
+        root_cause.total_failure_observations
+        if isinstance(root_cause.total_failure_observations, int)
+        else 0
+    )
+    failure_streak = (
+        root_cause.failure_streak
+        if isinstance(root_cause.failure_streak, int)
+        else 0
+    )
+    last_known_good_sha = (
+        root_cause.last_known_good_sha
+        if isinstance(root_cause.last_known_good_sha, str)
+        else None
+    )
+    first_bad_sha = (
+        root_cause.first_bad_sha
+        if isinstance(root_cause.first_bad_sha, str)
+        else None
+    )
+
+    if total_failures > 0 or failure_streak > 0 or last_known_good_sha or first_bad_sha:
+        lines.append("## Failure History\n")
+        if total_failures > 0:
+            lines.append(f"- Observed failures: {total_failures}")
+        if failure_streak > 0:
+            lines.append(f"- Consecutive failing runs: {failure_streak}")
+        if last_known_good_sha:
+            lines.append(f"- Last known good commit: `{last_known_good_sha}`")
+        if first_bad_sha:
+            lines.append(f"- First bad commit: `{first_bad_sha}`")
+        lines.append("")
+
     # AI disclaimer
     lines.append(
         "---\n"

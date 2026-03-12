@@ -40,7 +40,7 @@ Manual runs default to `dry_run=true` so you can verify corpus prep and data-sou
 
 This repo also includes a centralized monitor workflow at [`.github/workflows/monitor-valkey-daily.yml`](/Users/sarthagg/IdeaProjects/valkey-ci-bot/.github/workflows/monitor-valkey-daily.yml).
 
-It runs from this repo, watches new scheduled `Daily` runs in `valkey-io/valkey`, analyzes new failures, validates candidate fixes, and queues approved-ready patches using the local config at [`.github/valkey-daily-bot.yml`](/Users/sarthagg/IdeaProjects/valkey-ci-bot/.github/valkey-daily-bot.yml).
+It runs from this repo, watches new scheduled `Daily` runs in `valkey-io/valkey`, analyzes new failures, records per-job pass/fail history, validates candidate fixes, and queues approved-ready patches using the local config at [`.github/valkey-daily-bot.yml`](/Users/sarthagg/IdeaProjects/valkey-ci-bot/.github/valkey-daily-bot.yml).
 
 Required GitHub configuration for this repo:
 
@@ -50,10 +50,17 @@ Required GitHub configuration for this repo:
 
 The workflow has two stages:
 
-- `monitor`: runs automatically on schedule, analyzes failures, and queues validated fixes in this bot repo
+- `monitor`: runs automatically on schedule, analyzes failures, applies history-based queue gating, and queues validated fixes in this bot repo
 - `create-approved-prs`: runs only after approval on the protected environment `valkey-pr-approval`
 
 No PR is opened against `valkey-io/valkey` until that environment approval is granted.
+
+Approval context is written into the workflow summary so you can review:
+
+- the root-cause rationale
+- files the bot wants to change
+- observed failure streak
+- last known good commit and first bad commit when history exists
 
 Manual dispatch still defaults to `dry_run=true` so you can inspect candidate runs without advancing state or queueing fixes. When you want a real automated pass, dispatch with `dry_run=false`; the workflow will still stop at the approval gate before opening any PRs.
 

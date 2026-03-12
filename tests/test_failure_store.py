@@ -141,6 +141,84 @@ def test_record_queued_pr_persists_payload() -> None:
     assert entry.queued_pr_payload["patch"] == "diff"
 
 
+def test_records_history_and_summarizes_failure_streak() -> None:
+    store = FailureStore()
+    report = FailureReport(
+        workflow_name="Daily",
+        workflow_file="daily.yml",
+        job_name="test-ubuntu-jemalloc",
+        matrix_params={"param_0": "ubuntu"},
+        commit_sha="badbadbad123",
+        failure_source="trusted",
+        repo_full_name="valkey-io/valkey",
+        workflow_run_id=10,
+        target_branch="unstable",
+        parsed_failures=[],
+        is_unparseable=True,
+        raw_log_excerpt="boom",
+    )
+
+    store.record_failure_observation(report, fingerprint="fp1", max_entries=10)
+    store.record_success_observation(
+        workflow_name="Daily",
+        workflow_file="daily.yml",
+        job_name="test-ubuntu-jemalloc",
+        matrix_params={"param_0": "ubuntu"},
+        commit_sha="goodgood123",
+        workflow_run_id=11,
+        max_entries=10,
+    )
+    report.commit_sha = "worsebad456"
+    report.workflow_run_id = 12
+    store.record_failure_observation(report, fingerprint="fp2", max_entries=10)
+
+    summary = store.summarize_history(
+        "daily.yml",
+        "test-ubuntu-jemalloc",
+        {"param_0": "ubuntu"},
+        "test-ubuntu-jemalloc",
+    )
+
+    assert summary is not None
+    assert summary.failure_count == 2
+    assert summary.pass_count == 1
+    assert summary.consecutive_failures == 1
+    assert summary.last_known_good_sha == "goodgood123"
+    assert summary.first_bad_sha == "worsebad456"
+
+
+def test_success_observation_matches_existing_failure_identity() -> None:
+    store = FailureStore()
+    report = FailureReport(
+        workflow_name="Daily",
+        workflow_file="daily.yml",
+        job_name="test-ubuntu-jemalloc",
+        matrix_params={"param_0": "ubuntu"},
+        commit_sha="badsha",
+        failure_source="trusted",
+        repo_full_name="valkey-io/valkey",
+        workflow_run_id=10,
+        target_branch="unstable",
+        parsed_failures=[],
+        is_unparseable=True,
+        raw_log_excerpt="boom",
+    )
+    store.record_failure_observation(report, fingerprint="fp1", max_entries=5)
+
+    store.record_success_observation(
+        workflow_name="Daily",
+        workflow_file="daily.yml",
+        job_name="test-ubuntu-jemalloc",
+        matrix_params={"param_0": "ubuntu"},
+        commit_sha="goodsha",
+        workflow_run_id=11,
+        max_entries=5,
+    )
+
+    history_entry = next(iter(store.history.values()))
+    assert [obs.outcome for obs in history_entry.observations] == ["fail", "pass"]
+
+
 def test_save_creates_bot_data_branch_when_missing() -> None:
     repo = MagicMock()
     repo.default_branch = "main"

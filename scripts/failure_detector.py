@@ -60,12 +60,7 @@ class FailureDetector:
                 logger.info("Skipping infrastructure failure: %s", job.name)
                 continue
 
-            # Extract matrix params from job name (e.g., "test (ubuntu, tls)")
-            matrix_params: dict[str, str] = {}
-            match = re.search(r"\((.+)\)", job.name or "")
-            if match:
-                for i, part in enumerate(match.group(1).split(",")):
-                    matrix_params[f"param_{i}"] = part.strip()
+            matrix_params = self.extract_matrix_params(job.name or "")
 
             # Find the failed step name
             step_name: str | None = None
@@ -93,6 +88,16 @@ class FailureDetector:
     def is_infrastructure_failure(text: str) -> bool:
         """Return True if the text matches known infrastructure error patterns."""
         return any(p.search(text) for p in _INFRA_PATTERNS)
+
+    @staticmethod
+    def extract_matrix_params(job_name: str) -> dict[str, str]:
+        """Extract matrix params from a GitHub Actions job name."""
+        matrix_params: dict[str, str] = {}
+        match = re.search(r"\((.+)\)", job_name)
+        if match:
+            for index, part in enumerate(match.group(1).split(",")):
+                matrix_params[f"param_{index}"] = part.strip()
+        return matrix_params
 
     @staticmethod
     def classify_trust(workflow_run: WorkflowRun, consumer_repo: str) -> str:

@@ -25,6 +25,7 @@ from scripts.log_retriever import LogRetriever
 from scripts.models import (
     FailedJob,
     FailureReport,
+    FailureHistorySummary,
     RootCauseReport,
     ValidationResult,
     WorkflowRun,
@@ -38,7 +39,7 @@ from scripts.parsers.tcl_parser import TclTestParser
 from scripts.pr_manager import PRManager
 from scripts.rate_limiter import RateLimiter
 from scripts.root_cause_analyzer import RootCauseAnalyzer
-from scripts.summary import PRSummaryComment, WorkflowSummary
+from scripts.summary import ApprovalCandidate, ApprovalSummary, PRSummaryComment, WorkflowSummary
 from scripts.validation_runner import ValidationRunner
 
 logger = logging.getLogger(__name__)
@@ -189,6 +190,74 @@ def _build_pr_summary_comment(
         + pr_creation_duration
     )
     return comment
+
+
+def _build_workflow_run_url(report: FailureReport) -> str:
+    """Return the best available workflow-run URL for a failure report."""
+    repo_name = report.repo_full_name
+    if report.workflow_run_id is not None and repo_name:
+        return f"https://github.com/{repo_name}/actions/runs/{report.workflow_run_id}"
+    if report.commit_sha and repo_name:
+        return f"https://github.com/{repo_name}/commit/{report.commit_sha}"
+    return f"https://github.com/{repo_name}" if repo_name else ""
+
+
+def _is_single_run_candidate(
+    report: FailureReport,
+    root_cause: RootCauseReport,
+) -> bool:
+    """Return whether one strong signal is enough to queue or create a fix."""
+    if report.is_unparseable or root_cause.is_flaky or root_cause.confidence != "high":
+        return False
+    parser_types = {
+        parsed_failure.parser_type
+        for parsed_failure in report.parsed_failures
+    }
+    return bool(parser_types) and parser_types <= {"build"}
+
+
+def _apply_history_summary(
+    root_cause: RootCauseReport,
+    history_summary: FailureHistorySummary | None,
+) -> None:
+    """Copy derived failure-history metadata onto the root cause report."""
+    if history_summary is None:
+        return
+    streak = history_summary.consecutive_failures
+    failures = history_summary.failure_count
+    root_cause.failure_streak = streak if isinstance(streak, int) else 0
+    root_cause.total_failure_observations = failures if isinstance(failures, int) else 0
+    root_cause.last_known_good_sha = (
+        history_summary.last_known_good_sha
+        if isinstance(history_summary.last_known_good_sha, str)
+        else None
+    )
+    root_cause.first_bad_sha = (
+        history_summary.first_bad_sha
+        if isinstance(history_summary.first_bad_sha, str)
+        else None
+    )
+
+
+def _should_queue_validated_fix(
+    report: FailureReport,
+    root_cause: RootCauseReport,
+    history_summary: FailureHistorySummary | None,
+    config: BotConfig,
+) -> tuple[bool, str]:
+    """Decide whether a validated fix has enough evidence for queueing."""
+    if _is_single_run_candidate(report, root_cause):
+        return True, "high-confidence-build-failure"
+
+    streak = (
+        history_summary.consecutive_failures
+        if history_summary and isinstance(history_summary.consecutive_failures, int)
+        else 0
+    )
+    if streak >= max(1, config.min_failure_streak_before_queue):
+        return True, "history-threshold-met"
+
+    return False, "insufficient-history"
 
 
 def _fix_retry_count(fix_generator: FixGenerator) -> int:
@@ -641,6 +710,7 @@ def run_pipeline(
 
     # Workflow summary collector
     summary = WorkflowSummary(mode="analyze")
+    approval_summary = ApprovalSummary()
 
     # Enforce max_failures_per_run with alphabetical ordering
     failed_jobs.sort(key=lambda j: j.name)
@@ -684,6 +754,13 @@ def run_pipeline(
                 continue
 
             reports.append(report)
+            fingerprint = _get_report_fingerprint(report, failure_store)
+            if fingerprint:
+                failure_store.record_failure_observation(
+                    report,
+                    fingerprint=fingerprint,
+                    max_entries=max(1, config.max_history_entries_per_test),
+                )
 
             failure_id = report.parsed_failures[0].failure_identifier if report.parsed_failures else ""
 
@@ -698,7 +775,6 @@ def run_pipeline(
                 continue
 
             # Validate → PR (only if we have a diff)
-            fingerprint = _get_report_fingerprint(report, failure_store)
             validated_diff = _validate_fix(
                 report,
                 root_cause,
@@ -712,6 +788,33 @@ def run_pipeline(
             )
             if validated_diff is None:
                 summary.add_result(job.name, failure_id, "validation-failed")
+                continue
+
+            history_summary = None
+            if report.parsed_failures:
+                history_summary = failure_store.summarize_history(
+                    report.workflow_file,
+                    report.job_name,
+                    report.matrix_params,
+                    report.parsed_failures[0].failure_identifier,
+                )
+            else:
+                history_summary = failure_store.summarize_history(
+                    report.workflow_file,
+                    report.job_name,
+                    report.matrix_params,
+                    report.job_name,
+                )
+            _apply_history_summary(root_cause, history_summary)
+
+            should_queue, queue_reason = _should_queue_validated_fix(
+                report,
+                root_cause,
+                history_summary,
+                config,
+            )
+            if not should_queue:
+                summary.add_result(job.name, failure_id, queue_reason)
                 continue
 
             if not allow_pr_creation:
@@ -729,6 +832,21 @@ def run_pipeline(
                         "fingerprint=%s.",
                         job.name,
                         fingerprint[:12],
+                    )
+                    approval_summary.add_candidate(
+                        ApprovalCandidate(
+                            job_name=job.name,
+                            failure_identifier=failure_id,
+                            workflow_run_url=_build_workflow_run_url(report),
+                            confidence=root_cause.confidence,
+                            is_flaky=root_cause.is_flaky,
+                            failure_streak=root_cause.failure_streak,
+                            total_failure_observations=root_cause.total_failure_observations,
+                            last_known_good_sha=root_cause.last_known_good_sha,
+                            first_bad_sha=root_cause.first_bad_sha,
+                            files_to_change=root_cause.files_to_change,
+                            rationale=root_cause.rationale,
+                        )
                     )
                 summary.add_result(job.name, failure_id, "queued-manual-approval")
             elif rate_limiter.can_create_pr():
@@ -785,6 +903,8 @@ def run_pipeline(
 
     # Emit workflow summary
     summary.write()
+    if not allow_pr_creation:
+        approval_summary.write()
 
     logger.info("Processed %d failures from run %d.", len(reports), run_id)
     return reports

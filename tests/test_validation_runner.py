@@ -145,6 +145,13 @@ class TestSubstituteTestCommands:
         )
         assert cmds == ["./run --file src/server.c"]
 
+    def test_replaces_parser_type(self):
+        report = _make_failure_report()
+        cmds = _substitute_test_commands(
+            ["./run --kind {parser_type}"], report
+        )
+        assert cmds == ["./run --kind gtest"]
+
     def test_no_parsed_failures_returns_unchanged(self):
         report = _make_failure_report(parsed_failures=[])
         cmds = _substitute_test_commands(["./run --test {test_name}"], report)

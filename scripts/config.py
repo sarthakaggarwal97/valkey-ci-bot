@@ -65,6 +65,8 @@ class BotConfig:
     max_failures_per_run: int = 10
     max_open_bot_prs: int = 3
     daily_token_budget: int = 1_000_000
+    min_failure_streak_before_queue: int = 2
+    max_history_entries_per_test: int = 20
     project: ProjectContext = field(default_factory=ProjectContext)
     validation_profiles: list[ValidationProfile] = field(default_factory=list)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
@@ -342,6 +344,14 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
         daily_token_budget=_coerce_int(
             limits.get("daily_token_budget"),
             defaults.daily_token_budget,
+        ),
+        min_failure_streak_before_queue=_coerce_int(
+            limits.get("min_failure_streak_before_queue"),
+            defaults.min_failure_streak_before_queue,
+        ),
+        max_history_entries_per_test=_coerce_int(
+            limits.get("max_history_entries_per_test"),
+            defaults.max_history_entries_per_test,
         ),
         project=_merge_project(raw.get("project", {})) if isinstance(raw.get("project"), dict) else defaults.project,
         validation_profiles=_merge_validation_profiles(raw.get("validation_profiles", [])) if isinstance(raw.get("validation_profiles"), list) else defaults.validation_profiles,

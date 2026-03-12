@@ -6,11 +6,15 @@ import hashlib
 import json
 import logging
 from datetime import datetime, timezone
+from dataclasses import asdict
 from typing import TYPE_CHECKING
 
 from github.GithubException import GithubException
 
 from scripts.models import (
+    FailureHistoryEntry,
+    FailureHistorySummary,
+    FailureObservation,
     FailureReport,
     FailureStoreEntry,
     RootCauseReport,
@@ -43,10 +47,15 @@ class FailureStore:
         self._state_gh = state_github_client or github_client
         self._state_repo_name = state_repo_full_name or repo_full_name
         self._entries: dict[str, FailureStoreEntry] = {}
+        self._history: dict[str, FailureHistoryEntry] = {}
 
     @property
     def entries(self) -> dict[str, FailureStoreEntry]:
         return self._entries
+
+    @property
+    def history(self) -> dict[str, FailureHistoryEntry]:
+        return self._history
 
     @staticmethod
     def compute_fingerprint(
@@ -54,6 +63,20 @@ class FailureStore:
     ) -> str:
         """SHA-256 of (failure_identifier, error_signature, file_path)."""
         payload = f"{failure_identifier}\0{error_signature}\0{file_path}"
+        return hashlib.sha256(payload.encode()).hexdigest()
+
+    @staticmethod
+    def compute_history_key(
+        workflow_file: str,
+        job_name: str,
+        matrix_params: dict[str, str],
+        failure_identifier: str,
+    ) -> str:
+        """Stable identity for timeline tracking across workflow runs."""
+        matrix_blob = ",".join(
+            f"{key}={value}" for key, value in sorted(matrix_params.items())
+        )
+        payload = "\0".join([workflow_file, job_name, matrix_blob, failure_identifier])
         return hashlib.sha256(payload.encode()).hexdigest()
 
     def has_open_pr(self, fingerprint: str) -> bool:
@@ -146,6 +169,201 @@ class FailureStore:
             entry.queued_pr_payload = None
             entry.updated_at = datetime.now(timezone.utc).isoformat()
 
+    def record_failure_observation(
+        self,
+        report: FailureReport,
+        *,
+        fingerprint: str,
+        max_entries: int,
+    ) -> None:
+        """Append fail observations for parsed or unparseable failures."""
+        if report.parsed_failures:
+            for parsed_failure in report.parsed_failures:
+                key = self.compute_history_key(
+                    report.workflow_file,
+                    report.job_name,
+                    report.matrix_params,
+                    parsed_failure.failure_identifier,
+                )
+                entry = self._history.setdefault(
+                    key,
+                    FailureHistoryEntry(
+                        key=key,
+                        workflow_file=report.workflow_file,
+                        job_name=report.job_name,
+                        matrix_params=dict(report.matrix_params),
+                        failure_identifier=parsed_failure.failure_identifier,
+                        test_name=parsed_failure.test_name,
+                    ),
+                )
+                self._append_observation(
+                    entry,
+                    FailureObservation(
+                        outcome="fail",
+                        observed_at=datetime.now(timezone.utc).isoformat(),
+                        commit_sha=report.commit_sha,
+                        workflow_run_id=report.workflow_run_id,
+                        workflow_name=report.workflow_name,
+                        workflow_file=report.workflow_file,
+                        job_name=report.job_name,
+                        matrix_params=dict(report.matrix_params),
+                        failure_identifier=parsed_failure.failure_identifier,
+                        test_name=parsed_failure.test_name,
+                        error_signature=parsed_failure.error_message,
+                        file_path=parsed_failure.file_path,
+                        fingerprint=fingerprint,
+                    ),
+                    max_entries=max_entries,
+                )
+            return
+
+        key = self.compute_history_key(
+            report.workflow_file,
+            report.job_name,
+            report.matrix_params,
+            report.job_name,
+        )
+        entry = self._history.setdefault(
+            key,
+            FailureHistoryEntry(
+                key=key,
+                workflow_file=report.workflow_file,
+                job_name=report.job_name,
+                matrix_params=dict(report.matrix_params),
+                failure_identifier=report.job_name,
+                test_name=None,
+            ),
+        )
+        self._append_observation(
+            entry,
+            FailureObservation(
+                outcome="fail",
+                observed_at=datetime.now(timezone.utc).isoformat(),
+                commit_sha=report.commit_sha,
+                workflow_run_id=report.workflow_run_id,
+                workflow_name=report.workflow_name,
+                workflow_file=report.workflow_file,
+                job_name=report.job_name,
+                matrix_params=dict(report.matrix_params),
+                failure_identifier=report.job_name,
+                test_name=None,
+                error_signature=report.raw_log_excerpt or "",
+                file_path="",
+                fingerprint=fingerprint,
+            ),
+            max_entries=max_entries,
+        )
+
+    def record_success_observation(
+        self,
+        *,
+        workflow_name: str,
+        workflow_file: str,
+        job_name: str,
+        matrix_params: dict[str, str],
+        commit_sha: str,
+        workflow_run_id: int | None,
+        max_entries: int,
+    ) -> None:
+        """Append inferred pass observations for known failures in a successful job."""
+        matched_entries = [
+            entry
+            for entry in self._history.values()
+            if entry.workflow_file == workflow_file
+            and entry.job_name == job_name
+            and entry.matrix_params == matrix_params
+        ]
+        for entry in matched_entries:
+            self._append_observation(
+                entry,
+                FailureObservation(
+                    outcome="pass",
+                    observed_at=datetime.now(timezone.utc).isoformat(),
+                    commit_sha=commit_sha,
+                    workflow_run_id=workflow_run_id,
+                    workflow_name=workflow_name,
+                    workflow_file=workflow_file,
+                    job_name=job_name,
+                    matrix_params=dict(matrix_params),
+                    failure_identifier=entry.failure_identifier,
+                    test_name=entry.test_name,
+                ),
+                max_entries=max_entries,
+            )
+
+    def summarize_history(
+        self,
+        workflow_file: str,
+        job_name: str,
+        matrix_params: dict[str, str],
+        failure_identifier: str,
+    ) -> FailureHistorySummary | None:
+        """Return a derived history summary for a stable failure identity."""
+        key = self.compute_history_key(
+            workflow_file,
+            job_name,
+            matrix_params,
+            failure_identifier,
+        )
+        entry = self._history.get(key)
+        if entry is None or not entry.observations:
+            return None
+
+        observations = entry.observations
+        failures = [obs for obs in observations if obs.outcome == "fail"]
+        passes = [obs for obs in observations if obs.outcome == "pass"]
+        streak = 0
+        for observation in reversed(observations):
+            if observation.outcome != "fail":
+                break
+            streak += 1
+
+        latest_failure_sha = failures[-1].commit_sha if failures else None
+        last_known_good_sha = None
+        first_bad_sha = None
+        last_pass_index = -1
+        for index in range(len(observations) - 1, -1, -1):
+            if observations[index].outcome == "pass":
+                last_pass_index = index
+                last_known_good_sha = observations[index].commit_sha
+                break
+        for observation in observations[last_pass_index + 1:]:
+            if observation.outcome == "fail":
+                first_bad_sha = observation.commit_sha
+                break
+
+        return FailureHistorySummary(
+            key=entry.key,
+            total_observations=len(observations),
+            failure_count=len(failures),
+            pass_count=len(passes),
+            consecutive_failures=streak,
+            last_outcome=observations[-1].outcome,
+            latest_failure_sha=latest_failure_sha,
+            last_known_good_sha=last_known_good_sha,
+            first_bad_sha=first_bad_sha,
+        )
+
+    @staticmethod
+    def _append_observation(
+        entry: FailureHistoryEntry,
+        observation: FailureObservation,
+        *,
+        max_entries: int,
+    ) -> None:
+        """Append an observation, avoiding duplicate run/outcome pairs."""
+        if entry.observations:
+            latest = entry.observations[-1]
+            if (
+                latest.workflow_run_id == observation.workflow_run_id
+                and latest.outcome == observation.outcome
+                and latest.commit_sha == observation.commit_sha
+            ):
+                return
+        entry.observations.append(observation)
+        if max_entries > 0 and len(entry.observations) > max_entries:
+            entry.observations[:] = entry.observations[-max_entries:]
+
     def mark_abandoned(self, fingerprint: str) -> None:
         """Mark a failure entry as abandoned (PR closed without merge)."""
         entry = self._entries.get(fingerprint)
@@ -180,25 +398,36 @@ class FailureStore:
     def to_dict(self) -> dict:
         """Serialize the store to a JSON-compatible dict."""
         return {
-            fp: {
-                "fingerprint": e.fingerprint,
-                "failure_identifier": e.failure_identifier,
-                "test_name": e.test_name,
-                "error_signature": e.error_signature,
-                "file_path": e.file_path,
-                "pr_url": e.pr_url,
-                "status": e.status,
-                "created_at": e.created_at,
-                "updated_at": e.updated_at,
-                "queued_pr_payload": e.queued_pr_payload,
-            }
-            for fp, e in self._entries.items()
+            "entries": {
+                fp: {
+                    "fingerprint": e.fingerprint,
+                    "failure_identifier": e.failure_identifier,
+                    "test_name": e.test_name,
+                    "error_signature": e.error_signature,
+                    "file_path": e.file_path,
+                    "pr_url": e.pr_url,
+                    "status": e.status,
+                    "created_at": e.created_at,
+                    "updated_at": e.updated_at,
+                    "queued_pr_payload": e.queued_pr_payload,
+                }
+                for fp, e in self._entries.items()
+            },
+            "history": {
+                key: asdict(entry)
+                for key, entry in self._history.items()
+            },
         }
 
     def from_dict(self, data: dict) -> None:
         """Deserialize the store from a dict."""
         self._entries.clear()
-        for fp, raw in data.items():
+        self._history.clear()
+
+        entries_raw = data.get("entries") if isinstance(data.get("entries"), dict) else data
+        if not isinstance(entries_raw, dict):
+            return
+        for fp, raw in entries_raw.items():
             self._entries[fp] = FailureStoreEntry(
                 fingerprint=raw["fingerprint"],
                 failure_identifier=raw["failure_identifier"],
@@ -210,6 +439,44 @@ class FailureStore:
                 created_at=raw["created_at"],
                 updated_at=raw["updated_at"],
                 queued_pr_payload=raw.get("queued_pr_payload"),
+            )
+        history_raw = data.get("history", {}) if isinstance(data, dict) else {}
+        if not isinstance(history_raw, dict):
+            return
+        for key, raw in history_raw.items():
+            if not isinstance(raw, dict):
+                continue
+            observations_raw = raw.get("observations", [])
+            observations: list[FailureObservation] = []
+            if isinstance(observations_raw, list):
+                for observation_raw in observations_raw:
+                    if not isinstance(observation_raw, dict):
+                        continue
+                    observations.append(
+                        FailureObservation(
+                            outcome=str(observation_raw.get("outcome", "")),
+                            observed_at=str(observation_raw.get("observed_at", "")),
+                            commit_sha=str(observation_raw.get("commit_sha", "")),
+                            workflow_run_id=observation_raw.get("workflow_run_id"),
+                            workflow_name=str(observation_raw.get("workflow_name", "")),
+                            workflow_file=str(observation_raw.get("workflow_file", "")),
+                            job_name=str(observation_raw.get("job_name", "")),
+                            matrix_params=dict(observation_raw.get("matrix_params", {})),
+                            failure_identifier=str(observation_raw.get("failure_identifier", "")),
+                            test_name=observation_raw.get("test_name"),
+                            error_signature=str(observation_raw.get("error_signature", "")),
+                            file_path=str(observation_raw.get("file_path", "")),
+                            fingerprint=observation_raw.get("fingerprint"),
+                        )
+                    )
+            self._history[key] = FailureHistoryEntry(
+                key=str(raw.get("key", key)),
+                workflow_file=str(raw.get("workflow_file", "")),
+                job_name=str(raw.get("job_name", "")),
+                matrix_params=dict(raw.get("matrix_params", {})),
+                failure_identifier=str(raw.get("failure_identifier", "")),
+                test_name=raw.get("test_name"),
+                observations=observations,
             )
 
     def _ensure_store_branch(self, repo) -> None:
@@ -245,6 +512,7 @@ class FailureStore:
         except Exception as exc:
             logger.info("Could not load failure store (may not exist yet): %s", exc)
             self._entries.clear()
+            self._history.clear()
 
     def save(self) -> None:
         """Save the store to the dedicated branch via GitHub API."""

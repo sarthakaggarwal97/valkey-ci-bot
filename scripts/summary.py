@@ -184,6 +184,100 @@ class PRSummaryComment:
 
 
 @dataclass
+class ApprovalCandidate:
+    """Queued fix awaiting manual approval before PR creation."""
+
+    job_name: str
+    failure_identifier: str
+    workflow_run_url: str
+    confidence: str
+    is_flaky: bool
+    failure_streak: int
+    total_failure_observations: int
+    last_known_good_sha: str | None
+    first_bad_sha: str | None
+    files_to_change: list[str]
+    rationale: str
+
+
+@dataclass
+class ApprovalSummary:
+    """Human-facing summary of queued fixes waiting for approval."""
+
+    candidates: list[ApprovalCandidate] = field(default_factory=list)
+
+    def add_candidate(self, candidate: ApprovalCandidate) -> None:
+        """Record one queued candidate."""
+        self.candidates.append(candidate)
+
+    def render(self) -> str:
+        """Render approval-ready candidates as markdown."""
+        if not self.candidates:
+            return ""
+
+        lines = ["## Approval Queue\n"]
+        lines.append("| Job | Failure | Confidence | Flaky | Streak | Suspect Range | Run |")
+        lines.append("|-----|---------|------------|-------|--------|---------------|-----|")
+        for candidate in self.candidates:
+            suspect_range = "unknown"
+            if candidate.last_known_good_sha or candidate.first_bad_sha:
+                suspect_range = (
+                    f"{(candidate.last_known_good_sha or 'unknown')[:12]} -> "
+                    f"{(candidate.first_bad_sha or 'unknown')[:12]}"
+                )
+            lines.append(
+                "| "
+                f"{candidate.job_name} | "
+                f"{candidate.failure_identifier} | "
+                f"{candidate.confidence} | "
+                f"{'yes' if candidate.is_flaky else 'no'} | "
+                f"{candidate.failure_streak} | "
+                f"{suspect_range} | "
+                f"[run]({candidate.workflow_run_url}) |"
+            )
+
+        for candidate in self.candidates:
+            lines.append("")
+            lines.append(
+                f"### {candidate.job_name} — {candidate.failure_identifier}"
+            )
+            lines.append(
+                f"- Failure observations: {candidate.total_failure_observations}"
+            )
+            lines.append(f"- Consecutive failures: {candidate.failure_streak}")
+            if candidate.last_known_good_sha:
+                lines.append(
+                    f"- Last known good commit: `{candidate.last_known_good_sha}`"
+                )
+            if candidate.first_bad_sha:
+                lines.append(f"- First bad commit: `{candidate.first_bad_sha}`")
+            if candidate.files_to_change:
+                lines.append(
+                    f"- Files to change: {', '.join(candidate.files_to_change)}"
+                )
+            lines.append(f"- Rationale: {candidate.rationale}")
+
+        lines.append("")
+        return "\n".join(lines)
+
+    def write(self) -> str:
+        """Append the approval summary to ``$GITHUB_STEP_SUMMARY``."""
+        md = self.render()
+        if not md:
+            return md
+
+        summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary_path:
+            try:
+                with open(summary_path, "a") as fh:
+                    fh.write(md)
+                logger.info("Approval summary written to %s", summary_path)
+            except OSError as exc:
+                logger.warning("Failed to write approval summary: %s", exc)
+        return md
+
+
+@dataclass
 class ReviewStageResult:
     """Outcome of a PR reviewer stage."""
 

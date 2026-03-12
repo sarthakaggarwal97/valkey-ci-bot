@@ -108,6 +108,7 @@ def _substitute_test_commands(
     Supported placeholders:
     - {test_name}: the first parsed failure's test_name or failure_identifier
     - {file_path}: the first parsed failure's file_path
+    - {parser_type}: the first parsed failure's parser type
     """
     if not failure_report.parsed_failures:
         return commands
@@ -115,9 +116,13 @@ def _substitute_test_commands(
     first = failure_report.parsed_failures[0]
     test_name = first.test_name or first.failure_identifier
     file_path = first.file_path
+    parser_type = first.parser_type
 
     return [
-        cmd.replace("{test_name}", test_name).replace("{file_path}", file_path)
+        cmd
+        .replace("{test_name}", test_name)
+        .replace("{file_path}", file_path)
+        .replace("{parser_type}", parser_type)
         for cmd in commands
     ]
 

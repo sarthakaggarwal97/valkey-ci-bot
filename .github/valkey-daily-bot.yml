@@ -15,6 +15,8 @@ limits:
   max_failures_per_run: 5
   max_prs_per_day: 3
   max_open_bot_prs: 2
+  min_failure_streak_before_queue: 2
+  max_history_entries_per_test: 30
 
 monitored_workflows:
   - daily.yml
@@ -39,12 +41,14 @@ project:
       source_path: "src/{name}.c"
 
 validation_profiles:
-  - job_name_pattern: "^test-ubuntu-jemalloc$|^test-ubuntu-arm$|^test-ubuntu-io-threads$|^test-ubuntu-reclaim-cache$|^reply-schemas-validator$"
+  - job_name_pattern: "^test-ubuntu-jemalloc$|^test-ubuntu-arm$|^test-ubuntu-io-threads$|^test-ubuntu-reclaim-cache$|^reply-schemas-validator$|^test-ubuntu-jemalloc-fortify$"
     install_commands:
       - "sudo apt-get update"
       - "sudo apt-get install -y pkg-config libgtest-dev libgmock-dev tcl8.6 tclx"
     build_commands:
       - "make all-with-unit-tests SERVER_CFLAGS='-Werror'"
+    test_commands:
+      - "case \"{parser_type}\" in build) true ;; gtest) ./src/unit/valkey-unit-gtests --accurate --gtest_filter='{test_name}' ;; sentinel) ./runtest-sentinel ;; cluster) ./runtest-cluster ;; *) ./runtest --accurate --verbose --dump-logs ;; esac"
 
   - job_name_pattern: "^test-ubuntu-tls$|^test-ubuntu-tls-io-threads$"
     install_commands:
@@ -52,6 +56,8 @@ validation_profiles:
       - "sudo apt-get install -y pkg-config libgtest-dev libgmock-dev tcl8.6 tclx libssl-dev"
     build_commands:
       - "make BUILD_TLS=yes all-with-unit-tests SERVER_CFLAGS='-Werror'"
+    test_commands:
+      - "case \"{parser_type}\" in build) true ;; gtest) ./src/unit/valkey-unit-gtests --accurate --gtest_filter='{test_name}' ;; sentinel) ./runtest-sentinel ;; cluster) ./runtest-cluster ;; *) ./runtest --accurate --verbose --dump-logs ;; esac"
 
   - job_name_pattern: "^test-ubuntu-libc-malloc$"
     install_commands:
@@ -59,6 +65,8 @@ validation_profiles:
       - "sudo apt-get install -y pkg-config libgtest-dev libgmock-dev tcl8.6 tclx"
     build_commands:
       - "make MALLOC=libc all-with-unit-tests SERVER_CFLAGS='-Werror'"
+    test_commands:
+      - "case \"{parser_type}\" in build) true ;; gtest) ./src/unit/valkey-unit-gtests --accurate --gtest_filter='{test_name}' ;; sentinel) ./runtest-sentinel ;; cluster) ./runtest-cluster ;; *) ./runtest --accurate --verbose --dump-logs ;; esac"
 
   - job_name_pattern: "^test-sanitizer-address$"
     install_commands:
@@ -68,6 +76,8 @@ validation_profiles:
       SANITIZER: "address"
     build_commands:
       - "make SANITIZER=address all-with-unit-tests SERVER_CFLAGS='-Werror'"
+    test_commands:
+      - "case \"{parser_type}\" in build) true ;; gtest) ./src/unit/valkey-unit-gtests --accurate --gtest_filter='{test_name}' ;; sentinel) ./runtest-sentinel ;; cluster) ./runtest-cluster ;; *) ./runtest --accurate --verbose --dump-logs ;; esac"
 
   - job_name_pattern: "^test-sanitizer-undefined$"
     install_commands:
@@ -77,3 +87,5 @@ validation_profiles:
       SANITIZER: "undefined"
     build_commands:
       - "make SANITIZER=undefined all-with-unit-tests SERVER_CFLAGS='-Werror'"
+    test_commands:
+      - "case \"{parser_type}\" in build) true ;; gtest) ./src/unit/valkey-unit-gtests --accurate --gtest_filter='{test_name}' ;; sentinel) ./runtest-sentinel ;; cluster) ./runtest-cluster ;; *) ./runtest --accurate --verbose --dump-logs ;; esac"

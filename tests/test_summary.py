@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import tempfile
 
-from scripts.summary import WorkflowSummary
+from scripts.summary import ApprovalCandidate, ApprovalSummary, WorkflowSummary
 
 
 class TestWorkflowSummaryRender:
@@ -171,3 +171,36 @@ class TestPRSummaryCommentRender:
         assert "| Step |" in md
         assert "| Duration |" in md
         assert "| Status |" in md
+
+
+class TestApprovalSummary:
+    def test_empty_summary_is_blank(self):
+        summary = ApprovalSummary()
+        assert summary.render() == ""
+
+    def test_renders_candidate_details(self):
+        summary = ApprovalSummary()
+        summary.add_candidate(
+            ApprovalCandidate(
+                job_name="test-ubuntu-jemalloc",
+                failure_identifier="TestSuite.TestCase",
+                workflow_run_url="https://github.com/valkey-io/valkey/actions/runs/1",
+                confidence="high",
+                is_flaky=False,
+                failure_streak=2,
+                total_failure_observations=3,
+                last_known_good_sha="abcdef1234567890",
+                first_bad_sha="fedcba0987654321",
+                files_to_change=["src/server.c"],
+                rationale="The failure reproduces after a null check regression.",
+            )
+        )
+
+        md = summary.render()
+
+        assert "Approval Queue" in md
+        assert "test-ubuntu-jemalloc" in md
+        assert "TestSuite.TestCase" in md
+        assert "abcdef123456" in md
+        assert "fedcba098765" in md
+        assert "src/server.c" in md
