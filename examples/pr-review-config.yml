@@ -19,12 +19,6 @@ reviewer:
   bedrock_timeout_ms: 120000
   bedrock_concurrency_limit: 2
   github_concurrency_limit: 6
-  # Optional: use a pre-configured Bedrock Agent alias with attached knowledge
-  # bases and account-side prompt customization.
-  agent:
-    enabled: true
-    agent_id: "YOUR_AGENT_ID"
-    agent_alias_id: "YOUR_AGENT_ALIAS_ID"
   path_filters:
     - "!dist/**"
     - "!vendor/**"

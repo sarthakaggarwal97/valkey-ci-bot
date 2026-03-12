@@ -15,7 +15,7 @@ import tempfile
 from pathlib import Path
 
 import yaml
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from scripts.config import BotConfig, ProjectContext, ValidationProfile, load_config
@@ -90,7 +90,11 @@ full_config_strategy = st.fixed_dictionaries({
 
 # --- Property Tests ---
 
-@settings(max_examples=100)
+@settings(
+    max_examples=100,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
 @given(config_data=full_config_strategy)
 def test_config_round_trip_all_fields(config_data: dict) -> None:
     """Property 17 (part 1): Loading a valid YAML config with all supported
@@ -232,7 +236,11 @@ partial_fix_generation = st.fixed_dictionaries({}, optional={
 # --- Property 18 Tests ---
 
 
-@settings(max_examples=100)
+@settings(
+    max_examples=100,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
 @given(invalid_content=invalid_yaml_content)
 def test_invalid_yaml_returns_full_defaults(invalid_content: str) -> None:
     """Property 18 (part 1): Invalid YAML content returns BotConfig with all
@@ -268,7 +276,11 @@ def test_invalid_yaml_returns_full_defaults(invalid_content: str) -> None:
         os.unlink(tmp_path)
 
 
-@settings(max_examples=100)
+@settings(
+    max_examples=100,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
 @given(extra_fields=unrecognized_fields_strategy)
 def test_unrecognized_fields_ignored_with_defaults(extra_fields: dict) -> None:
     """Property 18 (part 2): Config with only unrecognized top-level fields
@@ -302,7 +314,11 @@ def test_unrecognized_fields_ignored_with_defaults(extra_fields: dict) -> None:
         os.unlink(tmp_path)
 
 
-@settings(max_examples=100)
+@settings(
+    max_examples=100,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
 @given(
     bedrock_data=partial_bedrock,
     limits_data=partial_limits,

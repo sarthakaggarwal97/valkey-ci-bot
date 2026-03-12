@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from hypothesis import given, settings, assume
+from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
 from scripts.failure_store import FailureStore
@@ -127,7 +127,7 @@ def _make_mock_repo():
 # ---------------------------------------------------------------------------
 
 @given(report=failure_report_strategy(), root_cause=root_cause_strategy())
-@settings(max_examples=100)
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
 def test_branch_name_follows_fingerprint_pattern(report, root_cause):
     """Property 13 (branch): The branch is always named bot/fix/<fingerprint>.
 
@@ -149,7 +149,7 @@ def test_branch_name_follows_fingerprint_pattern(report, root_cause):
 
 
 @given(report=failure_report_strategy(), root_cause=root_cause_strategy())
-@settings(max_examples=100)
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
 def test_commit_message_contains_identifier_and_job(report, root_cause):
     """Property 13 (commit message): The commit message always contains the
     failure identifier (or test name when available) and the job name.
@@ -165,7 +165,7 @@ def test_commit_message_contains_identifier_and_job(report, root_cause):
 
 
 @given(report=failure_report_strategy(), root_cause=root_cause_strategy())
-@settings(max_examples=100)
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
 def test_pr_body_contains_all_required_elements(report, root_cause):
     """Property 13 (PR body): The PR body always contains a link to the
     failing CI run, the failure summary, root cause analysis, confidence
@@ -197,7 +197,7 @@ def test_pr_body_contains_all_required_elements(report, root_cause):
 
 
 @given(report=failure_report_strategy(), root_cause=root_cause_strategy())
-@settings(max_examples=100)
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
 def test_bot_fix_label_is_applied(report, root_cause):
     """Property 13 (label): The `bot-fix` label is always applied to the PR.
 

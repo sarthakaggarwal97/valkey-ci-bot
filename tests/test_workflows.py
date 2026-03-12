@@ -79,16 +79,3 @@ def test_ci_workflow_declares_checkout_permissions_and_current_action() -> None:
     )
     assert checkout_step["uses"] == "actions/checkout@v6"
     assert checkout_step["with"]["persist-credentials"] is False
-
-
-def test_refresh_workflow_supports_oidc_role_auth() -> None:
-    workflow = _load_yaml(REPO_ROOT / ".github/workflows/refresh-bedrock-kb.yml")
-
-    assert workflow["permissions"]["id-token"] == "write"
-
-    role_step = next(
-        step
-        for step in workflow["jobs"]["refresh"]["steps"]
-        if step["name"] == "Configure AWS credentials from OIDC role"
-    )
-    assert role_step["with"]["role-to-assume"] == "${{ secrets.AWS_ROLE_ARN }}"

@@ -14,7 +14,6 @@ import boto3
 from github import Github
 
 from scripts.bedrock_client import BedrockClient, BedrockError, PromptClient
-from scripts.bedrock_agent_client import BedrockAgentClient
 from scripts.code_reviewer import CodeReviewer
 from scripts.comment_publisher import CommentPublisher
 from scripts.config import ReviewerConfig, load_reviewer_config, load_reviewer_config_text
@@ -176,27 +175,15 @@ def run(argv: list[str] | None = None) -> int:
     )
     rate_limiter.load()
 
-    bedrock_client: PromptClient
-    if config.uses_bedrock_agent:
-        bedrock_agent_runtime = boto3.client(
-            "bedrock-agent-runtime",
-            region_name=args.aws_region or None,
-        )
-        bedrock_client = BedrockAgentClient(
-            config=config,
-            client=bedrock_agent_runtime,
-            rate_limiter=rate_limiter,
-        )
-    else:
-        bedrock_runtime = boto3.client(
-            "bedrock-runtime",
-            region_name=args.aws_region or None,
-        )
-        bedrock_client = BedrockClient(
-            config=config,
-            client=bedrock_runtime,
-            rate_limiter=rate_limiter,
-        )
+    bedrock_runtime = boto3.client(
+        "bedrock-runtime",
+        region_name=args.aws_region or None,
+    )
+    bedrock_client: PromptClient = BedrockClient(
+        config=config,
+        client=bedrock_runtime,
+        rate_limiter=rate_limiter,
+    )
     fetcher = PRContextFetcher(gh, github_retries=config.github_retries)
     publisher = CommentPublisher(gh, github_retries=config.github_retries)
     state_store = ReviewStateStore(gh, repo_name)

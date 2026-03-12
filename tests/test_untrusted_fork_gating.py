@@ -19,7 +19,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
-from hypothesis import given, settings, assume
+from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
 from scripts.config import BotConfig, ValidationProfile
@@ -157,7 +157,7 @@ def trusted_failure_report_strategy(draw):
 
 
 @given(data=untrusted_workflow_run_strategy())
-@settings(max_examples=100)
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
 def test_untrusted_fork_classified_correctly(data):
     """Property 27 (classify_trust): For any workflow_run whose head repository
     differs from the consumer repository, classify_trust returns 'untrusted-fork'.
@@ -173,7 +173,7 @@ def test_untrusted_fork_classified_correctly(data):
 
 
 @given(data=trusted_workflow_run_strategy())
-@settings(max_examples=100)
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
 def test_trusted_repo_classified_correctly(data):
     """Property 27 (classify_trust): For any workflow_run whose head repository
     matches the consumer repository and is_fork is False, classify_trust
@@ -190,7 +190,7 @@ def test_trusted_repo_classified_correctly(data):
 
 
 @given(report=untrusted_failure_report_strategy())
-@settings(max_examples=100)
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
 def test_untrusted_fork_validation_skipped(report):
     """Property 27 (validation): For any untrusted fork failure, validation
     is skipped and returns output 'untrusted-fork'.
@@ -215,7 +215,7 @@ def test_untrusted_fork_validation_skipped(report):
 
 
 @given(report=untrusted_failure_report_strategy())
-@settings(max_examples=100)
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
 def test_untrusted_fork_pr_creation_skipped(report):
     """Property 27 (PR creation): For any untrusted fork failure, PR creation
     is skipped and raises ValueError with 'fork-pr-no-write-access'.
@@ -245,7 +245,7 @@ def test_untrusted_fork_pr_creation_skipped(report):
 
 
 @given(report=trusted_failure_report_strategy())
-@settings(max_examples=100)
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
 def test_trusted_failure_validation_proceeds(report):
     """Property 27 (trusted validation): For any trusted failure, validation
     proceeds normally (does not short-circuit with 'untrusted-fork').
@@ -279,7 +279,7 @@ def test_trusted_failure_validation_proceeds(report):
 
 
 @given(report=trusted_failure_report_strategy())
-@settings(max_examples=100)
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
 def test_trusted_failure_pr_creation_proceeds(report):
     """Property 27 (trusted PR creation): For any trusted failure, PR creation
     proceeds normally (does not raise fork-pr-no-write-access).

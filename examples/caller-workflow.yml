@@ -14,11 +14,6 @@
 #   Variable: CI_BOT_AWS_REGION          — AWS region where Bedrock is available
 #   Secret:   GITHUB_TOKEN               — Automatically provided by GitHub Actions
 #
-# Optional static-credential fallback:
-#   Secret:   CI_BOT_AWS_ACCESS_KEY_ID
-#   Secret:   CI_BOT_AWS_SECRET_ACCESS_KEY
-#   Secret:   CI_BOT_AWS_SESSION_TOKEN   — only when session-based credentials are used
-
 name: CI Failure Bot
 
 permissions:
@@ -96,9 +91,6 @@ jobs:
       mode: analyze
     secrets:
       AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.CI_BOT_AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_BOT_AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ secrets.CI_BOT_AWS_SESSION_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------
@@ -117,9 +109,6 @@ jobs:
       mode: reconcile
     secrets:
       AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.CI_BOT_AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_BOT_AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ secrets.CI_BOT_AWS_SESSION_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------

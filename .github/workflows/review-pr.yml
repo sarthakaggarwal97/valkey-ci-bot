@@ -30,13 +30,7 @@ on:
         default: "us-east-1"
     secrets:
       AWS_ROLE_ARN:
-        required: false
-      AWS_ACCESS_KEY_ID:
-        required: false
-      AWS_SECRET_ACCESS_KEY:
-        required: false
-      AWS_SESSION_TOKEN:
-        required: false
+        required: true
       GITHUB_TOKEN:
         required: true
 
@@ -66,27 +60,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Validate AWS authentication inputs
-        if: secrets.AWS_ROLE_ARN == '' && (secrets.AWS_ACCESS_KEY_ID == '' || secrets.AWS_SECRET_ACCESS_KEY == '')
-        run: |
-          echo "Configure either AWS_ROLE_ARN or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY for this workflow." >&2
-          exit 1
-
       - name: Configure AWS credentials from OIDC role
-        if: secrets.AWS_ROLE_ARN != ''
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: valkey-pr-review-bot-${{ github.run_id }}
-          aws-region: ${{ inputs.aws_region }}
-
-      - name: Configure AWS credentials from static secrets
-        if: secrets.AWS_ROLE_ARN == ''
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ inputs.aws_region }}
 
       - name: Run PR reviewer

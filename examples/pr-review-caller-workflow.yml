@@ -7,11 +7,6 @@
 #   Secret:   CI_BOT_AWS_ROLE_ARN
 #   Variable: CI_BOT_AWS_REGION
 #
-# Optional static-credential fallback:
-#   Secret:   CI_BOT_AWS_ACCESS_KEY_ID
-#   Secret:   CI_BOT_AWS_SECRET_ACCESS_KEY
-#   Secret:   CI_BOT_AWS_SESSION_TOKEN
-
 name: PR Review Bot
 
 on:
@@ -72,7 +67,4 @@ jobs:
       mode: ${{ needs.preflight.outputs.mode }}
     secrets:
       AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.CI_BOT_AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_BOT_AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ secrets.CI_BOT_AWS_SESSION_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

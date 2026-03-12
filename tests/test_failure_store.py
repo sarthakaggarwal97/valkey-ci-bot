@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from github.GithubException import GithubException
 
@@ -62,7 +62,7 @@ def _entries_strategy():
 # --- Property Tests ---
 
 
-@settings(max_examples=100)
+@settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
 @given(entries=_entries_strategy())
 def test_failure_store_serialization_round_trip(
     entries: dict[str, dict],

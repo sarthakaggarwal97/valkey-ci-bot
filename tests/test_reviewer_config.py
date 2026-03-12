@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from scripts.config import (
-    ReviewerAgent,
     ReviewerConfig,
     load_reviewer_config_data,
     load_reviewer_config_text,
@@ -19,7 +18,6 @@ def test_load_reviewer_config_defaults() -> None:
     assert config.ignore_keyword == "/reviewbot: ignore"
     assert config.models.light_model_id
     assert config.models.heavy_model_id
-    assert config.agent == ReviewerAgent()
 
 
 def test_load_reviewer_config_nested_section() -> None:
@@ -30,11 +28,6 @@ def test_load_reviewer_config_nested_section() -> None:
                 "disable_release_notes": True,
                 "max_review_comments": 7,
                 "path_filters": ["src/**", "!src/generated/**"],
-                "agent": {
-                    "enabled": True,
-                    "agent_id": "agent-123",
-                    "agent_alias_id": "alias-456",
-                },
                 "models": {
                     "light_model_id": "light-model",
                     "heavy_model_id": "heavy-model",
@@ -49,10 +42,6 @@ def test_load_reviewer_config_nested_section() -> None:
     assert config.disable_release_notes is True
     assert config.max_review_comments == 7
     assert config.path_filters == ["src/**", "!src/generated/**"]
-    assert config.agent.enabled is True
-    assert config.agent.agent_id == "agent-123"
-    assert config.agent.agent_alias_id == "alias-456"
-    assert config.uses_bedrock_agent is True
     assert config.models.light_model_id == "light-model"
     assert config.models.heavy_model_id == "heavy-model"
     assert config.models.temperature == 0.15
