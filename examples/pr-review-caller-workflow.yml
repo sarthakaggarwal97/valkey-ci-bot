@@ -67,4 +67,3 @@ jobs:
       mode: ${{ needs.preflight.outputs.mode }}
     secrets:
       AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

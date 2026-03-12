@@ -12,8 +12,6 @@
 # Recommended repository configuration:
 #   Secret:   CI_BOT_AWS_ROLE_ARN        — IAM role assumable via GitHub OIDC
 #   Variable: CI_BOT_AWS_REGION          — AWS region where Bedrock is available
-#   Secret:   GITHUB_TOKEN               — Automatically provided by GitHub Actions
-#
 name: CI Failure Bot
 
 permissions:
@@ -91,7 +89,6 @@ jobs:
       mode: analyze
     secrets:
       AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------
   # Reconcile: drain queued failures and sync failure store with PR state.
@@ -109,7 +106,6 @@ jobs:
       mode: reconcile
     secrets:
       AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------
   # Skip: log untrusted or non-failure workflow_run events.

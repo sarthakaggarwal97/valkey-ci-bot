@@ -29,6 +29,7 @@ def test_analyze_workflow_checks_out_bot_repository() -> None:
     assert "bot_ref" in inputs
     assert "aws_region" in inputs
     assert "AWS_ROLE_ARN" in secrets
+    assert "GITHUB_TOKEN" not in secrets
 
     checkout_step = next(
         step
@@ -65,6 +66,7 @@ def test_example_caller_passes_bot_checkout_inputs() -> None:
 
     analyze_secrets = workflow["jobs"]["analyze"]["secrets"]
     assert analyze_secrets["AWS_ROLE_ARN"] == "${{ secrets.CI_BOT_AWS_ROLE_ARN }}"
+    assert "GITHUB_TOKEN" not in analyze_secrets
 
 
 def test_ci_workflow_declares_checkout_permissions_and_current_action() -> None:

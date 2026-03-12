@@ -31,8 +31,6 @@ on:
     secrets:
       AWS_ROLE_ARN:
         required: true
-      GITHUB_TOKEN:
-        required: true
 
 jobs:
   run-pipeline:
@@ -76,7 +74,7 @@ jobs:
             --repo "${{ github.event.workflow_run.repository.full_name || github.repository }}" \
             --run-id "${{ github.event.workflow_run.id }}" \
             --config "${{ inputs.config_path }}" \
-            --token "${{ secrets.GITHUB_TOKEN }}" \
+            --token "${{ github.token }}" \
             --aws-region "${{ inputs.aws_region }}"
 
       - name: Run reconciliation
@@ -87,6 +85,6 @@ jobs:
           python scripts/main.py \
             --repo "${{ github.repository }}" \
             --config "${{ inputs.config_path }}" \
-            --token "${{ secrets.GITHUB_TOKEN }}" \
+            --token "${{ github.token }}" \
             --aws-region "${{ inputs.aws_region }}" \
             --mode reconcile

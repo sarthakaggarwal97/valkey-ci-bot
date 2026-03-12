@@ -29,6 +29,7 @@ def test_review_workflow_checks_out_bot_repository() -> None:
     assert "bot_ref" in inputs
     assert "aws_region" in inputs
     assert "AWS_ROLE_ARN" in secrets
+    assert "GITHUB_TOKEN" not in secrets
 
     checkout_step = next(
         step
@@ -60,3 +61,4 @@ def test_example_pr_review_caller_passes_bot_checkout_inputs() -> None:
 
     review_secrets = workflow["jobs"]["review"]["secrets"]
     assert review_secrets["AWS_ROLE_ARN"] == "${{ secrets.CI_BOT_AWS_ROLE_ARN }}"
+    assert "GITHUB_TOKEN" not in review_secrets

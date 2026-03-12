@@ -31,8 +31,6 @@ on:
     secrets:
       AWS_ROLE_ARN:
         required: true
-      GITHUB_TOKEN:
-        required: true
 
 jobs:
   review:
@@ -75,5 +73,5 @@ jobs:
             --repo "${{ github.repository }}" \
             --config "${{ inputs.config_path }}" \
             --mode "${{ inputs.mode }}" \
-            --token "${{ secrets.GITHUB_TOKEN }}" \
+            --token "${{ github.token }}" \
             --aws-region "${{ inputs.aws_region }}"
