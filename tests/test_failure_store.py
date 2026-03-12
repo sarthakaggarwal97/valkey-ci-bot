@@ -172,3 +172,27 @@ def test_save_does_not_fallback_to_create_on_non_404_lookup_error() -> None:
     store.save()
 
     repo.create_file.assert_not_called()
+
+
+def test_save_uses_separate_state_repository_when_configured() -> None:
+    target_gh = MagicMock()
+    state_repo = MagicMock()
+    state_repo.default_branch = "main"
+    state_repo.get_git_ref.side_effect = [
+        GithubException(404, {"message": "missing bot-data"}),
+        MagicMock(object=MagicMock(sha="base-sha")),
+    ]
+    state_gh = MagicMock()
+    state_gh.get_repo.return_value = state_repo
+
+    store = FailureStore(
+        target_gh,
+        "valkey-io/valkey",
+        state_github_client=state_gh,
+        state_repo_full_name="owner/valkey-ci-bot",
+    )
+
+    store.save()
+
+    state_gh.get_repo.assert_called_once_with("owner/valkey-ci-bot")
+    target_gh.get_repo.assert_not_called()

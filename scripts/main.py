@@ -536,12 +536,17 @@ def run_pipeline(
     config_path: str,
     github_token: str,
     aws_region: str | None = None,
+    state_github_token: str | None = None,
+    state_repo_name: str | None = None,
+    allow_pr_creation: bool = True,
     rate_limiter: RateLimiter | None = None,
     validation_runner: ValidationRunner | None = None,
     pr_manager: PRManager | None = None,
 ) -> list[FailureReport]:
     """Execute the full pipeline: Detect → Parse → Analyze → Fix → Validate → PR."""
     gh = Github(github_token)
+    state_gh = Github(state_github_token or github_token)
+    state_repo = state_repo_name or repo_name
 
     # Fetch workflow run before config so remote config loads can use the failing SHA.
     try:
@@ -568,11 +573,22 @@ def run_pipeline(
     detector = FailureDetector(gh)
     log_retriever = LogRetriever(gh)
     parser_router = _build_parser_router()
-    failure_store = FailureStore(gh, repo_name)
+    failure_store = FailureStore(
+        gh,
+        repo_name,
+        state_github_client=state_gh,
+        state_repo_full_name=state_repo,
+    )
 
     # Build rate limiter
     if rate_limiter is None:
-        rate_limiter = RateLimiter(config, gh, repo_name)
+        rate_limiter = RateLimiter(
+            config,
+            gh,
+            repo_name,
+            state_github_client=state_gh,
+            state_repo_full_name=state_repo,
+        )
     rate_limiter.load()
 
     # Build Bedrock-backed components
@@ -698,7 +714,24 @@ def run_pipeline(
                 summary.add_result(job.name, failure_id, "validation-failed")
                 continue
 
-            if rate_limiter.can_create_pr():
+            if not allow_pr_creation:
+                if fingerprint:
+                    failure_store.record_queued_pr(
+                        fingerprint,
+                        report,
+                        root_cause,
+                        validated_diff,
+                        report.target_branch or "unstable",
+                    )
+                    rate_limiter.queue_failure(fingerprint)
+                    logger.info(
+                        "Queued validated fix for job %s pending manual approval, "
+                        "fingerprint=%s.",
+                        job.name,
+                        fingerprint[:12],
+                    )
+                summary.add_result(job.name, failure_id, "queued-manual-approval")
+            elif rate_limiter.can_create_pr():
                 pr_creation_start = time.perf_counter()
                 pr_url = _create_pr_from_validated_fix(
                     report,
@@ -776,6 +809,8 @@ def run_reconciliation(
     config_path: str,
     github_token: str,
     aws_region: str | None = None,
+    state_github_token: str | None = None,
+    state_repo_name: str | None = None,
     rate_limiter: RateLimiter | None = None,
 ) -> int:
     """Drain queued failures when rate limits have reset.
@@ -786,11 +821,19 @@ def run_reconciliation(
     Returns the number of queued failures successfully processed.
     """
     gh = Github(github_token)
+    state_gh = Github(state_github_token or github_token)
+    state_repo = state_repo_name or repo_name
     config = _load_runtime_config(gh, repo_name, config_path)
 
     # Build rate limiter
     if rate_limiter is None:
-        rate_limiter = RateLimiter(config, gh, repo_name)
+        rate_limiter = RateLimiter(
+            config,
+            gh,
+            repo_name,
+            state_github_client=state_gh,
+            state_repo_full_name=state_repo,
+        )
     rate_limiter.load()
 
     queued = rate_limiter.get_queued_failures()
@@ -801,7 +844,12 @@ def run_reconciliation(
     logger.info("Reconciliation: %d queued failure(s) to process.", len(queued))
 
     # Build components needed for the pipeline
-    failure_store = FailureStore(gh, repo_name)
+    failure_store = FailureStore(
+        gh,
+        repo_name,
+        state_github_client=state_gh,
+        state_repo_full_name=state_repo,
+    )
     failure_store.load()
     failure_store.reconcile_pr_states()
     pr_manager = PRManager(gh, repo_name, failure_store)
@@ -905,9 +953,16 @@ def main() -> None:
     parser.add_argument("--run-id", type=int, default=None, help="Workflow run ID (required for analyze mode)")
     parser.add_argument("--config", default=".github/ci-failure-bot.yml", help="Config file path")
     parser.add_argument("--token", required=True, help="GitHub token")
+    parser.add_argument("--state-token", default=None, help="GitHub token for bot-state storage")
+    parser.add_argument("--state-repo", default=None, help="Repository full name used for bot-state persistence")
     parser.add_argument("--aws-region", default=None, help="AWS region for Bedrock client")
     parser.add_argument("--mode", default="analyze", choices=["analyze", "reconcile"],
                         help="Pipeline mode: 'analyze' for normal failure processing, 'reconcile' for draining queued failures")
+    parser.add_argument(
+        "--queue-only",
+        action="store_true",
+        help="Analyze and validate fixes, but queue them for approval instead of opening PRs.",
+    )
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
@@ -918,7 +973,12 @@ def main() -> None:
 
     if args.mode == "reconcile":
         count = run_reconciliation(
-            args.repo, args.config, args.token, aws_region=args.aws_region,
+            args.repo,
+            args.config,
+            args.token,
+            aws_region=args.aws_region,
+            state_github_token=args.state_token,
+            state_repo_name=args.state_repo,
         )
         logger.info("Reconciliation drained %d queued failure(s).", count)
         sys.exit(0)
@@ -927,7 +987,16 @@ def main() -> None:
     if args.run_id is None:
         parser.error("--run-id is required for analyze mode")
 
-    reports = run_pipeline(args.repo, args.run_id, args.config, args.token, aws_region=args.aws_region)
+    reports = run_pipeline(
+        args.repo,
+        args.run_id,
+        args.config,
+        args.token,
+        aws_region=args.aws_region,
+        state_github_token=args.state_token,
+        state_repo_name=args.state_repo,
+        allow_pr_creation=not args.queue_only,
+    )
     if not reports:
         logger.info("No failures processed.")
         sys.exit(0)

@@ -34,9 +34,14 @@ class FailureStore:
         self,
         github_client: Github | None = None,
         repo_full_name: str = "",
+        *,
+        state_github_client: Github | None = None,
+        state_repo_full_name: str | None = None,
     ) -> None:
         self._gh = github_client
         self._repo_name = repo_full_name
+        self._state_gh = state_github_client or github_client
+        self._state_repo_name = state_repo_full_name or repo_full_name
         self._entries: dict[str, FailureStoreEntry] = {}
 
     @property
@@ -226,11 +231,11 @@ class FailureStore:
 
     def load(self) -> None:
         """Load the store from the dedicated branch via GitHub API."""
-        if not self._gh or not self._repo_name:
+        if not self._state_gh or not self._state_repo_name:
             logger.info("No GitHub client; starting with empty store.")
             return
         try:
-            repo = self._gh.get_repo(self._repo_name)
+            repo = self._state_gh.get_repo(self._state_repo_name)
             contents = repo.get_contents(_STORE_FILE, ref=_STORE_BRANCH)
             if isinstance(contents, list):
                 raise ValueError("Failure store path resolved to a directory.")
@@ -243,11 +248,11 @@ class FailureStore:
 
     def save(self) -> None:
         """Save the store to the dedicated branch via GitHub API."""
-        if not self._gh or not self._repo_name:
+        if not self._state_gh or not self._state_repo_name:
             logger.warning("Cannot save: no GitHub client or repo configured.")
             return
         try:
-            repo = self._gh.get_repo(self._repo_name)
+            repo = self._state_gh.get_repo(self._state_repo_name)
             self._ensure_store_branch(repo)
             content = json.dumps(self.to_dict(), indent=2)
             try:

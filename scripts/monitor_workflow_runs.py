@@ -15,7 +15,9 @@ if __package__ in {None, ""}:
 
 from github import Auth, Github
 
+from scripts.config import BotConfig
 from scripts.main import run_pipeline
+from scripts.rate_limiter import RateLimiter
 from scripts.monitor_state_store import MonitorStateStore
 
 logger = logging.getLogger(__name__)
@@ -35,6 +37,7 @@ class MonitorArgs:
     max_runs: int
     aws_region: str | None
     dry_run: bool
+    queue_only: bool
     verbose: bool
 
 
@@ -51,6 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-runs", type=int, default=14)
     parser.add_argument("--aws-region")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--queue-only", action="store_true")
     parser.add_argument("--verbose", action="store_true")
     return parser
 
@@ -77,6 +81,7 @@ def parse_args(argv: list[str] | None = None) -> MonitorArgs:
         max_runs=max(1, ns.max_runs),
         aws_region=ns.aws_region,
         dry_run=ns.dry_run,
+        queue_only=ns.queue_only,
         verbose=ns.verbose,
     )
 
@@ -127,54 +132,65 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
         "event": args.event,
         "config_path": args.config_path,
         "dry_run": args.dry_run,
+        "queue_only": args.queue_only,
         "last_seen_run_id": last_seen_run_id,
         "new_run_count": len(recent_runs),
         "runs": run_results,
     }
-    if not recent_runs:
-        return result
-
     new_last_seen = last_seen_run_id
-    for run in recent_runs:
-        run_result: dict[str, object] = {
-            "run_id": run.id,
-            "run_number": run.run_number,
-            "conclusion": run.conclusion or "",
-            "head_sha": run.head_sha,
-            "html_url": run.html_url,
-        }
+    if recent_runs:
+        for run in recent_runs:
+            run_result: dict[str, object] = {
+                "run_id": run.id,
+                "run_number": run.run_number,
+                "conclusion": run.conclusion or "",
+                "head_sha": run.head_sha,
+                "html_url": run.html_url,
+            }
 
-        if run.conclusion != "failure":
-            run_result["action"] = "skip-non-failure"
+            if run.conclusion != "failure":
+                run_result["action"] = "skip-non-failure"
+                run_results.append(run_result)
+                new_last_seen = max(new_last_seen, run.id)
+                continue
+
+            if args.dry_run:
+                run_result["action"] = "would-process-failure"
+                run_results.append(run_result)
+                continue
+
+            try:
+                reports = run_pipeline(
+                    args.target_repo,
+                    run.id,
+                    args.config_path,
+                    args.target_token,
+                    aws_region=args.aws_region,
+                    state_github_token=args.state_token,
+                    state_repo_name=args.state_repo,
+                    allow_pr_creation=not args.queue_only,
+                )
+            except Exception as exc:
+                run_result["action"] = "pipeline-error"
+                run_result["error"] = str(exc)
+                run_results.append(run_result)
+                break
+
+            run_result["action"] = "processed-failure"
+            run_result["failure_reports"] = len(reports)
             run_results.append(run_result)
             new_last_seen = max(new_last_seen, run.id)
-            continue
-
-        if args.dry_run:
-            run_result["action"] = "would-process-failure"
-            run_results.append(run_result)
-            continue
-
-        try:
-            reports = run_pipeline(
-                args.target_repo,
-                run.id,
-                args.config_path,
-                args.target_token,
-                aws_region=args.aws_region,
-            )
-        except Exception as exc:
-            run_result["action"] = "pipeline-error"
-            run_result["error"] = str(exc)
-            run_results.append(run_result)
-            break
-
-        run_result["action"] = "processed-failure"
-        run_result["failure_reports"] = len(reports)
-        run_results.append(run_result)
-        new_last_seen = max(new_last_seen, run.id)
 
     result["new_last_seen_run_id"] = new_last_seen
+    queue_state = RateLimiter(
+        BotConfig(),
+        state_github_client=Github(auth=Auth.Token(args.state_token)),
+        state_repo_full_name=args.state_repo,
+    )
+    queue_state.load()
+    queued_failures = queue_state.get_queued_failures()
+    result["queued_failure_count"] = len(queued_failures)
+    result["has_queued_failures"] = bool(queued_failures)
 
     if not args.dry_run and new_last_seen > last_seen_run_id:
         state_store.mark_seen(
