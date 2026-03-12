@@ -9,11 +9,15 @@
 #
 # You will also need a config file — see examples/config.yml for a template.
 #
-# Required repository secrets:
-#   CI_BOT_AWS_ACCESS_KEY_ID     — IAM access key for Amazon Bedrock
-#   CI_BOT_AWS_SECRET_ACCESS_KEY — IAM secret key for Amazon Bedrock
-#   CI_BOT_AWS_REGION            — AWS region where Bedrock is available
-#   GITHUB_TOKEN                 — Automatically provided by GitHub Actions
+# Recommended repository configuration:
+#   Secret:   CI_BOT_AWS_ROLE_ARN        — IAM role assumable via GitHub OIDC
+#   Variable: CI_BOT_AWS_REGION          — AWS region where Bedrock is available
+#   Secret:   GITHUB_TOKEN               — Automatically provided by GitHub Actions
+#
+# Optional static-credential fallback:
+#   Secret:   CI_BOT_AWS_ACCESS_KEY_ID
+#   Secret:   CI_BOT_AWS_SECRET_ACCESS_KEY
+#   Secret:   CI_BOT_AWS_SESSION_TOKEN   — only when session-based credentials are used
 
 name: CI Failure Bot
 
@@ -88,11 +92,13 @@ jobs:
       config_path: .github/ci-failure-bot.yml
       bot_repository: valkey-io/valkey-ci-bot
       bot_ref: v1
+      aws_region: ${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}
       mode: analyze
     secrets:
+      AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}
       AWS_ACCESS_KEY_ID: ${{ secrets.CI_BOT_AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_BOT_AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: ${{ secrets.CI_BOT_AWS_REGION }}
+      AWS_SESSION_TOKEN: ${{ secrets.CI_BOT_AWS_SESSION_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------
@@ -107,11 +113,13 @@ jobs:
       config_path: .github/ci-failure-bot.yml
       bot_repository: valkey-io/valkey-ci-bot
       bot_ref: v1
+      aws_region: ${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}
       mode: reconcile
     secrets:
+      AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}
       AWS_ACCESS_KEY_ID: ${{ secrets.CI_BOT_AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_BOT_AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: ${{ secrets.CI_BOT_AWS_REGION }}
+      AWS_SESSION_TOKEN: ${{ secrets.CI_BOT_AWS_SESSION_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ---------------------------------------------------------------------------

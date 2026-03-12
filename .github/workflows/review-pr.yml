@@ -23,13 +23,20 @@ on:
         required: false
         type: string
         default: "auto"
+      aws_region:
+        description: "AWS region where Bedrock is available"
+        required: false
+        type: string
+        default: "us-east-1"
     secrets:
+      AWS_ROLE_ARN:
+        required: false
       AWS_ACCESS_KEY_ID:
-        required: true
+        required: false
       AWS_SECRET_ACCESS_KEY:
-        required: true
-      AWS_REGION:
-        required: true
+        required: false
+      AWS_SESSION_TOKEN:
+        required: false
       GITHUB_TOKEN:
         required: true
 
@@ -40,12 +47,15 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
+      id-token: write
     steps:
       - name: Checkout bot repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ inputs.bot_repository }}
           ref: ${{ inputs.bot_ref }}
+          persist-credentials: false
+          fetch-depth: 1
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -56,15 +66,36 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Validate AWS authentication inputs
+        if: secrets.AWS_ROLE_ARN == '' && (secrets.AWS_ACCESS_KEY_ID == '' || secrets.AWS_SECRET_ACCESS_KEY == '')
+        run: |
+          echo "Configure either AWS_ROLE_ARN or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY for this workflow." >&2
+          exit 1
+
+      - name: Configure AWS credentials from OIDC role
+        if: secrets.AWS_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: valkey-pr-review-bot-${{ github.run_id }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Configure AWS credentials from static secrets
+        if: secrets.AWS_ROLE_ARN == ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ inputs.aws_region }}
+
       - name: Run PR reviewer
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+          AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
         run: |
           python scripts/pr_review_main.py \
             --repo "${{ github.repository }}" \
             --config "${{ inputs.config_path }}" \
             --mode "${{ inputs.mode }}" \
             --token "${{ secrets.GITHUB_TOKEN }}" \
-            --aws-region "${{ secrets.AWS_REGION }}"
+            --aws-region "${{ inputs.aws_region }}"

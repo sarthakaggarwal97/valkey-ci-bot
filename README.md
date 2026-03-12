@@ -1,6 +1,30 @@
 # valkey-ci-bot
 An AI bot for Valkey CI failure remediation and PR review
 
+## Setup
+
+Model selection is configured in YAML, not in secrets:
+
+- `examples/config.yml` controls the CI failure bot model through `bedrock.model_id`
+- `examples/pr-review-config.yml` controls the PR reviewer models through `reviewer.models.light_model_id` and `reviewer.models.heavy_model_id`
+
+AWS authentication is wired for GitHub Actions OIDC by default:
+
+- GitHub Actions secret: `CI_BOT_AWS_ROLE_ARN`
+- GitHub Actions variable: `CI_BOT_AWS_REGION`
+
+Static access-key fallback is still supported if you need it:
+
+- `CI_BOT_AWS_ACCESS_KEY_ID`
+- `CI_BOT_AWS_SECRET_ACCESS_KEY`
+- `CI_BOT_AWS_SESSION_TOKEN` when using session credentials
+
+Local development:
+
+- copy [`.env.example`](/Users/sarthagg/IdeaProjects/valkey-ci-bot/.env.example) to `.env.local`
+- fill in your own `GITHUB_TOKEN`, `AWS_REGION`, and `AWS_PROFILE`
+- source `.env.local` manually before running scripts
+
 ## PR review bot
 
 The repository also includes a reusable PR reviewer workflow at `.github/workflows/review-pr.yml`.
@@ -25,10 +49,14 @@ It runs a full Bedrock knowledge-base refresh every 6 hours and can also be star
 
 Required repository secrets:
 
+- `AWS_ROLE_ARN` for OIDC role assumption, or:
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_SESSION_TOKEN` if your AWS credentials are session-based
-- `AWS_REGION` if you do not want the workflow default of `us-east-1`
+
+Recommended repository variable:
+
+- `AWS_REGION`
 
 What the workflow does:
 
