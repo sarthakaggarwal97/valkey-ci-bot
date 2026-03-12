@@ -89,7 +89,7 @@ def _looks_like_code(path: str) -> bool:
     }
 
 
-def _serialize_scope(scope: DiffScope, *, max_chars: int = 60_000) -> str:
+def _serialize_scope(scope: DiffScope, *, max_chars: int = 200_000) -> str:
     chunks: list[str] = []
     used = 0
     for changed_file in scope.files:
