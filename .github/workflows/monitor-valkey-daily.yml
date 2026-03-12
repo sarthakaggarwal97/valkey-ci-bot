@@ -38,6 +38,9 @@ jobs:
       MONITOR_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
       MONITOR_MAX_RUNS: ${{ github.event.inputs.max_runs || '14' }}
       MONITOR_VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
+      VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+      VALKEY_GITHUB_APP_ID: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
+      VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
     steps:
       - name: Check out bot repository
         uses: actions/checkout@v6
@@ -55,18 +58,18 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Validate target repository authentication inputs
-        if: ${{ secrets.VALKEY_GITHUB_TOKEN == '' && (vars.VALKEY_GITHUB_APP_ID == '' || secrets.VALKEY_GITHUB_APP_PRIVATE_KEY == '') }}
+        if: ${{ env.VALKEY_GITHUB_TOKEN == '' && (env.VALKEY_GITHUB_APP_ID == '' || env.VALKEY_GITHUB_APP_PRIVATE_KEY == '') }}
         run: |
           echo "Configure either VALKEY_GITHUB_TOKEN or VALKEY_GITHUB_APP_ID plus VALKEY_GITHUB_APP_PRIVATE_KEY." >&2
           exit 1
 
       - name: Create target repository GitHub App token
         id: app-token
-        if: ${{ secrets.VALKEY_GITHUB_TOKEN == '' }}
+        if: ${{ env.VALKEY_GITHUB_TOKEN == '' }}
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ vars.VALKEY_GITHUB_APP_ID }}
-          private-key: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
+          app-id: ${{ env.VALKEY_GITHUB_APP_ID }}
+          private-key: ${{ env.VALKEY_GITHUB_APP_PRIVATE_KEY }}
           owner: valkey-io
           repositories: valkey
           permission-actions: read
@@ -78,8 +81,8 @@ jobs:
         id: target-token
         shell: bash
         run: |
-          if [[ -n "${{ secrets.VALKEY_GITHUB_TOKEN }}" ]]; then
-            echo "token=${{ secrets.VALKEY_GITHUB_TOKEN }}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
+            echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
           else
             echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
           fi

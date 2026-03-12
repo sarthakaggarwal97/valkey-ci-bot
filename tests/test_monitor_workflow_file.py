@@ -22,9 +22,13 @@ def _get_on_block(workflow: dict) -> dict:
 def test_monitor_workflow_uses_oidc_and_app_token_support() -> None:
     workflow = _load_yaml(REPO_ROOT / ".github/workflows/monitor-valkey-daily.yml")
     on_block = _get_on_block(workflow)
+    job_env = workflow["jobs"]["monitor"]["env"]
 
     assert workflow["permissions"] == {"contents": "write", "id-token": "write"}
     assert on_block["workflow_dispatch"]["inputs"]["dry_run"]["default"] is True
+    assert "VALKEY_GITHUB_TOKEN" in job_env
+    assert "VALKEY_GITHUB_APP_ID" in job_env
+    assert "VALKEY_GITHUB_APP_PRIVATE_KEY" in job_env
 
     app_token_step = next(
         step
@@ -37,6 +41,10 @@ def test_monitor_workflow_uses_oidc_and_app_token_support() -> None:
     assert app_token_step["with"]["permission-actions"] == "read"
     assert app_token_step["with"]["permission-contents"] == "write"
     assert app_token_step["with"]["permission-pull-requests"] == "write"
+
+    for step in workflow["jobs"]["monitor"]["steps"]:
+        if "if" in step:
+            assert "secrets." not in step["if"]
 
 
 def test_monitor_workflow_runs_central_monitor_script() -> None:
