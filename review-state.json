@@ -2,7 +2,7 @@
   "sarthakaggarwal97/valkey#80": {
     "repo": "sarthakaggarwal97/valkey",
     "pr_number": 80,
-    "last_reviewed_head_sha": "16fb2e540573d2a2e6ec4f19f00a600ba86df332",
+    "last_reviewed_head_sha": "d653fd80f116c81dc15e63efc2020ff949d53820",
     "summary_comment_id": 4050412400,
     "review_comment_ids": [
       2927703795,
@@ -10,10 +10,22 @@
       2927704076,
       2927873343,
       2927873487,
-      2927873634,
-      2927967472,
-      2927967558
+      2927873634
     ],
-    "updated_at": "2026-03-12T23:18:34.668568+00:00"
+    "updated_at": "2026-03-12T22:56:17.901670+00:00"
+  },
+  "valkey-io/valkey-fuzzer#68": {
+    "repo": "valkey-io/valkey-fuzzer",
+    "pr_number": 68,
+    "last_reviewed_head_sha": "ab289221fe5a6e8ab490a38878712b1fa5085279",
+    "summary_comment_id": 4050176639,
+    "review_comment_ids": [
+      2927969696,
+      2927969807,
+      2927969931,
+      2927970033,
+      2927970162
+    ],
+    "updated_at": "2026-03-12T23:19:13.266002+00:00"
   }
 }
