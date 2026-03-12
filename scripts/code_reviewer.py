@@ -89,7 +89,7 @@ def _looks_like_code(path: str) -> bool:
     }
 
 
-def _serialize_scope(scope: DiffScope, *, max_chars: int = 30_000) -> str:
+def _serialize_scope(scope: DiffScope, *, max_chars: int = 60_000) -> str:
     chunks: list[str] = []
     used = 0
     for changed_file in scope.files:
@@ -100,13 +100,27 @@ def _serialize_scope(scope: DiffScope, *, max_chars: int = 30_000) -> str:
             f"Deletions: {changed_file.deletions}",
         ]
         if changed_file.patch:
-            chunk.append("Patch (unified diff with line numbers — may be truncated):")
-            chunk.append(changed_file.patch[:4000])
+            chunk.append("Patch (unified diff with line numbers):")
+            chunk.append(changed_file.patch)
         if changed_file.contents:
-            chunk.append("Contents excerpt (may be truncated):")
-            chunk.append(changed_file.contents[:1200])
+            chunk.append("Full file contents (may be truncated):")
+            chunk.append(changed_file.contents[:6000])
         rendered = "\n".join(chunk)
         if used + len(rendered) > max_chars:
+            # Try to fit a truncated version instead of skipping entirely
+            budget = max_chars - used
+            if budget > 500:
+                truncated_patch = changed_file.patch[:budget - 200] if changed_file.patch else ""
+                chunk_trunc = [
+                    f"Path: {changed_file.path}",
+                    f"Status: {changed_file.status}",
+                    f"Additions: {changed_file.additions}",
+                    f"Deletions: {changed_file.deletions}",
+                ]
+                if truncated_patch:
+                    chunk_trunc.append("Patch (unified diff — TRUNCATED to fit budget):")
+                    chunk_trunc.append(truncated_patch)
+                chunks.append("\n".join(chunk_trunc))
             break
         chunks.append(rendered)
         used += len(rendered)
