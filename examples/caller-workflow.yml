@@ -1,0 +1,125 @@
+# Example caller workflow for consumer repositories.
+#
+# Copy this file to your repository as:
+#   .github/workflows/ci-failure-bot.yml
+#
+# This workflow triggers the CI Failure Bot when your CI workflows fail.
+# It performs a lightweight preflight classification locally (no secrets needed),
+# then calls the bot's reusable workflow only for trusted, same-repository failures.
+#
+# You will also need a config file — see examples/config.yml for a template.
+#
+# Required repository secrets:
+#   CI_BOT_AWS_ACCESS_KEY_ID     — IAM access key for Amazon Bedrock
+#   CI_BOT_AWS_SECRET_ACCESS_KEY — IAM secret key for Amazon Bedrock
+#   CI_BOT_AWS_REGION            — AWS region where Bedrock is available
+#   GITHUB_TOKEN                 — Automatically provided by GitHub Actions
+
+name: CI Failure Bot
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+on:
+  workflow_run:
+    # IMPORTANT: These must be workflow DISPLAY NAMES (the `name:` field at the
+    # top of each workflow YAML file), NOT filenames.
+    #
+    # For example, if your ci.yml starts with `name: CI`, list "CI" here.
+    # If daily.yml starts with `name: Daily`, list "Daily" here.
+    #
+    # The bot's config file uses filenames (e.g., ci.yml) for the
+    # `monitored_workflows` setting, which filters after the trigger fires.
+    # This `workflows:` list and the config's `monitored_workflows` serve
+    # different purposes and must be maintained separately.
+    workflows: [CI, Daily, Weekly, External]
+    types: [completed]
+
+  # Reconcile failure store when PRs are closed (merged or abandoned).
+  pull_request_target:
+    types: [closed]
+
+  # Scheduled reconciliation drains queued failures after rate limits reset.
+  schedule:
+    - cron: "17 * * * *"  # Every hour at :17
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Preflight: classify the event before passing secrets to the reusable workflow.
+  # This job runs with read-only permissions and no secrets, so it is safe to
+  # execute for any event, including fork-originated workflow_run completions.
+  # ---------------------------------------------------------------------------
+  preflight:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      mode: ${{ steps.classify.outputs.mode }}
+    steps:
+      - id: classify
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Schedule and pull_request_target events trigger reconciliation.
+            if (context.eventName === "schedule" || context.eventName === "pull_request_target") {
+              core.setOutput("mode", "reconcile");
+              return;
+            }
+
+            // For workflow_run events, check trust and conclusion.
+            const run = context.payload.workflow_run;
+            const trusted = run?.head_repository?.full_name === `${context.repo.owner}/${context.repo.repo}`;
+            const shouldAnalyze = run?.conclusion === "failure" && trusted;
+            core.setOutput("mode", shouldAnalyze ? "analyze" : "skip");
+
+  # ---------------------------------------------------------------------------
+  # Analyze: process the CI failure through the bot pipeline.
+  # Only runs for trusted, same-repository failures.
+  # ---------------------------------------------------------------------------
+  analyze:
+    needs: preflight
+    if: needs.preflight.outputs.mode == 'analyze'
+    uses: valkey-io/valkey-ci-bot/.github/workflows/analyze-failure.yml@v1
+    with:
+      config_path: .github/ci-failure-bot.yml
+      bot_repository: valkey-io/valkey-ci-bot
+      bot_ref: v1
+      mode: analyze
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.CI_BOT_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_BOT_AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.CI_BOT_AWS_REGION }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Reconcile: drain queued failures and sync failure store with PR state.
+  # Runs on schedule and when PRs are closed.
+  # ---------------------------------------------------------------------------
+  reconcile:
+    needs: preflight
+    if: needs.preflight.outputs.mode == 'reconcile'
+    uses: valkey-io/valkey-ci-bot/.github/workflows/analyze-failure.yml@v1
+    with:
+      config_path: .github/ci-failure-bot.yml
+      bot_repository: valkey-io/valkey-ci-bot
+      bot_ref: v1
+      mode: reconcile
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.CI_BOT_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_BOT_AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.CI_BOT_AWS_REGION }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Skip: log untrusted or non-failure workflow_run events.
+  # ---------------------------------------------------------------------------
+  skip_untrusted:
+    needs: preflight
+    if: needs.preflight.outputs.mode == 'skip' && github.event_name == 'workflow_run'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Skipping untrusted fork failure or non-failure workflow_run."

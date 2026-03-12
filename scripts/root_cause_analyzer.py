@@ -1,0 +1,376 @@
+"""Root cause analysis using Amazon Bedrock.
+
+Identifies relevant source files from failure data, retrieves their contents
+at the failing commit SHA, sends a structured prompt to Bedrock, and parses
+the response into a RootCauseReport.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+from typing import Any
+
+from scripts.bedrock_client import BedrockClient, BedrockError
+from scripts.config import ProjectContext
+from scripts.models import FailureReport, ParsedFailure, RootCauseReport
+
+logger = logging.getLogger(__name__)
+
+# Keywords that suggest a flaky / non-deterministic test failure
+_FLAKY_KEYWORDS = [
+    "timeout",
+    "timed out",
+    "race condition",
+    "intermittent",
+    "flaky",
+    "non-deterministic",
+    "nondeterministic",
+    "timing",
+    "deadlock",
+    "random",
+    "sporadic",
+    "transient",
+    "retry",
+    "elapsed",
+    "sleep",
+    "wait_for",
+    "after 0 ms",
+]
+
+# Regex for extracting file paths from error messages / stack traces
+_FILE_PATH_RE = re.compile(
+    r"(?:^|[\s\"'(])("
+    r"(?:src|tests|test|include|lib|modules)"  # common root dirs
+    r"/[A-Za-z0-9_./-]+"                       # rest of path
+    r"\.(?:cpp|cc|hpp|tcl|py|rs|java|c|h)"     # file extension (longer first)
+    r")(?=[:\s\"'),;]|$)"                      # boundary
+)
+
+_SYSTEM_PROMPT = """\
+You are an expert C/C++ developer and CI failure analyst. Your task is to \
+analyze a CI test failure and identify the root cause.
+
+Respond ONLY with a JSON object (no markdown fences, no extra text) using \
+this exact schema:
+{
+  "description": "<concise root cause description>",
+  "files_to_change": ["<file1>", "<file2>"],
+  "confidence": "<high|medium|low>",
+  "rationale": "<brief rationale for the diagnosis>",
+  "is_flaky": <true|false>,
+  "flakiness_indicators": ["<indicator1>", "<indicator2>"] or null
+}
+
+Guidelines:
+- confidence should be "high" when the root cause is clear from the error, \
+"medium" when likely but uncertain, "low" when speculative.
+- Set is_flaky to true if the failure appears timing-dependent, \
+non-deterministic, or intermittent.
+- files_to_change should list only files that need modification to fix the issue.
+- Keep description and rationale concise but informative.
+"""
+
+
+def _detect_flaky_indicators(failure: ParsedFailure) -> list[str]:
+    """Scan a ParsedFailure for keywords that suggest flakiness."""
+    indicators: list[str] = []
+    text = " ".join(filter(None, [
+        failure.error_message,
+        failure.assertion_details,
+        failure.stack_trace,
+    ])).lower()
+
+    for keyword in _FLAKY_KEYWORDS:
+        if keyword in text:
+            indicators.append(keyword)
+    return indicators
+
+
+def _extract_file_paths(text: str) -> list[str]:
+    """Extract file paths from error messages or stack traces."""
+    if not text:
+        return []
+    return list(dict.fromkeys(_FILE_PATH_RE.findall(text)))
+
+
+def _apply_test_to_source_patterns(
+    file_path: str,
+    patterns: list[dict[str, str]],
+) -> list[str]:
+    """Map a test file path to source file paths using configurable patterns.
+
+    Each pattern dict has 'test_path' and 'source_path' keys with ``{name}``
+    placeholders.  For example::
+
+        {"test_path": "tests/unit/{name}.tcl", "source_path": "src/{name}.c"}
+
+    Returns a list of candidate source paths (may be empty).
+    """
+    results: list[str] = []
+    for pattern in patterns:
+        test_template = pattern.get("test_path", "")
+        source_template = pattern.get("source_path", "")
+        if not test_template or not source_template:
+            continue
+
+        # Build a regex from the test template to extract {name}
+        # Escape everything except the {name} placeholder
+        escaped = re.escape(test_template).replace(r"\{name\}", r"(?P<name>.+)")
+        match = re.fullmatch(escaped, file_path)
+        if match:
+            name = match.group("name")
+            results.append(source_template.replace("{name}", name))
+    return results
+
+
+def _build_user_prompt(
+    failure_report: FailureReport,
+    source_contents: dict[str, str],
+) -> str:
+    """Build the user prompt sent to Bedrock for root cause analysis."""
+    parts: list[str] = []
+
+    parts.append("## Failure Context")
+    parts.append(f"Workflow: {failure_report.workflow_name}")
+    parts.append(f"Job: {failure_report.job_name}")
+    parts.append(f"Commit: {failure_report.commit_sha}")
+    if failure_report.matrix_params:
+        params_str = ", ".join(
+            f"{k}={v}" for k, v in failure_report.matrix_params.items()
+        )
+        parts.append(f"Matrix: {params_str}")
+
+    for pf in failure_report.parsed_failures:
+        parts.append(f"\n### Failure: {pf.failure_identifier}")
+        parts.append(f"File: {pf.file_path}")
+        parts.append(f"Error: {pf.error_message}")
+        if pf.line_number is not None:
+            parts.append(f"Line: {pf.line_number}")
+        if pf.assertion_details:
+            parts.append(f"Assertion: {pf.assertion_details}")
+        if pf.stack_trace:
+            parts.append(f"Stack trace:\n{pf.stack_trace}")
+
+    if failure_report.raw_log_excerpt:
+        parts.append(f"\n### Raw Log Excerpt\n{failure_report.raw_log_excerpt}")
+
+    if source_contents:
+        parts.append("\n## Relevant Source Files")
+        for path, content in source_contents.items():
+            parts.append(f"\n### {path}\n```\n{content}\n```")
+
+    return "\n".join(parts)
+
+
+def _parse_bedrock_response(raw: str) -> RootCauseReport:
+    """Parse the JSON response from Bedrock into a RootCauseReport.
+
+    Raises ValueError if the response is not valid JSON or missing fields.
+    """
+    # Strip markdown code fences if present
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        # Remove opening fence (possibly ```json)
+        cleaned = re.sub(r"^```[a-z]*\n?", "", cleaned)
+        cleaned = re.sub(r"\n?```$", "", cleaned)
+        cleaned = cleaned.strip()
+
+    data = json.loads(cleaned)
+
+    confidence = data.get("confidence", "low")
+    if confidence not in ("high", "medium", "low"):
+        confidence = "low"
+
+    return RootCauseReport(
+        description=str(data.get("description", "")),
+        files_to_change=list(data.get("files_to_change", [])),
+        confidence=confidence,
+        rationale=str(data.get("rationale", "")),
+        is_flaky=bool(data.get("is_flaky", False)),
+        flakiness_indicators=data.get("flakiness_indicators"),
+    )
+
+
+class RootCauseAnalyzer:
+    """Bedrock-powered root cause analysis for CI failures.
+
+    Accepts a BedrockClient and a GitHub client (PyGithub ``Github``
+    instance) in its constructor.
+    """
+
+    def __init__(self, bedrock_client: BedrockClient, github_client: Any):
+        self._bedrock = bedrock_client
+        self._github = github_client
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def analyze(
+        self,
+        failure_report: FailureReport,
+        project: ProjectContext,
+    ) -> RootCauseReport:
+        """Analyze a failure report and produce a RootCauseReport.
+
+        Steps:
+        1. Identify relevant source files from parsed failures.
+        2. Retrieve file contents at the commit SHA via GitHub API.
+        3. Detect flaky-test indicators locally.
+        4. Send structured prompt to Bedrock.
+        5. Parse the model response into a RootCauseReport.
+
+        On Bedrock errors or unparseable responses, returns a special
+        "analysis-failed" report.
+        """
+        # 1. Collect relevant files across all parsed failures
+        relevant_files: list[str] = []
+        for pf in failure_report.parsed_failures:
+            relevant_files.extend(self.identify_relevant_files(pf, project))
+        # Deduplicate while preserving order
+        relevant_files = list(dict.fromkeys(relevant_files))
+        logger.info(
+            "Analysis started for job %s: %d relevant file(s) identified.",
+            failure_report.job_name, len(relevant_files),
+        )
+
+        # 2. Retrieve file contents at the commit SHA
+        source_contents = self._retrieve_file_contents(
+            failure_report.commit_sha,
+            relevant_files,
+            repo_name=self._infer_repo_name(failure_report),
+        )
+
+        # 3. Detect flaky indicators locally
+        all_flaky_indicators: list[str] = []
+        for pf in failure_report.parsed_failures:
+            all_flaky_indicators.extend(_detect_flaky_indicators(pf))
+        all_flaky_indicators = list(dict.fromkeys(all_flaky_indicators))
+
+        # 4. Build prompt and call Bedrock
+        user_prompt = _build_user_prompt(failure_report, source_contents)
+
+        try:
+            raw_response = self._bedrock.invoke(_SYSTEM_PROMPT, user_prompt)
+        except BedrockError as exc:
+            logger.error("Bedrock error during root cause analysis: %s", exc)
+            return self._analysis_failed_report(str(exc))
+
+        # 5. Parse response
+        try:
+            report = _parse_bedrock_response(raw_response)
+        except (json.JSONDecodeError, ValueError, KeyError, TypeError, AttributeError) as exc:
+            logger.error("Failed to parse Bedrock response: %s", exc)
+            return self._analysis_failed_report(
+                f"Unparseable model response: {exc}"
+            )
+
+        # Merge locally-detected flaky indicators with model's assessment
+        if all_flaky_indicators:
+            report.is_flaky = True
+            existing = report.flakiness_indicators or []
+            merged = list(dict.fromkeys(existing + all_flaky_indicators))
+            report.flakiness_indicators = merged
+
+        logger.info(
+            "Analysis complete for job %s: confidence=%s, is_flaky=%s, "
+            "files_to_change=%s",
+            failure_report.job_name, report.confidence, report.is_flaky,
+            report.files_to_change,
+        )
+        return report
+
+    def identify_relevant_files(
+        self,
+        failure: ParsedFailure,
+        project: ProjectContext,
+    ) -> list[str]:
+        """Map a ParsedFailure to relevant source file paths.
+
+        Uses three strategies:
+        1. Direct file references in error messages and stack traces.
+        2. Configurable test-to-source patterns from project config.
+        3. The failure's own file_path (always included if non-empty).
+        """
+        files: list[str] = []
+
+        # Strategy 1: extract paths from error message and stack trace
+        files.extend(_extract_file_paths(failure.error_message))
+        if failure.stack_trace:
+            files.extend(_extract_file_paths(failure.stack_trace))
+        if failure.assertion_details:
+            files.extend(_extract_file_paths(failure.assertion_details))
+
+        # Strategy 2: apply test-to-source patterns
+        if failure.file_path:
+            mapped = _apply_test_to_source_patterns(
+                failure.file_path, project.test_to_source_patterns
+            )
+            files.extend(mapped)
+
+        # Strategy 3: always include the failure's own file path
+        if failure.file_path:
+            files.append(failure.file_path)
+
+        # Deduplicate while preserving order
+        return list(dict.fromkeys(files))
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _retrieve_file_contents(
+        self,
+        commit_sha: str,
+        file_paths: list[str],
+        repo_name: str,
+    ) -> dict[str, str]:
+        """Retrieve file contents from GitHub at a specific commit SHA.
+
+        Returns a dict mapping file path → content.  Files that cannot be
+        retrieved (404, etc.) are silently skipped.
+        """
+        contents: dict[str, str] = {}
+        if not file_paths:
+            return contents
+
+        try:
+            repo = self._github.get_repo(repo_name)
+        except Exception as exc:
+            logger.warning("Could not access repo %s: %s", repo_name, exc)
+            return contents
+
+        for path in file_paths:
+            try:
+                file_content = repo.get_contents(path, ref=commit_sha)
+                if hasattr(file_content, "decoded_content"):
+                    contents[path] = file_content.decoded_content.decode(
+                        "utf-8", errors="replace"
+                    )
+            except Exception as exc:
+                logger.debug(
+                    "Could not retrieve %s at %s: %s", path, commit_sha[:12], exc
+                )
+        return contents
+
+    @staticmethod
+    def _infer_repo_name(failure_report: FailureReport) -> str:
+        """Infer the repository name from the failure report.
+
+        Prefer the explicit repository metadata on the report.
+        """
+        return failure_report.repo_full_name
+
+    @staticmethod
+    def _analysis_failed_report(reason: str) -> RootCauseReport:
+        """Return a sentinel RootCauseReport indicating analysis failure."""
+        return RootCauseReport(
+            description=f"analysis-failed: {reason}",
+            files_to_change=[],
+            confidence="low",
+            rationale=reason,
+            is_flaky=False,
+            flakiness_indicators=None,
+        )

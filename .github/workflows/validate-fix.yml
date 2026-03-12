@@ -1,0 +1,183 @@
+name: Validate Fix
+
+on:
+  workflow_call:
+    inputs:
+      consumer_repo:
+        description: "Full name of the consumer repository (owner/repo)"
+        required: true
+        type: string
+      commit_sha:
+        description: "Commit SHA to check out in the consumer repo"
+        required: true
+        type: string
+      patch_content:
+        description: "Unified diff patch content to apply via git apply"
+        required: true
+        type: string
+      build_commands:
+        description: "JSON array of build commands to run"
+        required: true
+        type: string
+      test_commands:
+        description: "JSON array of test commands to run (empty array for build-only validation)"
+        required: false
+        type: string
+        default: "[]"
+      env_vars:
+        description: "JSON object of environment variables to set during build and test"
+        required: false
+        type: string
+        default: "{}"
+    outputs:
+      passed:
+        description: "Whether the validation passed ('true' or 'false')"
+        value: ${{ jobs.validate.outputs.passed }}
+      output:
+        description: "Combined build/test output"
+        value: ${{ jobs.validate.outputs.output }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      passed: ${{ steps.result.outputs.passed }}
+      output: ${{ steps.result.outputs.output }}
+    steps:
+      - name: Checkout consumer repo at SHA
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.consumer_repo }}
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 1
+
+      - name: Apply patch
+        id: apply
+        env:
+          PATCH_CONTENT: ${{ inputs.patch_content }}
+        run: |
+          printf '%s\n' "$PATCH_CONTENT" | git apply -
+
+      - name: Set environment variables
+        env:
+          ENV_VARS_JSON: ${{ inputs.env_vars }}
+        run: |
+          python3 -c "
+          import json, os
+          env_vars = json.loads(os.environ['ENV_VARS_JSON'])
+          env_file = os.environ['GITHUB_ENV']
+          with open(env_file, 'a') as f:
+              for key, value in env_vars.items():
+                  f.write(f'{key}={value}\n')
+          "
+
+      - name: Run build commands
+        id: build
+        env:
+          BUILD_COMMANDS_JSON: ${{ inputs.build_commands }}
+        run: |
+          set +e
+          touch /tmp/build_output.txt
+          python3 -c "
+          import json, os
+          cmds = json.loads(os.environ['BUILD_COMMANDS_JSON'])
+          for cmd in cmds:
+              print(cmd)
+          " | while IFS= read -r cmd; do
+            echo "::group::Build: $cmd"
+            eval "$cmd" 2>&1 | tee -a /tmp/build_output.txt
+            rc=${PIPESTATUS[0]}
+            echo "::endgroup::"
+            if [ $rc -ne 0 ]; then
+              echo "Build command failed: $cmd (exit code $rc)" | tee -a /tmp/build_output.txt
+              exit $rc
+            fi
+          done
+          build_rc=$?
+          if [ $build_rc -ne 0 ]; then
+            echo "build_passed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_passed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run test commands
+        id: test
+        if: steps.build.outputs.build_passed == 'true'
+        env:
+          TEST_COMMANDS_JSON: ${{ inputs.test_commands }}
+        run: |
+          set +e
+          touch /tmp/test_output.txt
+          test_cmds=$(python3 -c "
+          import json, os
+          cmds = json.loads(os.environ['TEST_COMMANDS_JSON'])
+          for cmd in cmds:
+              print(cmd)
+          ")
+          if [ -z "$test_cmds" ]; then
+            echo "No test commands — build-only validation." | tee -a /tmp/test_output.txt
+            echo "test_passed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$test_cmds" | while IFS= read -r cmd; do
+            echo "::group::Test: $cmd"
+            eval "$cmd" 2>&1 | tee -a /tmp/test_output.txt
+            rc=${PIPESTATUS[0]}
+            echo "::endgroup::"
+            if [ $rc -ne 0 ]; then
+              echo "Test command failed: $cmd (exit code $rc)" | tee -a /tmp/test_output.txt
+              exit $rc
+            fi
+          done
+          test_rc=$?
+          if [ $test_rc -ne 0 ]; then
+            echo "test_passed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "test_passed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Collect results
+        id: result
+        if: always()
+        run: |
+          # Determine overall pass/fail based on previous step outcomes
+          if [ "${{ steps.apply.outcome }}" != "success" ]; then
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+            {
+              echo 'output<<VALIDATE_OUTPUT_EOF'
+              echo "Patch apply failed."
+              echo 'VALIDATE_OUTPUT_EOF'
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ steps.build.outputs.build_passed }}" != "true" ]; then
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+            {
+              echo 'output<<VALIDATE_OUTPUT_EOF'
+              echo "Build failed:"
+              tail -1000 /tmp/build_output.txt 2>/dev/null || echo "No build output captured."
+              echo 'VALIDATE_OUTPUT_EOF'
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ steps.test.outputs.test_passed }}" != "true" ] && [ "${{ steps.test.outcome }}" != "skipped" ]; then
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+            {
+              echo 'output<<VALIDATE_OUTPUT_EOF'
+              echo "Tests failed:"
+              tail -1000 /tmp/test_output.txt 2>/dev/null || echo "No test output captured."
+              echo 'VALIDATE_OUTPUT_EOF'
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "passed=true" >> "$GITHUB_OUTPUT"
+          {
+            echo 'output<<VALIDATE_OUTPUT_EOF'
+            echo "Validation passed."
+            tail -1000 /tmp/build_output.txt 2>/dev/null
+            tail -1000 /tmp/test_output.txt 2>/dev/null
+            echo 'VALIDATE_OUTPUT_EOF'
+          } >> "$GITHUB_OUTPUT"

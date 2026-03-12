@@ -1,0 +1,145 @@
+# Example CI Failure Bot configuration for consumer repositories.
+#
+# Copy this file to your repository as:
+#   .github/ci-failure-bot.yml
+#
+# All settings are optional — the bot uses sensible defaults when a field is
+# missing. Remove or comment out any section you don't need to customize.
+
+# ---------------------------------------------------------------------------
+# Amazon Bedrock settings
+# ---------------------------------------------------------------------------
+bedrock:
+  # Foundation model to use for root cause analysis and fix generation.
+  # Must be available in the configured AWS region.
+  model_id: "anthropic.claude-sonnet-4-20250514"
+
+  # Token limits to control cost. Input tokens cover the failure context,
+  # source code, and system prompt. Output tokens cover the model's response.
+  max_input_tokens: 100000
+  max_output_tokens: 4096
+
+# ---------------------------------------------------------------------------
+# Safety limits
+# ---------------------------------------------------------------------------
+limits:
+  # Maximum number of files a generated patch may modify.
+  # Patches exceeding this are rejected to prevent overly broad changes.
+  max_patch_files: 10
+
+  # Maximum pull requests the bot will create in a rolling 24-hour window.
+  # Failures beyond this limit are queued for the next reconciliation run.
+  max_prs_per_day: 5
+
+  # Maximum failures to process per CI run. When a run has more failures
+  # than this, the bot processes the first N (sorted by job name) and
+  # logs the rest as "skipped-rate-limit".
+  max_failures_per_run: 10
+
+  # If this many bot-generated PRs are already open on the target branch,
+  # the bot pauses new PR creation until existing PRs are resolved.
+  max_open_bot_prs: 3
+
+  # Cumulative Bedrock token budget per 24-hour period. The bot stops
+  # making Bedrock calls once this budget is exhausted.
+  daily_token_budget: 1000000
+
+# ---------------------------------------------------------------------------
+# Fix generation settings
+# ---------------------------------------------------------------------------
+fix_generation:
+  # Minimum confidence level required to attempt fix generation.
+  # "medium" generates fixes for medium and high confidence root causes.
+  # "high" only generates fixes when the bot is highly confident.
+  confidence_threshold: "medium"
+
+  # Number of retry attempts when a generated patch fails to apply cleanly.
+  max_retries: 2
+
+  # Number of retry attempts when validation (build/test) fails.
+  # Each retry re-generates the fix with the validation failure as context.
+  max_validation_retries: 1
+
+# ---------------------------------------------------------------------------
+# Monitored workflows
+# ---------------------------------------------------------------------------
+# List of CI workflow FILENAMES to monitor for failures.
+#
+# NOTE: This is different from the caller workflow's `workflows:` trigger,
+# which uses workflow DISPLAY NAMES. This list uses filenames and is checked
+# after the trigger fires to filter which workflow runs the bot processes.
+monitored_workflows:
+  - ci.yml
+  - daily.yml
+  - weekly.yml
+  - external.yml
+
+# ---------------------------------------------------------------------------
+# Project context
+# ---------------------------------------------------------------------------
+# Project-specific information injected into LLM prompts to improve the
+# quality of root cause analysis and fix generation.
+project:
+  language: "C"
+  build_system: "CMake"
+  description: "Valkey is an open-source, high-performance key/value datastore."
+
+  # Test frameworks used by the project. The bot uses this to select the
+  # appropriate log parser for each failure.
+  # Supported: gtest, tcl, sentinel, cluster, module
+  test_frameworks:
+    - gtest
+    - tcl
+    - sentinel
+    - cluster
+
+  # Directories containing source and test files. Used to map test failures
+  # back to the source files that likely need fixing.
+  source_dirs:
+    - src/
+  test_dirs:
+    - tests/
+
+  # Patterns for mapping test file paths to source file paths.
+  # Use {name} as a placeholder for the base filename.
+  test_to_source_patterns:
+    - test_path: "tests/unit/{name}.tcl"
+      source_path: "src/{name}.c"
+    - test_path: "tests/unit/{name}.cc"
+      source_path: "src/{name}.c"
+
+# ---------------------------------------------------------------------------
+# Validation profiles
+# ---------------------------------------------------------------------------
+# Each profile maps a CI job (by name pattern and/or matrix parameters) to
+# the build and test commands needed to reproduce that job's environment.
+# The bot uses these to validate generated fixes before creating PRs.
+#
+# - job_name_pattern: regex matched against the failing job name
+# - env: environment variables to set during build/test
+# - install_commands: dependency installation (run before build)
+# - build_commands: how to build the project
+# - test_commands: how to run the specific failing test (may be empty for
+#   build-only validation)
+validation_profiles:
+  - job_name_pattern: "^test-sanitizer-address$"
+    env:
+      SANITIZER: "address"
+    build_commands:
+      - "make -j$(nproc) BUILD_TLS=no SANITIZER=address"
+    test_commands:
+      - "./runtest --clients 1 --test tests/unit/failing-test.tcl"
+
+  - job_name_pattern: "^test-ubuntu-latest-cmake-tls$"
+    env:
+      BUILD_TLS: "yes"
+    build_commands:
+      - "cmake -S . -B build -DBUILD_TLS=yes"
+      - "cmake --build build -j$(nproc)"
+    test_commands:
+      - "cd tests && ./runtest --tls --clients 1 --test unit/failing-test"
+
+  - job_name_pattern: "^build-"
+    build_commands:
+      - "make -j$(nproc)"
+    # No test_commands — build-only validation.

@@ -1,0 +1,79 @@
+name: Refresh Bedrock KB
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      missing_only:
+        description: "Only ingest files not already present in the code KB (resume mode)."
+        required: false
+        default: false
+        type: boolean
+      skip_web_sync:
+        description: "Skip the Valkey docs web crawl for this run."
+        required: false
+        default: false
+        type: boolean
+      verbose:
+        description: "Enable verbose refresh logging."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-bedrock-kb
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION || 'us-east-1' }}
+      KB_REFRESH_MISSING_ONLY: ${{ github.event.inputs.missing_only || 'false' }}
+      KB_REFRESH_SKIP_WEB_SYNC: ${{ github.event.inputs.skip_web_sync || 'false' }}
+      KB_REFRESH_VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
+    steps:
+      - name: Check out bot repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Refresh Bedrock knowledge bases
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(scripts/bedrock_kb_refresh.py --region "${AWS_REGION}")
+
+          if [[ "${KB_REFRESH_MISSING_ONLY}" == "true" ]]; then
+            args+=(--missing-only)
+          fi
+
+          if [[ "${KB_REFRESH_SKIP_WEB_SYNC}" == "true" ]]; then
+            args+=(--skip-web-sync)
+          fi
+
+          if [[ "${KB_REFRESH_VERBOSE}" == "true" ]]; then
+            args+=(--verbose)
+          fi
+
+          python "${args[@]}"

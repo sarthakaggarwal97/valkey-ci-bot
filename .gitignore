@@ -1,0 +1,11 @@
+.DS_Store
+*.py[cod]
+__pycache__/
+
+.hypothesis/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+.idea/
+.vscode/
