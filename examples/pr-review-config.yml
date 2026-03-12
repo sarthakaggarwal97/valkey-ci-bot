@@ -19,6 +19,12 @@ reviewer:
   bedrock_timeout_ms: 120000
   bedrock_concurrency_limit: 2
   github_concurrency_limit: 6
+  # Optional: use a pre-configured Bedrock Agent alias with attached knowledge
+  # bases and account-side prompt customization.
+  agent:
+    enabled: true
+    agent_id: "YOUR_AGENT_ID"
+    agent_alias_id: "YOUR_AGENT_ALIAS_ID"
   path_filters:
     - "!dist/**"
     - "!vendor/**"
@@ -28,6 +34,6 @@ reviewer:
     - "src/**"
     - "tests/**"
   models:
-    light_model_id: "us.anthropic.claude-3-5-haiku-20241022-v1:0"
-    heavy_model_id: "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+    light_model_id: "us.anthropic.claude-opus-4-6-v1"
+    heavy_model_id: "us.anthropic.claude-opus-4-6-v1"
     temperature: 0.05

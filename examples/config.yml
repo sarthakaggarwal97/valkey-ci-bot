@@ -12,7 +12,7 @@
 bedrock:
   # Foundation model to use for root cause analysis and fix generation.
   # Must be available in the configured AWS region.
-  model_id: "us.anthropic.claude-sonnet-4-20250514-v1:0"
+  model_id: "us.anthropic.claude-opus-4-6-v1"
 
   # Token limits to control cost. Input tokens cover the failure context,
   # source code, and system prompt. Output tokens cover the model's response.

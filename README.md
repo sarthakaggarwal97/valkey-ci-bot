@@ -6,7 +6,7 @@ An AI bot for Valkey CI failure remediation and PR review
 Model selection is configured in YAML, not in secrets:
 
 - `examples/config.yml` controls the CI failure bot model through `bedrock.model_id`
-- `examples/pr-review-config.yml` controls the PR reviewer models through `reviewer.models.light_model_id` and `reviewer.models.heavy_model_id`
+- `examples/pr-review-config.yml` controls the PR reviewer Bedrock Agent through `reviewer.agent.*`, with `reviewer.models.*` as the direct-runtime fallback
 
 AWS authentication is wired for GitHub Actions OIDC by default:
 
@@ -35,6 +35,8 @@ It reviews pull requests through the GitHub API without checking out PR head cod
 - generate optional release notes
 - publish focused review comments
 - answer follow-up `/reviewbot` questions in PR comments and review threads
+
+The reviewer can run either through direct `bedrock-runtime` model calls or through a pre-configured Bedrock Agent alias with attached knowledge bases and prompt overrides.
 
 Example consumer-repo files:
 

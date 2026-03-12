@@ -1,5 +1,9 @@
 reviewer:
+  agent:
+    enabled: true
+    agent_id: "2308D9B3CF"
+    agent_alias_id: "TSTALIASID"
   models:
-    light_model_id: "us.anthropic.claude-3-5-haiku-20241022-v1:0"
-    heavy_model_id: "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+    light_model_id: "us.anthropic.claude-opus-4-6-v1"
+    heavy_model_id: "us.anthropic.claude-opus-4-6-v1"
     temperature: 0.05

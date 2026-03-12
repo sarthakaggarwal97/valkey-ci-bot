@@ -6,7 +6,7 @@ import json
 from pathlib import PurePosixPath
 from typing import Any
 
-from scripts.bedrock_client import BedrockClient
+from scripts.bedrock_client import PromptClient
 from scripts.config import ReviewerConfig
 from scripts.models import ChangedFile, DiffScope, PullRequestContext, ReviewFinding
 
@@ -87,7 +87,7 @@ def _serialize_scope(scope: DiffScope, *, max_chars: int = 18_000) -> str:
 class CodeReviewer:
     """Generates focused review findings for risky code changes."""
 
-    def __init__(self, bedrock_client: BedrockClient) -> None:
+    def __init__(self, bedrock_client: PromptClient) -> None:
         self._bedrock = bedrock_client
 
     def classify_simple_change(self, files: list[ChangedFile]) -> bool:

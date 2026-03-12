@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from scripts.bedrock_client import BedrockClient
+from scripts.bedrock_client import PromptClient
 from scripts.config import ReviewerConfig
 from scripts.models import PullRequestContext, ReviewThread
 
@@ -19,7 +19,7 @@ def _normalize_prompt(prompt: str) -> str:
 class ReviewChat:
     """Generates review-chat replies from diff and thread context."""
 
-    def __init__(self, bedrock_client: BedrockClient) -> None:
+    def __init__(self, bedrock_client: PromptClient) -> None:
         self._bedrock = bedrock_client
 
     def reply(

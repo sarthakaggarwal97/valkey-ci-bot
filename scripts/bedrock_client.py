@@ -55,6 +55,20 @@ class BedrockRuntimeClient(Protocol):
     def converse(self, **kwargs: Any) -> dict: ...
 
 
+class PromptClient(Protocol):
+    """Common interface for model and agent-backed prompt execution."""
+
+    def invoke(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        model_id: str | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str: ...
+
+
 class TokenBudgetLimiter(Protocol):
     """Interface used for coarse Bedrock budget enforcement."""
 

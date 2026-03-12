@@ -38,7 +38,7 @@ class ValidationProfile:
 @dataclass
 class BotConfig:
     """Top-level bot configuration with sensible defaults."""
-    bedrock_model_id: str = "anthropic.claude-opus-4-6-v1"
+    bedrock_model_id: str = "us.anthropic.claude-opus-4-6-v1"
     max_input_tokens: int = 100_000
     max_output_tokens: int = 4096
     max_patch_files: int = 10
@@ -61,9 +61,18 @@ class BotConfig:
 class ReviewerModels:
     """Model configuration for PR reviewer light/heavy tasks."""
 
-    light_model_id: str = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
-    heavy_model_id: str = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+    light_model_id: str = "us.anthropic.claude-opus-4-6-v1"
+    heavy_model_id: str = "us.anthropic.claude-opus-4-6-v1"
     temperature: float = 0.05
+
+
+@dataclass
+class ReviewerAgent:
+    """Optional Bedrock Agent configuration for the PR reviewer."""
+
+    enabled: bool = False
+    agent_id: str = ""
+    agent_alias_id: str = ""
 
 
 @dataclass
@@ -90,6 +99,7 @@ class ReviewerConfig:
     max_output_tokens: int = 4096
     project: ProjectContext = field(default_factory=ProjectContext)
     models: ReviewerModels = field(default_factory=ReviewerModels)
+    agent: ReviewerAgent = field(default_factory=ReviewerAgent)
 
     @property
     def bedrock_model_id(self) -> str:
@@ -100,6 +110,25 @@ class ReviewerConfig:
     def max_retries_bedrock(self) -> int:
         """Alias used by the shared Bedrock client."""
         return self.bedrock_retries
+
+    @property
+    def bedrock_agent_id(self) -> str:
+        """Agent id alias used by the Bedrock Agent client."""
+        return self.agent.agent_id
+
+    @property
+    def bedrock_agent_alias_id(self) -> str:
+        """Agent alias id used by the Bedrock Agent client."""
+        return self.agent.agent_alias_id
+
+    @property
+    def uses_bedrock_agent(self) -> bool:
+        """Return whether reviewer calls should use Bedrock Agent runtime."""
+        return (
+            self.agent.enabled
+            and bool(self.agent.agent_id.strip())
+            and bool(self.agent.agent_alias_id.strip())
+        )
 
 
 def _merge_project(data: dict) -> ProjectContext:
@@ -169,6 +198,19 @@ def _merge_reviewer_models(data: dict) -> ReviewerModels:
         temperature=_coerce_float(
             data.get("temperature"),
             defaults.temperature,
+        ),
+    )
+
+
+def _merge_reviewer_agent(data: dict) -> ReviewerAgent:
+    """Build ReviewerAgent from a raw dict."""
+    defaults = ReviewerAgent()
+    return ReviewerAgent(
+        enabled=_coerce_bool(data.get("enabled"), defaults.enabled),
+        agent_id=_coerce_str(data.get("agent_id"), defaults.agent_id),
+        agent_alias_id=_coerce_str(
+            data.get("agent_alias_id"),
+            defaults.agent_alias_id,
         ),
     )
 
@@ -354,6 +396,7 @@ def load_reviewer_config_data(raw: Any, *, source: str = "<memory>") -> Reviewer
 
     defaults = ReviewerConfig()
     models = root.get("models", {}) if isinstance(root.get("models"), dict) else {}
+    agent = root.get("agent", {}) if isinstance(root.get("agent"), dict) else {}
     project = root.get("project", {}) if isinstance(root.get("project"), dict) else {}
 
     return ReviewerConfig(
@@ -434,6 +477,7 @@ def load_reviewer_config_data(raw: Any, *, source: str = "<memory>") -> Reviewer
         ),
         project=_merge_project(project) if project else defaults.project,
         models=_merge_reviewer_models(models),
+        agent=_merge_reviewer_agent(agent),
     )
 
 

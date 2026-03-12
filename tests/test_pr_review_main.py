@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from scripts.config import ReviewerConfig
+from scripts.config import ReviewerAgent, ReviewerConfig
 from scripts.models import (
     ChangedFile,
     PullRequestContext,
@@ -85,6 +85,98 @@ def test_filtered_context_restricts_files() -> None:
     filtered = _filtered_context(_context(), {"src/failover.c"})
 
     assert [changed_file.path for changed_file in filtered.files] == ["src/failover.c"]
+
+
+@patch("scripts.pr_review_main.boto3.client")
+@patch("scripts.pr_review_main.BedrockAgentClient")
+@patch("scripts.pr_review_main.Github")
+@patch("scripts.pr_review_main.RateLimiter")
+@patch("scripts.pr_review_main.ReviewStateStore")
+@patch("scripts.pr_review_main.CommentPublisher")
+@patch("scripts.pr_review_main.PRContextFetcher")
+def test_run_review_mode_uses_bedrock_agent_when_configured(
+    mock_fetcher_cls,
+    mock_publisher_cls,
+    mock_state_store_cls,
+    mock_rate_limiter_cls,
+    mock_github_cls,
+    mock_agent_client_cls,
+    mock_boto_client,
+    tmp_path,
+) -> None:
+    payload = {
+        "repository": {"full_name": "owner/repo"},
+        "sender": {"login": "alice"},
+        "pull_request": {"number": 11, "body": "Details"},
+    }
+    event_path = _event_file(tmp_path, payload)
+
+    fetcher = mock_fetcher_cls.return_value
+    fetcher.fetch.return_value = _context()
+    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
+    fetcher.build_diff_scope.return_value = MagicMock(files=_context().files)
+
+    publisher = mock_publisher_cls.return_value
+    publisher.upsert_summary.return_value = 99
+    publisher.publish_review_comments.return_value = [1001]
+
+    state_store = mock_state_store_cls.return_value
+    state_store.load.return_value = None
+
+    mock_rate_limiter_cls.return_value.load.return_value = None
+    mock_rate_limiter_cls.return_value.save.return_value = None
+    mock_github_cls.return_value = MagicMock()
+    mock_agent_client_cls.return_value = MagicMock()
+
+    with patch(
+        "scripts.pr_review_main._load_runtime_reviewer_config",
+        return_value=ReviewerConfig(
+            agent=ReviewerAgent(
+                enabled=True,
+                agent_id="agent-123",
+                agent_alias_id="alias-456",
+            )
+        ),
+    ), patch(
+        "scripts.pr_review_main.PRSummarizer"
+    ) as mock_summarizer_cls, patch(
+        "scripts.pr_review_main.CodeReviewer"
+    ) as mock_reviewer_cls:
+        mock_summarizer_cls.return_value.summarize.return_value = SummaryResult(
+            walkthrough="Summary",
+            file_groups_markdown="- Core",
+            release_notes="Release note",
+        )
+        mock_reviewer = mock_reviewer_cls.return_value
+        mock_reviewer.classify_simple_change.return_value = False
+        mock_reviewer.review.return_value = [
+            MagicMock(path="src/failover.c", line=12, body="Risk", severity="high")
+        ]
+
+        exit_code = run(
+            [
+                "--repo",
+                "owner/repo",
+                "--mode",
+                "review",
+                "--token",
+                "token",
+                "--event-name",
+                "pull_request_target",
+                "--event-path",
+                str(event_path),
+            ]
+        )
+
+    assert exit_code == 0
+    mock_boto_client.assert_called_once_with(
+        "bedrock-agent-runtime",
+        region_name=None,
+    )
+    mock_agent_client_cls.assert_called_once()
+    publisher.upsert_summary.assert_called_once()
+    publisher.publish_review_comments.assert_called_once()
+    state_store.save.assert_called_once()
 
 
 @patch("scripts.pr_review_main.boto3.client")

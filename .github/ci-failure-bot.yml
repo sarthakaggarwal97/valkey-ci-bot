@@ -1,4 +1,4 @@
 bedrock:
-  model_id: "us.anthropic.claude-sonnet-4-20250514-v1:0"
+  model_id: "us.anthropic.claude-opus-4-6-v1"
   max_input_tokens: 100000
   max_output_tokens: 4096

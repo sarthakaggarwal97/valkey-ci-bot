@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from scripts.bedrock_client import BedrockClient
+from scripts.bedrock_client import PromptClient
 from scripts.config import ReviewerConfig
 from scripts.models import PullRequestContext, SummaryResult
 
@@ -53,7 +53,7 @@ def _render_file_context(pr: PullRequestContext, *, max_chars: int = 12_000) -> 
 class PRSummarizer:
     """Generates PR walkthroughs and optional release notes."""
 
-    def __init__(self, bedrock_client: BedrockClient) -> None:
+    def __init__(self, bedrock_client: PromptClient) -> None:
         self._bedrock = bedrock_client
 
     def summarize(
