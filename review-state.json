@@ -1,1 +1,14 @@
-{}
+{
+  "valkey-io/valkey-fuzzer#68": {
+    "repo": "valkey-io/valkey-fuzzer",
+    "pr_number": 68,
+    "last_reviewed_head_sha": "ab289221fe5a6e8ab490a38878712b1fa5085279",
+    "summary_comment_id": 4050176639,
+    "review_comment_ids": [
+      2927570651,
+      2927570773,
+      2927570873
+    ],
+    "updated_at": "2026-03-12T21:45:39.061058+00:00"
+  }
+}
