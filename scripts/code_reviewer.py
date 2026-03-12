@@ -100,8 +100,8 @@ def _serialize_scope(scope: DiffScope, *, max_chars: int = 200_000) -> str:
             f"Deletions: {changed_file.deletions}",
         ]
         if changed_file.patch:
-            chunk.append("Patch (unified diff with line numbers):")
-            chunk.append(changed_file.patch)
+            chunk.append("Patch (unified diff, each line prefixed with its right-side line number):")
+            chunk.append(_annotate_patch(changed_file.patch))
         if changed_file.contents:
             chunk.append("Full file contents (may be truncated):")
             chunk.append(changed_file.contents[:6000])
@@ -119,12 +119,36 @@ def _serialize_scope(scope: DiffScope, *, max_chars: int = 200_000) -> str:
                 ]
                 if truncated_patch:
                     chunk_trunc.append("Patch (unified diff — TRUNCATED to fit budget):")
-                    chunk_trunc.append(truncated_patch)
+                    chunk_trunc.append(_annotate_patch(truncated_patch))
                 chunks.append("\n".join(chunk_trunc))
             break
         chunks.append(rendered)
         used += len(rendered)
     return "\n\n".join(chunks)
+def _annotate_patch(patch: str) -> str:
+    """Prefix each diff line with its right-side line number.
+
+    Hunk headers and deleted lines (which have no right-side position) are
+    left unnumbered so the LLM can read line numbers directly instead of
+    counting from ``@@`` headers.
+    """
+    out: list[str] = []
+    current_line = 0
+    for raw in patch.splitlines():
+        if raw.startswith("@@"):
+            match = re.search(r"\+(\d+)", raw)
+            if match:
+                current_line = int(match.group(1))
+            out.append(raw)
+            continue
+        if raw.startswith("-"):
+            # Deleted lines have no right-side position
+            out.append(f"       {raw}")
+            continue
+        # '+' (added) or ' ' (context) lines map to the right side
+        out.append(f"L{current_line:<5d} {raw}")
+        current_line += 1
+    return "\n".join(out)
 
 
 def _parse_diff_lines(patch: str) -> tuple[set[int], set[int]]:
@@ -274,7 +298,7 @@ or
 {{ "findings": [ ... ] }}
 
 CRITICAL rules:
-- The "line" field MUST be a line number visible in the unified diff after a "+" or " " (context) marker. Use the @@ hunk header to determine the correct line number. If you cannot identify the exact line, set "line" to null.
+- Each diff line is prefixed with its right-side line number (e.g. "L42"). The "line" field MUST be one of these prefixed numbers. If you cannot identify the exact line, set "line" to null.
 - Only return findings with direct evidence in the shown patch/content excerpts.
 - Do NOT speculate about array sizes, buffer lengths, variable values, or code structure that is not fully visible in the provided excerpts.
 - Do not infer missing definitions from other files or from omitted parts of a file.

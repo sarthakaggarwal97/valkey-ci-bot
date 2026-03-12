@@ -142,7 +142,7 @@ def test_code_reviewer_filters_speculative_and_file_level_findings() -> None:
     assert [(finding.path, finding.line, finding.body) for finding in findings] == [
         (
             "src/failover.c",
-            14,
+            10,
             "This can leave failover state stale after timeout.",
         )
     ]
