@@ -331,3 +331,81 @@ class ReviewWorkflowSummary:
                 "GITHUB_STEP_SUMMARY not set; reviewer summary not written to file."
             )
         return md
+
+
+@dataclass
+class FuzzerRunSummaryRow:
+    """One analyzed fuzzer workflow run for summary rendering."""
+
+    run_id: int
+    run_url: str
+    conclusion: str
+    overall_status: str
+    scenario_id: str | None
+    seed: str | None
+    anomaly_count: int
+    normal_signal_count: int
+    summary: str
+    reproduction_hint: str | None = None
+
+
+@dataclass
+class FuzzerWorkflowSummary:
+    """Workflow summary tailored for centralized fuzzer-run analysis."""
+
+    rows: list[FuzzerRunSummaryRow] = field(default_factory=list)
+
+    def add_row(self, row: FuzzerRunSummaryRow) -> None:
+        """Record one analyzed run."""
+        self.rows.append(row)
+
+    def render(self) -> str:
+        """Render the centralized fuzzer analysis summary."""
+        lines = ["## Valkey Fuzzer Analysis\n"]
+        if not self.rows:
+            lines.append("No fuzzer runs analyzed.\n")
+            return "\n".join(lines)
+
+        lines.append(
+            "| Run | Conclusion | Status | Scenario | Seed | Anomalies | Normal Signals |"
+        )
+        lines.append(
+            "|-----|------------|--------|----------|------|-----------|----------------|"
+        )
+        for row in self.rows:
+            lines.append(
+                "| "
+                f"[{row.run_id}]({row.run_url}) | "
+                f"{row.conclusion or 'unknown'} | "
+                f"{row.overall_status} | "
+                f"{row.scenario_id or 'unknown'} | "
+                f"{row.seed or 'unknown'} | "
+                f"{row.anomaly_count} | "
+                f"{row.normal_signal_count} |"
+            )
+
+        for row in self.rows:
+            lines.append("")
+            lines.append(f"### Run {row.run_id}")
+            lines.append(f"- Summary: {row.summary}")
+            if row.reproduction_hint:
+                lines.append(f"- Reproduction: `{row.reproduction_hint}`")
+        lines.append("")
+        return "\n".join(lines)
+
+    def write(self) -> str:
+        """Render the summary and append it to ``$GITHUB_STEP_SUMMARY``."""
+        md = self.render()
+        summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary_path:
+            try:
+                with open(summary_path, "a") as fh:
+                    fh.write(md)
+                logger.info("Fuzzer workflow summary written to %s", summary_path)
+            except OSError as exc:
+                logger.warning("Failed to write fuzzer workflow summary: %s", exc)
+        else:
+            logger.debug(
+                "GITHUB_STEP_SUMMARY not set; fuzzer summary not written to file."
+            )
+        return md

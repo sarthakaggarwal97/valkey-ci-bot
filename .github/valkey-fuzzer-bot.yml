@@ -1,0 +1,24 @@
+bedrock:
+  model_id: "us.anthropic.claude-opus-4-6-v1"
+  max_input_tokens: 100000
+  max_output_tokens: 4096
+
+retrieval:
+  enabled: true
+  code_knowledge_base_id: "OHQMPN9RCG"
+  docs_knowledge_base_id: "NAKLE24DH9"
+  max_results_per_knowledge_base: 3
+  max_chars_per_result: 1200
+  max_total_chars: 5000
+
+monitored_workflows:
+  - fuzzer-run.yml
+
+project:
+  language: "C"
+  build_system: "Make"
+  description: "Analyze scheduled valkey-fuzzer chaos runs and distinguish normal recovery behavior from anomalies."
+  test_frameworks:
+    - valkey-fuzzer
+    - cluster
+    - chaos

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 
 
 @dataclass
@@ -238,6 +238,57 @@ class ReviewState:
     updated_at: str
 
 
+@dataclass
+class FuzzerSignal:
+    """One normal or anomalous signal extracted from a fuzzer run."""
+
+    title: str
+    severity: str
+    evidence: str
+
+
+@dataclass
+class FuzzerRunContext:
+    """Normalized input context for a single analyzed fuzzer workflow run."""
+
+    repo: str
+    workflow_file: str
+    run_id: int
+    run_url: str
+    conclusion: str
+    head_sha: str
+    scenario_id: str | None = None
+    seed: str | None = None
+    artifact_names: list[str] = field(default_factory=list)
+    manifest: dict[str, object] | None = None
+    results: dict[str, object] | None = None
+    scenario_yaml: str | None = None
+    structured_logs: dict[str, dict[str, object]] = field(default_factory=dict)
+    node_logs: dict[str, str] = field(default_factory=dict)
+    raw_job_log: str | None = None
+    raw_log_fallback_used: bool = False
+
+
+@dataclass
+class FuzzerRunAnalysis:
+    """Structured summary of a fuzzer workflow run."""
+
+    repo: str
+    workflow_file: str
+    run_id: int
+    run_url: str
+    conclusion: str
+    head_sha: str
+    scenario_id: str | None
+    seed: str | None
+    overall_status: str  # "normal", "warning", or "anomalous"
+    summary: str
+    anomalies: list[FuzzerSignal] = field(default_factory=list)
+    normal_signals: list[str] = field(default_factory=list)
+    reproduction_hint: str | None = None
+    raw_log_fallback_used: bool = False
+
+
 def failure_report_to_dict(report: FailureReport) -> dict:
     """Serialize a failure report for persistence."""
     return asdict(report)
@@ -301,3 +352,27 @@ def review_state_from_dict(data: dict) -> ReviewState:
         review_comment_ids=list(data.get("review_comment_ids", [])),
         updated_at=str(data.get("updated_at", "")),
     )
+
+
+def fuzzer_run_analysis_to_dict(analysis: FuzzerRunAnalysis) -> dict:
+    """Serialize a fuzzer run analysis."""
+    if not is_dataclass(analysis):
+        return {
+            "repo": getattr(analysis, "repo", ""),
+            "workflow_file": getattr(analysis, "workflow_file", ""),
+            "run_id": getattr(analysis, "run_id", 0),
+            "run_url": getattr(analysis, "run_url", ""),
+            "conclusion": getattr(analysis, "conclusion", ""),
+            "head_sha": getattr(analysis, "head_sha", ""),
+            "scenario_id": getattr(analysis, "scenario_id", None),
+            "seed": getattr(analysis, "seed", None),
+            "overall_status": getattr(analysis, "overall_status", "normal"),
+            "summary": getattr(analysis, "summary", ""),
+            "anomalies": list(getattr(analysis, "anomalies", [])),
+            "normal_signals": list(getattr(analysis, "normal_signals", [])),
+            "reproduction_hint": getattr(analysis, "reproduction_hint", None),
+            "raw_log_fallback_used": bool(
+                getattr(analysis, "raw_log_fallback_used", False)
+            ),
+        }
+    return asdict(analysis)

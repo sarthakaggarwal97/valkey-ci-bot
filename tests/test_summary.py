@@ -5,7 +5,13 @@ from __future__ import annotations
 import os
 import tempfile
 
-from scripts.summary import ApprovalCandidate, ApprovalSummary, WorkflowSummary
+from scripts.summary import (
+    ApprovalCandidate,
+    ApprovalSummary,
+    FuzzerRunSummaryRow,
+    FuzzerWorkflowSummary,
+    WorkflowSummary,
+)
 
 
 class TestWorkflowSummaryRender:
@@ -204,3 +210,35 @@ class TestApprovalSummary:
         assert "abcdef123456" in md
         assert "fedcba098765" in md
         assert "src/server.c" in md
+
+
+class TestFuzzerWorkflowSummary:
+    def test_empty_summary_is_not_blank(self):
+        summary = FuzzerWorkflowSummary()
+        md = summary.render()
+        assert "Valkey Fuzzer Analysis" in md
+        assert "No fuzzer runs analyzed." in md
+
+    def test_renders_rows(self):
+        summary = FuzzerWorkflowSummary()
+        summary.add_row(
+            FuzzerRunSummaryRow(
+                run_id=123,
+                run_url="https://github.com/valkey-io/valkey-fuzzer/actions/runs/123",
+                conclusion="failure",
+                overall_status="anomalous",
+                scenario_id="839534793",
+                seed="839534793",
+                anomaly_count=2,
+                normal_signal_count=1,
+                summary="Slot coverage failed after chaos.",
+                reproduction_hint="valkey-fuzzer cluster --seed 839534793",
+            )
+        )
+
+        md = summary.render()
+
+        assert "Run 123" in md
+        assert "anomalous" in md
+        assert "839534793" in md
+        assert "Slot coverage failed after chaos." in md

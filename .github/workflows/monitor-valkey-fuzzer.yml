@@ -1,0 +1,130 @@
+name: Monitor Valkey Fuzzer Runs
+
+on:
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List candidate fuzzer runs without analyzing them or advancing state."
+        required: false
+        default: true
+        type: boolean
+      max_runs:
+        description: "Maximum recent fuzzer runs to inspect."
+        required: false
+        default: "6"
+        type: string
+      verbose:
+        description: "Enable verbose monitor logging."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    concurrency:
+      group: monitor-valkey-fuzzer-scan
+      cancel-in-progress: false
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      MONITOR_DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || github.event.inputs.dry_run || 'true' }}
+      MONITOR_MAX_RUNS: ${{ github.event.inputs.max_runs || '6' }}
+      MONITOR_VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
+      VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+      VALKEY_GITHUB_APP_ID: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
+      VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
+    steps:
+      - name: Check out bot repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate target repository authentication inputs
+        if: ${{ env.VALKEY_GITHUB_TOKEN == '' && (env.VALKEY_GITHUB_APP_ID == '' || env.VALKEY_GITHUB_APP_PRIVATE_KEY == '') }}
+        run: |
+          echo "Configure either VALKEY_GITHUB_TOKEN or VALKEY_GITHUB_APP_ID plus VALKEY_GITHUB_APP_PRIVATE_KEY." >&2
+          exit 1
+
+      - name: Create target repository GitHub App token
+        id: app-token
+        if: ${{ env.VALKEY_GITHUB_TOKEN == '' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ env.VALKEY_GITHUB_APP_ID }}
+          private-key: ${{ env.VALKEY_GITHUB_APP_PRIVATE_KEY }}
+          owner: valkey-io
+          repositories: valkey-fuzzer
+          permission-actions: read
+          permission-contents: read
+
+      - name: Select target repository token
+        id: target-token
+        shell: bash
+        run: |
+          if [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
+            echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
+          else
+            echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials from OIDC role
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: valkey-fuzzer-monitor-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Analyze Valkey fuzzer runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            -m scripts.monitor_fuzzer_runs
+            --target-repo "valkey-io/valkey-fuzzer"
+            --workflow-file "fuzzer-run.yml"
+            --config ".github/valkey-fuzzer-bot.yml"
+            --target-token "${{ steps.target-token.outputs.token }}"
+            --state-token "${{ github.token }}"
+            --state-repo "${{ github.repository }}"
+            --max-runs "${MONITOR_MAX_RUNS}"
+            --aws-region "${AWS_REGION}"
+          )
+
+          if [[ "${MONITOR_DRY_RUN}" == "true" ]]; then
+            args+=(--dry-run)
+          fi
+
+          if [[ "${MONITOR_VERBOSE}" == "true" ]]; then
+            args+=(--verbose)
+          fi
+
+          python "${args[@]}" | tee fuzzer-monitor-result.json
+
+      - name: Upload fuzzer analysis result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: valkey-fuzzer-monitor-result-${{ github.run_id }}
+          path: fuzzer-monitor-result.json
+          if-no-files-found: warn
+          retention-days: 14

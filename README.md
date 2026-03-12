@@ -64,6 +64,25 @@ Approval context is written into the workflow summary so you can review:
 
 Manual dispatch still defaults to `dry_run=true` so you can inspect candidate runs without advancing state or queueing fixes. When you want a real automated pass, dispatch with `dry_run=false`; the workflow will still stop at the approval gate before opening any PRs.
 
+## Central Valkey Fuzzer Monitor
+
+This repo also includes an analysis-only monitor workflow at [`.github/workflows/monitor-valkey-fuzzer.yml`](/Users/sarthagg/IdeaProjects/valkey-ci-bot/.github/workflows/monitor-valkey-fuzzer.yml).
+
+It runs from this repo, watches new scheduled `fuzzer-run.yml` executions in `valkey-io/valkey-fuzzer`, downloads the structured artifact bundle from each run when available, falls back to job logs when it is not, and writes a per-run anomaly summary using the local config at [`.github/valkey-fuzzer-bot.yml`](/Users/sarthagg/IdeaProjects/valkey-ci-bot/.github/valkey-fuzzer-bot.yml).
+
+Required GitHub configuration for this repo:
+
+- secret: `AWS_ROLE_ARN`
+- either secret: `VALKEY_GITHUB_TOKEN`
+- or variable: `VALKEY_GITHUB_APP_ID` plus secret: `VALKEY_GITHUB_APP_PRIVATE_KEY`
+
+The fuzzer monitor is analysis-only:
+
+- it does not open pull requests
+- it distinguishes expected chaos behavior from anomalous behavior
+- it writes the analysis to the workflow summary
+- it uploads the raw `fuzzer-monitor-result.json` payload as a workflow artifact
+
 ## PR review bot
 
 The repository also includes a reusable PR reviewer workflow at `.github/workflows/review-pr.yml`.
