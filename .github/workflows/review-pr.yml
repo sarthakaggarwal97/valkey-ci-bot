@@ -8,16 +8,6 @@ on:
         required: false
         type: string
         default: ".github/pr-review-bot.yml"
-      bot_repository:
-        description: "Repository containing the PR reviewer bot code"
-        required: false
-        type: string
-        default: "valkey-io/valkey-ci-bot"
-      bot_ref:
-        description: "Git ref of the PR reviewer repository to check out"
-        required: false
-        type: string
-        default: "v1"
       mode:
         description: "Reviewer mode: review, chat, or auto"
         required: false
@@ -47,8 +37,6 @@ jobs:
       - name: Checkout bot repository
         uses: actions/checkout@v6
         with:
-          repository: ${{ inputs.bot_repository || github.repository }}
-          ref: ${{ inputs.bot_ref || github.sha }}
           persist-credentials: false
           fetch-depth: 1
 

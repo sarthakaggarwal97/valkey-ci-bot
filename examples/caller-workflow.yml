@@ -83,8 +83,6 @@ jobs:
     uses: valkey-io/valkey-ci-bot/.github/workflows/analyze-failure.yml@v1
     with:
       config_path: .github/ci-failure-bot.yml
-      bot_repository: valkey-io/valkey-ci-bot
-      bot_ref: v1
       aws_region: ${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}
       mode: analyze
     secrets:
@@ -100,8 +98,6 @@ jobs:
     uses: valkey-io/valkey-ci-bot/.github/workflows/analyze-failure.yml@v1
     with:
       config_path: .github/ci-failure-bot.yml
-      bot_repository: valkey-io/valkey-ci-bot
-      bot_ref: v1
       aws_region: ${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}
       mode: reconcile
     secrets:

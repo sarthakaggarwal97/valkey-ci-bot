@@ -87,8 +87,6 @@ jobs:
       repo_full_name: ${{ github.repository }}
       target_branch: ${{ matrix.target_branch }}
       config_path: .github/backport-bot.yml
-      bot_repository: valkey-io/valkey-ci-bot
-      bot_ref: v1
       aws_region: ${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}
     secrets:
       AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}

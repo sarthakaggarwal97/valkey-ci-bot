@@ -13,9 +13,19 @@ from github.GithubException import GithubException
 logger = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
-_RETRYABLE_STATUS_CODES = {403, 429, 500, 502, 503, 504}
+_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 _BASE_DELAY_SECONDS = 1.0
 _MAX_DELAY_SECONDS = 8.0
+
+# Substrings in 403 response messages that indicate rate limiting
+# (as opposed to permanent permission errors).
+_RATE_LIMIT_403_INDICATORS = (
+    "rate limit",
+    "abuse detection",
+    "retry after",
+    "secondary rate",
+    "exceeded a secondary",
+)
 
 
 def _is_retryable_error(exc: Exception) -> bool:
@@ -23,7 +33,11 @@ def _is_retryable_error(exc: Exception) -> bool:
         return False
     if exc.status in _RETRYABLE_STATUS_CODES:
         return True
-    return "rate limit" in str(exc).lower()
+    # Only retry 403 when it's clearly rate-limiting, not a permission error.
+    if exc.status == 403:
+        msg = str(exc).lower()
+        return any(indicator in msg for indicator in _RATE_LIMIT_403_INDICATORS)
+    return False
 
 
 def _delay(attempt: int) -> float:

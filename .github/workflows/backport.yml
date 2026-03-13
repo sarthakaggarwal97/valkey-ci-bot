@@ -20,16 +20,6 @@ on:
         required: false
         type: string
         default: ".github/backport-bot.yml"
-      bot_repository:
-        description: "Repository containing the backport bot code"
-        required: false
-        type: string
-        default: "valkey-io/valkey-ci-bot"
-      bot_ref:
-        description: "Git ref of the backport bot repository to check out"
-        required: false
-        type: string
-        default: "v1"
       aws_region:
         description: "AWS region where Bedrock is available"
         required: false
@@ -54,8 +44,6 @@ jobs:
       - name: Checkout bot repository
         uses: actions/checkout@v6
         with:
-          repository: ${{ inputs.bot_repository }}
-          ref: ${{ inputs.bot_ref }}
           persist-credentials: false
           fetch-depth: 1
 

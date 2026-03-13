@@ -25,8 +25,10 @@ def test_review_workflow_checks_out_bot_repository() -> None:
     inputs = on_block["workflow_call"]["inputs"]
     secrets = on_block["workflow_call"]["secrets"]
 
-    assert "bot_repository" in inputs
-    assert "bot_ref" in inputs
+    # bot_repository/bot_ref removed for security — workflow always
+    # checks out its own repository at the called ref.
+    assert "bot_repository" not in inputs
+    assert "bot_ref" not in inputs
     assert "aws_region" in inputs
     assert "AWS_ROLE_ARN" in secrets
     assert "GITHUB_TOKEN" not in secrets
@@ -37,8 +39,9 @@ def test_review_workflow_checks_out_bot_repository() -> None:
         for step in workflow["jobs"]["review"]["steps"]
         if step["name"] == "Checkout bot repository"
     )
-    assert checkout_step["with"]["repository"] == "${{ inputs.bot_repository || github.repository }}"
-    assert checkout_step["with"]["ref"] == "${{ inputs.bot_ref || github.sha }}"
+    # No repository/ref override — uses the called workflow's own repo
+    assert "repository" not in checkout_step.get("with", {})
+    assert "ref" not in checkout_step.get("with", {})
     assert checkout_step["uses"] == "actions/checkout@v6"
 
     assert workflow["jobs"]["review"]["permissions"]["id-token"] == "write"
@@ -70,8 +73,8 @@ def test_example_pr_review_caller_passes_bot_checkout_inputs() -> None:
     workflow = _load_yaml(REPO_ROOT / "examples/pr-review-caller-workflow.yml")
 
     review_with = workflow["jobs"]["review"]["with"]
-    assert review_with["bot_repository"] == "valkey-io/valkey-ci-bot"
-    assert review_with["bot_ref"] == "v1"
+    assert "bot_repository" not in review_with
+    assert "bot_ref" not in review_with
     assert review_with["aws_region"] == "${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}"
 
     review_secrets = workflow["jobs"]["review"]["secrets"]

@@ -8,16 +8,6 @@ on:
         required: false
         type: string
         default: ".github/ci-failure-bot.yml"
-      bot_repository:
-        description: "Repository containing the CI failure bot code"
-        required: false
-        type: string
-        default: "valkey-io/valkey-ci-bot"
-      bot_ref:
-        description: "Git ref of the CI failure bot repository to check out"
-        required: false
-        type: string
-        default: "v1"
       mode:
         description: "Pipeline mode: 'analyze' for failure processing, 'reconcile' for draining queued failures"
         required: false
@@ -47,8 +37,6 @@ jobs:
       - name: Checkout bot repository
         uses: actions/checkout@v6
         with:
-          repository: ${{ inputs.bot_repository }}
-          ref: ${{ inputs.bot_ref }}
           persist-credentials: false
           fetch-depth: 1
 
