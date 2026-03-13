@@ -52,28 +52,44 @@ _PASSING_CHECK_RE = re.compile(r"^\s*([A-Za-z ]+): PASS$", re.MULTILINE)
 _PASSING_CHAOS_RE = re.compile(r"^\s*\[PASS\]\s+(.+)$", re.MULTILINE)
 
 _ANOMALY_PATTERNS: tuple[tuple[str, str, str], ...] = (
-    (
-        "Node crash or assertion",
-        "critical",
-        r"ASSERTION FAILED|Assertion failed|BUG REPORT START|STACK TRACE",
-    ),
+    # Crashes and fatal errors
+    ("Node crash or assertion", "critical", r"ASSERTION FAILED|Assertion failed|BUG REPORT START|STACK TRACE"),
     ("Memory or sanitizer failure", "critical", r"AddressSanitizer|UndefinedBehaviorSanitizer|runtime error:"),
     ("Segmentation fault", "critical", r"segmentation fault|signal 11"),
+    ("Out of memory", "critical", r"Out Of Memory|oom-score-adj|Can't allocate|OOM command not allowed"),
+    # Cluster state
     ("Failover timeout", "critical", r"Failover attempt expired|Manual failover timed out"),
     ("Split-brain or slot loss", "critical", r"split.?brain|slots still assigned to killed nodes"),
+    ("Cluster state FAIL", "warning", r"Cluster state changed:.*fail"),
+    ("CLUSTERDOWN reported", "warning", r"CLUSTERDOWN"),
+    ("Slot migration error", "warning", r"slot migration.*error|MIGRAT(?:E|ING).*error|Can't migrate"),
+    # Replication
     ("Replication topology issue", "warning", r"I'm a sub-replica! Reconfiguring myself"),
+    ("Replication sync failure", "warning", r"MASTER aborted replication|Failed trying to load the MASTER|Unable to partial resync"),
+    ("Replication link severed", "warning", r"Connection with (?:master|replica) lost|Disconnected from MASTER"),
+    # Persistence
+    ("RDB save failure", "warning", r"Background saving error|Failed opening.*rdb|fork.*failed|MISCONF.*background"),
+    ("AOF error", "warning", r"AOF rewrite.*failed|Unrecoverable error.*AOF|Bad file format reading.*aof"),
+    # Resource and config
+    ("Config rewrite failure", "warning", r"CONFIG REWRITE.*failed|Rewriting config file.*error"),
+    ("Rejected client connection", "warning", r"max number of clients reached|Error registering fd.*event"),
+    ("Loading state unexpected", "warning", r"LOADING.*dataset in memory|Server started but keys loaded"),
+    # Valkey server warnings/errors (log-level markers)
+    ("Server warning emitted", "warning", r"# WARNING:.*"),
+    ("Server error emitted", "critical", r"# ERROR:.*"),
 )
 _NORMAL_PATTERNS: tuple[tuple[str, str], ...] = (
     ("Successful failover election observed", r"Failover election won"),
     ("Failover authorization granted", r"Failover auth granted"),
-    (
-        "Promoted node committed a new config epoch",
-        r"configEpoch set to \d+ after successful failover",
-    ),
+    ("Promoted node committed a new config epoch", r"configEpoch set to \d+ after successful failover"),
     ("Cluster quorum marked a failed node", r"Marking node .* as failing.*quorum reached"),
+    ("Cluster state recovered to OK", r"Cluster state changed:.*ok"),
+    ("RDB save completed", r"Background saving terminated with success|DB saved on disk"),
+    ("AOF rewrite completed", r"Background AOF rewrite finished successfully"),
+    ("Node joined cluster", r"Cluster node .* added|New node added"),
+    ("Replica sync completed", r"MASTER <-> REPLICA sync: Finished|Successfully replicated"),
 )
 _SEVERITY_RANK = {"normal": 0, "warning": 1, "anomalous": 2}
-
 
 def _decode_text(payload: bytes) -> str:
     return payload.decode("utf-8", errors="replace")
