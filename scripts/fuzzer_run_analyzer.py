@@ -19,6 +19,11 @@ logger = logging.getLogger(__name__)
 _SYSTEM_PROMPT = """You analyze scheduled Valkey fuzzer workflow runs.
 Your job is to distinguish expected chaos behavior from anomalous behavior.
 Be conservative. Do not invent anomalies without evidence.
+
+Deterministic anomalies (crashes, assertions, sanitizer errors) are always real bugs.
+Chaos-expected signals (CLUSTERDOWN, replication link loss, cluster state FAIL,
+server warnings) are normal during node kills — only flag them as anomalies if
+they persist after the cluster should have recovered or indicate a deeper problem.
 Return valid JSON only using this exact schema:
 {
   "overall_status": "normal|warning|anomalous",
@@ -52,31 +57,33 @@ _PASSING_CHECK_RE = re.compile(r"^\s*([A-Za-z ]+): PASS$", re.MULTILINE)
 _PASSING_CHAOS_RE = re.compile(r"^\s*\[PASS\]\s+(.+)$", re.MULTILINE)
 
 _ANOMALY_PATTERNS: tuple[tuple[str, str, str], ...] = (
-    # Crashes and fatal errors
+    # Always-bad: these indicate real bugs regardless of chaos activity.
     ("Node crash or assertion", "critical", r"ASSERTION FAILED|Assertion failed|BUG REPORT START|STACK TRACE"),
     ("Memory or sanitizer failure", "critical", r"AddressSanitizer|UndefinedBehaviorSanitizer|runtime error:"),
     ("Segmentation fault", "critical", r"segmentation fault|signal 11"),
     ("Out of memory", "critical", r"Out Of Memory|oom-score-adj|Can't allocate|OOM command not allowed"),
-    # Cluster state
     ("Failover timeout", "critical", r"Failover attempt expired|Manual failover timed out"),
     ("Split-brain or slot loss", "critical", r"split.?brain|slots still assigned to killed nodes"),
-    ("Cluster state FAIL", "warning", r"Cluster state changed:.*fail"),
-    ("CLUSTERDOWN reported", "warning", r"CLUSTERDOWN"),
-    ("Slot migration error", "warning", r"slot migration.*error|MIGRAT(?:E|ING).*error|Can't migrate"),
-    # Replication
     ("Replication topology issue", "warning", r"I'm a sub-replica! Reconfiguring myself"),
-    ("Replication sync failure", "warning", r"MASTER aborted replication|Failed trying to load the MASTER|Unable to partial resync"),
-    ("Replication link severed", "warning", r"Connection with (?:master|replica) lost|Disconnected from MASTER"),
-    # Persistence
     ("RDB save failure", "warning", r"Background saving error|Failed opening.*rdb|fork.*failed|MISCONF.*background"),
     ("AOF error", "warning", r"AOF rewrite.*failed|Unrecoverable error.*AOF|Bad file format reading.*aof"),
-    # Resource and config
     ("Config rewrite failure", "warning", r"CONFIG REWRITE.*failed|Rewriting config file.*error"),
     ("Rejected client connection", "warning", r"max number of clients reached|Error registering fd.*event"),
-    ("Loading state unexpected", "warning", r"LOADING.*dataset in memory|Server started but keys loaded"),
-    # Valkey server warnings/errors (log-level markers)
-    ("Server warning emitted", "warning", r"# WARNING:.*"),
     ("Server error emitted", "critical", r"# ERROR:.*"),
+)
+
+# Chaos-expected: these are normal side-effects of killing nodes during a
+# fuzzer run.  They are passed to the LLM as context but NOT flagged as
+# deterministic anomalies, since the LLM can judge whether they resolved
+# after recovery or indicate a deeper problem.
+_CHAOS_EXPECTED_PATTERNS: tuple[tuple[str, str], ...] = (
+    ("Cluster state changed to FAIL", r"Cluster state changed:.*fail"),
+    ("CLUSTERDOWN reported", r"CLUSTERDOWN"),
+    ("Slot migration error during chaos", r"slot migration.*error|MIGRAT(?:E|ING).*error|Can't migrate"),
+    ("Replication sync interrupted", r"MASTER aborted replication|Failed trying to load the MASTER|Unable to partial resync"),
+    ("Replication link lost", r"Connection with (?:master|replica) lost|Disconnected from MASTER"),
+    ("Loading state during restart", r"LOADING.*dataset in memory|Server started but keys loaded"),
+    ("Server warning emitted", r"# WARNING:.*"),
 )
 _NORMAL_PATTERNS: tuple[tuple[str, str], ...] = (
     ("Successful failover election observed", r"Failover election won"),
@@ -315,6 +322,11 @@ def _extract_observations(context: FuzzerRunContext) -> tuple[list[FuzzerSignal]
                     evidence=f"{source_name}: {evidence}",
                 )
             )
+        for label, pattern in _CHAOS_EXPECTED_PATTERNS:
+            match = re.search(pattern, cleaned_log, re.IGNORECASE)
+            if match is None:
+                continue
+            normal_signals.append(f"{label} ({source_name}).")
         for label, pattern in _NORMAL_PATTERNS:
             match = re.search(pattern, cleaned_log, re.IGNORECASE)
             if match is None:
