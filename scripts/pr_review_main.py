@@ -22,6 +22,7 @@ from scripts.code_reviewer import CodeReviewer
 from scripts.comment_publisher import CommentPublisher
 from scripts.config import ReviewerConfig, load_reviewer_config, load_reviewer_config_text
 from scripts.models import PullRequestContext, ReviewState, SummaryResult
+from scripts.models import DiffScope as _DiffScope
 from scripts.path_filter import PathFilter
 from scripts.permission_gate import PermissionGate
 from scripts.pr_context_fetcher import PRContextFetcher
@@ -294,6 +295,7 @@ def run(argv: list[str] | None = None) -> int:
             return 0
 
         summary_comment_id = current_state.summary_comment_id if current_state else None
+        short_summary = ""
         try:
             summary_result = PRSummarizer(
                 bedrock_client,
@@ -303,6 +305,7 @@ def run(argv: list[str] | None = None) -> int:
                 review_context,
                 config,
             )
+            short_summary = summary_result.short_summary
             summary_comment_id = publisher.upsert_summary(
                 repo_name,
                 pr_context.number,
@@ -336,23 +339,39 @@ def run(argv: list[str] | None = None) -> int:
                     detail = "simple-change" if diff_scope.files else "no-new-files"
                     summary.add_result("review", "skipped", detail)
                 else:
-                    findings = reviewer.review(review_context, diff_scope, config)
-                    published_ids = publisher.publish_review_comments(
-                        repo_name,
-                        pr_context.number,
-                        findings,
-                        commit_sha=pr_context.head_sha,
+                    # Per-file triage: use light model to skip trivial files
+                    triaged_files = reviewer.triage_files(
+                        diff_scope.files, review_context, config,
                     )
-                    review_comment_ids.extend(
-                        comment_id
-                        for comment_id in published_ids
-                        if comment_id not in review_comment_ids
-                    )
-                    summary.add_result(
-                        "review",
-                        "performed",
-                        f"{len(published_ids)} comment(s)",
-                    )
+                    if not triaged_files:
+                        summary.add_result("review", "skipped", "all-files-approved-by-triage")
+                    else:
+                        triaged_scope = _DiffScope(
+                            base_sha=diff_scope.base_sha,
+                            head_sha=diff_scope.head_sha,
+                            files=triaged_files,
+                            incremental=diff_scope.incremental,
+                        )
+                        findings = reviewer.review(
+                            review_context, triaged_scope, config,
+                            short_summary=short_summary,
+                        )
+                        published_ids = publisher.publish_review_comments(
+                            repo_name,
+                            pr_context.number,
+                            findings,
+                            commit_sha=pr_context.head_sha,
+                        )
+                        review_comment_ids.extend(
+                            comment_id
+                            for comment_id in published_ids
+                            if comment_id not in review_comment_ids
+                        )
+                        summary.add_result(
+                            "review",
+                            "performed",
+                            f"{len(published_ids)} comment(s), {len(diff_scope.files) - len(triaged_files)} file(s) auto-approved",
+                        )
             except Exception as exc:
                 had_failure = True
                 logger.warning("PR review failed for %s#%d: %s", repo_name, pr_context.number, exc)

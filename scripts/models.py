@@ -193,6 +193,7 @@ class SummaryResult:
     walkthrough: str
     file_groups_markdown: str
     release_notes: str | None
+    short_summary: str = ""
 
 
 @dataclass

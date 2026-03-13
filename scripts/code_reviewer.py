@@ -15,16 +15,20 @@ from scripts.bedrock_retriever import BedrockRetriever
 from scripts.config import RetrievalConfig, ReviewerConfig
 from scripts.models import ChangedFile, DiffScope, PullRequestContext, ReviewFinding
 
-_SYSTEM_PROMPT = """You are a strict code reviewer.
-Return only high-confidence, defect-oriented findings about correctness,
-regressions, security, performance risks, or missing validation.
-Only report issues that are directly supported by the provided patch/content.
-The provided excerpts may be truncated; never treat missing context as a bug.
-Do not speculate about symbols, methods, fields, workflows, or files that are
-not shown, and do not ask maintainers to verify whether something exists.
-Avoid duplicate or overlapping findings for the same root cause.
-Do not include praise or generic approvals.
-Return valid JSON only."""
+_SYSTEM_PROMPT = """You are a highly experienced software engineer performing a thorough code review.
+Your purpose is to find substantive defects — correctness bugs, regressions,
+security vulnerabilities, performance risks, or missing validation.
+
+Rules:
+- Only report issues that are directly supported by the provided patch/content.
+- The provided excerpts may be truncated; never treat missing context as a bug.
+- Do not speculate about symbols, methods, fields, workflows, or files that are
+  not shown, and do not ask maintainers to verify whether something exists.
+- Do NOT provide general feedback, summaries, explanations of changes, or praises
+  for making good additions.
+- Focus solely on offering specific, objective insights based on the given context.
+- Avoid duplicate or overlapping findings for the same root cause.
+- Return valid JSON only."""
 
 _SPECULATIVE_SUBSTRINGS = (
     "not shown in the diff",
@@ -36,6 +40,23 @@ _SPECULATIVE_SUBSTRINGS = (
     "verify that",
     "verify the full file",
     "older callers",
+    "not visible in the provided",
+    "not visible in the diff",
+    "cannot determine from the",
+    "without seeing the full",
+    "without the full context",
+    "rest of the file",
+    "outside the provided",
+    "beyond the scope of",
+    "may or may not",
+    "it is unclear whether",
+    "it's unclear whether",
+    "consider checking",
+    "consider verifying",
+    "might want to check",
+    "should verify that",
+    "ensure that the caller",
+    "ensure that callers",
 )
 
 _SPECULATIVE_PATTERNS = (
@@ -43,6 +64,9 @@ _SPECULATIVE_PATTERNS = (
     re.compile(r"\bif the model does not define\b"),
     re.compile(r"\bif the model doesn't define\b"),
     re.compile(r"\bif [`_a-zA-Z0-9.()'-]+ returns a\b"),
+    re.compile(r"\bassuming (?:that |this )?\w+ (?:is|does|has)\b"),
+    re.compile(r"\bpotentially? (?:cause|lead|result)\b"),
+    re.compile(r"\bcould potentially\b"),
 )
 
 
@@ -72,20 +96,32 @@ def _extract_json_payload(text: str) -> Any:
 def _looks_like_code(path: str) -> bool:
     suffix = PurePosixPath(path).suffix.lower()
     return suffix in {
-        ".c",
-        ".cc",
-        ".cpp",
-        ".h",
-        ".hpp",
-        ".py",
-        ".js",
-        ".ts",
-        ".tsx",
+        ".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hxx",
+        ".py", ".pyi",
+        ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs",
         ".go",
-        ".java",
+        ".java", ".kt", ".kts", ".scala",
         ".rb",
         ".rs",
-        ".sh",
+        ".sh", ".bash", ".zsh",
+        ".cs",
+        ".swift",
+        ".m", ".mm",
+        ".lua",
+        ".pl", ".pm",
+        ".php",
+        ".r",
+        ".tcl",
+        ".zig",
+        ".v",
+        ".hs",
+        ".ex", ".exs",
+        ".erl",
+        ".clj", ".cljs",
+        ".ml", ".mli",
+        ".dart",
+        ".sol",
+        ".vue", ".svelte",
     }
 
 
@@ -100,8 +136,14 @@ def _serialize_scope(scope: DiffScope, *, max_chars: int = 200_000) -> str:
             f"Deletions: {changed_file.deletions}",
         ]
         if changed_file.patch:
-            chunk.append("Patch (unified diff, each line prefixed with its right-side line number):")
-            chunk.append(_annotate_patch(changed_file.patch))
+            new_hunk, old_hunk = _split_hunks(changed_file.patch)
+            chunk.append("<new_hunk>")
+            chunk.append(new_hunk)
+            chunk.append("</new_hunk>")
+            if old_hunk.strip():
+                chunk.append("<old_hunk>")
+                chunk.append(old_hunk)
+                chunk.append("</old_hunk>")
         if changed_file.contents:
             chunk.append("Full file contents (may be truncated):")
             chunk.append(changed_file.contents[:6000])
@@ -149,6 +191,40 @@ def _annotate_patch(patch: str) -> str:
         out.append(f"L{current_line:<5d} {raw}")
         current_line += 1
     return "\n".join(out)
+
+
+def _split_hunks(patch: str) -> tuple[str, str]:
+    """Split a unified diff into annotated new_hunk and old_hunk.
+
+    new_hunk: added and context lines with right-side line numbers.
+    old_hunk: removed and context lines (the code being replaced).
+
+    This gives the LLM both the new code (with line numbers for commenting)
+    and the old code (for understanding what changed).
+    """
+    new_lines: list[str] = []
+    old_lines: list[str] = []
+    current_line = 0
+    for raw in patch.splitlines():
+        if raw.startswith("@@"):
+            match = re.search(r"\+(\d+)", raw)
+            if match:
+                current_line = int(match.group(1))
+            new_lines.append(raw)
+            old_lines.append(raw)
+            continue
+        if raw.startswith("-"):
+            old_lines.append(raw[1:] if len(raw) > 1 else "")
+            continue
+        if raw.startswith("+"):
+            new_lines.append(f"{current_line}: {raw[1:] if len(raw) > 1 else ''}")
+            current_line += 1
+            continue
+        # context line
+        old_lines.append(raw)
+        new_lines.append(f"{current_line}: {raw}")
+        current_line += 1
+    return "\n".join(new_lines), "\n".join(old_lines)
 
 
 def _parse_diff_lines(patch: str) -> tuple[set[int], set[int]]:
@@ -256,11 +332,98 @@ class CodeReviewer:
 
         return all(not _looks_like_code(changed_file.path) for changed_file in files)
 
+    def triage_file(
+        self,
+        changed_file: ChangedFile,
+        pr: PullRequestContext,
+        config: ReviewerConfig,
+    ) -> str:
+        """Triage a single file as NEEDS_REVIEW or APPROVED using the light model.
+
+        Returns "NEEDS_REVIEW" or "APPROVED".
+        """
+        if not changed_file.patch:
+            return "APPROVED"
+
+        # Very small changes to non-code files are auto-approved
+        delta = changed_file.additions + changed_file.deletions
+        if delta <= 3 and not _looks_like_code(changed_file.path):
+            return "APPROVED"
+
+        triage_prompt = f"""Triage this file diff as NEEDS_REVIEW or APPROVED.
+
+Rules:
+- If the diff modifies logic, control flow, function signatures, variable assignments, or anything that could affect behavior: NEEDS_REVIEW
+- If the diff only fixes typos, formatting, comments, renames for clarity, or trivial whitespace: APPROVED
+- When in doubt, err on the side of NEEDS_REVIEW
+
+PR title: {pr.title}
+
+File: {changed_file.path}
+Status: {changed_file.status}
+
+Diff:
+{changed_file.patch[:4000]}
+
+Respond with ONLY one line:
+[TRIAGE]: NEEDS_REVIEW
+or
+[TRIAGE]: APPROVED
+"""
+        try:
+            response = self._bedrock.invoke(
+                "You triage pull request file diffs. Respond with only the triage line.",
+                triage_prompt,
+                model_id=config.models.light_model_id,
+                max_output_tokens=50,
+                temperature=0.0,
+            )
+            if "APPROVED" in response and "NEEDS_REVIEW" not in response:
+                logger.info("Triage: %s -> APPROVED", changed_file.path)
+                return "APPROVED"
+        except Exception as exc:
+            logger.warning("Triage failed for %s: %s, defaulting to NEEDS_REVIEW", changed_file.path, exc)
+
+        logger.info("Triage: %s -> NEEDS_REVIEW", changed_file.path)
+        return "NEEDS_REVIEW"
+
+    def triage_files(
+        self,
+        files: list[ChangedFile],
+        pr: PullRequestContext,
+        config: ReviewerConfig,
+    ) -> list[ChangedFile]:
+        """Filter files to only those that need detailed review.
+
+        Uses the light model to triage each file, skipping trivial changes.
+        Returns the subset of files that need review.
+        """
+        if not files:
+            return []
+
+        needs_review: list[ChangedFile] = []
+        approved_count = 0
+        for changed_file in files:
+            verdict = self.triage_file(changed_file, pr, config)
+            if verdict == "NEEDS_REVIEW":
+                needs_review.append(changed_file)
+            else:
+                approved_count += 1
+
+        logger.info(
+            "File triage complete: %d need review, %d approved (skipped).",
+            len(needs_review),
+            approved_count,
+        )
+        return needs_review
+
     def review(
         self,
         pr: PullRequestContext,
         diff_scope: DiffScope,
         config: ReviewerConfig,
+        *,
+        short_summary: str = "",
     ) -> list[ReviewFinding]:
         """Review the selected diff scope with the configured heavy model."""
         if not diff_scope.files:
@@ -273,12 +436,20 @@ class CodeReviewer:
                 self._retrieval_config,
                 section_title="Retrieved Valkey Context",
             )
+
+        summary_section = ""
+        if short_summary:
+            summary_section = f"""
+Summary of all changes in this PR (for cross-file context):
+{short_summary}
+"""
+
         user_prompt = f"""Review this pull request and return only actionable findings.
 
 PR title: {pr.title}
 PR description:
 {pr.body}
-
+{summary_section}
 Review scope excerpts (patch/content may be truncated):
 {_serialize_scope(diff_scope)}
 
@@ -290,7 +461,7 @@ Return JSON in one of these shapes:
     "path": "relative/path",
     "line": <line number from the diff's +N side, or null if unsure>,
     "severity": "high|medium|low",
-    "body": "single concrete finding"
+    "body": "single concrete finding in markdown"
   }}
 ]
 
@@ -298,29 +469,115 @@ or
 {{ "findings": [ ... ] }}
 
 CRITICAL rules:
-- Each diff line is prefixed with its right-side line number (e.g. "L42"). The "line" field MUST be one of these prefixed numbers. If you cannot identify the exact line, set "line" to null.
+- New hunks are annotated with line numbers (e.g. "120: code"). Old hunks show the replaced code without line numbers. Use the line numbers from new_hunk for the "line" field.
 - Only return findings with direct evidence in the shown patch/content excerpts.
+- Do NOT provide general feedback, summaries, explanations of changes, or praises for making good additions.
+- Focus solely on offering specific, objective insights based on the given context and refrain from making broad comments about potential impacts on the system or question intentions behind the changes.
 - Do NOT speculate about array sizes, buffer lengths, variable values, or code structure that is not fully visible in the provided excerpts.
 - Do not infer missing definitions from other files or from omitted parts of a file.
 - Do not report that a file, diff, or workflow looks truncated.
 - Do not ask maintainers to verify whether a symbol exists.
 - Prefer one strongest finding per root cause; if unsure, return [].
 - Do not emit generic praise.
+- For code modification suggestions, use GitHub's suggestion format in the body:
+  ```suggestion
+  corrected code here
+  ```
+
+<example_input>
+<new_hunk file="src/server.c">
+@@ -118,7 +118,7 @@
+120:   int timeout = config->timeout;
+121:   if (timeout = 0) {{
+122:       timeout = DEFAULT_TIMEOUT;
+123:   }}
+124:   startServer(timeout);
+</new_hunk>
+
+<old_hunk file="src/server.c">
+@@ -118,7 +118,7 @@
+  int timeout = config->timeout;
+  if (timeout == 0) {{
+      timeout = DEFAULT_TIMEOUT;
+  }}
+  startServer(timeout);
+</old_hunk>
+</example_input>
+
+<example_output>
+[
+  {{
+    "path": "src/server.c",
+    "line": 121,
+    "severity": "high",
+    "body": "Bug: assignment `=` used instead of comparison `==` in condition. This will always set timeout to 0 and evaluate as false, so `DEFAULT_TIMEOUT` is never applied.\\n\\n```suggestion\\n    if (timeout == 0) {{\\n```"
+  }}
+]
+</example_output>
 """
-        response = self._bedrock.invoke(
-            _SYSTEM_PROMPT,
-            user_prompt,
-            model_id=config.models.heavy_model_id,
-            max_output_tokens=config.max_output_tokens,
-            temperature=config.models.temperature,
+        # Define the JSON schema for structured tool-use output
+        _review_schema: dict = {
+            "type": "object",
+            "properties": {
+                "reviews": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                            "line": {"type": "integer"},
+                            "severity": {"type": "string", "enum": ["high", "medium", "low"]},
+                            "body": {"type": "string"},
+                        },
+                        "required": ["path", "body"],
+                    },
+                },
+                "lgtm": {"type": "boolean"},
+            },
+            "required": ["reviews", "lgtm"],
+        }
+
+        # Try structured tool-use first, fall back to plain invoke + JSON parsing
+        raw_findings: list = []
+        _has_schema_method = (
+            callable(getattr(self._bedrock, "invoke_with_schema", None))
+            and type(self._bedrock).__name__ != "MagicMock"
         )
+        used_tool_use = False
+        if _has_schema_method:
+            try:
+                response = self._bedrock.invoke_with_schema(
+                    _SYSTEM_PROMPT,
+                    user_prompt,
+                    tool_name="generate_review_json",
+                    tool_description="Generate code review findings in structured JSON format",
+                    json_schema=_review_schema,
+                    model_id=config.models.heavy_model_id,
+                    max_output_tokens=config.max_output_tokens,
+                    temperature=config.models.temperature,
+                )
+                payload = json.loads(response) if isinstance(response, str) else response
+                if isinstance(payload, dict):
+                    raw_findings = payload.get("reviews", [])
+                    used_tool_use = True
+                    logger.info("Used structured tool-use output, got %d finding(s).", len(raw_findings))
+            except Exception as tool_exc:
+                logger.info("Tool-use failed (%s), falling back to plain invoke.", tool_exc)
 
-        try:
-            payload = _extract_json_payload(response)
-        except Exception as exc:
-            raise ValueError("Unparseable review response") from exc
+        if not used_tool_use:
+            response = self._bedrock.invoke(
+                _SYSTEM_PROMPT,
+                user_prompt,
+                model_id=config.models.heavy_model_id,
+                max_output_tokens=config.max_output_tokens,
+                temperature=config.models.temperature,
+            )
+            try:
+                payload = _extract_json_payload(response)
+            except Exception as exc:
+                raise ValueError("Unparseable review response") from exc
+            raw_findings = payload.get("findings", []) if isinstance(payload, dict) else payload
 
-        raw_findings = payload.get("findings", []) if isinstance(payload, dict) else payload
         if not isinstance(raw_findings, list):
             raise ValueError("Review response did not contain a findings list.")
 

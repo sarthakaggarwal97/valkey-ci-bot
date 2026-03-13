@@ -68,6 +68,25 @@ class PromptClient(Protocol):
         temperature: float | None = None,
     ) -> str: ...
 
+    def invoke_with_schema(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        tool_name: str,
+        tool_description: str,
+        json_schema: dict,
+        model_id: str | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str:
+        """Invoke with a tool-use JSON schema for structured output.
+
+        Implementations that don't support tool use should fall back to
+        a plain ``invoke`` call.
+        """
+        ...
+
 
 class TokenBudgetLimiter(Protocol):
     """Interface used for coarse Bedrock budget enforcement."""
@@ -232,6 +251,8 @@ class BedrockClient:
                 self._rate_limiter.record_token_usage(reserved_tokens)
             try:
                 response = self._client.converse(**converse_kwargs)
+                # Track actual token usage from the API response when available
+                self._adjust_token_usage(response, reserved_tokens)
                 return self._extract_response_text(response)
 
             except ClientError as exc:
@@ -290,3 +311,190 @@ class BedrockClient:
                 error_code=None,
                 retryable=False,
             ) from exc
+
+    @staticmethod
+    def _extract_tool_use_json(response: dict) -> str:
+        """Extract JSON from a tool-use response block.
+
+        When the model is invoked with a toolConfig, it returns a toolUse
+        content block whose ``input`` field contains the structured JSON.
+        Falls back to text extraction if no toolUse block is found.
+        """
+        try:
+            content = response["output"]["message"]["content"]
+            for block in content:
+                if "toolUse" in block:
+                    import json as _json
+                    return _json.dumps(block["toolUse"]["input"])
+            # Fallback: no toolUse block, try text
+            text_parts = [block["text"] for block in content if "text" in block]
+            return "".join(text_parts)
+        except (KeyError, IndexError, TypeError) as exc:
+            raise BedrockError(
+                f"Unexpected Bedrock tool-use response format: {exc}",
+                error_code=None,
+                retryable=False,
+            ) from exc
+
+    def _adjust_token_usage(self, response: dict, reserved_tokens: int) -> None:
+        """Correct rate-limiter accounting with actual token counts from the API.
+
+        The Converse API returns ``usage.inputTokens`` and
+        ``usage.outputTokens`` in every response.  We pre-reserved
+        ``reserved_tokens`` before the call; now we adjust the difference
+        so the budget reflects reality instead of estimates.
+        """
+        if self._rate_limiter is None:
+            return
+        usage = response.get("usage")
+        if not usage:
+            return
+        actual = usage.get("inputTokens", 0) + usage.get("outputTokens", 0)
+        if actual > 0:
+            diff = reserved_tokens - actual
+            if diff > 0:
+                # We over-reserved — give tokens back
+                self._rate_limiter.record_token_usage(-diff)
+            elif diff < 0:
+                # We under-reserved — charge the extra
+                self._rate_limiter.record_token_usage(-diff)
+        logger.debug(
+            "Token usage: reserved=%d, actual=%d (input=%d, output=%d), adjustment=%+d",
+            reserved_tokens,
+            actual,
+            usage.get("inputTokens", 0),
+            usage.get("outputTokens", 0),
+            actual - reserved_tokens,
+        )
+
+    def invoke_with_schema(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        tool_name: str,
+        tool_description: str,
+        json_schema: dict,
+        model_id: str | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str:
+        """Call Bedrock Converse API with tool-use for structured JSON output.
+
+        This uses Bedrock's native toolConfig to constrain the model to
+        return valid JSON matching the provided schema, eliminating the
+        need for fragile JSON extraction from prose responses.
+
+        Args:
+            system_prompt: The system-level instructions for the model.
+            user_prompt: The user message to send to the model.
+            tool_name: Name of the tool (e.g. "generate_review_json").
+            tool_description: Description of what the tool produces.
+            json_schema: JSON Schema dict describing the expected output.
+            model_id: Optional model override for this call.
+            max_output_tokens: Optional output-token override for this call.
+            temperature: Optional sampling temperature for this call.
+
+        Returns:
+            JSON string from the tool-use response.
+
+        Raises:
+            BedrockError: On non-retryable errors or after exhausting retries.
+        """
+        full_system_prompt = (
+            f"{system_prompt}\n\n"
+            f"## Project Context\n{self._project_context}"
+        )
+        estimated_input_tokens = (
+            _estimate_tokens(full_system_prompt) + _estimate_tokens(user_prompt)
+        )
+        if estimated_input_tokens > self._config.max_input_tokens:
+            raise BedrockError(
+                "Bedrock input prompt exceeds max_input_tokens.",
+                error_code="InputTooLarge",
+                retryable=False,
+            )
+
+        output_tokens = max_output_tokens or self._config.max_output_tokens
+        messages = [
+            {
+                "role": "user",
+                "content": [{"text": user_prompt}],
+            }
+        ]
+
+        converse_kwargs: dict[str, Any] = {
+            "modelId": model_id or self._config.bedrock_model_id,
+            "system": [{"text": full_system_prompt}],
+            "messages": messages,
+            "inferenceConfig": {
+                "maxTokens": output_tokens,
+            },
+            "toolConfig": {
+                "tools": [
+                    {
+                        "toolSpec": {
+                            "name": tool_name,
+                            "description": tool_description,
+                            "inputSchema": {
+                                "json": json_schema,
+                            },
+                        }
+                    }
+                ],
+            },
+        }
+        if temperature is not None:
+            converse_kwargs["inferenceConfig"]["temperature"] = temperature
+
+        max_attempts = self._config.max_retries_bedrock + 1
+        last_error: ClientError | None = None
+        reserved_tokens = estimated_input_tokens + output_tokens
+
+        for attempt in range(max_attempts):
+            if self._rate_limiter is not None:
+                if not self._rate_limiter.can_use_tokens(reserved_tokens):
+                    raise BedrockError(
+                        "daily token budget exhausted",
+                        error_code="TokenBudgetExceeded",
+                        retryable=False,
+                    )
+                self._rate_limiter.record_token_usage(reserved_tokens)
+            try:
+                response = self._client.converse(**converse_kwargs)
+                self._adjust_token_usage(response, reserved_tokens)
+                return self._extract_tool_use_json(response)
+
+            except ClientError as exc:
+                last_error = exc
+                error_code = exc.response.get("Error", {}).get("Code", "")
+                error_message = exc.response.get("Error", {}).get("Message", str(exc))
+
+                if not _is_retryable_error(exc):
+                    raise BedrockError(
+                        f"Bedrock API error: {error_message}",
+                        error_code=error_code,
+                        retryable=False,
+                    ) from exc
+
+                retries_left = max_attempts - attempt - 1
+                if retries_left == 0:
+                    raise BedrockError(
+                        f"Bedrock API error after {max_attempts} attempts: {error_message}",
+                        error_code=error_code,
+                        retryable=True,
+                    ) from exc
+
+                delay = _compute_backoff_delay(attempt)
+                logger.warning(
+                    "Retryable Bedrock error (code=%s), attempt %d/%d. "
+                    "Retrying in %.2fs. Error: %s",
+                    error_code, attempt + 1, max_attempts, delay, error_message,
+                )
+                time.sleep(delay)
+
+        raise BedrockError(
+            f"Bedrock API error after {max_attempts} attempts",
+            error_code=last_error.response.get("Error", {}).get("Code", "") if last_error else None,
+            retryable=True,
+        )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from scripts.bedrock_client import PromptClient
@@ -10,8 +11,13 @@ from scripts.bedrock_retriever import BedrockRetriever
 from scripts.config import RetrievalConfig, ReviewerConfig
 from scripts.models import PullRequestContext, SummaryResult
 
+logger = logging.getLogger(__name__)
+
 _SYSTEM_PROMPT = """You summarize pull requests for maintainers.
 Focus on intent, architecture, and the concrete files changed.
+If applicable, note alterations to signatures of exported functions,
+global data structures and variables, and any changes that might affect
+the external interface or behavior of the code.
 Return valid JSON only."""
 
 
@@ -103,28 +109,74 @@ Changed files:
 
 Return JSON with this schema:
 {{
-  "walkthrough": "short maintainer-facing summary",
-  "file_groups_markdown": "markdown bullets grouped by theme",
-  "release_notes": "markdown or null"
+  "walkthrough": "A high-level summary of the overall change within 80 words, focusing on intent and architecture rather than listing individual files",
+  "short_summary": "A concise factual summary of the changes (max 500 words) that will be used as context when reviewing each file. Focus only on what changed, not instructions for how to review. Do not mention that files need review or caution about potential issues.",
+  "file_groups_markdown": "A markdown table of files and their summaries, grouping files with similar changes together into a single row to save space",
+  "release_notes": "Concise release notes categorized as New Feature, Bug Fix, Documentation, Refactor, Style, Test, Chore, or Revert. Bullet-point list, 50-100 words, focusing on end-user-visible features. Or null if not applicable."
 }}
 
 {release_notes_instruction}
 """
-        response = self._bedrock.invoke(
-            _SYSTEM_PROMPT,
-            user_prompt,
-            model_id=config.models.light_model_id,
-            max_output_tokens=config.max_output_tokens,
-            temperature=config.models.temperature,
-        )
-        try:
-            payload = _extract_json_payload(response)
-        except Exception:
-            return SummaryResult(
-                walkthrough=response.strip(),
-                file_groups_markdown="",
-                release_notes=None,
+        # Define the JSON schema for structured tool-use output
+        _summary_schema: dict = {
+            "type": "object",
+            "properties": {
+                "walkthrough": {"type": "string"},
+                "short_summary": {"type": "string"},
+                "file_groups_markdown": {"type": "string"},
+                "release_notes": {"type": ["string", "null"]},
+            },
+            "required": ["walkthrough", "short_summary", "file_groups_markdown"],
+        }
+
+        # Try structured tool-use first, fall back to plain invoke + JSON parsing
+        payload: dict | None = None
+        _has_schema_method = (
+            callable(getattr(self._bedrock, "invoke_with_schema", None))
+            and not isinstance(
+                getattr(type(self._bedrock), "invoke_with_schema", None),
+                property,
             )
+            and type(self._bedrock).__name__ != "MagicMock"
+        )
+        if _has_schema_method:
+            try:
+                response = self._bedrock.invoke_with_schema(
+                    _SYSTEM_PROMPT,
+                    user_prompt,
+                    tool_name="generate_pr_summary",
+                    tool_description="Generate a structured PR summary with walkthrough, short summary, file groups, and release notes",
+                    json_schema=_summary_schema,
+                    model_id=config.models.light_model_id,
+                    max_output_tokens=config.max_output_tokens,
+                    temperature=config.models.temperature,
+                )
+                payload = json.loads(response) if isinstance(response, str) else response
+                if isinstance(payload, dict):
+                    logger.info("Used structured tool-use output for summary.")
+                else:
+                    payload = None
+            except Exception as tool_exc:
+                logger.info("Tool-use failed (%s), falling back to plain invoke.", tool_exc)
+                payload = None
+
+        if payload is None:
+            response = self._bedrock.invoke(
+                _SYSTEM_PROMPT,
+                user_prompt,
+                model_id=config.models.light_model_id,
+                max_output_tokens=config.max_output_tokens,
+                temperature=config.models.temperature,
+            )
+            try:
+                payload = _extract_json_payload(response)
+            except Exception:
+                return SummaryResult(
+                    walkthrough=response.strip(),
+                    file_groups_markdown="",
+                    release_notes=None,
+                    short_summary="",
+                )
 
         return SummaryResult(
             walkthrough=str(payload.get("walkthrough", "")).strip(),
@@ -136,4 +188,5 @@ Return JSON with this schema:
                 if payload.get("release_notes") is not None
                 else None
             ),
+            short_summary=str(payload.get("short_summary", "")).strip(),
         )

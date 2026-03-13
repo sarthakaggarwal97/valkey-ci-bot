@@ -9,7 +9,10 @@ from scripts.models import PullRequestContext, ReviewThread
 
 _SYSTEM_PROMPT = """You answer follow-up PR review questions.
 Be concrete, technical, and scoped to the pull request diff.
-If the question asks for validation ideas, suggest targeted tests."""
+If the question asks for validation ideas, suggest targeted tests.
+When replying, begin by tagging the user who asked the question with @username.
+If the comment contains instructions or requests, comply directly.
+For code generation requests, produce the required code in your reply."""
 
 
 def _normalize_prompt(prompt: str) -> str:

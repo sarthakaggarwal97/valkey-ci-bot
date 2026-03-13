@@ -10,20 +10,39 @@ _GENERATED_SEGMENTS = {
     "dist",
     "vendor",
     "third_party",
+    "third-party",
     "node_modules",
     "build",
+    "gen",
+    "_gen",
+    "generated",
+    "@generated",
 }
 _UNSUPPORTED_SUFFIXES = {
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".pdf",
-    ".zip",
-    ".jar",
-    ".class",
-    ".ico",
-    ".lock",
+    # Images
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".ico", ".svg",
+    ".webm", ".woff", ".woff2", ".eot", ".otf", ".ttf",
+    # Documents
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    # Archives / binaries
+    ".zip", ".gz", ".xz", ".bz2", ".7z", ".rar", ".zst", ".tar",
+    ".jar", ".war", ".class", ".dll", ".dylib", ".so", ".exe",
+    ".o", ".lo", ".pyc", ".pyd", ".pyo", ".egg",
+    ".app", ".bin", ".iso", ".nar", ".wasm",
+    # Media
+    ".mp3", ".wav", ".wma", ".flac", ".ogg",
+    ".mp4", ".avi", ".mkv", ".wmv", ".mov", ".flv",
+    ".m4a", ".m4v", ".3gp", ".3g2", ".rm", ".swf",
+    # Data / serialized
+    ".db", ".csv", ".tsv", ".dat", ".pkl", ".pickle", ".parquet",
+    ".pb.go", ".snap", ".tfstate", ".tfstate.backup",
+    # Keys / certs
+    ".pub", ".pem",
+    # Lock / config (rarely need code review)
+    ".lock", ".md5sum",
+    # Misc
+    ".log", ".rkt", ".ss", ".p", ".glif", ".dot",
+    ".mmd",
 }
 
 
@@ -40,7 +59,12 @@ def _looks_generated(path: str) -> bool:
     if any(segment in _GENERATED_SEGMENTS for segment in normalized.split("/")):
         return True
     lowered = normalized.lower()
-    return lowered.endswith(".min.js") or lowered.endswith(".generated.h")
+    return (
+        lowered.endswith(".min.js")
+        or lowered.endswith(".min.js.map")
+        or lowered.endswith(".min.css")
+        or lowered.endswith(".generated.h")
+    )
 
 
 def _unsupported(path: str) -> bool:
