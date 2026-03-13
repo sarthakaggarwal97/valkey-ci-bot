@@ -173,7 +173,16 @@ def run_backport(
     # ---- Step 3: Rate limit check (Req 8.1) ----
     logger.info("Checking rate limit.")
     bot_config = BotConfig(max_prs_per_day=config.max_prs_per_day)
-    rate_limiter = RateLimiter(bot_config, gh, repo_full_name)
+    # Pass github_client=None so the rate limiter skips the open-PR-label
+    # check (which looks for "bot-fix" labels, not backport labels).
+    # State persistence still works via state_github_client.
+    rate_limiter = RateLimiter(
+        bot_config,
+        None,
+        "",
+        state_github_client=gh,
+        state_repo_full_name=repo_full_name,
+    )
     rate_limiter.load()
     if not rate_limiter.can_create_pr():
         msg = "Daily backport PR rate limit reached. Please try again later."
