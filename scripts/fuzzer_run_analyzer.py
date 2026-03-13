@@ -24,6 +24,8 @@ Deterministic anomalies (crashes, assertions, sanitizer errors) are always real 
 Chaos-expected signals (CLUSTERDOWN, replication link loss, cluster state FAIL,
 server warnings) are normal during node kills — only flag them as anomalies if
 they persist after the cluster should have recovered or indicate a deeper problem.
+Pay special attention to "Untargeted node failure" signals — these indicate a node
+that was NOT part of the chaos plan crashed or failed, which is likely a real bug.
 Return valid JSON only using this exact schema:
 {
   "overall_status": "normal|warning|anomalous",
@@ -263,6 +265,9 @@ def _extract_observations(context: FuzzerRunContext) -> tuple[list[FuzzerSignal]
                     )
                 )
 
+    # Collect chaos target identifiers so we can flag crashes on
+    # non-targeted nodes as unexpected.
+    chaos_targets: set[str] = set()
     for structured_log in context.structured_logs.values():
         chaos_events = structured_log.get("chaos_events")
         if isinstance(chaos_events, list):
@@ -271,6 +276,7 @@ def _extract_observations(context: FuzzerRunContext) -> tuple[list[FuzzerSignal]
                     continue
                 chaos_type = str(event.get("chaos_type", "chaos"))
                 target = str(event.get("target_node", "unknown-target"))
+                chaos_targets.add(target.lower())
                 if event.get("success") is True:
                     normal_signals.append(
                         f"Chaos event {chaos_type} on {target} completed successfully."
@@ -304,24 +310,43 @@ def _extract_observations(context: FuzzerRunContext) -> tuple[list[FuzzerSignal]
                     )
                 )
 
+    # Patterns that indicate a node died — used to detect untargeted node failures.
+    _FATAL_PATTERNS = (
+        r"ASSERTION FAILED|Assertion failed|BUG REPORT START|STACK TRACE",
+        r"AddressSanitizer|UndefinedBehaviorSanitizer|runtime error:",
+        r"segmentation fault|signal 11",
+    )
+
     log_sources = list(context.node_logs.items())
     if not log_sources and context.raw_job_log:
         log_sources = [("job-log", context.raw_job_log)]
 
     for source_name, log_text in log_sources:
         cleaned_log = _strip_ansi(log_text)
+        # Check if this log belongs to a chaos-targeted node.
+        is_targeted = any(t in source_name.lower() for t in chaos_targets) if chaos_targets else True
         for title, severity, pattern in _ANOMALY_PATTERNS:
             match = re.search(pattern, cleaned_log, re.IGNORECASE)
             if match is None:
                 continue
             evidence = match.group(0).strip()
-            anomalies.append(
-                FuzzerSignal(
-                    title=title,
-                    severity=severity,
-                    evidence=f"{source_name}: {evidence}",
+            # If a fatal pattern hits a non-targeted node, that's unexpected.
+            if not is_targeted and any(re.search(p, evidence, re.IGNORECASE) for p in _FATAL_PATTERNS):
+                anomalies.append(
+                    FuzzerSignal(
+                        title=f"Untargeted node failure: {title}",
+                        severity="critical",
+                        evidence=f"{source_name} (not a chaos target): {evidence}",
+                    )
                 )
-            )
+            else:
+                anomalies.append(
+                    FuzzerSignal(
+                        title=title,
+                        severity=severity,
+                        evidence=f"{source_name}: {evidence}",
+                    )
+                )
         for label, pattern in _CHAOS_EXPECTED_PATTERNS:
             match = re.search(pattern, cleaned_log, re.IGNORECASE)
             if match is None:
