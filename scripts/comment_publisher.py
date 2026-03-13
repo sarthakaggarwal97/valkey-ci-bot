@@ -90,13 +90,79 @@ class CommentPublisher:
         *,
         commit_sha: str | None = None,
     ) -> list[int]:
-        """Publish file-level or line-level review comments."""
+        """Publish review comments as a single batched review.
+
+        All findings are submitted in one ``create_review`` call so that
+        GitHub sends a single notification email instead of one per comment.
+        """
+        if not findings:
+            return []
+
         pr = retry_github_call(
             lambda: self._gh.get_repo(repo).get_pull(pr_number),
             retries=self._github_retries,
             description=f"load PR {repo}#{pr_number}",
         )
         commit = commit_sha or pr.head.sha
+
+        review_comments: list[dict] = []
+        for finding in findings:
+            comment_dict: dict = {
+                "path": finding.path,
+                "body": finding.body,
+            }
+            if finding.line is not None and finding.line > 0:
+                comment_dict["line"] = finding.line
+                comment_dict["side"] = "RIGHT"
+            else:
+                comment_dict["subject_type"] = "file"
+            review_comments.append(comment_dict)
+
+        try:
+            repo_obj = pr.base.repo
+            commit_obj = retry_github_call(
+                lambda: repo_obj.get_commit(commit),
+                retries=self._github_retries,
+                description=f"resolve commit {commit[:12]}",
+            )
+            review = retry_github_call(
+                lambda: pr.create_review(
+                    commit=commit_obj,
+                    body="",
+                    event="COMMENT",
+                    comments=review_comments,
+                ),
+                retries=self._github_retries,
+                description=f"create batched review for {repo}#{pr_number}",
+            )
+            # Extract comment IDs from the submitted review.
+            comment_ids: list[int] = []
+            try:
+                for rc in review.get_comments():
+                    comment_ids.append(rc.id)
+            except Exception:
+                logger.debug("Could not enumerate review comment IDs; using review ID.")
+                comment_ids.append(review.id)
+            return comment_ids
+        except Exception as exc:
+            logger.warning(
+                "Batched review creation failed for %s#%d: %s. "
+                "Falling back to individual comments.",
+                repo,
+                pr_number,
+                exc,
+            )
+            return self._publish_review_comments_individually(
+                pr, commit, findings,
+            )
+
+    def _publish_review_comments_individually(
+        self,
+        pr,
+        commit: str,
+        findings: list[ReviewFinding],
+    ) -> list[int]:
+        """Fallback: publish each finding as a standalone review comment."""
         comment_ids: list[int] = []
         for finding in findings:
             try:
