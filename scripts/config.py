@@ -315,7 +315,7 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
         ),
         max_patch_files_override=_coerce_int(
             limits.get("max_patch_files_override"),
-            defaults.max_patch_files_override,
+            defaults.max_patch_files_override or 0,
         ) if limits.get("max_patch_files_override") is not None else defaults.max_patch_files_override,
         confidence_threshold=_coerce_str(
             fix_gen.get("confidence_threshold"),
