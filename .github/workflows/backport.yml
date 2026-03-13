@@ -44,8 +44,8 @@ jobs:
       - name: Checkout bot repository
         uses: actions/checkout@v6
         with:
-          repository: ${{ github.action_repository || github.repository }}
-          ref: ${{ github.action_ref || github.ref }}
+          repository: sarthakaggarwal97/valkey-ci-bot
+          ref: main
           persist-credentials: false
           fetch-depth: 1
 
