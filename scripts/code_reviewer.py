@@ -296,6 +296,73 @@ def _is_speculative_finding(body: str) -> bool:
     return any(pattern.search(normalized) for pattern in _SPECULATIVE_PATTERNS)
 
 
+_INDENTATION_KEYWORDS = re.compile(
+    r"\bindent(?:ation|ed)?\b|\b\d+\s*spaces?\b|\btab[s ]?\b"
+    r"|\bwhitespace\b|\bmis-?indent\b|\bnesting\b",
+    re.IGNORECASE,
+)
+
+
+def _is_false_indentation_finding(
+    body: str,
+    path: str,
+    line: int | None,
+    file_contents: str | None,
+) -> bool:
+    """Reject indentation findings that contradict the actual file content.
+
+    LLMs frequently miscount spaces when reasoning from unified diffs
+    because the ``+``/``-``/`` `` prefix shifts columns by one.  When
+    the finding mentions indentation and we have the full file, verify
+    the claim before letting it through.
+    """
+    if not _INDENTATION_KEYWORDS.search(body):
+        return False
+    if line is None or not file_contents:
+        return False
+
+    lines = file_contents.splitlines()
+    if line < 1 or line > len(lines):
+        return False
+
+    actual_line = lines[line - 1]
+    actual_indent = len(actual_line) - len(actual_line.lstrip())
+
+    # Extract the claimed indent from the finding body (e.g. "9 spaces")
+    claimed_match = re.search(r"(\d+)\s*spaces?", body, re.IGNORECASE)
+    if claimed_match:
+        claimed_spaces = int(claimed_match.group(1))
+        if claimed_spaces != actual_indent:
+            logger.info(
+                "Filtering false indentation finding for %s:%d — "
+                "claimed %d spaces, actual %d spaces.",
+                path,
+                line,
+                claimed_spaces,
+                actual_indent,
+            )
+            return True
+
+    # Also check suggestion blocks — if the suggestion has the same
+    # indentation as the actual file, the finding is a no-op.
+    suggestion_match = re.search(
+        r"```suggestion\n(.*?)\n```", body, re.DOTALL,
+    )
+    if suggestion_match:
+        suggested_line = suggestion_match.group(1).splitlines()[0]
+        suggested_indent = len(suggested_line) - len(suggested_line.lstrip())
+        if suggested_indent == actual_indent and suggested_line.strip() == actual_line.strip():
+            logger.info(
+                "Filtering no-op indentation suggestion for %s:%d — "
+                "suggestion matches actual file.",
+                path,
+                line,
+            )
+            return True
+
+    return False
+
+
 def _build_retrieval_query(pr: PullRequestContext, diff_scope: DiffScope) -> str:
     """Build a retrieval query for detailed review context."""
     lines = [pr.title, pr.body]
@@ -627,6 +694,11 @@ CRITICAL rules:
                         len(context_lines),
                     )
                 normalized_line = snapped
+            if _is_false_indentation_finding(
+                body, path, normalized_line, changed_file.contents,
+            ):
+                filtered_speculative += 1
+                continue
             dedupe_key = (path, normalized_line, normalized_body)
             if dedupe_key in seen_keys:
                 continue
