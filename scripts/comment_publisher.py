@@ -120,30 +120,30 @@ class CommentPublisher:
 
         try:
             repo_obj = pr.base.repo
-            commit_obj = retry_github_call(
-                lambda: repo_obj.get_commit(commit),
-                retries=self._github_retries,
-                description=f"resolve commit {commit[:12]}",
-            )
-            review = retry_github_call(
-                lambda: pr.create_review(
-                    commit=commit_obj,
-                    body="",
-                    event="COMMENT",
-                    comments=review_comments,
-                ),
+
+            def _create_review() -> dict:
+                _headers, data = repo_obj._requester.requestJsonAndCheck(
+                    "POST",
+                    f"/repos/{repo}/pulls/{pr_number}/reviews",
+                    input={
+                        "commit_id": commit,
+                        "body": "",
+                        "event": "COMMENT",
+                        "comments": review_comments,
+                    },
+                )
+                return data  # type: ignore[return-value]
+
+            data = retry_github_call(
+                _create_review,
                 retries=self._github_retries,
                 description=f"create batched review for {repo}#{pr_number}",
             )
-            # Extract comment IDs from the submitted review.
-            comment_ids: list[int] = []
-            try:
-                for rc in review.get_comments():
-                    comment_ids.append(rc.id)
-            except Exception:
-                logger.debug("Could not enumerate review comment IDs; using review ID.")
-                comment_ids.append(review.id)
-            return comment_ids
+            # The review ID is always present; individual comment IDs
+            # are not returned inline, so we use the review ID as the
+            # tracking identifier.
+            review_id = data.get("id") if isinstance(data, dict) else None
+            return [review_id] if review_id else []
         except Exception as exc:
             logger.warning(
                 "Batched review creation failed for %s#%d: %s. "
