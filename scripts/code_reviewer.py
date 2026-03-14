@@ -32,9 +32,9 @@ Rules:
   validation in code that is NOT fully visible in the diff, do NOT report it.
   Assume that unseen code is correct and that invariants documented in comments
   are maintained.
-- Do not report theoretical race conditions, memory leaks, or use-after-free
-  issues unless you can trace the complete faulty code path within the provided
-  excerpts. "Could happen if a future change breaks X" is not a valid finding.
+- You MAY report concurrency issues, memory leaks, or use-after-free bugs when
+  the faulty code path is visible in the provided excerpts. Trace the path
+  through the shown code and explain the concrete scenario.
 - Prefer precision over recall: it is far better to miss a real bug than to
   report a false positive. Only report when you are highly confident.
 - Return valid JSON only."""
@@ -66,34 +66,14 @@ _SPECULATIVE_SUBSTRINGS = (
     "should verify that",
     "ensure that the caller",
     "ensure that callers",
-    # Patterns indicating findings about unseen guards/invariants
-    "there is no corresponding check",
-    "there is no check at dispatch",
-    "no corresponding check at",
-    "if this invariant is ever violated",
-    "if the mutual-exclusion invariant",
-    "due to a future code change",
-    "if both states could become",
-    "while currently harmless",
-    "this is fragile",
-    "could cause double-free",
-    "could cause double-accounting",
 )
 
 _SPECULATIVE_PATTERNS = (
     re.compile(r"\bif this method does not exist\b"),
     re.compile(r"\bif the model does not define\b"),
     re.compile(r"\bif the model doesn't define\b"),
-    re.compile(r"\bif [`_a-zA-Z0-9.()'-]+ returns a\b"),
     re.compile(r"\bassuming (?:that |this )?\w+ (?:is|does|has)\b"),
-    re.compile(r"\bpotentially? (?:cause|lead|result)\b"),
-    re.compile(r"\bcould potentially\b"),
-    # Findings that depend on hypothetical future changes
-    re.compile(r"\bif (?:the |a )?(?:mutual[- ]exclusion|invariant) is (?:ever )?(?:violated|broken)\b"),
-    re.compile(r"\bif (?:both|two) (?:states?|jobs?) (?:could|can) (?:become|be)\b"),
-    re.compile(r"\bdepending on .{0,40} implementation\b"),
-    re.compile(r"\bmay be freed .{0,30} depending on\b"),
-    re.compile(r"\bif .{0,60} logic changes\b"),
+    re.compile(r"\bif [`_a-zA-Z0-9.()'-]+ returns a\b"),
 )
 
 
@@ -152,7 +132,7 @@ def _looks_like_code(path: str) -> bool:
     }
 
 
-def _serialize_scope(scope: DiffScope, *, max_chars: int = 200_000) -> str:
+def _serialize_scope(scope: DiffScope, *, max_chars: int = 500_000) -> str:
     chunks: list[str] = []
     used = 0
     for changed_file in scope.files:
@@ -173,7 +153,7 @@ def _serialize_scope(scope: DiffScope, *, max_chars: int = 200_000) -> str:
                 chunk.append("</old_hunk>")
         if changed_file.contents:
             chunk.append("Full file contents (may be truncated):")
-            chunk.append(changed_file.contents[:6000])
+            chunk.append(changed_file.contents[:60_000])
         rendered = "\n".join(chunk)
         if used + len(rendered) > max_chars:
             # Try to fit a truncated version instead of skipping entirely
@@ -194,6 +174,111 @@ def _serialize_scope(scope: DiffScope, *, max_chars: int = 200_000) -> str:
         chunks.append(rendered)
         used += len(rendered)
     return "\n\n".join(chunks)
+
+
+def _chunk_diff_scope(scope: DiffScope, *, max_chars_per_chunk: int = 180_000) -> list[DiffScope]:
+    """Split a DiffScope into multiple chunks that each fit within the token budget.
+
+    Large files are split by hunk boundaries so each chunk is self-contained.
+    Small files are grouped together to minimize the number of LLM calls.
+    """
+    if not scope.files:
+        return []
+
+    chunks: list[DiffScope] = []
+    current_files: list[ChangedFile] = []
+    current_size = 0
+
+    for changed_file in scope.files:
+        # Estimate the serialized size of this file
+        file_size = len(changed_file.patch or "") * 2  # new_hunk + old_hunk
+        if changed_file.contents:
+            file_size += min(len(changed_file.contents), 60_000)
+        file_size += 200  # metadata overhead
+
+        # If a single file is too large, split it by hunk boundaries
+        if file_size > max_chars_per_chunk and changed_file.patch:
+            # Flush current batch first
+            if current_files:
+                chunks.append(DiffScope(
+                    base_sha=scope.base_sha,
+                    head_sha=scope.head_sha,
+                    files=current_files,
+                    incremental=scope.incremental,
+                ))
+                current_files = []
+                current_size = 0
+
+            hunk_groups = _split_patch_into_groups(changed_file.patch, max_chars_per_chunk // 3)
+            for hunk_patch in hunk_groups:
+                from dataclasses import replace as _replace
+                chunk_file = _replace(changed_file, patch=hunk_patch)
+                chunks.append(DiffScope(
+                    base_sha=scope.base_sha,
+                    head_sha=scope.head_sha,
+                    files=[chunk_file],
+                    incremental=scope.incremental,
+                ))
+            continue
+
+        # If adding this file would exceed the budget, flush
+        if current_size + file_size > max_chars_per_chunk and current_files:
+            chunks.append(DiffScope(
+                base_sha=scope.base_sha,
+                head_sha=scope.head_sha,
+                files=current_files,
+                incremental=scope.incremental,
+            ))
+            current_files = []
+            current_size = 0
+
+        current_files.append(changed_file)
+        current_size += file_size
+
+    if current_files:
+        chunks.append(DiffScope(
+            base_sha=scope.base_sha,
+            head_sha=scope.head_sha,
+            files=current_files,
+            incremental=scope.incremental,
+        ))
+
+    return chunks if chunks else [scope]
+
+
+def _split_patch_into_groups(patch: str, max_chars: int) -> list[str]:
+    """Split a unified diff patch into groups of hunks that fit within max_chars."""
+    hunks: list[str] = []
+    current_hunk_lines: list[str] = []
+
+    for line in patch.splitlines():
+        if line.startswith("@@") and current_hunk_lines:
+            hunks.append("\n".join(current_hunk_lines))
+            current_hunk_lines = []
+        current_hunk_lines.append(line)
+
+    if current_hunk_lines:
+        hunks.append("\n".join(current_hunk_lines))
+
+    if not hunks:
+        return [patch]
+
+    groups: list[str] = []
+    current_group: list[str] = []
+    current_size = 0
+
+    for hunk in hunks:
+        if current_size + len(hunk) > max_chars and current_group:
+            groups.append("\n".join(current_group))
+            current_group = []
+            current_size = 0
+        current_group.append(hunk)
+        current_size += len(hunk)
+
+    if current_group:
+        groups.append("\n".join(current_group))
+
+    return groups if groups else [patch]
 def _annotate_patch(patch: str) -> str:
     """Prefix each diff line with its right-side line number.
 
@@ -403,26 +488,25 @@ def _build_retrieval_query(pr: PullRequestContext, diff_scope: DiffScope) -> str
 
 _VERIFY_SYSTEM_PROMPT = """You are a senior software engineer tasked with verifying code review findings.
 Your job is to challenge each finding and determine if it is a TRUE positive or
-a FALSE positive. You must be skeptical and assume the code is correct unless
-proven otherwise.
+a FALSE positive. Be skeptical but fair — do not dismiss findings just because
+they involve concurrency, memory management, or error-path reasoning.
 
 A finding is a FALSE POSITIVE if:
 - It claims a guard, check, or cleanup is missing, but the guard exists in the
   shown code (even in a different function within the same diff).
-- It claims a race condition or concurrency issue, but the dispatch/caller code
-  shown in the diff already enforces mutual exclusion.
-- It claims a memory leak or use-after-free, but reference counting or deferred
-  cleanup visible in the diff prevents it.
-- It depends on a hypothetical future code change breaking an invariant.
-- It flags redundant-but-harmless code as a bug.
 - It describes a theoretical concern that cannot actually occur given the control
   flow visible in the diff.
+- It flags redundant-but-harmless code as a bug.
+- It depends entirely on hypothetical future code changes with no current impact.
 
 A finding is a TRUE POSITIVE if:
-- The buggy code path can be fully traced within the provided diff excerpts.
-- The finding identifies a concrete, reproducible defect (e.g., wrong operator,
-  copy-paste duplication, off-by-one, null dereference with no guard).
-- The evidence is entirely self-contained in the shown code.
+- The buggy code path can be traced within the provided diff excerpts.
+- The finding identifies a concrete defect (e.g., wrong operator, copy-paste
+  duplication, off-by-one, null dereference, memory leak, use-after-free,
+  race condition, missing cleanup on error path).
+- The finding identifies a real concurrency or memory safety issue where the
+  faulty interaction is visible in the shown code, even if it requires
+  reasoning about thread scheduling or error paths.
 
 Return valid JSON only."""
 
@@ -565,6 +649,65 @@ or
         short_summary: str = "",
     ) -> list[ReviewFinding]:
         """Review the selected diff scope with the configured heavy model."""
+        if not diff_scope.files:
+            return []
+
+        # Check if the scope needs to be split into multiple chunks.
+        # Use ~75% of max_input_tokens (in chars, ~4 chars/token) as the budget
+        # to leave room for the system prompt, user prompt template, and output.
+        char_budget = (config.max_input_tokens * 4) * 3 // 4
+        scope_size = sum(
+            len(f.patch or "") * 2 + min(len(f.contents or ""), 60_000) + 200
+            for f in diff_scope.files
+        )
+        if scope_size > char_budget:
+            chunks = _chunk_diff_scope(diff_scope, max_chars_per_chunk=char_budget)
+            if len(chunks) > 1:
+                logger.info(
+                    "Splitting review into %d chunks (scope_size=%d, budget=%d).",
+                    len(chunks), scope_size, char_budget,
+                )
+                all_findings: list[ReviewFinding] = []
+                for i, chunk in enumerate(chunks):
+                    logger.info(
+                        "Reviewing chunk %d/%d (%d file(s)).",
+                        i + 1, len(chunks), len(chunk.files),
+                    )
+                    chunk_findings = self._review_single_scope(
+                        pr, chunk, config,
+                        short_summary=short_summary,
+                    )
+                    all_findings.extend(chunk_findings)
+                # Deduplicate across chunks
+                seen: set[tuple[str, int | None, str]] = set()
+                deduped: list[ReviewFinding] = []
+                for f in all_findings:
+                    key = (f.path, f.line, _normalize_finding_text(f.body))
+                    if key not in seen:
+                        seen.add(key)
+                        deduped.append(f)
+                capped = deduped[: config.max_review_comments]
+                if capped:
+                    capped = self.verify_findings(capped, diff_scope, config)
+                return capped
+
+        findings = self._review_single_scope(
+            pr, diff_scope, config, short_summary=short_summary,
+        )
+        capped = findings[: config.max_review_comments]
+        if capped:
+            capped = self.verify_findings(capped, diff_scope, config)
+        return capped
+
+    def _review_single_scope(
+        self,
+        pr: PullRequestContext,
+        diff_scope: DiffScope,
+        config: ReviewerConfig,
+        *,
+        short_summary: str = "",
+    ) -> list[ReviewFinding]:
+        """Review a single diff scope chunk with the configured heavy model."""
         if not diff_scope.files:
             return []
 
@@ -793,10 +936,6 @@ CRITICAL rules:
         )
 
         capped = findings[: config.max_review_comments]
-
-        # Self-verification pass: challenge each finding to filter false positives
-        if capped:
-            capped = self.verify_findings(capped, diff_scope, config)
 
         return capped
 

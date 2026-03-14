@@ -22,7 +22,7 @@ class PRContextFetcher:
         self,
         github_client: "Github",
         *,
-        max_file_bytes: int = 200_000,
+        max_file_bytes: int = 512_000,
         github_retries: int = 5,
     ) -> None:
         self._gh = github_client

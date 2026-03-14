@@ -102,8 +102,8 @@ class ReviewerConfig:
     bedrock_timeout_ms: int = 120_000
     bedrock_concurrency_limit: int = 2
     github_concurrency_limit: int = 6
-    max_input_tokens: int = 100_000
-    max_output_tokens: int = 4096
+    max_input_tokens: int = 190_000
+    max_output_tokens: int = 8192
     project: ProjectContext = field(default_factory=ProjectContext)
     models: ReviewerModels = field(default_factory=ReviewerModels)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
