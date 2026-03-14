@@ -247,7 +247,7 @@ def _should_queue_validated_fix(
 
     # Flaky tests with a validated fix should be queued — they degrade CI
     # signal and the fix has already passed validation.
-    if root_cause.is_flaky and root_cause.confidence in ("medium", "high"):
+    if root_cause.is_flaky:
         return True, "flaky-test-fix"
 
     streak = (
@@ -397,7 +397,7 @@ def _analyze_and_fix(
         return root_cause, None
 
     # Skip fix generation for low confidence non-flaky failures.
-    # Flaky tests still deserve a fix attempt since they degrade CI signal.
+    # Flaky tests always get a fix attempt — green CI is the priority.
     if root_cause.confidence == "low" and not root_cause.is_flaky:
         logger.warning(
             "Skipping fix generation for job %s: low-confidence.",
