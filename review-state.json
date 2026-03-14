@@ -29,5 +29,13 @@
       3947181071
     ],
     "updated_at": "2026-03-13T22:04:29.498095+00:00"
+  },
+  "hpatro/valkey#4": {
+    "repo": "hpatro/valkey",
+    "pr_number": 4,
+    "last_reviewed_head_sha": "2b71f18752505d23464280b53ffab8b738f574f2",
+    "summary_comment_id": 4054853531,
+    "review_comment_ids": [],
+    "updated_at": "2026-03-14T15:39:37.574028+00:00"
   }
 }
