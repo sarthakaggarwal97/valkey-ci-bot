@@ -5,15 +5,18 @@
 #
 # This workflow triggers the Backport Bot when a merged PR is labeled with
 # a `backport <branch>` label (e.g. `backport 8.1`). It checks that the PR
-# is merged, extracts target branches from all matching labels, and dispatches
-# one backport run per target branch to the bot repository.
+# is merged, extracts target branches from all matching labels, and triggers
+# one backport run per target branch.
 #
-# No AWS credentials or bot-specific secrets are needed in the consumer repo.
+# No secrets or variables are needed in the consumer repo — the bot repo
+# owns all credentials.
 name: Backport Bot
 
 permissions:
-  contents: read
-  pull-requests: read
+  contents: write
+  pull-requests: write
+  actions: read
+  id-token: write
 
 on:
   pull_request_target:
@@ -22,6 +25,9 @@ on:
 jobs:
   preflight:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       branches: ${{ steps.extract.outputs.branches }}
       should_run: ${{ steps.extract.outputs.should_run }}
@@ -59,29 +65,17 @@ jobs:
             core.setOutput("should_run", "true");
             core.setOutput("branches", JSON.stringify(branches));
 
-  dispatch:
+  backport:
     needs: preflight
     if: needs.preflight.outputs.should_run == 'true'
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         target_branch: ${{ fromJson(needs.preflight.outputs.branches) }}
-    steps:
-      - name: Dispatch backport to bot repository
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: 'valkey-io',
-              repo: 'valkey-ci-bot',
-              workflow_id: 'backport.yml',
-              ref: 'main',
-              inputs: {
-                source_pr_number: String(context.payload.pull_request.number),
-                repo_full_name: context.repo.owner + '/' + context.repo.repo,
-                target_branch: '${{ matrix.target_branch }}',
-              }
-            });
-            core.info(`Dispatched backport for PR #${context.payload.pull_request.number} to ${{ matrix.target_branch }}`);
+    uses: sarthakaggarwal97/valkey-ci-bot/.github/workflows/backport.yml@main
+    with:
+      source_pr_number: ${{ github.event.pull_request.number }}
+      repo_full_name: ${{ github.repository }}
+      target_branch: ${{ matrix.target_branch }}
+      config_path: .github/backport-bot.yml
+    secrets: inherit
