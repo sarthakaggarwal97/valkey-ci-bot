@@ -42,6 +42,7 @@ jobs:
       - name: Checkout bot repository
         uses: actions/checkout@v6
         with:
+          repository: sarthakaggarwal97/valkey-ci-bot
           persist-credentials: false
           fetch-depth: 1
 
