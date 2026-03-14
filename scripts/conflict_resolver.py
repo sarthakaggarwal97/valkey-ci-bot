@@ -23,9 +23,25 @@ from scripts.bedrock_client import BedrockClient
 
 logger = logging.getLogger(__name__)
 
+
+def _strip_code_fences(text: str) -> str:
+    """Remove markdown code fences that LLMs sometimes wrap around output."""
+    import re
+
+    # Match ```<optional lang>\n ... \n``` wrapping the entire response
+    stripped = re.sub(
+        r"^```[a-zA-Z]*\s*\n(.*?)```\s*$",
+        r"\1",
+        text.strip(),
+        flags=re.DOTALL,
+    )
+    return stripped
+
+
 _SYSTEM_PROMPT = (
     "You are a code merge conflict resolver for the Valkey project "
-    "(a C codebase)."
+    "(a C codebase). Return ONLY raw file content — never wrap your "
+    "response in markdown code fences (``` or ```c)."
 )
 
 
@@ -198,6 +214,9 @@ class ConflictResolver:
             response_tokens = len(response) // 4
             tokens_used += prompt_tokens + response_tokens
 
+            # Strip markdown code fences the LLM may wrap around the output.
+            response = _strip_code_fences(response)
+
             if not has_conflict_markers(response):
                 resolved_text = response
                 break
@@ -299,6 +318,7 @@ class ConflictResolver:
             "intent of the source pull request to the target branch version "
             "of the code. Return ONLY the complete resolved file content "
             "with no conflict markers (<<<<<<<, =======, >>>>>>>). "
+            "Do NOT wrap your response in markdown code fences. "
             "Preserve the coding style and conventions of the target branch "
             "version. Limit your changes to the conflicting regions only.",
         ]
