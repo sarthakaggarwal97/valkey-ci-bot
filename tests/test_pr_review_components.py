@@ -62,7 +62,8 @@ def test_pr_summarizer_uses_light_model() -> None:
 
 def test_code_reviewer_uses_heavy_model_and_filters_findings() -> None:
     bedrock = MagicMock()
-    bedrock.invoke.return_value = """
+    bedrock.invoke.side_effect = [
+        """
     {
       "findings": [
         {
@@ -79,7 +80,9 @@ def test_code_reviewer_uses_heavy_model_and_filters_findings() -> None:
         }
       ]
     }
-    """
+    """,
+        '{"results": [{"index": 0, "verdict": "keep", "reason": "valid"}]}',
+    ]
     reviewer = CodeReviewer(bedrock)
     config = ReviewerConfig(max_review_comments=5)
     scope = DiffScope(
@@ -93,13 +96,18 @@ def test_code_reviewer_uses_heavy_model_and_filters_findings() -> None:
 
     assert len(findings) == 1
     assert findings[0].path == "src/failover.c"
-    kwargs = bedrock.invoke.call_args.kwargs
+    # First invoke call is the review pass
+    kwargs = bedrock.invoke.call_args_list[0].kwargs
     assert kwargs["model_id"] == config.models.heavy_model_id
 
 
 def test_code_reviewer_filters_speculative_and_file_level_findings() -> None:
     bedrock = MagicMock()
-    bedrock.invoke.return_value = """
+    # First call: review pass returns findings (some speculative).
+    # Second call: verification pass — return keep-all so the test focuses on
+    # the speculative filter, not the verification logic.
+    bedrock.invoke.side_effect = [
+        """
     {
       "findings": [
         {
@@ -128,7 +136,9 @@ def test_code_reviewer_filters_speculative_and_file_level_findings() -> None:
         }
       ]
     }
-    """
+    """,
+        '{"results": [{"index": 0, "verdict": "keep", "reason": "valid"}]}',
+    ]
     reviewer = CodeReviewer(bedrock)
     scope = DiffScope(
         base_sha="base123",
@@ -146,7 +156,9 @@ def test_code_reviewer_filters_speculative_and_file_level_findings() -> None:
             "This can leave failover state stale after timeout.",
         )
     ]
-    user_prompt = bedrock.invoke.call_args[0][1]
+    # The first invoke call is the review pass
+    review_call_args = bedrock.invoke.call_args_list[0]
+    user_prompt = review_call_args[0][1]
     assert "patch/content may be truncated" in user_prompt
     assert "Do not report that a file, diff, or workflow looks truncated." in user_prompt
 
@@ -233,6 +245,7 @@ def test_code_reviewer_includes_retrieved_context() -> None:
 
     reviewer.review(_context(), scope, ReviewerConfig(max_review_comments=5))
 
+    # No findings means no verification call; the only invoke is the review pass
     user_prompt = bedrock.invoke.call_args[0][1]
     assert "Retrieved Valkey Context" in user_prompt
     assert "server notes" in user_prompt
