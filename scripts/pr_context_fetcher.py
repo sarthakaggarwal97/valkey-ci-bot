@@ -94,8 +94,12 @@ class PRContextFetcher:
 
             try:
                 cf_path = changed_file.path
+
+                def _fetch(p: str = cf_path):  # type: ignore[assignment]
+                    return repo.get_contents(p, ref=context.head_sha)
+
                 contents = retry_github_call(
-                    lambda cf_path=cf_path: repo.get_contents(cf_path, ref=context.head_sha),
+                    _fetch,
                     retries=self._github_retries,
                     description=f"load file contents for {changed_file.path}",
                 )

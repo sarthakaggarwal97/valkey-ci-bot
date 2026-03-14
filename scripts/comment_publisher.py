@@ -169,28 +169,27 @@ class CommentPublisher:
             f_body = finding.body
             f_path = finding.path
             f_line = finding.line
+
+            def _make_line_comment(body: str, path: str, ln: int):  # type: ignore[no-untyped-def]
+                return lambda: pr.create_review_comment(
+                    body, commit, path, line=ln, side="RIGHT",
+                )
+
+            def _make_file_comment(body: str, path: str):  # type: ignore[no-untyped-def]
+                return lambda: pr.create_review_comment(
+                    body, commit, path, subject_type="file",
+                )
+
             try:
                 if f_line is not None and f_line > 0:
-                    line = f_line
                     comment = retry_github_call(
-                        lambda f_body=f_body, f_path=f_path, line=line: pr.create_review_comment(
-                            f_body,
-                            commit,
-                            f_path,
-                            line=line,
-                            side="RIGHT",
-                        ),
+                        _make_line_comment(f_body, f_path, f_line),
                         retries=self._github_retries,
                         description=f"create line review comment for {f_path}",
                     )
                 else:
                     comment = retry_github_call(
-                        lambda f_body=f_body, f_path=f_path: pr.create_review_comment(
-                            f_body,
-                            commit,
-                            f_path,
-                            subject_type="file",
-                        ),
+                        _make_file_comment(f_body, f_path),
                         retries=self._github_retries,
                         description=f"create file review comment for {f_path}",
                     )
@@ -203,12 +202,7 @@ class CommentPublisher:
                 )
                 try:
                     comment = retry_github_call(
-                        lambda f_body=f_body, f_path=f_path: pr.create_review_comment(
-                            f_body,
-                            commit,
-                            f_path,
-                            subject_type="file",
-                        ),
+                        _make_file_comment(f_body, f_path),
                         retries=self._github_retries,
                         description=f"fallback file review comment for {f_path}",
                     )

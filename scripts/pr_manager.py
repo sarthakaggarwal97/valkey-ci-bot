@@ -434,8 +434,11 @@ class PRManager:
 
         for file_path, file_diff in file_patches.items():
             try:
+                def _fetch_contents(fp: str = file_path):  # type: ignore[assignment]
+                    return repo.get_contents(fp, ref=branch_name)
+
                 contents = retry_github_call(
-                    lambda fp=file_path: repo.get_contents(fp, ref=branch_name),
+                    _fetch_contents,
                     retries=5,
                     description=f"load branch contents for {file_path}",
                 )
