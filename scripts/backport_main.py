@@ -387,7 +387,7 @@ def _clone_repo(
     clone_url = f"https://x-access-token:{github_token}@github.com/{repo_full_name}.git"
     logger.info("Cloning %s into %s.", repo_full_name, dest_dir)
     subprocess.run(
-        ["git", "clone", "--branch", target_branch, clone_url, "."],
+        ["git", "clone", "--no-single-branch", "--branch", target_branch, clone_url, "."],
         cwd=dest_dir,
         check=True,
         capture_output=True,
