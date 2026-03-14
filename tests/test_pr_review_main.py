@@ -286,7 +286,7 @@ def test_run_manual_review_mode_uses_bot_repo_state(
     assert rate_kwargs["state_github_client"] is state_gh
     assert rate_kwargs["state_repo_full_name"] == "sarthakaggarwal97/valkey-ci-bot"
     publisher.upsert_summary.assert_called_once()
-    publisher.publish_review_comments.assert_called_once()
+    publisher.approve_pr.assert_called_once()
 
 
 @patch("scripts.pr_review_main.boto3.client")

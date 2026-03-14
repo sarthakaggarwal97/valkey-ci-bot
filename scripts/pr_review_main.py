@@ -356,22 +356,35 @@ def run(argv: list[str] | None = None) -> int:
                             review_context, triaged_scope, config,
                             short_summary=short_summary,
                         )
-                        published_ids = publisher.publish_review_comments(
-                            repo_name,
-                            pr_context.number,
-                            findings,
-                            commit_sha=pr_context.head_sha,
-                        )
-                        review_comment_ids.extend(
-                            comment_id
-                            for comment_id in published_ids
-                            if comment_id not in review_comment_ids
-                        )
-                        summary.add_result(
-                            "review",
-                            "performed",
-                            f"{len(published_ids)} comment(s), {len(diff_scope.files) - len(triaged_files)} file(s) auto-approved",
-                        )
+                        if findings:
+                            published_ids = publisher.publish_review_comments(
+                                repo_name,
+                                pr_context.number,
+                                findings,
+                                commit_sha=pr_context.head_sha,
+                            )
+                            review_comment_ids.extend(
+                                comment_id
+                                for comment_id in published_ids
+                                if comment_id not in review_comment_ids
+                            )
+                            summary.add_result(
+                                "review",
+                                "performed",
+                                f"{len(published_ids)} comment(s), {len(diff_scope.files) - len(triaged_files)} file(s) auto-approved",
+                            )
+                        else:
+                            publisher.approve_pr(
+                                repo_name,
+                                pr_context.number,
+                                body="LGTM",
+                                commit_sha=pr_context.head_sha,
+                            )
+                            summary.add_result(
+                                "review",
+                                "performed",
+                                "approved (no issues found)",
+                            )
             except Exception as exc:
                 had_failure = True
                 logger.warning("PR review failed for %s#%d: %s", repo_name, pr_context.number, exc)

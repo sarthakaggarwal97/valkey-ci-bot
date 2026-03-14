@@ -82,6 +82,51 @@ class CommentPublisher:
             description=f"create summary comment for {repo}#{pr_number}",
         )
 
+    def approve_pr(
+        self,
+        repo: str,
+        pr_number: int,
+        body: str = "",
+        *,
+        commit_sha: str | None = None,
+    ) -> int | None:
+        """Submit an APPROVE review on the pull request.
+
+        Returns the review ID on success, or ``None`` on failure.
+        """
+        pr = retry_github_call(
+            lambda: self._gh.get_repo(repo).get_pull(pr_number),
+            retries=self._github_retries,
+            description=f"load PR {repo}#{pr_number}",
+        )
+        commit = commit_sha or pr.head.sha
+        repo_obj = pr.base.repo
+
+        def _create_approval() -> dict:
+            _headers, data = repo_obj._requester.requestJsonAndCheck(
+                "POST",
+                f"/repos/{repo}/pulls/{pr_number}/reviews",
+                input={
+                    "commit_id": commit,
+                    "body": body,
+                    "event": "APPROVE",
+                },
+            )
+            return data  # type: ignore[return-value]
+
+        try:
+            data = retry_github_call(
+                _create_approval,
+                retries=self._github_retries,
+                description=f"approve PR {repo}#{pr_number}",
+            )
+            review_id = data.get("id") if isinstance(data, dict) else None
+            logger.info("Approved PR %s#%d (review_id=%s).", repo, pr_number, review_id)
+            return review_id
+        except Exception as exc:
+            logger.warning("Failed to approve PR %s#%d: %s", repo, pr_number, exc)
+            return None
+
     def publish_review_comments(
         self,
         repo: str,
