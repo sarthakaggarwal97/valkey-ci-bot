@@ -33,7 +33,7 @@
   "hpatro/valkey#4": {
     "repo": "hpatro/valkey",
     "pr_number": 4,
-    "last_reviewed_head_sha": "28d410dc2c3f37abf9c38cbf197006dd7219797f",
+    "last_reviewed_head_sha": "2b71f18752505d23464280b53ffab8b738f574f2",
     "summary_comment_id": 4054853531,
     "review_comment_ids": [
       2931004336,
@@ -43,8 +43,9 @@
       2931004990,
       2931005154,
       2931005288,
-      2931005395
+      2931005395,
+      3948374605
     ],
-    "updated_at": "2026-03-13T12:49:23.035909+00:00"
+    "updated_at": "2026-03-14T07:48:30.578829+00:00"
   }
 }
