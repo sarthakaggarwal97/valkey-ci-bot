@@ -69,6 +69,37 @@ class CherryPickExecutor:
                 merge_commit_sha,
             )
             conflicts = self._collect_conflicts(target_branch)
+
+            # Empty cherry-pick: non-zero exit but no unmerged files means
+            # the changes already exist on the target branch.  Abort the
+            # cherry-pick and retry with --allow-empty so the branch has a
+            # commit that can be pushed.
+            if not conflicts:
+                logger.info(
+                    "No conflicting files — cherry-pick is empty. "
+                    "Retrying with --allow-empty.",
+                )
+                self._run_git("cherry-pick", "--abort", check=False)
+                retry = self._run_git(
+                    "cherry-pick", "-m", "1", "--allow-empty",
+                    merge_commit_sha, check=False,
+                )
+                if retry.returncode == 0:
+                    logger.info(
+                        "Empty cherry-pick of %s succeeded with --allow-empty",
+                        merge_commit_sha,
+                    )
+                    return CherryPickResult(
+                        success=True,
+                        applied_commits=[merge_commit_sha],
+                    )
+                # If --allow-empty also fails, fall through to conflict path
+                logger.warning(
+                    "Retry with --allow-empty also failed for %s",
+                    merge_commit_sha,
+                )
+                conflicts = self._collect_conflicts(target_branch)
+
             return CherryPickResult(
                 success=False,
                 conflicting_files=conflicts,
