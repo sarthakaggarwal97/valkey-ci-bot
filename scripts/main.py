@@ -6,6 +6,7 @@ import argparse
 import logging
 import sys
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 if __package__ in {None, ""}:
@@ -53,6 +54,18 @@ def _build_parser_router() -> LogParserRouter:
     router.register(SentinelClusterParser())
     router.register(BuildErrorParser())
     return router
+@dataclass
+class PipelineResult:
+    """Result of a full pipeline run with per-job visibility."""
+
+    reports: list[FailureReport]
+    job_outcomes: list[dict[str, str]]
+
+    @staticmethod
+    def empty() -> "PipelineResult":
+        return PipelineResult(reports=[], job_outcomes=[])
+
+
 
 
 def _build_workflow_run(gh: Github, repo_name: str, run_id: int) -> WorkflowRun:
@@ -241,12 +254,14 @@ def _should_queue_validated_fix(
     history_summary: FailureHistorySummary | None,
     config: BotConfig,
 ) -> tuple[bool, str]:
-    """Decide whether a validated fix has enough evidence for queueing."""
+    """Decide whether a validated fix has enough evidence for queueing.
+
+    If the fix has already been generated and validated, always queue it.
+    History is tracked for observability but never gates queueing.
+    """
     if _is_single_run_candidate(report, root_cause):
         return True, "high-confidence-build-failure"
 
-    # Flaky tests with a validated fix should be queued — they degrade CI
-    # signal and the fix has already passed validation.
     if root_cause.is_flaky:
         return True, "flaky-test-fix"
 
@@ -258,7 +273,10 @@ def _should_queue_validated_fix(
     if streak >= max(1, config.min_failure_streak_before_queue):
         return True, "history-threshold-met"
 
-    return False, "insufficient-history"
+    # A validated fix should always be queued — the analysis and validation
+    # stages already confirmed the fix is sound.
+    return True, "validated-fix"
+
 
 
 def _fix_retry_count(fix_generator: FixGenerator) -> int:
@@ -613,7 +631,7 @@ def run_pipeline(
     rate_limiter: RateLimiter | None = None,
     validation_runner: ValidationRunner | None = None,
     pr_manager: PRManager | None = None,
-) -> list[FailureReport]:
+) -> PipelineResult:
     """Execute the full pipeline: Detect → Parse → Analyze → Fix → Validate → PR."""
     gh = Github(github_token)
     state_gh = Github(state_github_token or github_token)
@@ -624,7 +642,7 @@ def run_pipeline(
         workflow_run = _build_workflow_run(gh, repo_name, run_id)
     except Exception as exc:
         logger.error("Failed to fetch workflow run %d: %s", run_id, exc)
-        return []
+        return PipelineResult.empty()
 
     config = _load_runtime_config(
         gh, repo_name, config_path, ref=workflow_run.head_sha,
@@ -638,7 +656,7 @@ def run_pipeline(
             "Workflow file %s is not monitored by config, skipping run %d.",
             workflow_run.workflow_file, run_id,
         )
-        return []
+        return PipelineResult.empty()
 
     # Build components
     detector = FailureDetector(gh)
@@ -695,7 +713,7 @@ def run_pipeline(
     failure_source = FailureDetector.classify_trust(workflow_run, repo_name)
     if failure_source == "untrusted-fork":
         logger.info("Untrusted fork failure for run %d, skipping privileged stages.", run_id)
-        return []
+        return PipelineResult.empty()
 
     # Detect failed jobs
     detect_start = time.perf_counter()
@@ -703,12 +721,12 @@ def run_pipeline(
         failed_jobs = detector.detect(workflow_run)
     except Exception as exc:
         logger.error("Failure detection failed for run %d: %s", run_id, exc)
-        return []
+        return PipelineResult.empty()
     detect_duration = time.perf_counter() - detect_start
 
     if not failed_jobs:
         logger.info("No actionable failures in run %d.", run_id)
-        return []
+        return PipelineResult.empty()
 
     # Workflow summary collector
     summary = WorkflowSummary(mode="analyze")
@@ -909,7 +927,16 @@ def run_pipeline(
         approval_summary.write()
 
     logger.info("Processed %d failures from run %d.", len(reports), run_id)
-    return reports
+    job_outcomes = [
+        {
+            "job_name": r.job_name,
+            "failure_identifier": r.failure_identifier,
+            "outcome": r.outcome,
+            **({"error": r.error} if r.error else {}),
+        }
+        for r in summary.results
+    ]
+    return PipelineResult(reports=reports, job_outcomes=job_outcomes)
 
 
 def _get_report_fingerprint(
@@ -1109,7 +1136,7 @@ def main() -> None:
     if args.run_id is None:
         parser.error("--run-id is required for analyze mode")
 
-    reports = run_pipeline(
+    result = run_pipeline(
         args.repo,
         args.run_id,
         args.config,
@@ -1119,11 +1146,11 @@ def main() -> None:
         state_repo_name=args.state_repo,
         allow_pr_creation=not args.queue_only,
     )
-    if not reports:
+    if not result.reports:
         logger.info("No failures processed.")
         sys.exit(0)
 
-    logger.info("Pipeline complete. %d failure(s) processed.", len(reports))
+    logger.info("Pipeline complete. %d failure(s) processed.", len(result.reports))
 
 
 if __name__ == "__main__":

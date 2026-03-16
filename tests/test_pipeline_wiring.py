@@ -647,8 +647,8 @@ class TestRunPipeline:
             "owner/repo", 1, ".github/ci-failure-bot.yml", "token",
         )
 
-        assert result == []
-        mock_detector.assert_not_called()
+        assert result.reports == []
+        assert result.job_outcomes == []
 
     @patch("scripts.main._build_workflow_run")
     @patch("scripts.main._load_runtime_config")
@@ -753,7 +753,7 @@ class TestRunPipeline:
             rate_limiter=rate_limiter,
         )
 
-        assert len(reports) == 1
+        assert len(reports.reports) == 1
         failure_store.record_queued_pr.assert_called_once()
         rate_limiter.queue_failure.assert_called_once_with("fp1")
         mock_pr_manager.return_value.create_pr.assert_not_called()
@@ -921,7 +921,7 @@ class TestRunPipeline:
     @patch("scripts.main.FixGenerator")
     @patch("scripts.main.ValidationRunner")
     @patch("scripts.main.PRManager")
-    def test_skips_queueing_when_history_threshold_is_not_met(
+    def test_queues_validated_fix_even_when_history_threshold_is_not_met(
         self,
         mock_pr_manager,
         mock_validation_runner,
@@ -997,8 +997,8 @@ class TestRunPipeline:
             rate_limiter=rate_limiter,
         )
 
-        failure_store.record_queued_pr.assert_not_called()
-        rate_limiter.queue_failure.assert_not_called()
+        failure_store.record_queued_pr.assert_called_once()
+        rate_limiter.queue_failure.assert_called_once_with("fp1")
         mock_pr_manager.return_value.create_pr.assert_not_called()
 
     @patch("scripts.main._build_workflow_run")

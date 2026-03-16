@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from scripts.main import PipelineResult
 from scripts.monitor_workflow_runs import MonitorArgs, monitor
 
 
@@ -57,7 +58,10 @@ def test_monitor_processes_only_new_failed_runs_and_updates_watermark(
     repo = MagicMock()
     repo.get_workflow.return_value = workflow
     mock_github_cls.return_value.get_repo.return_value = repo
-    mock_run_pipeline.return_value = [object()]
+    mock_run_pipeline.return_value = PipelineResult(
+        reports=[MagicMock()],
+        job_outcomes=[{"job_name": "test-job", "failure_identifier": "test-id", "outcome": "pr-created"}],
+    )
 
     result = monitor(_args())
 
@@ -68,6 +72,9 @@ def test_monitor_processes_only_new_failed_runs_and_updates_watermark(
         "skip-non-failure",
     ]
     assert mock_run_pipeline.call_count == 2
+    assert result["runs"][0]["job_outcomes"] == [
+        {"job_name": "test-job", "failure_identifier": "test-id", "outcome": "pr-created"},
+    ]
     assert result["has_queued_failures"] is False
     state_store.mark_seen.assert_called_once_with(
         "valkey-io/valkey:daily.yml:schedule",
@@ -152,7 +159,7 @@ def test_monitor_passes_queue_only_to_pipeline(
     repo = MagicMock()
     repo.get_workflow.return_value = workflow
     mock_github_cls.return_value.get_repo.return_value = repo
-    mock_run_pipeline.return_value = [object()]
+    mock_run_pipeline.return_value = PipelineResult(reports=[MagicMock()], job_outcomes=[])
 
     monitor(_args(queue_only=True))
 

@@ -237,7 +237,7 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
             )
 
             try:
-                reports = run_pipeline(
+                pipeline_result = run_pipeline(
                     args.target_repo,
                     run.id,
                     args.config_path,
@@ -263,7 +263,8 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                 continue
 
             run_result["action"] = "processed-failure"
-            run_result["failure_reports"] = len(reports)
+            run_result["failure_reports"] = len(pipeline_result.reports)
+            run_result["job_outcomes"] = pipeline_result.job_outcomes
             run_results.append(run_result)
             new_last_seen = max(new_last_seen, run.id)
 
