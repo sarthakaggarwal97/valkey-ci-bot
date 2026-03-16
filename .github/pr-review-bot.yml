@@ -1,4 +1,39 @@
 reviewer:
+  custom_instructions: |
+    This project is Valkey, a high-performance in-memory key-value store
+    forked from Redis 7.2. It is written in C and uses an event-driven,
+    single-threaded architecture with optional io-threads for network I/O.
+
+    Key architectural areas to be aware of during review:
+    - Memory management uses zmalloc/zfree (wrappers around jemalloc).
+      Never use raw malloc/free in server code.
+    - The event loop (ae.c) is single-threaded. Blocking operations in the
+      main thread will stall all clients.
+    - Cluster mode: watch for changes that break cluster bus protocol
+      compatibility or slot migration.
+    - Replication: changes to the replication stream format or PSYNC
+      handshake must maintain backward compatibility.
+    - RDB/AOF persistence: changes to serialization format must handle
+      backward compatibility and version checks.
+    - New commands must be registered in the command table (commands.json)
+      with correct flags (write, readonly, fast, etc.).
+    - Thread safety: io-threads only handle read/write network buffers.
+      Shared data structures (dict, rax, listpack, ziplist) are not
+      thread-safe and must only be accessed from the main thread.
+    - Module API: public API changes must maintain backward compatibility.
+    - TCL tests in tests/unit/ and tests/integration/ use the Valkey
+      test framework. New features should include test coverage.
+  project:
+    language: "C"
+    build_system: "CMake"
+    test_frameworks: ["tcl", "gtest"]
+    description: >-
+      Valkey is a high-performance in-memory key-value store forked from
+      Redis 7.2. It supports data structures like strings, hashes, lists,
+      sets, sorted sets, streams, and more. It features replication,
+      clustering, Lua scripting, pub/sub, and persistence via RDB and AOF.
+    source_dirs: ["src/"]
+    test_dirs: ["tests/"]
   retrieval:
     enabled: true
     code_knowledge_base_id: "OHQMPN9RCG"
