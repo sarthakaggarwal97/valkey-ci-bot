@@ -23,6 +23,18 @@
       "created_at": "2026-03-14T22:24:43.098416+00:00",
       "updated_at": "2026-03-14T22:24:43.098416+00:00",
       "queued_pr_payload": null
+    },
+    "0752c5a6c4afa8ffa38a6bd4b4192fc6f957ecd1f591e5bfb9fb2dfa7c16ac7b": {
+      "fingerprint": "0752c5a6c4afa8ffa38a6bd4b4192fc6f957ecd1f591e5bfb9fb2dfa7c16ac7b",
+      "failure_identifier": "test-ubuntu-32bit",
+      "test_name": null,
+      "error_signature": "2026-03-16T00:20:50.7450000Z Evaluating test-ubuntu-32bit.if\n2026-03-16T00:20:50.7450000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, '32bit'))))\n2026-03-16T00:20:50.7450000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, '32bit')))\n2026-03-16T00:20:50.7450000Z Result: true\n2026-03-16T00:20:50.7480000Z Requested labels: ubuntu-latest\n2026-03-16T00:20:50.7480000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-16T00:20:50.7480000Z Waiting for a runner to pick up this job...\n2026-03-16T00:20:50.9350000Z Job is waiting for a hosted runner to come online.\n2026-03-16T00:20:50.9350000Z Job is about to start running on the hosted runner: GitHub Actions 1000574875",
+      "file_path": "",
+      "pr_url": null,
+      "status": "processing",
+      "created_at": "2026-03-16T07:50:47.238851+00:00",
+      "updated_at": "2026-03-16T07:50:47.238851+00:00",
+      "queued_pr_payload": null
     }
   },
   "history": {
@@ -118,6 +130,21 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-03-16T07:50:47.239047+00:00",
+          "commit_sha": "6c329dfe2c02d09b276fd5617acdb31e6169ebc1",
+          "workflow_run_id": 23122785995,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-32bit",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-32bit",
+          "test_name": null,
+          "error_signature": "2026-03-16T00:20:50.7450000Z Evaluating test-ubuntu-32bit.if\n2026-03-16T00:20:50.7450000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, '32bit'))))\n2026-03-16T00:20:50.7450000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, '32bit')))\n2026-03-16T00:20:50.7450000Z Result: true\n2026-03-16T00:20:50.7480000Z Requested labels: ubuntu-latest\n2026-03-16T00:20:50.7480000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-16T00:20:50.7480000Z Waiting for a runner to pick up this job...\n2026-03-16T00:20:50.9350000Z Job is waiting for a hosted runner to come online.\n2026-03-16T00:20:50.9350000Z Job is about to start running on the hosted runner: GitHub Actions 1000574875",
+          "file_path": "",
+          "fingerprint": "0752c5a6c4afa8ffa38a6bd4b4192fc6f957ecd1f591e5bfb9fb2dfa7c16ac7b"
         }
       ]
     }
