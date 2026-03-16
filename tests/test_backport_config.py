@@ -1,4 +1,4 @@
-# Feature: backport-bot, Property 12: Config loading round trip
+# Feature: backport-agent, Property 12: Config loading round trip
 """Property tests for backport configuration loading.
 
 Property 12: For any valid BackportConfig values serialized to a YAML-compatible

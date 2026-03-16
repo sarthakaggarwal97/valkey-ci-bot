@@ -1,4 +1,4 @@
-"""Backport PR creator for the Backport Bot pipeline.
+"""Backport PR creator for the Backport Agent pipeline.
 
 Creates backport branches and pull requests via the GitHub API, with
 duplicate detection and structured PR body generation.

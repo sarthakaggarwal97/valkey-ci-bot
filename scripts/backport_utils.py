@@ -1,4 +1,4 @@
-"""Utility functions for the Backport Bot pipeline.
+"""Utility functions for the Backport Agent pipeline.
 
 Provides label parsing, naming conventions, conflict detection, and basic
 syntax validation helpers used across the backport workflow.

@@ -1,4 +1,4 @@
-"""Cherry-pick executor for the Backport Bot pipeline.
+"""Cherry-pick executor for the Backport Agent pipeline.
 
 Handles git operations for cherry-picking source PR commits onto a target
 release branch.  Uses ``subprocess.run`` for all git CLI calls.

@@ -314,7 +314,7 @@ _conflict_strategy = st.builds(
 )
 
 
-# Feature: backport-bot, Property 7: Conflict resolution prompt contains all required context
+# Feature: backport-agent, Property 7: Conflict resolution prompt contains all required context
 class TestPromptCompletenessProperty:
     """
     **Validates: Requirements 3.1, 3.6**
@@ -349,7 +349,7 @@ class TestPromptCompletenessProperty:
         assert pr_context.source_pr_diff in user_prompt
 
 
-# Feature: backport-bot, Property 8: Independent file processing
+# Feature: backport-agent, Property 8: Independent file processing
 class TestIndependentFileProcessingProperty:
     """
     **Validates: Requirements 3.5**
@@ -421,7 +421,7 @@ class TestIndependentFileProcessingProperty:
         assert [r.path for r in results] == [c.path for c in conflicts]
 
 
-# Feature: backport-bot, Property 10: Conflict resolver respects resource limits
+# Feature: backport-agent, Property 10: Conflict resolver respects resource limits
 class TestResourceLimitsProperty:
     """
     **Validates: Requirements 8.2, 8.3**

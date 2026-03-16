@@ -58,7 +58,7 @@ _unresolved_result_strategy = st.builds(
 
 
 # ---------------------------------------------------------------------------
-# Feature: backport-bot, Property 4: PR body contains all required sections
+# Feature: backport-agent, Property 4: PR body contains all required sections
 # ---------------------------------------------------------------------------
 
 
@@ -168,7 +168,7 @@ class TestPRBodyCompletenessProperty:
 
 
 # ---------------------------------------------------------------------------
-# Feature: backport-bot, Property 13: Duplicate detection uses branch naming convention
+# Feature: backport-agent, Property 13: Duplicate detection uses branch naming convention
 # ---------------------------------------------------------------------------
 
 

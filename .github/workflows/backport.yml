@@ -16,10 +16,10 @@ on:
         required: true
         type: string
       config_path:
-        description: "Path to the backport bot configuration file in the consumer repo"
+        description: "Path to the backport agent configuration file in the consumer repo"
         required: false
         type: string
-        default: ".github/backport-bot.yml"
+        default: ".github/backport-agent.yml"
     secrets:
       AWS_ROLE_ARN:
         required: false
@@ -39,7 +39,7 @@ jobs:
       actions: read
       id-token: write
     steps:
-      - name: Checkout bot repository
+      - name: Checkout agent repository
         uses: actions/checkout@v6
         with:
           repository: sarthakaggarwal97/valkey-ci-agent
@@ -59,7 +59,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: valkey-backport-bot-${{ github.run_id }}
+          role-session-name: valkey-backport-agent-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run backport pipeline

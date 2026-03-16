@@ -1,16 +1,16 @@
 # Example caller workflow for consumer repositories.
 #
 # Copy this file to your repository as:
-#   .github/workflows/backport-bot.yml
+#   .github/workflows/backport-agent.yml
 #
-# This workflow triggers the Backport Bot when a merged PR is labeled with
+# This workflow triggers the Backport Agent when a merged PR is labeled with
 # a `backport <branch>` label (e.g. `backport 8.1`). It checks that the PR
 # is merged, extracts target branches from all matching labels, and triggers
 # one backport run per target branch.
 #
-# No secrets or variables are needed in the consumer repo — the bot repo
+# No secrets or variables are needed in the consumer repo — the agent repo
 # owns all credentials.
-name: Backport Bot
+name: Backport Agent
 
 permissions:
   contents: write
@@ -77,5 +77,5 @@ jobs:
       source_pr_number: ${{ github.event.pull_request.number }}
       repo_full_name: ${{ github.repository }}
       target_branch: ${{ matrix.target_branch }}
-      config_path: .github/backport-bot.yml
+      config_path: .github/backport-agent.yml
     secrets: inherit

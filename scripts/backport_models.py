@@ -1,4 +1,4 @@
-"""Data models for the Backport Bot pipeline."""
+"""Data models for the Backport Agent pipeline."""
 
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ class BackportResult:
 
 @dataclass
 class BackportConfig:
-    """Configuration for the backport bot, loaded from consumer repo YAML."""
+    """Configuration for the backport agent, loaded from consumer repo YAML."""
 
     bedrock_model_id: str = "us.anthropic.claude-sonnet-4-20250514-v1:0"
     max_conflict_retries: int = 2

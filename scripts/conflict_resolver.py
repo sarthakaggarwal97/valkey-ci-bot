@@ -1,4 +1,4 @@
-"""LLM-based conflict resolver for the Backport Bot pipeline.
+"""LLM-based conflict resolver for the Backport Agent pipeline.
 
 Uses Amazon Bedrock to resolve merge conflicts file-by-file, with
 whitespace-only conflict detection, retry logic, and C syntax validation.

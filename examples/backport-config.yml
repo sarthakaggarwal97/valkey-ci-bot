@@ -1,9 +1,9 @@
-# Example Backport Bot configuration for consumer repositories.
+# Example Backport Agent configuration for consumer repositories.
 #
 # Copy this file to your repository as:
-#   .github/backport-bot.yml
+#   .github/backport-agent.yml
 #
-# All settings are optional — the bot uses sensible defaults when a field is
+# All settings are optional — the agent uses sensible defaults when a field is
 # missing. Remove or comment out any section you don't need to customize.
 
 # ---------------------------------------------------------------------------
@@ -15,9 +15,9 @@
 # remaining markers.
 max_conflict_retries: 2
 
-# Maximum number of conflicting files the bot will attempt to resolve via
+# Maximum number of conflicting files the agent will attempt to resolve via
 # the LLM. If the cherry-pick produces more conflicts than this limit, the
-# bot creates the backport PR with all conflicts left unresolved.
+# agent creates the backport PR with all conflicts left unresolved.
 max_conflicting_files: 20
 
 # Per-backport token budget for Bedrock API calls. If the budget is exhausted
@@ -28,7 +28,7 @@ per_backport_token_budget: 100000
 # Safety limits
 # ---------------------------------------------------------------------------
 
-# Maximum backport PRs the bot will create in a rolling 24-hour window.
+# Maximum backport PRs the agent will create in a rolling 24-hour window.
 # Once the limit is reached, subsequent backport requests are skipped with
 # a comment on the source PR.
 max_prs_per_day: 10
@@ -37,7 +37,7 @@ max_prs_per_day: 10
 # Labels
 # ---------------------------------------------------------------------------
 
-# Label prefix used to identify backport targets. The bot looks for labels
+# Label prefix used to identify backport targets. The agent looks for labels
 # matching "<backport_label> <branch>" (e.g. "backport 8.1").
 backport_label: "backport"
 

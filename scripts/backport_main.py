@@ -1,4 +1,4 @@
-"""Backport Bot — CLI entry point and pipeline orchestrator.
+"""Backport Agent — CLI entry point and pipeline orchestrator.
 
 Orchestrates the full backport pipeline: config loading, validation,
 cherry-pick, conflict resolution, PR creation, and summary reporting.
@@ -176,7 +176,7 @@ def run_backport(
     logger.info("Checking rate limit.")
     bot_config = BotConfig(max_prs_per_day=config.max_prs_per_day)
     # Pass github_client=None so the rate limiter skips the open-PR-label
-    # check (which looks for "bot-fix" labels, not backport labels).
+    # check (which looks for "agent-fix" labels, not backport labels).
     # State persistence still works via state_github_client.
     rate_limiter = RateLimiter(
         bot_config,
@@ -477,8 +477,8 @@ def _apply_resolutions(
         # in the non-interactive CI environment.
         try:
             _run_git(
-                repo_dir, "-c", "user.name=backport-bot",
-                "-c", "user.email=backport-bot@users.noreply.github.com",
+                repo_dir, "-c", "user.name=backport-agent",
+                "-c", "user.email=backport-agent@users.noreply.github.com",
                 "-c", "core.editor=true",
                 "cherry-pick", "--continue",
             )
@@ -487,8 +487,8 @@ def _apply_resolutions(
             # progress because all files were staged), commit directly.
             logger.warning("cherry-pick --continue failed, committing directly.")
             _run_git(
-                repo_dir, "-c", "user.name=backport-bot",
-                "-c", "user.email=backport-bot@users.noreply.github.com",
+                repo_dir, "-c", "user.name=backport-agent",
+                "-c", "user.email=backport-agent@users.noreply.github.com",
                 "commit", "--allow-empty", "-m",
                 "Backport with conflict resolutions",
             )
@@ -500,8 +500,8 @@ def _apply_resolutions(
 
 
 def main() -> None:
-    """CLI entry point for the backport bot."""
-    parser = argparse.ArgumentParser(description="Backport Bot Pipeline")
+    """CLI entry point for the backport agent."""
+    parser = argparse.ArgumentParser(description="Backport Agent Pipeline")
     parser.add_argument(
         "--repo", required=True, help="Repository full name (owner/repo)",
     )
@@ -513,7 +513,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--config",
-        default=".github/backport-bot.yml",
+        default=".github/backport-agent.yml",
         help="Path to backport config YAML in the consumer repo",
     )
     parser.add_argument(

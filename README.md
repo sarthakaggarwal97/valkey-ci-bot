@@ -1,12 +1,12 @@
 # valkey-ci-agent
 
-An AI bot for Valkey CI failure remediation, PR review, and automated backports.
+An AI agent for Valkey CI failure remediation, PR review, and automated backports.
 
 ## Features
 
-- **CI Failure Bot** — analyzes workflow failures, generates and validates fixes, opens PRs with approval gating
-- **PR Review Bot** — reviews pull requests via the GitHub API, posts summaries, publishes review comments, answers follow-up questions
-- **Backport Bot** — cherry-picks merged PRs onto release branches with LLM-based conflict resolution
+- **CI Failure Agent** — analyzes workflow failures, generates and validates fixes, opens PRs with approval gating
+- **PR Review Agent** — reviews pull requests via the GitHub API, posts summaries, publishes review comments, answers follow-up questions
+- **Backport Agent** — cherry-picks merged PRs onto release branches with LLM-based conflict resolution
 - **Fuzzer Monitor** — watches fuzzer runs, detects anomalies, creates GitHub issues
 - **Central Valkey Monitor** — watches scheduled CI runs, tracks failure history, queues validated fixes
 
@@ -14,7 +14,7 @@ An AI bot for Valkey CI failure remediation, PR review, and automated backports.
 
 Model selection is configured in YAML, not in secrets:
 
-- `examples/config.yml` controls the CI failure bot model through `bedrock.model_id`
+- `examples/config.yml` controls the CI failure agent model through `bedrock.model_id`
 - `examples/pr-review-config.yml` controls the PR reviewer model through `reviewer.models.*`
 - both configs also support optional `retrieval` settings for explicit Bedrock Knowledge Base lookup
 
@@ -29,11 +29,11 @@ Local development:
 - fill in your own `GITHUB_TOKEN`, `AWS_REGION`, and `AWS_PROFILE`
 - source `.env.local` manually before running scripts
 
-## CI Failure Bot
+## CI Failure Agent
 
 The core feature. Reusable workflow at `.github/workflows/analyze-failure.yml`.
 
-When a CI workflow fails in `valkey-io/valkey`, the bot:
+When a CI workflow fails in `valkey-io/valkey`, the agent:
 
 1. detects and classifies the failure (build error, test failure, flaky test)
 2. retrieves and parses logs using format-specific parsers (gtest, tcl, build errors, sentinel/cluster)
@@ -48,7 +48,7 @@ Required GitHub configuration:
 - either secret: `VALKEY_GITHUB_TOKEN`
 - or variable: `VALKEY_GITHUB_APP_ID` plus secret: `VALKEY_GITHUB_APP_PRIVATE_KEY`
 
-## PR Review Bot
+## PR Review Agent
 
 Reusable workflow at `.github/workflows/review-pr.yml`.
 
@@ -64,9 +64,9 @@ Example consumer-repo files:
 - `examples/pr-review-caller-workflow.yml`
 - `examples/pr-review-config.yml`
 
-For fork or cross-repo testing, `.github/workflows/review-external-pr.yml` lets you dispatch a one-off review against any `owner/repo#PR` reachable by your GitHub token or GitHub App installation. It does not require adding workflow files or config files to the target repository. The reviewer posts comments on the target PR, but its incremental state is stored on this bot repo's `bot-data` branch.
+For fork or cross-repo testing, `.github/workflows/review-external-pr.yml` lets you dispatch a one-off review against any `owner/repo#PR` reachable by your GitHub token or GitHub App installation. It does not require adding workflow files or config files to the target repository. The reviewer posts comments on the target PR, but its incremental state is stored on this agent repo's `bot-data` branch.
 
-Config loading checks the target repo first (`.github/pr-review-bot.yml`), then falls back to this bot repo's checked-in config.
+Config loading checks the target repo first (`.github/pr-review-bot.yml`), then falls back to this agent repo's checked-in config.
 
 Required GitHub configuration:
 
@@ -74,11 +74,11 @@ Required GitHub configuration:
 - either secret: `VALKEY_GITHUB_TOKEN`
 - or variable: `VALKEY_GITHUB_APP_ID` plus secret: `VALKEY_GITHUB_APP_PRIVATE_KEY`
 
-## Backport Bot
+## Backport Agent
 
 Reusable workflow at `.github/workflows/backport.yml`.
 
-When a maintainer adds a `backport <branch>` label to a merged PR in `valkey-io/valkey`, a caller workflow in that repo triggers this bot. The bot cherry-picks the merged PR's commits onto the target release branch and opens a backport PR. If the cherry-pick produces merge conflicts, the bot uses Amazon Bedrock to resolve them, applying the original PR's intent to the diverged codebase.
+When a maintainer adds a `backport <branch>` label to a merged PR in `valkey-io/valkey`, a caller workflow in that repo triggers this agent. The agent cherry-picks the merged PR's commits onto the target release branch and opens a backport PR. If the cherry-pick produces merge conflicts, the agent uses Amazon Bedrock to resolve them, applying the original PR's intent to the diverged codebase.
 
 The pipeline:
 
@@ -89,9 +89,9 @@ The pipeline:
 5. pushes the branch and opens a backport PR with labels, conflict details, and per-file resolution summaries
 6. posts a summary comment on the source PR
 
-The bot applies a `backport` label to every backport PR, and an `llm-resolved-conflicts` label when any file was resolved by the LLM, signaling that extra review attention is needed.
+The agent applies a `backport` label to every backport PR, and an `llm-resolved-conflicts` label when any file was resolved by the LLM, signaling that extra review attention is needed.
 
-Configuration is loaded from `.github/backport-bot.yml` in the consumer repo. When the file is missing, sensible defaults are used. Configurable settings include the Bedrock model ID, max conflict retries, max conflicting files, daily PR limit, per-backport token budget, and label names.
+Configuration is loaded from `.github/backport-agent.yml` in the consumer repo. When the file is missing, sensible defaults are used. Configurable settings include the Bedrock model ID, max conflict retries, max conflicting files, daily PR limit, per-backport token budget, and label names.
 
 Example consumer-repo files:
 
@@ -111,12 +111,12 @@ Runs from this repo, watches new scheduled `Daily` runs in `valkey-io/valkey`, a
 
 The workflow has two stages:
 
-- `monitor`: runs automatically on schedule, analyzes failures, applies history-based queue gating, and queues validated fixes in this bot repo
+- `monitor`: runs automatically on schedule, analyzes failures, applies history-based queue gating, and queues validated fixes in this agent repo
 - `create-approved-prs`: runs only after approval on the protected environment `valkey-pr-approval`
 
 No PR is opened against `valkey-io/valkey` until that environment approval is granted.
 
-Approval context is written into the workflow summary so you can review the root-cause rationale, files the bot wants to change, observed failure streak, and last known good / first bad commits when history exists.
+Approval context is written into the workflow summary so you can review the root-cause rationale, files the agent wants to change, observed failure streak, and last known good / first bad commits when history exists.
 
 Manual dispatch defaults to `dry_run=true` so you can inspect candidate runs without advancing state or queueing fixes. Dispatch with `dry_run=false` for a real automated pass; the workflow still stops at the approval gate before opening any PRs.
 

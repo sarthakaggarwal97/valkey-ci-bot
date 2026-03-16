@@ -158,7 +158,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 
-# Feature: backport-bot, Property 1: Label parsing extracts correct target branches
+# Feature: backport-agent, Property 1: Label parsing extracts correct target branches
 class TestParseBackportLabelsProperty:
     """**Validates: Requirements 1.1, 1.4**"""
 
@@ -207,7 +207,7 @@ class TestParseBackportLabelsProperty:
         assert result == []
 
 
-# Feature: backport-bot, Property 2: Branch name construction follows convention
+# Feature: backport-agent, Property 2: Branch name construction follows convention
 class TestBuildBranchNameProperty:
     """**Validates: Requirements 4.1, 6.2**"""
 
@@ -231,7 +231,7 @@ class TestBuildBranchNameProperty:
         assert f"-to-{target_branch}" in result
 
 
-# Feature: backport-bot, Property 3: PR title follows convention
+# Feature: backport-agent, Property 3: PR title follows convention
 class TestBuildPrTitleProperty:
     """**Validates: Requirements 4.3**"""
 
@@ -255,7 +255,7 @@ class TestBuildPrTitleProperty:
         assert result.endswith(source_title)
 
 
-# Feature: backport-bot, Property 5: Conflict marker detection
+# Feature: backport-agent, Property 5: Conflict marker detection
 class TestHasConflictMarkersProperty:
     """**Validates: Requirements 3.3**"""
 
@@ -292,7 +292,7 @@ class TestHasConflictMarkersProperty:
         assert has_conflict_markers(content) is False
 
 
-# Feature: backport-bot, Property 6: C syntax validation rejects unbalanced braces
+# Feature: backport-agent, Property 6: C syntax validation rejects unbalanced braces
 class TestValidateCSyntaxProperty:
     """**Validates: Requirements 5.5**"""
 
@@ -342,7 +342,7 @@ class TestValidateCSyntaxProperty:
         assert validate_c_syntax(unbalanced) is False
 
 
-# Feature: backport-bot, Property 14: Whitespace-only conflicts are resolved without LLM
+# Feature: backport-agent, Property 14: Whitespace-only conflicts are resolved without LLM
 class TestIsWhitespaceOnlyConflictProperty:
     """**Validates: Requirements 3.2**"""
 

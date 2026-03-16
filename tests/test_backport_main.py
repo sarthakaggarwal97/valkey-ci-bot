@@ -28,7 +28,7 @@ from scripts.rate_limiter import RateLimiter
 
 
 # ======================================================================
-# Feature: backport-bot, Property 11: Summary contains all required metrics
+# Feature: backport-agent, Property 11: Summary contains all required metrics
 # **Validates: Requirements 9.2, 9.4**
 # ======================================================================
 
@@ -79,7 +79,7 @@ class TestBuildSummaryProperty:
 
 
 # ======================================================================
-# Feature: backport-bot, Property 9: Rate limiter enforces daily PR limit
+# Feature: backport-agent, Property 9: Rate limiter enforces daily PR limit
 # **Validates: Requirements 8.1**
 # ======================================================================
 

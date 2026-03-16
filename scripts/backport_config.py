@@ -1,4 +1,4 @@
-"""Configuration loader for the Backport Bot."""
+"""Configuration loader for the Backport Agent."""
 
 from __future__ import annotations
 
