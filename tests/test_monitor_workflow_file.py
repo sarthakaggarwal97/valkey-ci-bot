@@ -23,7 +23,6 @@ def test_monitor_workflow_uses_oidc_and_app_token_support() -> None:
     workflow = _load_yaml(REPO_ROOT / ".github/workflows/monitor-valkey-daily.yml")
     on_block = _get_on_block(workflow)
     job_env = workflow["jobs"]["monitor"]["env"]
-    reconcile_env = workflow["jobs"]["create-approved-prs"]["env"]
 
     assert workflow["permissions"] == {"contents": "write", "id-token": "write"}
     assert on_block["workflow_dispatch"]["inputs"]["dry_run"]["default"] is True
@@ -33,9 +32,11 @@ def test_monitor_workflow_uses_oidc_and_app_token_support() -> None:
     assert "VALKEY_GITHUB_TOKEN" in job_env
     assert "VALKEY_GITHUB_APP_ID" in job_env
     assert "VALKEY_GITHUB_APP_PRIVATE_KEY" in job_env
-    assert "VALKEY_GITHUB_TOKEN" in reconcile_env
     assert workflow["jobs"]["monitor"]["concurrency"]["group"] == "monitor-valkey-daily-scan"
-    assert workflow["jobs"]["create-approved-prs"]["concurrency"]["group"] == "monitor-valkey-daily-approval"
+
+    # Verify there is no separate create-approved-prs job — PRs are created
+    # directly inside the monitor job now.
+    assert "create-approved-prs" not in workflow["jobs"]
 
     app_token_step = next(
         step
@@ -60,13 +61,10 @@ def test_monitor_workflow_uses_oidc_and_app_token_support() -> None:
     assert app_token_step["with"]["permission-actions"] == "read"
     assert app_token_step["with"]["permission-contents"] == "write"
     assert app_token_step["with"]["permission-pull-requests"] == "write"
-    assert workflow["jobs"]["create-approved-prs"]["environment"]["name"] == "valkey-pr-approval"
-    assert workflow["jobs"]["create-approved-prs"]["if"] == "${{ needs.monitor.outputs.effective_dry_run != 'true' && needs.monitor.outputs.has_queued_failures == 'true' }}"
 
-    for job_name in ("monitor", "create-approved-prs"):
-        for step in workflow["jobs"][job_name]["steps"]:
-            if "if" in step:
-                assert "secrets." not in step["if"]
+    for step in workflow["jobs"]["monitor"]["steps"]:
+        if "if" in step:
+            assert "secrets." not in step["if"]
 
 
 def test_monitor_workflow_runs_central_monitor_script() -> None:
@@ -82,13 +80,5 @@ def test_monitor_workflow_runs_central_monitor_script() -> None:
     assert '--target-repo "valkey-io/valkey"' in script
     assert '--workflow-file "daily.yml"' in script
     assert '--config ".github/valkey-daily-bot.yml"' in script
-    assert "--queue-only" in script
-
-    reconcile_step = next(
-        step
-        for step in workflow["jobs"]["create-approved-prs"]["steps"]
-        if step["name"] == "Create approved Valkey PRs"
-    )
-    reconcile_script = reconcile_step["run"]
-    assert "--mode reconcile" in reconcile_script
-    assert '--state-repo "${{ github.repository }}"' in reconcile_script
+    # --queue-only is no longer used; PRs are created directly
+    assert "--queue-only" not in script
