@@ -194,12 +194,13 @@ class ReviewStateStore:
                             description=f"create {_STORE_FILE}",
                         )
                     else:
+                        existing_sha = getattr(existing, "sha", "")
                         retry_github_call(
                             lambda: repo.update_file(
                                 _STORE_FILE,
                                 "Update PR review state",
                                 content,
-                                existing.sha,
+                                existing_sha,
                                 branch=_STORE_BRANCH,
                             ),
                             retries=5,

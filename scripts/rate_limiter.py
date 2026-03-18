@@ -267,11 +267,12 @@ class RateLimiter:
                             branch=_RATE_STATE_BRANCH,
                         )
                     else:
+                        existing_sha = getattr(existing, "sha", "")
                         repo.update_file(
                             _RATE_STATE_FILE,
                             "Update rate limiter state",
                             content,
-                            existing.sha,
+                            existing_sha,
                             branch=_RATE_STATE_BRANCH,
                         )
                     self.from_dict(merged)
