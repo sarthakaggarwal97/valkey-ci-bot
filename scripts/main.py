@@ -423,6 +423,15 @@ def _analyze_and_fix(
         )
         return root_cause, None
 
+    # Skip when the analysis identified no files to change — the model
+    # cannot produce a valid patch without a target.
+    if not root_cause.files_to_change:
+        logger.warning(
+            "Skipping fix generation for job %s: no files_to_change identified.",
+            report.job_name,
+        )
+        return root_cause, None
+
     # Collect source files for fix generation
     try:
         source_files = _collect_source_files(report, root_cause_analyzer, project)
