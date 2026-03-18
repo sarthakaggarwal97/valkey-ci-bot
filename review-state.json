@@ -40,14 +40,6 @@
     ],
     "updated_at": "2026-03-16T21:46:14.529254+00:00"
   },
-  "valkey-io/valkey#3358": {
-    "repo": "valkey-io/valkey",
-    "pr_number": 3358,
-    "last_reviewed_head_sha": "d6ee9d4820549ffbf789f3989f4a75540bf7c968",
-    "summary_comment_id": 4077644892,
-    "review_comment_ids": [],
-    "updated_at": "2026-03-18T05:19:54.268519+00:00"
-  },
   "valkey-io/valkey-fuzzer#79": {
     "repo": "valkey-io/valkey-fuzzer",
     "pr_number": 79,
