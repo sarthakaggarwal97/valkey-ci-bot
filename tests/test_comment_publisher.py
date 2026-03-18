@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from scripts.comment_publisher import CommentPublisher, SUMMARY_MARKER
+from scripts.models import ReviewFinding
 
 
 def test_upsert_summary_updates_existing_marker_comment() -> None:
@@ -80,3 +81,31 @@ def test_publish_chat_reply_uses_review_comment_reply_for_review_threads() -> No
 
     assert reply_id == 8
     pr.create_review_comment_reply.assert_called_once_with(77, "reply")
+
+
+def test_publish_review_comments_includes_review_summary_body() -> None:
+    pr = MagicMock()
+    pr.base.repo._requester.requestJsonAndCheck.return_value = ({}, {"id": 11})
+
+    repo = MagicMock()
+    repo.get_pull.return_value = pr
+
+    gh = MagicMock()
+    gh.get_repo.return_value = repo
+
+    findings = [
+        ReviewFinding(
+            path="src/failover.c",
+            line=12,
+            body="**Top issue**\n\nConfidence: `high`",
+            severity="high",
+            title="Top issue",
+            confidence="high",
+        )
+    ]
+
+    CommentPublisher(gh).publish_review_comments("owner/repo", 1, findings, commit_sha="head456")
+
+    payload = pr.base.repo._requester.requestJsonAndCheck.call_args.kwargs["input"]
+    assert "Automated review found 1 issue" in payload["body"]
+    assert payload["comments"][0]["body"] == findings[0].body

@@ -204,6 +204,12 @@ class ReviewFinding:
     line: int | None
     body: str
     severity: str
+    title: str = ""
+    confidence: str = "medium"
+    trigger: str = ""
+    impact: str = ""
+    supporting_paths: list[str] = field(default_factory=list)
+    verification_notes: str = ""
 
 
 @dataclass

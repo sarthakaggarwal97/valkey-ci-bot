@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from scripts.code_reviewer import CodeReviewer, ReviewToolHandler
-from scripts.config import RetrievalConfig, ReviewerConfig
+from scripts.config import ProjectContext, RetrievalConfig, ReviewerConfig
 from scripts.models import (
     ChangedFile,
     DiffScope,
@@ -149,13 +149,11 @@ def test_code_reviewer_filters_speculative_and_file_level_findings() -> None:
 
     findings = reviewer.review(_context(), scope, ReviewerConfig(max_review_comments=5))
 
-    assert [(finding.path, finding.line, finding.body) for finding in findings] == [
-        (
-            "src/failover.c",
-            10,
-            "This can leave failover state stale after timeout.",
-        )
-    ]
+    assert len(findings) == 1
+    assert findings[0].path == "src/failover.c"
+    assert findings[0].line == 10
+    assert "stale after timeout" in findings[0].body
+    assert "Confidence:" in findings[0].body
     # The first invoke call is the review pass
     review_call_args = bedrock.invoke.call_args_list[0]
     user_prompt = review_call_args[0][1]
@@ -226,6 +224,63 @@ def test_review_tool_handler_search_code_drops_unverified_hits() -> None:
     assert "No results found for 'failover_timeout'" in result
 
 
+def test_review_tool_handler_get_base_file_uses_base_sha() -> None:
+    gh = MagicMock()
+    repo = MagicMock()
+    gh.get_repo.return_value = repo
+    repo.get_contents.return_value = MagicMock(
+        decoded_content=b"int failover(void) { return 0; }\n",
+    )
+
+    handler = ReviewToolHandler(gh, "owner/repo", "head456", base_sha="base123")
+    result = handler.execute("get_base_file", {"path": "src/failover.c"})
+
+    assert "return 0" in result
+    repo.get_contents.assert_called_with("src/failover.c", ref="base123")
+
+
+def test_review_tool_handler_find_tests_for_path_uses_project_patterns() -> None:
+    gh = MagicMock()
+    repo = MagicMock()
+    gh.get_repo.return_value = repo
+
+    tests_dir = MagicMock()
+    tests_dir.path = "tests/unit"
+    tests_dir.type = "dir"
+    predicted = MagicMock()
+    predicted.decoded_content = b"test failover timeout"
+
+    def get_contents(path: str, ref: str | None = None):
+        if path == "tests/":
+            return [tests_dir]
+        if path == "tests/unit":
+            return []
+        if path == "tests/unit/failover_timeout.tcl":
+            return predicted
+        raise FileNotFoundError(path)
+
+    repo.get_contents.side_effect = get_contents
+
+    handler = ReviewToolHandler(
+        gh,
+        "owner/repo",
+        "head456",
+        project=ProjectContext(
+            source_dirs=["src/"],
+            test_dirs=["tests/"],
+            test_to_source_patterns=[
+                {
+                    "source_path": "src/{name}.c",
+                    "test_path": "tests/unit/{name}.tcl",
+                }
+            ],
+        ),
+    )
+    result = handler.execute("find_tests_for_path", {"path": "src/failover_timeout.c"})
+
+    assert "tests/unit/failover_timeout.tcl" in result
+
+
 def test_code_reviewer_raises_on_unparseable_response() -> None:
     bedrock = MagicMock()
     bedrock.invoke.return_value = "not json"
@@ -240,6 +295,92 @@ def test_code_reviewer_raises_on_unparseable_response() -> None:
 
     with pytest.raises(ValueError, match="Unparseable review response"):
         reviewer.review(_context(), scope, config)
+
+
+def test_code_reviewer_verifier_can_drop_candidate_findings() -> None:
+    bedrock = MagicMock()
+    bedrock.invoke.side_effect = [
+        """
+    {
+      "findings": [
+        {
+          "path": "src/failover.c",
+          "line": 14,
+          "severity": "high",
+          "confidence": "high",
+          "title": "Potential stale state",
+          "trigger": "a timeout fires before cleanup",
+          "impact": "leave stale failover state behind",
+          "body": "The timeout path updates the timer but not the state field."
+        }
+      ]
+    }
+    """,
+        '{"results": [{"index": 0, "verdict": "drop", "reason": "not well supported"}]}',
+    ]
+    reviewer = CodeReviewer(bedrock)
+    scope = DiffScope(
+        base_sha="base123",
+        head_sha="head456",
+        files=_context().files,
+        incremental=False,
+    )
+
+    findings = reviewer.review(_context(), scope, ReviewerConfig(max_review_comments=5))
+
+    assert findings == []
+
+
+def test_code_reviewer_ranks_by_severity_and_confidence_before_capping() -> None:
+    bedrock = MagicMock()
+    bedrock.invoke.side_effect = [
+        """
+    {
+      "findings": [
+        {
+          "path": "src/failover.c",
+          "line": 14,
+          "severity": "medium",
+          "confidence": "low",
+          "title": "Lower-priority issue",
+          "trigger": "the timeout path runs",
+          "impact": "log stale telemetry",
+          "body": "This only affects logging."
+        },
+        {
+          "path": "src/failover.c",
+          "line": 13,
+          "severity": "high",
+          "confidence": "high",
+          "title": "Top issue",
+          "trigger": "the timeout path runs",
+          "impact": "leave stale failover state behind",
+          "body": "State is never reset."
+        }
+      ]
+    }
+    """,
+        """
+    {
+      "results": [
+        {"index": 0, "verdict": "keep", "reason": "valid"},
+        {"index": 1, "verdict": "keep", "reason": "valid"}
+      ]
+    }
+    """,
+    ]
+    reviewer = CodeReviewer(bedrock)
+    scope = DiffScope(
+        base_sha="base123",
+        head_sha="head456",
+        files=_context().files,
+        incremental=False,
+    )
+
+    findings = reviewer.review(_context(), scope, ReviewerConfig(max_review_comments=1))
+
+    assert len(findings) == 1
+    assert findings[0].title == "Top issue"
 
 
 def test_pr_summarizer_includes_retrieved_context() -> None:

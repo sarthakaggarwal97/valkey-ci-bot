@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import logging
 import re
@@ -11,22 +12,26 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 from scripts.bedrock_client import BedrockClient, PromptClient
+from scripts.config import ProjectContext
 from scripts.bedrock_retriever import BedrockRetriever
 from scripts.config import RetrievalConfig, ReviewerConfig
 from scripts.github_client import retry_github_call
 from scripts.models import ChangedFile, DiffScope, PullRequestContext, ReviewFinding
 
-_SYSTEM_PROMPT = """You are a highly experienced software engineer performing a thorough code review.
-Your purpose is to find substantive defects — correctness bugs, regressions,
-security vulnerabilities, performance risks, or missing validation.
+_SYSTEM_PROMPT = """You are a skeptical staff engineer performing a code review.
+Your job is to find the small number of defects that are both real and worth
+blocking on: correctness bugs, regressions, security issues, data-loss risks,
+concurrency hazards, or missing validation with concrete consequences.
 
 Rules:
+- Prefer 0-3 high-confidence findings over broad coverage.
 - Only report issues that are directly supported by the provided patch/content.
 - The provided excerpts may be truncated; never treat missing context as a bug.
 - Do not speculate about symbols, methods, fields, workflows, or files that are
   not shown, and do not ask maintainers to verify whether something exists.
 - Do NOT provide general feedback, summaries, explanations of changes, or praises
   for making good additions.
+- Every surviving finding must have a concrete trigger and a concrete impact.
 - Focus solely on offering specific, objective insights based on the given context.
 - Avoid duplicate or overlapping findings for the same root cause.
 - If your finding depends on the ABSENCE of a guard, check, cleanup, or
@@ -45,6 +50,9 @@ Rules:
   relative indentation within the embedded script matters. This is a very
   common source of false positives.
 - Return valid JSON only."""
+
+_SEVERITY_RANK = {"high": 3, "medium": 2, "low": 1}
+_CONFIDENCE_RANK = {"high": 3, "medium": 2, "low": 1}
 
 _SPECULATIVE_SUBSTRINGS = (
     "not shown in the diff",
@@ -84,6 +92,23 @@ _SPECULATIVE_PATTERNS = (
 )
 
 
+@dataclass
+class _FindingDraft:
+    """Structured intermediate finding before final rendering."""
+
+    path: str
+    line: int | None
+    severity: str
+    confidence: str
+    title: str
+    trigger: str
+    impact: str
+    details: str
+    suggestion: str
+    supporting_paths: list[str]
+    verification_notes: str = ""
+
+
 def _extract_json_payload(text: str) -> Any:
     candidate = text.strip()
     if candidate.startswith("```"):
@@ -105,6 +130,96 @@ def _extract_json_payload(text: str) -> Any:
     if end_object == -1:
         raise ValueError("No JSON object found.")
     return json.loads(candidate[start_object : end_object + 1])
+
+
+def _normalize_severity(value: object) -> str:
+    """Return a normalized severity enum."""
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in _SEVERITY_RANK else "medium"
+
+
+def _normalize_confidence(value: object) -> str:
+    """Return a normalized confidence enum."""
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in _CONFIDENCE_RANK else "medium"
+
+
+def _derive_title(title: str, body: str) -> str:
+    """Produce a short reviewer-facing title."""
+    explicit = title.strip()
+    if explicit:
+        return explicit
+    summary = body.strip().splitlines()[0] if body.strip() else "Potential defect"
+    summary = summary.strip(" -*`")
+    if len(summary) <= 90:
+        return summary
+    return summary[:87].rstrip() + "..."
+
+
+def _clean_supporting_paths(paths: object, primary_path: str) -> list[str]:
+    """Normalize supporting path lists."""
+    if not isinstance(paths, list):
+        return []
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in paths:
+        path = str(raw or "").strip()
+        if not path or path == primary_path or path in seen:
+            continue
+        seen.add(path)
+        cleaned.append(path)
+    return cleaned
+
+
+def _render_review_body(draft: _FindingDraft) -> str:
+    """Render a structured review finding into GitHub comment markdown."""
+    parts: list[str] = []
+    if draft.title:
+        parts.append(f"**{draft.title}**")
+
+    sentence = ""
+    if draft.trigger and draft.impact:
+        sentence = f"When {draft.trigger}, this can {draft.impact}"
+    elif draft.trigger:
+        sentence = f"When {draft.trigger}."
+    elif draft.impact:
+        sentence = draft.impact[:1].upper() + draft.impact[1:]
+    if sentence:
+        if not sentence.endswith("."):
+            sentence += "."
+        parts.append(sentence)
+
+    details = draft.details.strip()
+    if (
+        details
+        and draft.title
+        and _normalize_finding_text(details) == _normalize_finding_text(draft.title)
+        and not draft.trigger
+        and not draft.impact
+    ):
+        details = ""
+    if details:
+        parts.append(details)
+    if draft.supporting_paths:
+        parts.append(
+            "Also checked: " + ", ".join(f"`{path}`" for path in draft.supporting_paths)
+        )
+    parts.append(f"Confidence: `{draft.confidence}`")
+    suggestion = draft.suggestion.rstrip()
+    if suggestion:
+        parts.append(f"```suggestion\n{suggestion}\n```")
+    return "\n\n".join(part for part in parts if part.strip())
+
+
+def _finding_sort_key(finding: ReviewFinding) -> tuple[int, int, int, str, int]:
+    """Return a sort key that prioritizes stronger findings first."""
+    return (
+        _SEVERITY_RANK.get(_normalize_severity(finding.severity), 0),
+        _CONFIDENCE_RANK.get(_normalize_confidence(finding.confidence), 0),
+        1 if finding.line is not None else 0,
+        finding.path,
+        -(finding.line or 0),
+    )
 
 
 def _looks_like_code(path: str) -> bool:
@@ -599,6 +714,30 @@ _GET_FILE_TOOL: dict = {
     },
 }
 
+_GET_BASE_FILE_TOOL: dict = {
+    "toolSpec": {
+        "name": "get_base_file",
+        "description": (
+            "Fetch the contents of a file from the repository at the PR's "
+            "base commit. Use this when you need the full pre-change "
+            "implementation to confirm whether the patch removed a guard, "
+            "changed a contract, or altered behavior in a subtle way."
+        ),
+        "inputSchema": {
+            "json": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Relative file path in the repository.",
+                    },
+                },
+                "required": ["path"],
+            },
+        },
+    },
+}
+
 _LIST_FILES_TOOL: dict = {
     "toolSpec": {
         "name": "list_directory",
@@ -618,6 +757,30 @@ _LIST_FILES_TOOL: dict = {
                             "Directory path to list. Use empty string or '.' "
                             "for the repository root."
                         ),
+                    },
+                },
+                "required": ["path"],
+            },
+        },
+    },
+}
+
+_FIND_TESTS_TOOL: dict = {
+    "toolSpec": {
+        "name": "find_tests_for_path",
+        "description": (
+            "Locate related test files for a changed source path using the "
+            "project's configured test directories and file-name heuristics. "
+            "Use this when you want to assess whether an important code path "
+            "has nearby regression coverage."
+        ),
+        "inputSchema": {
+            "json": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Changed source or test file path.",
                     },
                 },
                 "required": ["path"],
@@ -664,24 +827,51 @@ _SEARCH_CODE_TOOL: dict = {
     },
 }
 
+_STRUCTURED_FINDING_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "path": {"type": "string"},
+        "line": {
+            "anyOf": [
+                {"type": "integer"},
+                {"type": "null"},
+            ]
+        },
+        "severity": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+        },
+        "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+        },
+        "title": {"type": "string"},
+        "trigger": {"type": "string"},
+        "impact": {"type": "string"},
+        "body": {"type": "string"},
+        "supporting_paths": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "suggestion": {"type": "string"},
+    },
+    "required": [
+        "path",
+        "severity",
+        "confidence",
+        "title",
+        "trigger",
+        "impact",
+        "body",
+    ],
+}
+
 _SUBMIT_REVIEW_SCHEMA: dict = {
     "type": "object",
     "properties": {
         "reviews": {
             "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string"},
-                    "line": {"type": "integer"},
-                    "severity": {
-                        "type": "string",
-                        "enum": ["high", "medium", "low"],
-                    },
-                    "body": {"type": "string"},
-                },
-                "required": ["path", "body"],
-            },
+            "items": _STRUCTURED_FINDING_SCHEMA,
         },
         "lgtm": {"type": "boolean"},
     },
@@ -715,6 +905,8 @@ class ReviewToolHandler:
         repo_name: str,
         head_sha: str,
         *,
+        base_sha: str | None = None,
+        project: ProjectContext | None = None,
         max_file_bytes: int = 60_000,
         max_fetches: int = 10,
         github_retries: int = 5,
@@ -722,19 +914,27 @@ class ReviewToolHandler:
         self._gh = github_client
         self._repo_name = repo_name
         self._head_sha = head_sha
+        self._base_sha = base_sha
+        self._project = project or ProjectContext()
         self._max_file_bytes = max_file_bytes
         self._max_fetches = max_fetches
         self._github_retries = github_retries
         self._fetch_count = 0
         self._cache: dict[str, str] = {}
+        self._directory_cache: dict[str, list[str]] = {}
+        self._history: list[str] = []
         self._repo = None
 
     def execute(self, tool_name: str, tool_input: dict) -> str:
         """Execute a tool call and return the result text."""
         if tool_name == "get_file":
             return self._get_file(tool_input.get("path", ""))
+        if tool_name == "get_base_file":
+            return self._get_base_file(tool_input.get("path", ""))
         if tool_name == "list_directory":
             return self._list_directory(tool_input.get("path", ""))
+        if tool_name == "find_tests_for_path":
+            return self._find_tests_for_path(tool_input.get("path", ""))
         if tool_name == "search_code":
             return self._search_code(
                 tool_input.get("query", ""),
@@ -745,8 +945,9 @@ class ReviewToolHandler:
     def _get_file(self, path: str) -> str:
         if not path:
             return "Error: path is required."
-        if path in self._cache:
-            return self._cache[path]
+        cache_key = f"head:{path}"
+        if cache_key in self._cache:
+            return self._cache[cache_key]
         if self._fetch_count >= self._max_fetches:
             return (
                 f"Fetch limit reached ({self._max_fetches}). "
@@ -758,6 +959,8 @@ class ReviewToolHandler:
             raw = self._fetch_file_text(
                 repo,
                 path,
+                ref=self._head_sha,
+                cache_key=cache_key,
                 description=f"get file {path}",
             )
             if raw is None:
@@ -771,12 +974,46 @@ class ReviewToolHandler:
                     return f"Could not fetch {path}: expected a directory listing."
                 names = [c.path for c in contents]
                 result = f"{path} is a directory. Contents:\n" + "\n".join(names)
-                self._cache[path] = result
+                self._cache[cache_key] = result
+                self._remember_context(f"Directory {path or '.'}", result)
                 return result
             logger.info("Fetched %s (%d bytes) for agentic review.", path, len(raw))
+            self._remember_context(f"HEAD file {path}", raw)
             return raw
         except Exception as exc:
             msg = f"Could not fetch {path}: {exc}"
+            logger.warning(msg)
+            return msg
+
+    def _get_base_file(self, path: str) -> str:
+        if not path:
+            return "Error: path is required."
+        if not self._base_sha:
+            return "Base commit is unavailable for this review."
+        cache_key = f"base:{path}"
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+        if self._fetch_count >= self._max_fetches:
+            return (
+                f"Fetch limit reached ({self._max_fetches}). "
+                "Please submit your review with the context you have."
+            )
+        self._fetch_count += 1
+        try:
+            repo = self._get_repo()
+            raw = self._fetch_file_text(
+                repo,
+                path,
+                ref=self._base_sha,
+                cache_key=cache_key,
+                description=f"get base file {path}",
+            )
+            if raw is None:
+                return f"{path} is a directory at the base commit."
+            self._remember_context(f"BASE file {path}", raw)
+            return raw
+        except Exception as exc:
+            msg = f"Could not fetch base version of {path}: {exc}"
             logger.warning(msg)
             return msg
 
@@ -797,9 +1034,80 @@ class ReviewToolHandler:
             if not isinstance(contents, list):
                 return f"{path} is a file, not a directory."
             names = sorted(c.path for c in contents)
-            return "\n".join(names)
+            result = "\n".join(names)
+            self._remember_context(f"Directory listing {path or '.'}", result)
+            return result
         except Exception as exc:
             return f"Could not list {path}: {exc}"
+
+    def _find_tests_for_path(self, path: str) -> str:
+        if not path:
+            return "Error: path is required."
+        if self._fetch_count >= self._max_fetches:
+            return (
+                f"Fetch limit reached ({self._max_fetches}). "
+                "Please submit your review with the context you have."
+            )
+        self._fetch_count += 1
+
+        lowered_path = path.lower()
+        if any(lowered_path.startswith(test_dir.lower()) for test_dir in self._project.test_dirs):
+            return f"{path} is already under the configured test directories."
+
+        try:
+            repo = self._get_repo()
+            candidates: list[tuple[int, str]] = []
+            exact_matches = set(self._derive_test_paths_from_patterns(path))
+            seen: set[str] = set()
+            stem = PurePosixPath(path).stem.lower()
+            basename = PurePosixPath(path).name.lower()
+            parent = PurePosixPath(path).parent.name.lower()
+
+            for test_path in exact_matches:
+                text = self._fetch_file_text(
+                    repo,
+                    test_path,
+                    ref=self._head_sha,
+                    cache_key=f"head:{test_path}",
+                    description=f"check predicted test {test_path}",
+                )
+                if text is not None:
+                    candidates.append((100, test_path))
+                    seen.add(test_path)
+
+            for test_dir in self._project.test_dirs:
+                for test_path in self._walk_directory_files(repo, test_dir):
+                    if test_path in seen:
+                        continue
+                    lowered_test = test_path.lower()
+                    score = 0
+                    if stem and stem in lowered_test:
+                        score += 10
+                    if basename and basename in lowered_test:
+                        score += 15
+                    if parent and parent in lowered_test:
+                        score += 3
+                    if score <= 0:
+                        continue
+                    candidates.append((score, test_path))
+                    seen.add(test_path)
+
+            if not candidates:
+                return f"No obvious related tests found for {path}."
+
+            ordered = [test_path for _score, test_path in sorted(
+                candidates,
+                key=lambda item: (-item[0], item[1]),
+            )[:15]]
+            result = f"Potential related tests for {path}:\n" + "\n".join(
+                f"- {test_path}" for test_path in ordered
+            )
+            self._remember_context(f"Related tests for {path}", result)
+            return result
+        except Exception as exc:
+            msg = f"Could not locate related tests for {path}: {exc}"
+            logger.warning(msg)
+            return msg
 
     def _search_code(self, query: str, path_filter: str = "") -> str:
         if not query:
@@ -843,6 +1151,8 @@ class ReviewToolHandler:
                 text = self._fetch_file_text(
                     repo,
                     path,
+                    ref=self._head_sha,
+                    cache_key=f"head:{path}",
                     description=f"verify search hit {path}",
                 )
                 if text is None:
@@ -867,14 +1177,29 @@ class ReviewToolHandler:
                 count,
                 self._head_sha[:12],
             )
-            return (
+            result = (
                 f"Found {count} verified result(s) for '{query}' "
                 f"at {self._head_sha[:12]}:\n" + "\n".join(lines)
             )
+            self._remember_context(f"Code search {query}", result)
+            return result
         except Exception as exc:
             msg = f"Code search failed for '{query}': {exc}"
             logger.warning(msg)
             return msg
+
+    def render_context(self, *, max_chars: int = 24_000) -> str:
+        """Render fetched tool context for downstream verification."""
+        if not self._history:
+            return ""
+        parts: list[str] = []
+        used = 0
+        for entry in self._history:
+            if used + len(entry) > max_chars:
+                break
+            parts.append(entry)
+            used += len(entry)
+        return "\n\n".join(parts)
 
     def _get_repo(self):
         if self._repo is None:
@@ -890,12 +1215,14 @@ class ReviewToolHandler:
         repo,
         path: str,
         *,
+        ref: str,
+        cache_key: str,
         description: str,
     ) -> str | None:
-        if path in self._cache:
-            return self._cache[path]
+        if cache_key in self._cache:
+            return self._cache[cache_key]
         contents = retry_github_call(
-            lambda: repo.get_contents(path, ref=self._head_sha),
+            lambda: repo.get_contents(path, ref=ref),
             retries=self._github_retries,
             description=description,
         )
@@ -905,8 +1232,63 @@ class ReviewToolHandler:
         truncated = raw[: self._max_file_bytes]
         if len(raw) > self._max_file_bytes:
             truncated += f"\n\n[truncated at {self._max_file_bytes} bytes]"
-        self._cache[path] = truncated
+        self._cache[cache_key] = truncated
         return truncated
+
+    def _walk_directory_files(self, repo, root: str) -> list[str]:
+        cache_key = root or "."
+        cached = self._directory_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        stack = [root]
+        files: list[str] = []
+        seen_dirs: set[str] = set()
+        while stack and len(files) < 500:
+            current = stack.pop()
+            if current in seen_dirs:
+                continue
+            seen_dirs.add(current)
+
+            def _load_contents() -> Any:
+                return repo.get_contents(current, ref=self._head_sha)
+
+            contents = retry_github_call(
+                _load_contents,
+                retries=self._github_retries,
+                description=f"walk directory {current or '.'}",
+            )
+            if not isinstance(contents, list):
+                files.append(current)
+                continue
+            for item in contents:
+                item_path = getattr(item, "path", "")
+                item_type = getattr(item, "type", "file")
+                if item_type == "dir":
+                    stack.append(item_path)
+                elif item_type == "file" and item_path:
+                    files.append(item_path)
+
+        ordered = sorted(files)
+        self._directory_cache[cache_key] = ordered
+        return ordered
+
+    def _derive_test_paths_from_patterns(self, source_path: str) -> list[str]:
+        results: list[str] = []
+        for pattern in self._project.test_to_source_patterns:
+            test_template = pattern.get("test_path", "")
+            source_template = pattern.get("source_path", "")
+            if not test_template or not source_template:
+                continue
+            escaped = re.escape(source_template).replace(r"\{name\}", r"(?P<name>.+)")
+            match = re.fullmatch(escaped, source_path)
+            if match:
+                results.append(test_template.replace("{name}", match.group("name")))
+        return results
+
+    def _remember_context(self, label: str, text: str) -> None:
+        snippet = text if len(text) <= 4_000 else text[:4_000] + "\n...[truncated]"
+        self._history.append(f"### {label}\n{snippet}")
 
     @staticmethod
     def _path_matches_filter(path: str, path_filter: str) -> bool:
@@ -1109,13 +1491,15 @@ or
                     if key not in seen:
                         seen.add(key)
                         deduped.append(f)
-                capped = deduped[: config.max_review_comments]
+                ranked = sorted(deduped, key=_finding_sort_key, reverse=True)
+                capped = ranked[: config.max_review_comments]
                 return capped
 
         findings = review_fn(
             pr, diff_scope, config, short_summary=short_summary,
         )
-        capped = findings[: config.max_review_comments]
+        ranked = sorted(findings, key=_finding_sort_key, reverse=True)
+        capped = ranked[: config.max_review_comments]
         return capped
 
     def _review_single_scope(
@@ -1165,15 +1549,7 @@ Review scope excerpts (patch/content may be truncated):
 {custom_instructions_section}
 
 Return JSON in one of these shapes:
-[
-  {{
-    "path": "relative/path",
-    "line": <line number from the diff's +N side, or null if unsure>,
-    "severity": "high|medium|low",
-    "body": "single concrete finding in markdown"
-  }}
-]
-
+{{ "reviews": [ ... ], "lgtm": false }}
 or
 {{ "findings": [ ... ] }}
 
@@ -1181,190 +1557,48 @@ CRITICAL rules:
 - New hunks are annotated with line numbers (e.g. "120: code"). Old hunks show the replaced code without line numbers. Use the line numbers from new_hunk for the "line" field.
 - Only return findings with direct evidence in the shown patch/content excerpts.
 - Do NOT provide general feedback, summaries, explanations of changes, or praises for making good additions.
-- Focus solely on offering specific, objective insights based on the given context and refrain from making broad comments about potential impacts on the system or question intentions behind the changes.
+- Prefer 0-3 findings. It is better to return [] than a weak claim.
+- Each finding must include: title, trigger, impact, severity, confidence, and a concise body with the evidence.
+- The body must explain the concrete failure mode; do not write generic review advice.
 - Do NOT speculate about array sizes, buffer lengths, variable values, or code structure that is not fully visible in the provided excerpts.
 - Do not infer missing definitions from other files or from omitted parts of a file.
 - Do not report that a file, diff, or workflow looks truncated.
 - Do not ask maintainers to verify whether a symbol exists.
 - Prefer one strongest finding per root cause; if unsure, return [].
 - Do not emit generic praise.
-- For code modification suggestions, use GitHub's suggestion format in the body:
-  ```suggestion
-  corrected code here
-  ```
-
-<example_input>
-<new_hunk file="src/server.c">
-@@ -118,7 +118,7 @@
-120:   int timeout = config->timeout;
-121:   if (timeout = 0) {{
-122:       timeout = DEFAULT_TIMEOUT;
-123:   }}
-124:   startServer(timeout);
-</new_hunk>
-
-<old_hunk file="src/server.c">
-@@ -118,7 +118,7 @@
-  int timeout = config->timeout;
-  if (timeout == 0) {{
-      timeout = DEFAULT_TIMEOUT;
-  }}
-  startServer(timeout);
-</old_hunk>
-</example_input>
-
-<example_output>
-[
-  {{
-    "path": "src/server.c",
-    "line": 121,
-    "severity": "high",
-    "body": "Bug: assignment `=` used instead of comparison `==` in condition. This will always set timeout to 0 and evaluate as false, so `DEFAULT_TIMEOUT` is never applied.\\n\\n```suggestion\\n    if (timeout == 0) {{\\n```"
-  }}
-]
-</example_output>
+- Use a suggestion only when the exact correction is obvious. Put only the replacement code in `suggestion`.
+- If there are no issues, return {{ "reviews": [], "lgtm": true }}.
 """
-        # Define the JSON schema for structured tool-use output
-        _review_schema: dict = {
-            "type": "object",
-            "properties": {
-                "reviews": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "path": {"type": "string"},
-                            "line": {"type": "integer"},
-                            "severity": {"type": "string", "enum": ["high", "medium", "low"]},
-                            "body": {"type": "string"},
-                        },
-                        "required": ["path", "body"],
+        payload = self._invoke_json_response(
+            _SYSTEM_PROMPT,
+            user_prompt,
+            schema={
+                "type": "object",
+                "properties": {
+                    "reviews": {
+                        "type": "array",
+                        "items": _STRUCTURED_FINDING_SCHEMA,
                     },
+                    "lgtm": {"type": "boolean"},
                 },
-                "lgtm": {"type": "boolean"},
+                "required": ["reviews", "lgtm"],
             },
-            "required": ["reviews", "lgtm"],
-        }
-
-        # Try structured tool-use first, fall back to plain invoke + JSON parsing
-        raw_findings: list = []
-        _has_schema_method = (
-            callable(getattr(self._bedrock, "invoke_with_schema", None))
-            and type(self._bedrock).__name__ != "MagicMock"
+            tool_name="generate_review_json",
+            tool_description="Generate structured code review findings",
+            model_id=config.models.heavy_model_id,
+            max_output_tokens=config.max_output_tokens,
+            temperature=config.models.temperature,
         )
-        used_tool_use = False
-        if _has_schema_method:
-            try:
-                response = self._bedrock.invoke_with_schema(
-                    _SYSTEM_PROMPT,
-                    user_prompt,
-                    tool_name="generate_review_json",
-                    tool_description="Generate code review findings in structured JSON format",
-                    json_schema=_review_schema,
-                    model_id=config.models.heavy_model_id,
-                    max_output_tokens=config.max_output_tokens,
-                    temperature=config.models.temperature,
-                )
-                payload = json.loads(response) if isinstance(response, str) else response
-                if isinstance(payload, dict):
-                    raw_findings = payload.get("reviews", [])
-                    used_tool_use = True
-                    logger.info("Used structured tool-use output, got %d finding(s).", len(raw_findings))
-            except Exception as tool_exc:
-                logger.info("Tool-use failed (%s), falling back to plain invoke.", tool_exc)
-
-        if not used_tool_use:
-            response = self._bedrock.invoke(
-                _SYSTEM_PROMPT,
-                user_prompt,
-                model_id=config.models.heavy_model_id,
-                max_output_tokens=config.max_output_tokens,
-                temperature=config.models.temperature,
-            )
-            try:
-                payload = _extract_json_payload(response)
-            except Exception as exc:
-                raise ValueError("Unparseable review response") from exc
-            raw_findings = payload.get("findings", []) if isinstance(payload, dict) else payload
-
-        if not isinstance(raw_findings, list):
-            raise ValueError("Review response did not contain a findings list.")
-
-        logger.info("LLM returned %d raw finding(s).", len(raw_findings))
-
-        allowed_paths = {changed_file.path for changed_file in diff_scope.files}
-        reviewable_files = {changed_file.path: changed_file for changed_file in diff_scope.files}
-        findings: list[ReviewFinding] = []
-        seen_keys: set[tuple[str, int | None, str]] = set()
-        filtered_no_line = 0
-        filtered_speculative = 0
-        filtered_lgtm = 0
-        filtered_path = 0
-        for raw_finding in raw_findings:
-            if not isinstance(raw_finding, dict):
-                continue
-            path = str(raw_finding.get("path", "")).strip()
-            if not path or path not in allowed_paths:
-                filtered_path += 1
-                continue
-            body = str(raw_finding.get("body", "")).strip()
-            if not body:
-                continue
-            lowered = body.lower()
-            if not config.review_comment_lgtm and (
-                "lgtm" in lowered or "looks good" in lowered or "no issues" in lowered
-            ):
-                filtered_lgtm += 1
-                continue
-            line = raw_finding.get("line")
-            if _is_speculative_finding(body):
-                filtered_speculative += 1
-                continue
-            changed_file = reviewable_files[path]
-            normalized_body = _normalize_finding_text(body)
-            normalized_line = int(line) if isinstance(line, int) and line > 0 else None
-            if normalized_line is not None and changed_file.patch:
-                added_lines, context_lines = _parse_diff_lines(changed_file.patch)
-                snapped = _snap_line_to_diff(normalized_line, added_lines, context_lines)
-                if snapped != normalized_line:
-                    logger.info(
-                        "Line %d for %s snapped to %s (added=%d, context=%d lines in diff)",
-                        normalized_line,
-                        path,
-                        snapped,
-                        len(added_lines),
-                        len(context_lines),
-                    )
-                normalized_line = snapped
-            if _is_false_indentation_finding(
-                body, path, normalized_line, changed_file.contents,
-            ):
-                filtered_speculative += 1
-                continue
-            dedupe_key = (path, normalized_line, normalized_body)
-            if dedupe_key in seen_keys:
-                continue
-            seen_keys.add(dedupe_key)
-            findings.append(
-                ReviewFinding(
-                    path=path,
-                    line=normalized_line,
-                    body=body,
-                    severity=str(raw_finding.get("severity", "medium")).strip() or "medium",
-                )
-            )
-
-        logger.info(
-            "Finding filter stats: path=%d, lgtm=%d, speculative=%d, kept=%d",
-            filtered_path,
-            filtered_lgtm,
-            filtered_speculative,
-            len(findings),
+        raw_findings = self._extract_raw_findings(payload)
+        drafts = self._normalize_raw_findings(raw_findings, diff_scope, config)
+        verified = self._verify_candidates(
+            pr,
+            diff_scope,
+            drafts,
+            config,
+            extra_context="",
         )
-
-        capped = findings[: config.max_review_comments]
-
-        return capped
+        return self._drafts_to_findings(verified)
 
 
     # ------------------------------------------------------------------
@@ -1431,23 +1665,22 @@ Review scope excerpts (patch/content may be truncated):
 {custom_instructions_section}
 
 WORKFLOW:
-1. Read the diff carefully and identify potential issues.
-2. If a potential finding depends on code in another file (e.g. an imported function, a header, a caller, a config file), use get_file to fetch that file and verify your hypothesis BEFORE reporting it.
-3. If you're unsure which file to look at, use list_directory to explore the repo structure.
-4. Use search_code to find all callers of a function, all references to a variable, or to locate where something is defined across the codebase.
-5. Once you have enough context, call submit_review with your findings.
+1. Read the diff and identify only the highest-risk hypotheses.
+2. For each hypothesis, actively try to disprove it before reporting it.
+3. Use get_file for related files at the PR head, get_base_file for the full pre-change file, list_directory to explore, search_code to find definitions/usages, and find_tests_for_path to locate likely regression coverage.
+4. Only keep a finding if the fetched context still supports it.
+5. Prefer 0-3 findings total unless there are clearly multiple independent defects.
+6. Once you have enough context, call submit_review with the surviving findings.
 
 CRITICAL rules:
 - New hunks are annotated with line numbers (e.g. "120: code"). Use these for the "line" field.
 - Only report findings with direct evidence. If you fetched a file and it disproves your hypothesis, DROP the finding.
 - Do NOT report speculative issues. If you cannot verify a finding with the available tools, do not report it.
 - Do NOT provide general feedback, summaries, or praise.
+- Each finding must include: title, trigger, impact, severity, confidence, and a concise body with the evidence.
 - Prefer precision over recall: it is far better to miss a real bug than to report a false positive.
 - YAML workflow files embed scripts in run: | blocks — YAML strips the base indentation at runtime. Do NOT report indentation errors in these blocks.
-- For code suggestions, use GitHub's suggestion format in the body:
-  ```suggestion
-  corrected code here
-  ```
+- Use a suggestion only when the exact correction is obvious. Put only the replacement code in `suggestion`.
 - When you are done, call submit_review. If there are no issues, set lgtm to true and reviews to [].
 """
 
@@ -1455,10 +1688,19 @@ CRITICAL rules:
             github_client=self._github_client,
             repo_name=pr.repo,
             head_sha=pr.head_sha,
+            base_sha=diff_scope.base_sha,
+            project=config.project,
             github_retries=config.github_retries,
         )
 
-        tools = [_GET_FILE_TOOL, _LIST_FILES_TOOL, _SEARCH_CODE_TOOL, _SUBMIT_REVIEW_TOOL]
+        tools = [
+            _GET_FILE_TOOL,
+            _GET_BASE_FILE_TOOL,
+            _LIST_FILES_TOOL,
+            _SEARCH_CODE_TOOL,
+            _FIND_TESTS_TOOL,
+            _SUBMIT_REVIEW_TOOL,
+        ]
 
         try:
             response = self._bedrock.converse_with_tools(
@@ -1494,20 +1736,90 @@ CRITICAL rules:
             raw_findings = payload
 
         logger.info("Agentic review returned %d raw finding(s).", len(raw_findings))
+        drafts = self._normalize_raw_findings(raw_findings, diff_scope, config)
+        verified = self._verify_candidates(
+            pr,
+            diff_scope,
+            drafts,
+            config,
+            extra_context=tool_handler.render_context(),
+        )
+        return self._drafts_to_findings(verified)
 
-        # Apply the same filtering as _review_single_scope
-        return self._filter_raw_findings(raw_findings, diff_scope, config)
+    def _invoke_json_response(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        schema: dict,
+        tool_name: str,
+        tool_description: str,
+        model_id: str,
+        max_output_tokens: int,
+        temperature: float,
+    ) -> Any:
+        """Invoke a model and parse a structured JSON response."""
+        has_schema = (
+            callable(getattr(self._bedrock, "invoke_with_schema", None))
+            and type(self._bedrock).__name__ != "MagicMock"
+        )
+        if has_schema:
+            try:
+                response = self._bedrock.invoke_with_schema(
+                    system_prompt,
+                    user_prompt,
+                    tool_name=tool_name,
+                    tool_description=tool_description,
+                    json_schema=schema,
+                    model_id=model_id,
+                    max_output_tokens=max_output_tokens,
+                    temperature=temperature,
+                )
+                return json.loads(response) if isinstance(response, str) else response
+            except Exception as exc:
+                logger.info(
+                    "Structured tool-use failed for %s (%s); falling back to plain invoke.",
+                    tool_name,
+                    exc,
+                )
 
-    def _filter_raw_findings(
+        response = self._bedrock.invoke(
+            system_prompt,
+            user_prompt,
+            model_id=model_id,
+            max_output_tokens=max_output_tokens,
+            temperature=temperature,
+        )
+        if isinstance(response, (dict, list)):
+            return response
+        try:
+            return _extract_json_payload(response)
+        except Exception as exc:
+            raise ValueError("Unparseable review response") from exc
+
+    @staticmethod
+    def _extract_raw_findings(payload: Any) -> list:
+        """Extract raw finding objects from a model payload."""
+        if isinstance(payload, dict):
+            if isinstance(payload.get("reviews"), list):
+                return payload["reviews"]
+            if isinstance(payload.get("findings"), list):
+                return payload["findings"]
+            raise ValueError("Review response did not contain a findings list.")
+        if isinstance(payload, list):
+            return payload
+        raise ValueError("Review response did not contain a findings list.")
+
+    def _normalize_raw_findings(
         self,
         raw_findings: list,
         diff_scope: DiffScope,
         config: ReviewerConfig,
-    ) -> list[ReviewFinding]:
-        """Apply standard post-processing filters to raw LLM findings."""
-        allowed_paths = {f.path for f in diff_scope.files}
-        reviewable_files = {f.path: f for f in diff_scope.files}
-        findings: list[ReviewFinding] = []
+    ) -> list[_FindingDraft]:
+        """Normalize raw model findings into structured drafts."""
+        allowed_paths = {changed_file.path for changed_file in diff_scope.files}
+        reviewable_files = {changed_file.path: changed_file for changed_file in diff_scope.files}
+        drafts: list[_FindingDraft] = []
         seen_keys: set[tuple[str, int | None, str]] = set()
         filtered_speculative = 0
         filtered_lgtm = 0
@@ -1520,51 +1832,267 @@ CRITICAL rules:
             if not path or path not in allowed_paths:
                 filtered_path += 1
                 continue
-            body = str(raw_finding.get("body", "")).strip()
-            if not body:
+
+            title = str(raw_finding.get("title", "")).strip()
+            trigger = str(raw_finding.get("trigger", "")).strip()
+            impact = str(raw_finding.get("impact", "")).strip()
+            raw_body = raw_finding.get("body")
+            if not isinstance(raw_body, str):
+                raw_body = raw_finding.get("evidence", "")
+            body = str(raw_body or "").strip()
+            raw_suggestion = raw_finding.get("suggestion", "")
+            suggestion = str(raw_suggestion or "").rstrip() if isinstance(raw_suggestion, str) else ""
+            if not any([title, trigger, impact, body]):
                 continue
-            lowered = body.lower()
+
+            combined_text = "\n".join(
+                part for part in [title, trigger, impact, body] if part
+            )
+            lowered = combined_text.lower()
             if not config.review_comment_lgtm and (
                 "lgtm" in lowered or "looks good" in lowered or "no issues" in lowered
             ):
                 filtered_lgtm += 1
                 continue
-            line = raw_finding.get("line")
-            if _is_speculative_finding(body):
+            if _is_speculative_finding(combined_text):
                 filtered_speculative += 1
                 continue
+
             changed_file = reviewable_files[path]
-            normalized_body = _normalize_finding_text(body)
-            normalized_line = int(line) if isinstance(line, int) and line > 0 else None
+            raw_line = raw_finding.get("line")
+            normalized_line = int(raw_line) if isinstance(raw_line, int) and raw_line > 0 else None
             if normalized_line is not None and changed_file.patch:
                 added_lines, context_lines = _parse_diff_lines(changed_file.patch)
                 snapped = _snap_line_to_diff(normalized_line, added_lines, context_lines)
                 if snapped != normalized_line:
                     logger.info(
                         "Line %d for %s snapped to %s",
-                        normalized_line, path, snapped,
+                        normalized_line,
+                        path,
+                        snapped,
                     )
                 normalized_line = snapped
+
             if _is_false_indentation_finding(
-                body, path, normalized_line, changed_file.contents,
+                combined_text, path, normalized_line, changed_file.contents,
             ):
                 filtered_speculative += 1
                 continue
-            dedupe_key = (path, normalized_line, normalized_body)
+
+            severity = _normalize_severity(raw_finding.get("severity", "medium"))
+            confidence = _normalize_confidence(raw_finding.get("confidence", "medium"))
+            derived_title = _derive_title(title, body or impact or trigger)
+            supporting_paths = _clean_supporting_paths(
+                raw_finding.get("supporting_paths", []),
+                path,
+            )
+            dedupe_key = (
+                path,
+                normalized_line,
+                _normalize_finding_text(
+                    " ".join(
+                        part for part in [derived_title, trigger, impact, body] if part
+                    )
+                ),
+            )
             if dedupe_key in seen_keys:
                 continue
             seen_keys.add(dedupe_key)
-            findings.append(
-                ReviewFinding(
+
+            drafts.append(
+                _FindingDraft(
                     path=path,
                     line=normalized_line,
-                    body=body,
-                    severity=str(raw_finding.get("severity", "medium")).strip() or "medium",
+                    severity=severity,
+                    confidence=confidence,
+                    title=derived_title,
+                    trigger=trigger,
+                    impact=impact,
+                    details=body,
+                    suggestion=suggestion,
+                    supporting_paths=supporting_paths,
                 )
             )
 
         logger.info(
-            "Agentic filter stats: path=%d, lgtm=%d, speculative=%d, kept=%d",
-            filtered_path, filtered_lgtm, filtered_speculative, len(findings),
+            "Finding normalization stats: path=%d, lgtm=%d, speculative=%d, kept=%d",
+            filtered_path,
+            filtered_lgtm,
+            filtered_speculative,
+            len(drafts),
         )
-        return findings[: config.max_review_comments]
+        return drafts
+
+    def _verify_candidates(
+        self,
+        pr: PullRequestContext,
+        diff_scope: DiffScope,
+        drafts: list[_FindingDraft],
+        config: ReviewerConfig,
+        *,
+        extra_context: str,
+    ) -> list[_FindingDraft]:
+        """Run a skeptic verification pass over candidate findings."""
+        if not drafts:
+            return []
+
+        verification_candidates = [
+            {
+                "index": index,
+                "path": draft.path,
+                "line": draft.line,
+                "severity": draft.severity,
+                "confidence": draft.confidence,
+                "title": draft.title,
+                "trigger": draft.trigger,
+                "impact": draft.impact,
+                "body": draft.details,
+                "supporting_paths": draft.supporting_paths,
+            }
+            for index, draft in enumerate(drafts)
+        ]
+        context_parts = [
+            f"PR title: {pr.title}",
+            "Review scope excerpts:",
+            _serialize_scope(diff_scope, max_chars=120_000),
+        ]
+        if extra_context:
+            context_parts.extend([
+                "",
+                "Additional fetched context:",
+                extra_context[:24_000],
+            ])
+        context_parts.extend([
+            "",
+            "Candidate findings to verify:",
+            json.dumps(verification_candidates, indent=2),
+        ])
+        verifier_prompt = "\n".join(context_parts) + """
+
+Review the candidate findings skeptically.
+
+Rules:
+- Drop a candidate if it is speculative, duplicate, style-only, or not strongly supported by the shown diff/context.
+- Keep a candidate only if the trigger and impact are both concrete.
+- You may downgrade severity or confidence if the evidence is weaker than claimed.
+- Prefer dropping a weak finding over keeping it.
+
+Return JSON only:
+{
+  "results": [
+    {
+      "index": 0,
+      "verdict": "keep|drop",
+      "severity": "high|medium|low",
+      "confidence": "high|medium|low",
+      "reason": "short explanation"
+    }
+  ]
+}
+"""
+        try:
+            payload = self._invoke_json_response(
+                _SYSTEM_PROMPT,
+                verifier_prompt,
+                schema={
+                    "type": "object",
+                    "properties": {
+                        "results": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "index": {"type": "integer"},
+                                    "verdict": {
+                                        "type": "string",
+                                        "enum": ["keep", "drop"],
+                                    },
+                                    "severity": {
+                                        "type": "string",
+                                        "enum": ["high", "medium", "low"],
+                                    },
+                                    "confidence": {
+                                        "type": "string",
+                                        "enum": ["high", "medium", "low"],
+                                    },
+                                    "reason": {"type": "string"},
+                                },
+                                "required": ["index", "verdict", "reason"],
+                            },
+                        },
+                    },
+                    "required": ["results"],
+                },
+                tool_name="verify_review_findings",
+                tool_description="Verify and rank candidate code review findings",
+                model_id=config.models.light_model_id,
+                max_output_tokens=min(4_096, config.max_output_tokens),
+                temperature=0.0,
+            )
+        except Exception as exc:
+            logger.warning("Reviewer verification failed: %s. Keeping generated findings.", exc)
+            return drafts
+
+        if not isinstance(payload, dict) or not isinstance(payload.get("results"), list):
+            logger.warning("Reviewer verification returned an unexpected payload. Keeping generated findings.")
+            return drafts
+
+        result_map: dict[int, dict[str, Any]] = {}
+        for raw_result in payload["results"]:
+            if not isinstance(raw_result, dict):
+                continue
+            index = raw_result.get("index")
+            if isinstance(index, int):
+                result_map[index] = raw_result
+
+        verified: list[_FindingDraft] = []
+        for index, draft in enumerate(drafts):
+            raw_result = result_map.get(index)
+            if raw_result is None:
+                verified.append(draft)
+                continue
+            if str(raw_result.get("verdict", "")).strip().lower() != "keep":
+                continue
+            verified.append(
+                _FindingDraft(
+                    path=draft.path,
+                    line=draft.line,
+                    severity=_normalize_severity(raw_result.get("severity", draft.severity)),
+                    confidence=_normalize_confidence(raw_result.get("confidence", draft.confidence)),
+                    title=draft.title,
+                    trigger=draft.trigger,
+                    impact=draft.impact,
+                    details=draft.details,
+                    suggestion=draft.suggestion,
+                    supporting_paths=draft.supporting_paths,
+                    verification_notes=str(raw_result.get("reason", "")).strip(),
+                )
+            )
+
+        logger.info(
+            "Verification kept %d of %d candidate finding(s).",
+            len(verified),
+            len(drafts),
+        )
+        return verified
+
+    @staticmethod
+    def _drafts_to_findings(drafts: list[_FindingDraft]) -> list[ReviewFinding]:
+        """Convert structured drafts into final published findings."""
+        findings: list[ReviewFinding] = []
+        for draft in drafts:
+            findings.append(
+                ReviewFinding(
+                    path=draft.path,
+                    line=draft.line,
+                    body=_render_review_body(draft),
+                    severity=draft.severity,
+                    title=draft.title,
+                    confidence=draft.confidence,
+                    trigger=draft.trigger,
+                    impact=draft.impact,
+                    supporting_paths=list(draft.supporting_paths),
+                    verification_notes=draft.verification_notes,
+                )
+            )
+        return findings

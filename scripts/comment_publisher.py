@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 SUMMARY_MARKER = "<!-- pr-review-bot:summary -->"
+_SEVERITY_RANK = {"high": 3, "medium": 2, "low": 1}
 
 
 class CommentPublisher:
@@ -172,7 +173,7 @@ class CommentPublisher:
                     f"/repos/{repo}/pulls/{pr_number}/reviews",
                     input={
                         "commit_id": commit,
-                        "body": "",
+                        "body": self._build_review_body(findings),
                         "event": "COMMENT",
                         "comments": review_comments,
                     },
@@ -294,6 +295,21 @@ class CommentPublisher:
         if SUMMARY_MARKER in body:
             return body
         return f"{SUMMARY_MARKER}\n{body}"
+
+    @staticmethod
+    def _build_review_body(findings: list[ReviewFinding]) -> str:
+        """Build the top-level body for a batched review submission."""
+        if not findings:
+            return ""
+        highest = max(
+            findings,
+            key=lambda finding: _SEVERITY_RANK.get(str(finding.severity).lower(), 0),
+        )
+        count = len(findings)
+        return (
+            f"Automated review found {count} issue(s). "
+            f"Highest severity: `{highest.severity}`."
+        )
 
     def _is_bot_authored_comment(self, comment) -> bool:
         """Return True only for comments authored by the authenticated bot."""
