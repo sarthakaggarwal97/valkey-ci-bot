@@ -12,11 +12,27 @@ Requirements: 11.2, 11.4
 
 from __future__ import annotations
 
+from collections import Counter
 import logging
 import os
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
+
+
+def _escape_table_cell(value: object) -> str:
+    """Return markdown-table-safe text."""
+    text = str(value).replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not text:
+        return ""
+    return text.replace("|", "\\|").replace("\n", "<br>")
+
+
+def _short_sha(value: str | None) -> str:
+    """Return a readable abbreviated SHA or ``unknown``."""
+    if not value:
+        return "unknown"
+    return value[:12]
 
 
 @dataclass
@@ -60,7 +76,7 @@ class WorkflowSummary:
     def render(self) -> str:
         """Return the full markdown summary string."""
         lines: list[str] = []
-        lines.append(f"## CI Failure Bot — {self.mode} run\n")
+        lines.append(f"## CI Failure Bot - {self.mode} run\n")
 
         if not self.results:
             lines.append("No failures processed.\n")
@@ -70,15 +86,28 @@ class WorkflowSummary:
         total = len(self.results)
         errors = sum(1 for r in self.results if r.error)
         lines.append(f"**{total}** failure(s) processed, **{errors}** error(s).\n")
+        outcome_counts = Counter(result.outcome for result in self.results)
+        lines.append("**Overview**")
+        lines.append(
+            "- Outcomes: "
+            + ", ".join(
+                f"`{outcome}`: {count}"
+                for outcome, count in sorted(outcome_counts.items())
+            )
+        )
+        if errors:
+            lines.append(f"- Attention required for {errors} item(s) with explicit errors.")
+        lines.append("")
 
         # Markdown table
         lines.append("| Job | Failure | Outcome | Error |")
         lines.append("|-----|---------|---------|-------|")
         for r in self.results:
-            error_cell = r.error or ""
             lines.append(
-                f"| {r.job_name} | {r.failure_identifier} "
-                f"| {r.outcome} | {error_cell} |"
+                f"| {_escape_table_cell(r.job_name)} "
+                f"| {_escape_table_cell(r.failure_identifier)} "
+                f"| {_escape_table_cell(r.outcome)} "
+                f"| {_escape_table_cell(r.error or '')} |"
             )
 
         lines.append("")  # trailing newline
@@ -160,24 +189,27 @@ class PRSummaryComment:
         lines: list[str] = []
         lines.append("## Processing Summary\n")
 
-        # Steps table
-        lines.append("| Step | Duration | Status |")
-        lines.append("|------|----------|--------|")
-        for step in self.steps:
-            duration_str = f"{step.duration_seconds:.1f}s"
-            lines.append(f"| {step.name} | {duration_str} | {step.status} |")
-
-        lines.append("")
-
-        # Retries
-        lines.append(f"**Fix generation retries:** {self.fix_retries}")
-        lines.append(f"**Validation retries:** {self.validation_retries}")
-
-        # Total time
         total = self.total_duration_seconds
         if total <= 0.0 and self.steps:
             total = sum(s.duration_seconds for s in self.steps)
         lines.append(f"**Total time:** {total:.1f}s")
+        lines.append(f"**Fix generation retries:** {self.fix_retries}")
+        lines.append(f"**Validation retries:** {self.validation_retries}")
+        lines.append(f"**Stages recorded:** {len(self.steps)}")
+
+        if self.steps:
+            lines.append("")
+            lines.append("### Stage Breakdown")
+            lines.append("")
+            lines.append("| Step | Duration | Status |")
+            lines.append("|------|----------|--------|")
+            for step in self.steps:
+                duration_str = f"{step.duration_seconds:.1f}s"
+                lines.append(
+                    f"| {_escape_table_cell(step.name)} "
+                    f"| {duration_str} "
+                    f"| {_escape_table_cell(step.status)} |"
+                )
 
         lines.append("")
         return "\n".join(lines)
@@ -216,31 +248,36 @@ class ApprovalSummary:
             return ""
 
         lines = ["## Approval Queue\n"]
+        lines.append(
+            f"Pending manual review for **{len(self.candidates)}** candidate(s).\n"
+        )
         lines.append("| Job | Failure | Confidence | Flaky | Streak | Suspect Range | Run |")
         lines.append("|-----|---------|------------|-------|--------|---------------|-----|")
         for candidate in self.candidates:
             suspect_range = "unknown"
             if candidate.last_known_good_sha or candidate.first_bad_sha:
                 suspect_range = (
-                    f"{(candidate.last_known_good_sha or 'unknown')[:12]} -> "
-                    f"{(candidate.first_bad_sha or 'unknown')[:12]}"
+                    f"{_short_sha(candidate.last_known_good_sha)} -> "
+                    f"{_short_sha(candidate.first_bad_sha)}"
                 )
             lines.append(
                 "| "
-                f"{candidate.job_name} | "
-                f"{candidate.failure_identifier} | "
-                f"{candidate.confidence} | "
+                f"{_escape_table_cell(candidate.job_name)} | "
+                f"{_escape_table_cell(candidate.failure_identifier)} | "
+                f"{_escape_table_cell(candidate.confidence)} | "
                 f"{'yes' if candidate.is_flaky else 'no'} | "
                 f"{candidate.failure_streak} | "
-                f"{suspect_range} | "
+                f"{_escape_table_cell(suspect_range)} | "
                 f"[run]({candidate.workflow_run_url}) |"
             )
 
         for candidate in self.candidates:
             lines.append("")
             lines.append(
-                f"### {candidate.job_name} — {candidate.failure_identifier}"
+                f"### {candidate.job_name} - {candidate.failure_identifier}"
             )
+            lines.append(f"- Run: [workflow run]({candidate.workflow_run_url})")
+            lines.append(f"- Confidence: `{candidate.confidence}`")
             lines.append(
                 f"- Failure observations: {candidate.total_failure_observations}"
             )
@@ -253,7 +290,8 @@ class ApprovalSummary:
                 lines.append(f"- First bad commit: `{candidate.first_bad_sha}`")
             if candidate.files_to_change:
                 lines.append(
-                    f"- Files to change: {', '.join(candidate.files_to_change)}"
+                    "- Files to review: "
+                    + ", ".join(f"`{path}`" for path in candidate.files_to_change)
                 )
             lines.append(f"- Rationale: {candidate.rationale}")
 
@@ -306,11 +344,22 @@ class ReviewWorkflowSummary:
             lines.append("No review stages executed.\n")
             return "\n".join(lines)
 
+        attention_needed = sum(
+            1
+            for result in self.results
+            if result.outcome != "ok" or bool(result.detail)
+        )
+        lines.append(
+            f"**{len(self.results)}** review stage(s) recorded, "
+            f"**{attention_needed}** with detail or follow-up.\n"
+        )
         lines.append("| Stage | Outcome | Detail |")
         lines.append("|-------|---------|--------|")
         for result in self.results:
             lines.append(
-                f"| {result.stage} | {result.outcome} | {result.detail or ''} |"
+                f"| {_escape_table_cell(result.stage)} "
+                f"| {_escape_table_cell(result.outcome)} "
+                f"| {_escape_table_cell(result.detail or '')} |"
             )
         lines.append("")
         return "\n".join(lines)
@@ -369,6 +418,18 @@ class FuzzerWorkflowSummary:
             lines.append("No fuzzer runs analyzed.\n")
             return "\n".join(lines)
 
+        anomalous = sum(1 for row in self.rows if row.overall_status == "anomalous")
+        warning = sum(1 for row in self.rows if row.overall_status == "warning")
+        normal = sum(1 for row in self.rows if row.overall_status == "normal")
+        issue_count = sum(1 for row in self.rows if row.issue_url)
+        lines.append(
+            f"Analyzed **{len(self.rows)}** run(s): "
+            f"**{anomalous}** anomalous, "
+            f"**{warning}** warning, "
+            f"**{normal}** normal.\n"
+        )
+        if issue_count:
+            lines.append(f"Issues updated or created for **{issue_count}** run(s).\n")
         lines.append(
             "| Run | Conclusion | Status | Scenario | Seed | Anomalies | Normal Signals | Issue |"
         )
@@ -383,10 +444,10 @@ class FuzzerWorkflowSummary:
             lines.append(
                 "| "
                 f"[{row.run_id}]({row.run_url}) | "
-                f"{row.conclusion or 'unknown'} | "
-                f"{row.overall_status} | "
-                f"{row.scenario_id or 'unknown'} | "
-                f"{row.seed or 'unknown'} | "
+                f"{_escape_table_cell(row.conclusion or 'unknown')} | "
+                f"{_escape_table_cell(row.overall_status)} | "
+                f"{_escape_table_cell(row.scenario_id or 'unknown')} | "
+                f"{_escape_table_cell(row.seed or 'unknown')} | "
                 f"{row.anomaly_count} | "
                 f"{row.normal_signal_count} | "
                 f"{issue_cell} |"
@@ -394,13 +455,14 @@ class FuzzerWorkflowSummary:
 
         for row in self.rows:
             lines.append("")
-            lines.append(f"### Run {row.run_id}")
-            lines.append(f"- Status: **{row.overall_status}** ({row.conclusion})")
+            lines.append(f"### Run {row.run_id} - {row.overall_status}")
+            lines.append(f"- Conclusion: `{row.conclusion or 'unknown'}`")
+            lines.append(f"- Scenario: `{row.scenario_id or 'unknown'}`")
+            lines.append(f"- Seed: `{row.seed or 'unknown'}`")
             lines.append(f"- Summary: {row.summary}")
             if row.anomaly_details:
-                lines.append("- Anomalies:")
                 for detail in row.anomaly_details:
-                    lines.append(f"  - {detail}")
+                    lines.append(f"- Finding: {detail}")
             if row.reproduction_hint:
                 lines.append(f"- Reproduction: `{row.reproduction_hint}`")
             if row.issue_url:

@@ -8,6 +8,7 @@ from scripts.fuzzer_issue_publisher import (
     FuzzerIssuePublisher,
     _fingerprint_for_analysis,
     _issue_marker,
+    _render_issue_body,
 )
 from scripts.models import FuzzerRunAnalysis, FuzzerSignal
 
@@ -85,3 +86,15 @@ def test_upsert_issue_updates_existing_open_issue() -> None:
     existing.edit.assert_called_once()
     updated_body = existing.edit.call_args.kwargs["body"]
     assert "<!-- valkey-ci-agent:occurrences:3 -->" in updated_body
+
+
+def test_render_issue_body_uses_verdict_and_plain_severity_labels() -> None:
+    body = _render_issue_body(_analysis(), fingerprint="fp123", occurrences=2)
+
+    assert "## Fuzzer Run Summary" in body
+    assert "Action Needed" in body
+    assert "raw job log fallback" in body
+    assert "Critical:" in body
+    assert "Warning:" not in body
+    assert "🔴" not in body
+    assert "🟡" not in body

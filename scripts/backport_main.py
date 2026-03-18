@@ -88,11 +88,12 @@ def build_summary(result: BackportResult) -> str:
     **Validates: Requirements 9.2, 9.4**
     """
     lines = [
-        f"Commits cherry-picked: {result.commits_cherry_picked}",
-        f"Conflicting files: {result.files_conflicted}",
-        f"Files resolved by LLM: {result.files_resolved}",
-        f"Files unresolved: {result.files_unresolved}",
-        f"Total tokens used: {result.total_tokens_used}",
+        f"- Outcome: `{result.outcome}`",
+        f"- Commits cherry-picked: {result.commits_cherry_picked}",
+        f"- Conflicting files: {result.files_conflicted}",
+        f"- Files resolved by LLM: {result.files_resolved}",
+        f"- Files unresolved: {result.files_unresolved}",
+        f"- Total tokens used: {result.total_tokens_used}",
     ]
     return "\n".join(lines)
 
@@ -155,7 +156,7 @@ def run_backport(
         if exc.status == 404:
             msg = f"Target branch `{target_branch}` does not exist."
             logger.warning(msg)
-            _post_comment(repo, source_pr_number, f"⚠️ Backport skipped: {msg}")
+            _post_comment(repo, source_pr_number, f"Backport skipped: {msg}")
             return BackportResult(outcome="branch-missing", error_message=msg)
         raise
 
@@ -169,7 +170,7 @@ def run_backport(
             f"`{target_branch}`: {existing_url}"
         )
         logger.info(msg)
-        _post_comment(repo, source_pr_number, f"ℹ️ Backport skipped: {msg}")
+        _post_comment(repo, source_pr_number, f"Backport skipped: {msg}")
         return BackportResult(outcome="duplicate", backport_pr_url=existing_url)
 
     # ---- Step 3: Rate limit check (Req 8.1) ----
@@ -189,7 +190,7 @@ def run_backport(
     if not rate_limiter.can_create_pr():
         msg = "Daily backport PR rate limit reached. Please try again later."
         logger.warning(msg)
-        _post_comment(repo, source_pr_number, f"⚠️ Backport skipped: {msg}")
+        _post_comment(repo, source_pr_number, f"Backport skipped: {msg}")
         return BackportResult(outcome="rate-limited", error_message=msg)
 
     # ---- Step 4: Fetch source PR metadata ----
@@ -203,7 +204,7 @@ def run_backport(
     except GithubException as exc:
         msg = f"Failed to fetch source PR #{source_pr_number}: {exc}"
         logger.error(msg)
-        _post_comment(repo, source_pr_number, f"❌ Backport failed: {msg}")
+        _post_comment(repo, source_pr_number, f"Backport failed: {msg}")
         return BackportResult(outcome="error", error_message=msg)
 
     commits = [
@@ -263,7 +264,7 @@ def run_backport(
         except Exception as exc:
             msg = f"Cherry-pick failed: {exc}"
             logger.error(msg)
-            _post_comment(repo, source_pr_number, f"❌ Backport failed: {msg}")
+            _post_comment(repo, source_pr_number, f"Backport failed: {msg}")
             return BackportResult(outcome="error", error_message=msg)
 
         # ---- Step 6: Conflict resolution ----
@@ -308,7 +309,7 @@ def run_backport(
     except Exception as exc:
         msg = f"Failed to create backport PR: {exc}"
         logger.error(msg)
-        _post_comment(repo, source_pr_number, f"❌ Backport failed: {msg}")
+        _post_comment(repo, source_pr_number, f"Backport failed: {msg}")
         return BackportResult(outcome="error", error_message=msg)
 
     # ---- Build result ----
@@ -336,8 +337,9 @@ def run_backport(
     # ---- Step 8: Post summary comment on source PR (Req 9.2) ----
     summary_text = build_summary(result)
     comment_body = (
-        f"✅ Backport PR created: {backport_pr_url}\n\n"
-        f"### Summary\n```\n{summary_text}\n```"
+        "## Backport Result\n\n"
+        f"Backport PR created: [view PR]({backport_pr_url})\n\n"
+        f"### Overview\n{summary_text}"
     )
     _post_comment(repo, source_pr_number, comment_body)
 
@@ -348,10 +350,10 @@ def run_backport(
     # ---- Step 10: Emit GitHub Actions job summary (Req 9.4) ----
     job_summary = (
         f"## Backport Result: {result.outcome}\n\n"
-        f"- **Source PR:** #{source_pr_number}\n"
-        f"- **Target branch:** `{target_branch}`\n"
-        f"- **Backport PR:** {backport_pr_url}\n\n"
-        f"```\n{summary_text}\n```"
+        f"- Source PR: #{source_pr_number}\n"
+        f"- Target branch: `{target_branch}`\n"
+        f"- Backport PR: [view PR]({backport_pr_url})\n\n"
+        f"### Overview\n{summary_text}"
     )
     emit_job_summary(job_summary)
 

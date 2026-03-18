@@ -22,6 +22,23 @@ _OCCURRENCES_MARKER_RE = re.compile(
 )
 
 
+def _escape_table_cell(value: object) -> str:
+    """Return markdown-table-safe text."""
+    text = str(value).replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not text:
+        return ""
+    return text.replace("|", "\\|").replace("\n", "<br>")
+
+
+def _issue_verdict(analysis: FuzzerRunAnalysis) -> str:
+    """Return a concise maintainer-facing status line."""
+    if analysis.overall_status == "anomalous":
+        return "This run looks anomalous and likely needs maintainer attention."
+    if analysis.overall_status == "warning":
+        return "This run needs review before it is treated as expected chaos noise."
+    return "This run is being tracked for follow-up."
+
+
 def _stable_titles(signals: list[FuzzerSignal]) -> list[str]:
     specific = sorted({
         signal.title.strip()
@@ -87,21 +104,44 @@ def _render_issue_body(
         _issue_marker(fingerprint),
         f"<!-- valkey-ci-agent:occurrences:{occurrences} -->",
         "",
-        analysis.summary,
+        "## Fuzzer Run Summary",
         "",
-        "| | |",
+        _issue_verdict(analysis),
+        "",
+        "### Metadata",
+        "",
+        "| Field | Value |",
         "|---|---|",
         f"| Run | [{analysis.run_id}]({analysis.run_url}) |",
         f"| Conclusion | `{analysis.conclusion or 'unknown'}` |",
         f"| Status | `{analysis.overall_status}` |",
     ]
     if analysis.root_cause_category:
-        lines.append(f"| Root cause | `{analysis.root_cause_category}` |")
+        lines.append(
+            f"| Root cause | `{_escape_table_cell(analysis.root_cause_category)}` |"
+        )
     lines.extend([
-        f"| Scenario | `{analysis.scenario_id or 'unknown'}` |",
-        f"| Seed | `{analysis.seed or 'unknown'}` |",
+        f"| Scenario | `{_escape_table_cell(analysis.scenario_id or 'unknown')}` |",
+        f"| Seed | `{_escape_table_cell(analysis.seed or 'unknown')}` |",
+        f"| Evidence source | "
+        f"`{'raw job log fallback' if analysis.raw_log_fallback_used else 'artifacts and structured logs'}` |",
         f"| Occurrences | {occurrences} |",
+        "",
+        "### Summary",
+        "",
+        analysis.summary,
+        "",
+        "### Action Needed",
+        "",
     ])
+    if analysis.overall_status == "anomalous":
+        lines.append("- Investigate the findings below as likely bug evidence.")
+    elif analysis.overall_status == "warning":
+        lines.append("- Review whether the warnings persisted past expected chaos recovery.")
+    else:
+        lines.append("- Track repeat occurrences and escalate if the pattern becomes stronger.")
+    if analysis.reproduction_hint:
+        lines.append("- Re-run the scenario below if you need to confirm the failure pattern.")
 
     if analysis.reproduction_hint:
         lines.extend([
@@ -127,11 +167,11 @@ def _render_issue_body(
         critical = [a for a in deduped if a.severity == "critical"]
         warnings = [a for a in deduped if a.severity != "critical"]
 
-        lines.extend(["", "### Anomalies", ""])
+        lines.extend(["", "### Findings", ""])
         for anomaly in critical:
-            lines.append(f"- 🔴 **{anomaly.title}** — {anomaly.evidence}")
+            lines.append(f"- Critical: **{anomaly.title}**. {anomaly.evidence}")
         for anomaly in warnings:
-            lines.append(f"- 🟡 **{anomaly.title}** — {anomaly.evidence}")
+            lines.append(f"- Warning: **{anomaly.title}**. {anomaly.evidence}")
 
     if analysis.normal_signals:
         lines.extend([

@@ -61,6 +61,21 @@ class TestWorkflowSummaryRender:
         assert len(lines) == 1
         assert lines[0].endswith("|")
 
+    def test_escapes_table_cells(self):
+        summary = WorkflowSummary(mode="analyze")
+        summary.add_result(
+            "build|linux",
+            "TestFoo\nBar",
+            "analysis-failed",
+            error="bad|error\nline2",
+        )
+
+        md = summary.render()
+
+        assert "build\\|linux" in md
+        assert "TestFoo<br>Bar" in md
+        assert "bad\\|error<br>line2" in md
+
 
 class TestWorkflowSummaryWrite:
     """Tests for writing to GITHUB_STEP_SUMMARY."""
@@ -119,6 +134,7 @@ class TestPRSummaryCommentRender:
         comment = PRSummaryComment()
         md = comment.render()
         assert "Processing Summary" in md
+        assert "Stages recorded:** 0" in md
         assert "Fix generation retries:** 0" in md
         assert "Validation retries:** 0" in md
 
@@ -205,6 +221,7 @@ class TestApprovalSummary:
         md = summary.render()
 
         assert "Approval Queue" in md
+        assert "Pending manual review" in md
         assert "test-ubuntu-jemalloc" in md
         assert "TestSuite.TestCase" in md
         assert "abcdef123456" in md
@@ -242,6 +259,7 @@ class TestFuzzerWorkflowSummary:
 
         assert "Run 123" in md
         assert "anomalous" in md
+        assert "Analyzed **1** run(s)" in md
         assert "839534793" in md
         assert "Slot coverage failed after chaos." in md
         assert "issues/7" in md

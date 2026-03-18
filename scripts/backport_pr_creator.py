@@ -21,6 +21,14 @@ from scripts.github_client import retry_github_call
 logger = logging.getLogger(__name__)
 
 
+def _escape_table_cell(value: object) -> str:
+    """Return markdown-table-safe text."""
+    text = str(value).replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not text:
+        return ""
+    return text.replace("|", "\\|").replace("\n", "<br>")
+
+
 class BackportPRCreator:
     """Create backport branches and pull requests via the GitHub API."""
 
@@ -118,56 +126,78 @@ class BackportPRCreator:
         **Validates: Requirements 4.4, 5.3**
         """
         sections: list[str] = []
+        results = resolution_results or []
+        resolved_count = sum(result.resolved_content is not None for result in results)
+        unresolved_count = len(results) - resolved_count
 
-        # Source PR link.
-        sections.append(
-            f"## Source Pull Request\n\n"
-            f"Backport of {context.source_pr_url} (#{context.source_pr_number})"
-        )
-
-        # Cherry-picked commits.
-        commits_list = "\n".join(
-            f"- `{sha}`" for sha in context.commits
-        )
-        sections.append(
-            f"## Cherry-Picked Commits\n\n{commits_list}"
-        )
-
-        # Conflict status.
         if had_conflicts:
-            sections.append(
-                "## Conflict Status\n\n"
-                "⚠️ Cherry-pick produced merge conflicts."
-            )
+            if unresolved_count > 0:
+                verdict = (
+                    "Cherry-pick encountered conflicts and some files still need "
+                    "manual follow-up."
+                )
+            elif resolved_count > 0:
+                verdict = (
+                    "Cherry-pick encountered conflicts and the conflicted files were "
+                    "resolved automatically."
+                )
+            else:
+                verdict = "Cherry-pick encountered conflicts."
         else:
-            sections.append(
-                "## Conflict Status\n\n"
-                "✅ Cherry-pick applied cleanly — no conflicts."
+            verdict = "Cherry-pick applied cleanly with no conflicts."
+
+        sections.append("## Backport Summary\n\n" + verdict)
+        sections.append(
+            "\n".join([
+                "| Field | Value |",
+                "|---|---|",
+                f"| Source PR | [#{context.source_pr_number}]({context.source_pr_url}) |",
+                f"| Source title | {_escape_table_cell(context.source_pr_title)} |",
+                f"| Target branch | `{context.target_branch}` |",
+                f"| Cherry-picked commits | {len(context.commits)} |",
+                f"| Conflicts detected | {'yes' if had_conflicts else 'no'} |",
+                f"| Auto-resolved files | {resolved_count} |",
+                f"| Unresolved files | {unresolved_count} |",
+            ])
+        )
+        checklist = [
+            "- Compare this backport against the source PR before merge.",
+        ]
+        if resolved_count > 0:
+            checklist.append(
+                "- Review the automatically resolved files carefully for semantic drift."
             )
+        if unresolved_count > 0:
+            checklist.append(
+                "- Resolve the remaining conflicted files or close the PR if the backport is not viable."
+            )
+        sections.append("### Reviewer Checklist\n\n" + "\n".join(checklist))
+
+        commits_list = "\n".join(f"- `{sha}`" for sha in context.commits)
+        sections.append(f"### Cherry-Picked Commits\n\n{commits_list}")
 
         # Per-file resolution summaries.
-        if resolution_results:
+        if results:
             file_lines: list[str] = []
-            for result in resolution_results:
+            for result in results:
                 status = (
-                    "✅ Resolved" if result.resolved_content is not None
-                    else "❌ Unresolved"
+                    "Resolved automatically" if result.resolved_content is not None
+                    else "Needs manual resolution"
                 )
                 file_lines.append(
-                    f"- **`{result.path}`**: {status} — {result.resolution_summary}"
+                    f"- `{result.path}`: {status}. {result.resolution_summary}"
                 )
             sections.append(
-                "## Conflict Resolution Details\n\n" + "\n".join(file_lines)
+                "### Conflict Details\n\n" + "\n".join(file_lines)
             )
 
         # Human review disclaimer (when any file was LLM-resolved).
         any_llm_resolved = bool(
-            resolution_results
-            and any(r.resolved_content is not None for r in resolution_results)
+            results and any(r.resolved_content is not None for r in results)
         )
         if any_llm_resolved:
             sections.append(
-                "## ⚠️ LLM-Resolved Conflicts — Human Review Required\n\n"
+                "### Human Review Required\n\n"
                 "Some conflicts in this backport were resolved using an LLM. "
                 "These resolutions require careful human review to ensure "
                 "correctness. Please verify that the resolved code matches "

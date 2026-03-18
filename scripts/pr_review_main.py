@@ -89,7 +89,10 @@ def _select_review_files(
 
 def _render_summary_comment(summary: SummaryResult) -> str:
     """Render the summary comment body posted to the pull request."""
-    sections = ["## PR Summary", "", summary.walkthrough]
+    sections = ["## PR Summary"]
+    if summary.short_summary:
+        sections.extend(["", summary.short_summary])
+    sections.extend(["", "### Walkthrough", "", summary.walkthrough])
     if summary.file_groups_markdown:
         sections.extend(["", "### File Groups", "", summary.file_groups_markdown])
     if summary.release_notes:

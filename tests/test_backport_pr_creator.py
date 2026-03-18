@@ -167,6 +167,40 @@ class TestPRBodyCompletenessProperty:
         assert "human review" not in body.lower()
 
 
+def test_build_pr_body_includes_checklist_and_plain_status_labels() -> None:
+    context = BackportPRContext(
+        source_pr_number=123,
+        source_pr_title="Fix failover edge case",
+        source_pr_body="Body",
+        source_pr_url="https://github.com/owner/repo/pull/123",
+        source_pr_diff="diff",
+        target_branch="8.1",
+        commits=["abc1234"],
+        repo_full_name="owner/repo",
+    )
+    results = [
+        ResolutionResult(
+            path="src/server.c",
+            resolved_content="resolved",
+            resolution_summary="Applied the null check from the source branch.",
+            tokens_used=12,
+            attempts=1,
+        )
+    ]
+
+    body = BackportPRCreator.build_pr_body(
+        context,
+        had_conflicts=True,
+        resolution_results=results,
+    )
+
+    assert "Reviewer Checklist" in body
+    assert "Human Review Required" in body
+    assert "Resolved automatically" in body
+    assert "✅" not in body
+    assert "❌" not in body
+
+
 # ---------------------------------------------------------------------------
 # Feature: backport-agent, Property 13: Duplicate detection uses branch naming convention
 # ---------------------------------------------------------------------------

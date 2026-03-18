@@ -16,6 +16,7 @@ from scripts.models import (
 from scripts.pr_review_main import (
     _filtered_context,
     _load_runtime_reviewer_config,
+    _render_summary_comment,
     _select_chat_paths,
     _select_review_files,
     run,
@@ -120,6 +121,21 @@ def test_select_chat_paths_prefers_explicit_file_mentions() -> None:
     )
 
     assert selected == {"tests/failover_timeout.tcl"}
+
+
+def test_render_summary_comment_uses_short_summary_when_present() -> None:
+    rendered = _render_summary_comment(
+        SummaryResult(
+            walkthrough="Longer walkthrough",
+            file_groups_markdown="- Core",
+            release_notes="Release note",
+            short_summary="Short summary first.",
+        )
+    )
+
+    assert "Short summary first." in rendered
+    assert "### Walkthrough" in rendered
+    assert "Longer walkthrough" in rendered
 
 
 def test_select_chat_paths_falls_back_to_first_five_when_no_file_is_mentioned() -> None:
