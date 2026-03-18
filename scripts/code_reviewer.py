@@ -818,11 +818,14 @@ class ReviewToolHandler:
             # Build the GitHub code search query
             search_q = f"{query} repo:{self._repo_name}"
             if path_filter:
-                # path_filter can be an extension like ".c" or a path like "src/"
-                if path_filter.startswith("."):
-                    search_q += f" language:{path_filter.lstrip('.')}"
+                # Distinguish bare extensions like ".c" from paths like "src/"
+                # or "tests/instances.tcl".  A bare extension has no "/" and
+                # matches r"^\.\w+$".
+                stripped = path_filter.strip()
+                if re.match(r"^\.\w+$", stripped):
+                    search_q += f" language:{stripped.lstrip('.')}"
                 else:
-                    search_q += f" path:{path_filter}"
+                    search_q += f" path:{stripped}"
 
             results = retry_github_call(
                 lambda: self._gh.search_code(search_q),
@@ -1389,7 +1392,7 @@ CRITICAL rules:
                 tools=tools,
                 tool_handler=tool_handler,
                 terminal_tool="submit_review",
-                max_turns=6,
+                max_turns=10,
                 model_id=config.models.heavy_model_id,
                 max_output_tokens=config.max_output_tokens,
                 temperature=config.models.temperature,
