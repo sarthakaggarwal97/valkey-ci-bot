@@ -653,8 +653,69 @@ class BedrockClient:
             messages.append({"role": "user", "content": tool_results})
 
         logger.warning(
-            "Tool-use loop exhausted %d turns without terminal tool.", max_turns,
+            "Tool-use loop exhausted %d turns without terminal tool. "
+            "Forcing final submission.", max_turns,
         )
+
+        # Force the model to submit by sending a user message asking it
+        # to call submit_review NOW, with only the terminal tool available.
+        tool_results_for_pending = []
+        for block in tool_use_blocks:
+            tool_use = block["toolUse"]
+            tool_results_for_pending.append({
+                "toolResult": {
+                    "toolUseId": tool_use["toolUseId"],
+                    "content": [{"text": (
+                        "Turn limit reached. You MUST call submit_review now "
+                        "with whatever findings you have so far."
+                    )}],
+                }
+            })
+        messages.append({"role": "user", "content": tool_results_for_pending})
+
+        # Only offer the terminal tool so the model is forced to use it
+        forced_kwargs = {**converse_kwargs}
+        forced_kwargs["messages"] = messages
+        forced_kwargs["toolConfig"] = {
+            "tools": [
+                t for t in tools
+                if t.get("toolSpec", {}).get("name") == terminal_tool
+            ],
+        }
+
+        try:
+            estimated = _estimate_tokens(full_system_prompt) + sum(
+                _estimate_tokens(str(m)) for m in messages
+            ) + output_tokens
+            if self._rate_limiter is not None:
+                if not self._rate_limiter.can_use_tokens(estimated):
+                    raise BedrockError(
+                        "daily token budget exhausted during forced submission",
+                        error_code="TokenBudgetExceeded",
+                        retryable=False,
+                    )
+                self._rate_limiter.record_token_usage(estimated)
+
+            response = self._client.converse(**forced_kwargs)
+            self._adjust_token_usage(response, estimated)
+            assistant_content = response["output"]["message"]["content"]
+
+            for block in assistant_content:
+                if "toolUse" in block and block["toolUse"]["name"] == terminal_tool:
+                    logger.info(
+                        "Terminal tool %s called on forced turn.", terminal_tool,
+                    )
+                    return _json.dumps(block["toolUse"].get("input", {}))
+
+            # If still no terminal tool, extract any text
+            text_parts = [
+                block["text"] for block in assistant_content if "text" in block
+            ]
+            if text_parts:
+                return "".join(text_parts)
+        except Exception as exc:
+            logger.warning("Forced submission failed: %s", exc)
+
         raise BedrockError(
             f"Tool-use loop did not complete within {max_turns} turns.",
             error_code="ToolUseLoopExhausted",
