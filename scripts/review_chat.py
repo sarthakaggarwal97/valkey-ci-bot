@@ -164,6 +164,7 @@ Relevant file context:
 
         import json as _json
         try:
+            assert isinstance(self._bedrock, BedrockClient)
             response = self._bedrock.converse_with_tools(
                 _SYSTEM_PROMPT,
                 agentic_prompt,
