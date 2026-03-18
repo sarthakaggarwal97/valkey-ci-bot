@@ -194,6 +194,8 @@ class FixGenerator:
         root_cause: RootCauseReport,
         source_files: dict[str, str],
         validation_error: str | None = None,
+        *,
+        repo_ref: str | None = None,
     ) -> str | None:
         """Generate a unified diff patch for the given root cause.
 
@@ -203,6 +205,8 @@ class FixGenerator:
                 relevant source files.
             validation_error: Optional validation failure output from a
                 previous attempt, included as additional context.
+            repo_ref: Optional Git ref or commit SHA used when the
+                agentic path fetches additional repository files.
 
         Returns:
             The unified diff string, or None if generation fails or
@@ -226,7 +230,10 @@ class FixGenerator:
 
         # Try agentic generation first
         agentic_diff = self._generate_agentic(
-            root_cause, source_files, validation_error=validation_error,
+            root_cause,
+            source_files,
+            validation_error=validation_error,
+            repo_ref=repo_ref,
         )
         if agentic_diff is not None:
             self.last_attempt_count = 1
@@ -331,6 +338,8 @@ class FixGenerator:
         root_cause: RootCauseReport,
         source_files: dict[str, str],
         validation_error: str | None = None,
+        *,
+        repo_ref: str | None = None,
     ) -> str | None:
         """Try to generate a fix using the agentic tool-use loop.
 
@@ -393,7 +402,7 @@ class FixGenerator:
         tool_handler = ReviewToolHandler(
             github_client=self._github_client,
             repo_name=self._repo_full_name,
-            head_sha="HEAD",
+            head_sha=repo_ref or "HEAD",
             max_fetches=8,
         )
 
@@ -435,6 +444,15 @@ class FixGenerator:
         if len(modified_files) > effective_limit:
             logger.warning("Agentic patch modifies too many files (%d).", len(modified_files))
             return None
+
+        if root_cause.files_to_change:
+            unexpected_files = modified_files.difference(root_cause.files_to_change)
+            if unexpected_files:
+                logger.warning(
+                    "Agentic patch modified files outside the allowed scope: %s",
+                    ", ".join(sorted(unexpected_files)),
+                )
+                return None
 
         success, error_output = _validate_patch_applies(diff, source_files)
         if success:

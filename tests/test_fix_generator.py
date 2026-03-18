@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -299,6 +300,59 @@ class TestPatchValidation:
         user_prompt = mock_bedrock.invoke.call_args[0][1]
         assert "Retrieved Valkey Context" in user_prompt
         assert "replication subsystem notes" in user_prompt
+
+
+# ---------------------------------------------------------------------------
+# FixGenerator.generate — agentic path safety
+# ---------------------------------------------------------------------------
+
+class TestAgenticGeneration:
+    def test_agentic_generation_uses_explicit_repo_ref(self):
+        mock_bedrock = MagicMock()
+        mock_bedrock.converse_with_tools.return_value = json.dumps({
+            "diff": _SAMPLE_DIFF,
+        })
+        gen = FixGenerator(
+            mock_bedrock,
+            BotConfig(),
+            github_client=MagicMock(),
+            repo_full_name="owner/repo",
+        )
+        rc = _make_root_cause()
+
+        with patch("scripts.code_reviewer.ReviewToolHandler") as handler_cls:
+            with patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
+                result = gen.generate(
+                    rc,
+                    {"src/server.c": "void handle_request(Request *req) {}"},
+                    repo_ref="abc123",
+                )
+
+        assert result is not None
+        assert _count_patch_files(result) == {"src/server.c"}
+        assert handler_cls.call_args.kwargs["head_sha"] == "abc123"
+
+    def test_agentic_generation_rejects_patch_outside_allowed_files(self):
+        mock_bedrock = MagicMock()
+        mock_bedrock.converse_with_tools.return_value = json.dumps({
+            "diff": _SAMPLE_DIFF_MULTI,
+        })
+        gen = FixGenerator(
+            mock_bedrock,
+            BotConfig(),
+            github_client=MagicMock(),
+            repo_full_name="owner/repo",
+        )
+        rc = _make_root_cause(files_to_change=["src/server.c"])
+
+        with patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
+            result = gen._generate_agentic(
+                rc,
+                {"src/server.c": "void handle_request(Request *req) {}"},
+                repo_ref="abc123",
+            )
+
+        assert result is None
 
 
 # ---------------------------------------------------------------------------

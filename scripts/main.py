@@ -445,7 +445,11 @@ def _analyze_and_fix(
     # Generate fix
     generation_start = time.perf_counter()
     try:
-        diff = fix_generator.generate(root_cause, source_files)
+        diff = fix_generator.generate(
+            root_cause,
+            source_files,
+            repo_ref=report.commit_sha,
+        )
     except Exception as exc:
         logger.error("Fix generation failed for job %s: %s", report.job_name, exc)
         return root_cause, None
@@ -532,6 +536,7 @@ def _validate_fix(
                 new_diff = fix_generator.generate(
                     root_cause, source_files,
                     validation_error=result.output,
+                    repo_ref=report.commit_sha,
                 )
             except Exception as exc:
                 logger.error("Fix regeneration failed for job %s: %s", report.job_name, exc)

@@ -251,6 +251,7 @@ class TestAnalyzeAndFix:
                 "src/foo.c": "int foo(void);",
                 "include/foo.h": "#define FOO 1",
             },
+            repo_ref=report.commit_sha,
         )
 
     def test_source_file_retrieval_failure_still_generates(self):
@@ -358,6 +359,7 @@ class TestValidateAndCreatePR:
         deps["fix_generator"].generate.assert_called_once()
         call_kwargs = deps["fix_generator"].generate.call_args
         assert call_kwargs[1].get("validation_error") == "test failed"
+        assert call_kwargs[1].get("repo_ref") == report.commit_sha
         deps["pr_manager"].create_pr.assert_called_once()
 
     def test_validation_fails_exhausts_retries_abandons(self):
