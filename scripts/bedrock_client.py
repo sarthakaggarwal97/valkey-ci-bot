@@ -160,6 +160,14 @@ def _estimate_tokens(text: str) -> int:
     return max(1, (len(text) + 3) // 4)
 
 
+def _summarize_tool_result(text: str, *, max_chars: int = 180) -> str:
+    """Render a compact one-line summary of a tool result for logs."""
+    collapsed = " ".join((text or "").split())
+    if len(collapsed) <= max_chars:
+        return collapsed
+    return collapsed[: max_chars - 3] + "..."
+
+
 class BedrockClient:
     """Wrapper around the Amazon Bedrock Converse API.
 
@@ -664,6 +672,12 @@ class BedrockClient:
                     except Exception as exc:
                         result_text = f"Error: {exc}"
                         logger.warning("Tool %s failed: %s", name, exc)
+                    logger.info(
+                        "Tool result turn %d: %s -> %s",
+                        turn + 1,
+                        name,
+                        _summarize_tool_result(result_text),
+                    )
                     tool_results.append({
                         "toolResult": {
                             "toolUseId": tool_use_id,

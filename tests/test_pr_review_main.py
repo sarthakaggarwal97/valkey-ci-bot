@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from scripts.code_reviewer import ReviewCoverage
 from scripts.config import RetrievalConfig, ReviewerConfig
 from scripts.models import (
     ChangedFile,
@@ -346,6 +347,85 @@ def test_run_manual_review_mode_uses_bot_repo_state(
     assert rate_kwargs["state_repo_full_name"] == "sarthakaggarwal97/valkey-ci-agent"
     publisher.upsert_summary.assert_called_once()
     publisher.approve_pr.assert_called_once()
+
+
+@patch("scripts.pr_review_main.boto3.client")
+@patch("scripts.pr_review_main.Github")
+@patch("scripts.pr_review_main.RateLimiter")
+@patch("scripts.pr_review_main.ReviewStateStore")
+@patch("scripts.pr_review_main.CommentPublisher")
+@patch("scripts.pr_review_main.PRContextFetcher")
+def test_run_review_mode_withholds_approval_when_coverage_is_incomplete(
+    mock_fetcher_cls,
+    mock_publisher_cls,
+    mock_state_store_cls,
+    mock_rate_limiter_cls,
+    mock_github_cls,
+    _mock_boto_client,
+    tmp_path,
+) -> None:
+    payload = {
+        "repository": {"full_name": "owner/repo"},
+        "sender": {"login": "alice"},
+        "pull_request": {"number": 11, "body": "Details"},
+    }
+    event_path = _event_file(tmp_path, payload)
+
+    fetcher = mock_fetcher_cls.return_value
+    fetcher.fetch.return_value = _context()
+    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
+    fetcher.build_diff_scope.return_value = MagicMock(files=_context().files)
+
+    publisher = mock_publisher_cls.return_value
+    publisher.upsert_summary.return_value = 99
+    publisher.publish_review_note.return_value = 1234
+
+    mock_state_store_cls.return_value.load.return_value = None
+    mock_rate_limiter_cls.return_value.load.return_value = None
+    mock_rate_limiter_cls.return_value.save.return_value = None
+    mock_github_cls.return_value = MagicMock()
+
+    with patch(
+        "scripts.pr_review_main._load_runtime_reviewer_config",
+        return_value=ReviewerConfig(),
+    ), patch(
+        "scripts.pr_review_main.PRSummarizer"
+    ) as mock_summarizer_cls, patch(
+        "scripts.pr_review_main.CodeReviewer"
+    ) as mock_reviewer_cls:
+        mock_summarizer_cls.return_value.summarize.return_value = SummaryResult(
+            walkthrough="Summary",
+            file_groups_markdown="- Core",
+            release_notes="Release note",
+        )
+        mock_reviewer = mock_reviewer_cls.return_value
+        mock_reviewer.classify_simple_change.return_value = False
+        mock_reviewer.review.return_value = []
+        mock_reviewer.get_last_review_coverage.return_value = ReviewCoverage(
+            requested_lgtm=True,
+            checked_files=[],
+            skipped_files=[],
+            unaccounted_files=["src/failover.c"],
+        )
+
+        exit_code = run(
+            [
+                "--repo",
+                "owner/repo",
+                "--mode",
+                "review",
+                "--token",
+                "token",
+                "--event-name",
+                "pull_request_target",
+                "--event-path",
+                str(event_path),
+            ]
+        )
+
+    assert exit_code == 0
+    publisher.approve_pr.assert_not_called()
+    publisher.publish_review_note.assert_called_once()
 
 
 @patch("scripts.pr_review_main.boto3.client")

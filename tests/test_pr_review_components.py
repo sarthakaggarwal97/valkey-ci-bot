@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from scripts.code_reviewer import CodeReviewer, ReviewToolHandler
+from scripts.code_reviewer import CodeReviewer, ReviewCoverage, ReviewToolHandler
 from scripts.config import ProjectContext, RetrievalConfig, ReviewerConfig
 from scripts.models import (
     ChangedFile,
@@ -325,6 +325,49 @@ def test_review_tool_handler_find_tests_for_path_uses_project_patterns() -> None
     result = handler.execute("find_tests_for_path", {"path": "src/failover_timeout.c"})
 
     assert "tests/unit/failover_timeout.tcl" in result
+
+
+def test_review_tool_handler_tracks_checked_paths_and_fetch_limit() -> None:
+    gh = MagicMock()
+    repo = MagicMock()
+    gh.get_repo.return_value = repo
+    repo.get_contents.return_value = MagicMock(
+        decoded_content=b"int failover(void) { return 0; }\n",
+    )
+
+    handler = ReviewToolHandler(
+        gh,
+        "owner/repo",
+        "head456",
+        max_fetches=1,
+    )
+    first = handler.execute("get_file", {"path": "src/failover.c"})
+    second = handler.execute("get_file", {"path": "src/other.c"})
+
+    assert "return 0" in first
+    assert "Fetch limit reached (1)" in second
+    assert handler.checked_paths() == ["src/failover.c"]
+    assert handler.fetch_limit_hit is True
+
+
+def test_review_coverage_note_lists_gaps() -> None:
+    coverage = ReviewCoverage(
+        requested_lgtm=False,
+        checked_files=["src/failover.c"],
+        skipped_files=[("src/failover.h", "covered via implementation search")],
+        claimed_without_tool=["src/socket.c"],
+        unaccounted_files=["tests/failover_timeout.tcl"],
+        fetch_limit_hit=True,
+    )
+
+    note = coverage.render_review_note()
+
+    assert "withheld LGTM" in note
+    assert "`src/failover.c`" in note
+    assert "`src/failover.h`: covered via implementation search" in note
+    assert "`src/socket.c`" in note
+    assert "`tests/failover_timeout.tcl`" in note
+    assert "fetch budget" in note
 
 
 def test_code_reviewer_raises_on_unparseable_response() -> None:

@@ -109,3 +109,27 @@ def test_publish_review_comments_includes_review_summary_body() -> None:
     payload = pr.base.repo._requester.requestJsonAndCheck.call_args.kwargs["input"]
     assert "Automated review found 1 issue" in payload["body"]
     assert payload["comments"][0]["body"] == findings[0].body
+
+
+def test_publish_review_note_posts_comment_review() -> None:
+    pr = MagicMock()
+    pr.base.repo._requester.requestJsonAndCheck.return_value = ({}, {"id": 17})
+
+    repo = MagicMock()
+    repo.get_pull.return_value = pr
+
+    gh = MagicMock()
+    gh.get_repo.return_value = repo
+
+    review_id = CommentPublisher(gh).publish_review_note(
+        "owner/repo",
+        1,
+        "coverage note",
+        commit_sha="head456",
+    )
+
+    assert review_id == 17
+    payload = pr.base.repo._requester.requestJsonAndCheck.call_args.kwargs["input"]
+    assert payload["body"] == "coverage note"
+    assert payload["event"] == "COMMENT"
+    assert payload["commit_id"] == "head456"

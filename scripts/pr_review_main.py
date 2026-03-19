@@ -20,7 +20,7 @@ from github import Auth, Github
 
 from scripts.bedrock_client import BedrockClient, PromptClient
 from scripts.bedrock_retriever import BedrockRetriever
-from scripts.code_reviewer import CodeReviewer
+from scripts.code_reviewer import CodeReviewer, ReviewCoverage
 from scripts.comment_publisher import CommentPublisher
 from scripts.config import ReviewerConfig, load_reviewer_config, load_reviewer_config_text
 from scripts.models import PullRequestContext, ReviewState, SummaryResult
@@ -400,6 +400,12 @@ def run(argv: list[str] | None = None) -> int:
                             review_context, triaged_scope, config,
                             short_summary=short_summary,
                         )
+                        coverage_report: ReviewCoverage | None = None
+                        get_coverage = getattr(reviewer, "get_last_review_coverage", None)
+                        if callable(get_coverage):
+                            candidate = get_coverage()
+                            if isinstance(candidate, ReviewCoverage):
+                                coverage_report = candidate
                         if findings:
                             published_ids = publisher.publish_review_comments(
                                 repo_name,
@@ -418,17 +424,32 @@ def run(argv: list[str] | None = None) -> int:
                                 f"{len(published_ids)} comment(s), {len(diff_scope.files) - len(triaged_files)} file(s) auto-approved",
                             )
                         else:
-                            publisher.approve_pr(
-                                repo_name,
-                                pr_context.number,
-                                body="LGTM",
-                                commit_sha=pr_context.head_sha,
-                            )
-                            summary.add_result(
-                                "review",
-                                "performed",
-                                "approved (no issues found)",
-                            )
+                            if coverage_report is not None and not coverage_report.approvable:
+                                review_id = publisher.publish_review_note(
+                                    repo_name,
+                                    pr_context.number,
+                                    coverage_report.render_review_note(),
+                                    commit_sha=pr_context.head_sha,
+                                )
+                                if review_id and review_id not in review_comment_ids:
+                                    review_comment_ids.append(review_id)
+                                summary.add_result(
+                                    "review",
+                                    "performed",
+                                    "approval withheld (incomplete review coverage)",
+                                )
+                            else:
+                                publisher.approve_pr(
+                                    repo_name,
+                                    pr_context.number,
+                                    body="LGTM",
+                                    commit_sha=pr_context.head_sha,
+                                )
+                                summary.add_result(
+                                    "review",
+                                    "performed",
+                                    "approved (no issues found)",
+                                )
             except Exception as exc:
                 had_failure = True
                 logger.warning("PR review failed for %s#%d: %s", repo_name, pr_context.number, exc)

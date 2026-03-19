@@ -202,6 +202,58 @@ class CommentPublisher:
                 pr, commit, findings,
             )
 
+    def publish_review_note(
+        self,
+        repo: str,
+        pr_number: int,
+        body: str,
+        *,
+        commit_sha: str | None = None,
+    ) -> int | None:
+        """Publish a top-level COMMENT review without inline findings."""
+        pr = retry_github_call(
+            lambda: self._gh.get_repo(repo).get_pull(pr_number),
+            retries=self._github_retries,
+            description=f"load PR {repo}#{pr_number}",
+        )
+        commit = commit_sha or pr.head.sha
+        repo_obj = pr.base.repo
+
+        def _create_review_note() -> dict:
+            _headers, data = repo_obj._requester.requestJsonAndCheck(
+                "POST",
+                f"/repos/{repo}/pulls/{pr_number}/reviews",
+                input={
+                    "commit_id": commit,
+                    "body": body,
+                    "event": "COMMENT",
+                },
+            )
+            return data  # type: ignore[return-value]
+
+        try:
+            data = retry_github_call(
+                _create_review_note,
+                retries=self._github_retries,
+                description=f"create comment review for {repo}#{pr_number}",
+            )
+            review_id = data.get("id") if isinstance(data, dict) else None
+            logger.info(
+                "Posted comment review on %s#%d (review_id=%s).",
+                repo,
+                pr_number,
+                review_id,
+            )
+            return review_id
+        except Exception as exc:
+            logger.warning(
+                "Failed to post comment review on %s#%d: %s",
+                repo,
+                pr_number,
+                exc,
+            )
+            return None
+
     def _publish_review_comments_individually(
         self,
         pr,

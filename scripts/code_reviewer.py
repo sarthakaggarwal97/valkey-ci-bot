@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import logging
 import re
@@ -116,6 +116,58 @@ class _FindingDraft:
     suggestion: str
     supporting_paths: list[str]
     verification_notes: str = ""
+
+
+@dataclass
+class ReviewCoverage:
+    """Coverage/accounting metadata from one reviewer pass."""
+
+    requested_lgtm: bool = False
+    checked_files: list[str] = field(default_factory=list)
+    skipped_files: list[tuple[str, str]] = field(default_factory=list)
+    claimed_without_tool: list[str] = field(default_factory=list)
+    unaccounted_files: list[str] = field(default_factory=list)
+    fetch_limit_hit: bool = False
+
+    @property
+    def approvable(self) -> bool:
+        """Return True when the reviewer explicitly approved with full coverage."""
+        return (
+            self.requested_lgtm
+            and not self.claimed_without_tool
+            and not self.unaccounted_files
+        )
+
+    def render_review_note(self) -> str:
+        """Render a top-level review note when approval is withheld."""
+        if self.claimed_without_tool or self.unaccounted_files:
+            intro = (
+                "Automated review withheld LGTM because it did not explicitly account "
+                "for every file that required detailed review."
+            )
+        else:
+            intro = "Automated review withheld LGTM for this pass."
+        lines = [intro]
+        if self.checked_files:
+            lines.extend(["", "Checked files:"])
+            lines.extend(f"- `{path}`" for path in self.checked_files)
+        if self.skipped_files:
+            lines.extend(["", "Skipped files:"])
+            lines.extend(
+                f"- `{path}`: {reason}"
+                for path, reason in self.skipped_files
+            )
+        if self.claimed_without_tool:
+            lines.extend(["", "Claimed as checked without explicit tool evidence:"])
+            lines.extend(f"- `{path}`" for path in self.claimed_without_tool)
+        if self.unaccounted_files:
+            lines.extend(["", "Unaccounted files:"])
+            lines.extend(f"- `{path}`" for path in self.unaccounted_files)
+        if self.fetch_limit_hit:
+            lines.extend(["", "The reviewer hit its fetch budget during this run."])
+        if not self.requested_lgtm:
+            lines.extend(["", "The model did not request approval for this pass."])
+        return "\n".join(lines)
 
 
 def _extract_json_payload(text: str) -> Any:
@@ -881,10 +933,26 @@ _SUBMIT_REVIEW_SCHEMA: dict = {
         "reviews": {
             "type": "array",
             "items": _STRUCTURED_FINDING_SCHEMA,
+            "maxItems": 5,
         },
         "lgtm": {"type": "boolean"},
+        "checked_files": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "skipped_files": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "reason": {"type": "string"},
+                },
+                "required": ["path", "reason"],
+            },
+        },
     },
-    "required": ["reviews", "lgtm"],
+    "required": ["reviews", "lgtm", "checked_files", "skipped_files"],
 }
 
 _SUBMIT_REVIEW_TOOL: dict = {
@@ -917,7 +985,7 @@ class ReviewToolHandler:
         base_sha: str | None = None,
         project: ProjectContext | None = None,
         max_file_bytes: int = 60_000,
-        max_fetches: int = 10,
+        max_fetches: int = 20,
         github_retries: int = 5,
     ) -> None:
         self._gh = github_client
@@ -932,7 +1000,18 @@ class ReviewToolHandler:
         self._cache: dict[str, str] = {}
         self._directory_cache: dict[str, list[str]] = {}
         self._history: list[str] = []
+        self._checked_paths: set[str] = set()
+        self._fetch_limit_hit = False
         self._repo = None
+
+    def checked_paths(self) -> list[str]:
+        """Return repository paths explicitly inspected during tool use."""
+        return sorted(self._checked_paths)
+
+    @property
+    def fetch_limit_hit(self) -> bool:
+        """Return whether the reviewer exhausted its fetch budget."""
+        return self._fetch_limit_hit
 
     def execute(self, tool_name: str, tool_input: dict) -> str:
         """Execute a tool call and return the result text."""
@@ -958,10 +1037,7 @@ class ReviewToolHandler:
         if cache_key in self._cache:
             return self._cache[cache_key]
         if self._fetch_count >= self._max_fetches:
-            return (
-                f"Fetch limit reached ({self._max_fetches}). "
-                "Please submit your review with the context you have."
-            )
+            return self._fetch_limit_message(f"fetch {path}")
         self._fetch_count += 1
         try:
             repo = self._get_repo()
@@ -986,6 +1062,7 @@ class ReviewToolHandler:
                 self._cache[cache_key] = result
                 self._remember_context(f"Directory {path or '.'}", result)
                 return result
+            self._record_checked_path(path)
             logger.info("Fetched %s (%d bytes) for agentic review.", path, len(raw))
             self._remember_context(f"HEAD file {path}", raw)
             return raw
@@ -1003,10 +1080,7 @@ class ReviewToolHandler:
         if cache_key in self._cache:
             return self._cache[cache_key]
         if self._fetch_count >= self._max_fetches:
-            return (
-                f"Fetch limit reached ({self._max_fetches}). "
-                "Please submit your review with the context you have."
-            )
+            return self._fetch_limit_message(f"fetch base version of {path}")
         self._fetch_count += 1
         try:
             repo = self._get_repo()
@@ -1019,6 +1093,7 @@ class ReviewToolHandler:
             )
             if raw is None:
                 return f"{path} is a directory at the base commit."
+            self._record_checked_path(path)
             self._remember_context(f"BASE file {path}", raw)
             return raw
         except Exception as exc:
@@ -1028,10 +1103,7 @@ class ReviewToolHandler:
 
     def _list_directory(self, path: str) -> str:
         if self._fetch_count >= self._max_fetches:
-            return (
-                f"Fetch limit reached ({self._max_fetches}). "
-                "Please submit your review with the context you have."
-            )
+            return self._fetch_limit_message(f"list directory {path or '.'}")
         self._fetch_count += 1
         try:
             repo = self._get_repo()
@@ -1053,10 +1125,7 @@ class ReviewToolHandler:
         if not path:
             return "Error: path is required."
         if self._fetch_count >= self._max_fetches:
-            return (
-                f"Fetch limit reached ({self._max_fetches}). "
-                "Please submit your review with the context you have."
-            )
+            return self._fetch_limit_message(f"find tests for {path}")
         self._fetch_count += 1
 
         lowered_path = path.lower()
@@ -1122,10 +1191,8 @@ class ReviewToolHandler:
         if not query:
             return "Error: query is required."
         if self._fetch_count >= self._max_fetches:
-            return (
-                f"Fetch limit reached ({self._max_fetches}). "
-                "Please submit your review with the context you have."
-            )
+            filter_note = f" with filter {path_filter}" if path_filter else ""
+            return self._fetch_limit_message(f"search for {query}{filter_note}")
         self._fetch_count += 1
         try:
             repo = self._get_repo()
@@ -1175,6 +1242,7 @@ class ReviewToolHandler:
                     continue
                 if count >= 15:
                     break
+                self._record_checked_path(path)
                 entry = f"- {path}"
                 for excerpt in excerpts:
                     entry += f"\n  > {excerpt}"
@@ -1200,6 +1268,20 @@ class ReviewToolHandler:
             msg = f"Code search failed for '{query}': {exc}"
             logger.warning(msg)
             return msg
+
+    def _record_checked_path(self, path: str) -> None:
+        normalized = path.strip()
+        if normalized:
+            self._checked_paths.add(normalized)
+
+    def _fetch_limit_message(self, action: str) -> str:
+        self._fetch_limit_hit = True
+        msg = (
+            f"Fetch limit reached ({self._max_fetches}) while trying to {action}. "
+            "Please submit your review with the context you have."
+        )
+        logger.warning(msg)
+        return msg
 
     def render_context(self, *, max_chars: int = 24_000) -> str:
         """Render fetched tool context for downstream verification."""
@@ -1348,6 +1430,11 @@ class CodeReviewer:
         self._retriever = retriever
         self._retrieval_config = retrieval_config or RetrievalConfig()
         self._github_client = github_client
+        self._last_review_coverage: ReviewCoverage | None = None
+
+    def get_last_review_coverage(self) -> ReviewCoverage | None:
+        """Return metadata from the most recent review pass."""
+        return self._last_review_coverage
 
     def classify_simple_change(self, files: list[ChangedFile]) -> bool:
         """Return ``True`` for changes that are likely trivial."""
@@ -1461,6 +1548,7 @@ or
         """
         if not diff_scope.files:
             return []
+        self._last_review_coverage = None
 
         # Choose the review strategy
         use_agentic = (
@@ -1486,6 +1574,7 @@ or
                     len(chunks), scope_size, char_budget,
                 )
                 all_findings: list[ReviewFinding] = []
+                coverage_reports: list[ReviewCoverage] = []
                 for i, chunk in enumerate(chunks):
                     logger.info(
                         "Reviewing chunk %d/%d (%d file(s)).",
@@ -1496,6 +1585,8 @@ or
                         short_summary=short_summary,
                     )
                     all_findings.extend(chunk_findings)
+                    if self._last_review_coverage is not None:
+                        coverage_reports.append(self._last_review_coverage)
                 # Deduplicate across chunks
                 seen: set[tuple[str, int | None, str]] = set()
                 deduped: list[ReviewFinding] = []
@@ -1506,6 +1597,11 @@ or
                         deduped.append(f)
                 ranked = sorted(deduped, key=_finding_sort_key, reverse=True)
                 capped = ranked[: config.max_review_comments]
+                if coverage_reports:
+                    self._last_review_coverage = self._merge_review_coverage(
+                        coverage_reports,
+                        diff_scope,
+                    )
                 return capped
 
         findings = review_fn(
@@ -1570,7 +1666,7 @@ CRITICAL rules:
 - New hunks are annotated with line numbers (e.g. "120: code"). Old hunks show the replaced code without line numbers. Use the line numbers from new_hunk for the "line" field.
 - Only return findings with direct evidence in the shown patch/content excerpts.
 - Do NOT provide general feedback, summaries, explanations of changes, or praises for making good additions.
-- Prefer 0-3 findings. It is better to return [] than a weak claim.
+- Prefer 1-5 findings when the diff supports them. It is better to return [] than a weak claim.
 - Each finding must include: title, trigger, impact, severity, confidence, and a concise body with the evidence.
 - The body must explain the concrete failure mode; do not write generic review advice.
 - Do NOT speculate about array sizes, buffer lengths, variable values, or code structure that is not fully visible in the provided excerpts.
@@ -1591,6 +1687,7 @@ CRITICAL rules:
                     "reviews": {
                         "type": "array",
                         "items": _STRUCTURED_FINDING_SCHEMA,
+                        "maxItems": 5,
                     },
                     "lgtm": {"type": "boolean"},
                 },
@@ -1610,6 +1707,10 @@ CRITICAL rules:
             drafts,
             config,
             extra_context="",
+        )
+        self._last_review_coverage = ReviewCoverage(
+            requested_lgtm=len(verified) == 0,
+            checked_files=[changed_file.path for changed_file in diff_scope.files],
         )
         return self._drafts_to_findings(verified)
 
@@ -1664,6 +1765,9 @@ CRITICAL rules:
         custom_instructions_section = ""
         if config.custom_instructions:
             custom_instructions_section = f"\n## Project-Specific Review Guidelines\n{config.custom_instructions}\n"
+        review_paths = "\n".join(
+            f"- {changed_file.path}" for changed_file in diff_scope.files
+        )
 
         user_prompt = f"""Review this pull request. You have tools to fetch additional files from the repository if you need more context to verify a potential finding.
 
@@ -1677,13 +1781,17 @@ Review scope excerpts (patch/content may be truncated):
 {retrieved_context}
 {custom_instructions_section}
 
+Files that require detailed review and must be accounted for in `submit_review`:
+{review_paths}
+
 WORKFLOW:
 1. Read the diff and identify only the highest-risk hypotheses.
 2. For each hypothesis, actively try to disprove it before reporting it.
 3. Use get_file for related files at the PR head, get_base_file for the full pre-change file, list_directory to explore, search_code to find definitions/usages, and find_tests_for_path to locate likely regression coverage.
 4. Only keep a finding if the fetched context still supports it.
-5. Prefer 0-3 findings total unless there are clearly multiple independent defects.
-6. Once you have enough context, call submit_review with the surviving findings.
+5. Prefer 1-5 findings total when there are clearly evidence-backed issues.
+6. Before calling submit_review, account for every file above by putting it in `checked_files` or `skipped_files`.
+7. Once you have enough context, call submit_review with the surviving findings.
 
 CRITICAL rules:
 - New hunks are annotated with line numbers (e.g. "120: code"). Use these for the "line" field.
@@ -1691,10 +1799,12 @@ CRITICAL rules:
 - Do NOT report speculative issues. If you cannot verify a finding with the available tools, do not report it.
 - Do NOT provide general feedback, summaries, or praise.
 - Each finding must include: title, trigger, impact, severity, confidence, and a concise body with the evidence.
+- A file counts as `checked` only if you explicitly inspected it with `get_file`, `get_base_file`, or `search_code` and saw evidence relevant to that file.
+- Every `skipped_files` entry must include a concrete reason.
 - Prefer precision over recall: it is far better to miss a real bug than to report a false positive.
 - YAML workflow files embed scripts in run: | blocks — YAML strips the base indentation at runtime. Do NOT report indentation errors in these blocks.
 - Use a suggestion only when the exact correction is obvious. Put only the replacement code in `suggestion`.
-- When you are done, call submit_review. If there are no issues, set lgtm to true and reviews to [].
+- When you are done, call submit_review. If there are no issues, set lgtm to true, reviews to [], and fully account for every file.
 """
 
         tool_handler = ReviewToolHandler(
@@ -1748,6 +1858,12 @@ CRITICAL rules:
         elif isinstance(payload, list):
             raw_findings = payload
 
+        self._last_review_coverage = self._extract_review_coverage(
+            payload,
+            diff_scope,
+            tool_handler,
+        )
+
         logger.info("Agentic review returned %d raw finding(s).", len(raw_findings))
         drafts = self._normalize_raw_findings(raw_findings, diff_scope, config)
         verified = self._verify_candidates(
@@ -1758,6 +1874,113 @@ CRITICAL rules:
             extra_context=tool_handler.render_context(),
         )
         return self._drafts_to_findings(verified)
+
+    def _extract_review_coverage(
+        self,
+        payload: Any,
+        diff_scope: DiffScope,
+        tool_handler: ReviewToolHandler,
+    ) -> ReviewCoverage:
+        ordered_paths = [changed_file.path for changed_file in diff_scope.files]
+        allowed_paths = set(ordered_paths)
+
+        claimed_checked: list[str] = []
+        if isinstance(payload, dict) and isinstance(payload.get("checked_files"), list):
+            for raw_path in payload["checked_files"]:
+                path = str(raw_path).strip()
+                if path and path in allowed_paths and path not in claimed_checked:
+                    claimed_checked.append(path)
+
+        explicit_paths = set(tool_handler.checked_paths())
+        checked_files = [
+            path for path in ordered_paths
+            if path in claimed_checked and path in explicit_paths
+        ]
+        claimed_without_tool = [
+            path for path in claimed_checked
+            if path not in explicit_paths
+        ]
+
+        skipped_by_path: dict[str, str] = {}
+        if isinstance(payload, dict) and isinstance(payload.get("skipped_files"), list):
+            for raw_entry in payload["skipped_files"]:
+                if not isinstance(raw_entry, dict):
+                    continue
+                path = str(raw_entry.get("path", "")).strip()
+                reason = str(raw_entry.get("reason", "")).strip()
+                if (
+                    path
+                    and reason
+                    and path in allowed_paths
+                    and path not in skipped_by_path
+                    and path not in checked_files
+                ):
+                    skipped_by_path[path] = reason
+
+        skipped_files = [
+            (path, skipped_by_path[path])
+            for path in ordered_paths
+            if path in skipped_by_path
+        ]
+        accounted_paths = set(checked_files) | set(skipped_by_path)
+        unaccounted_files = [
+            path for path in ordered_paths
+            if path not in accounted_paths
+        ]
+
+        requested_lgtm = bool(payload.get("lgtm")) if isinstance(payload, dict) else False
+        return ReviewCoverage(
+            requested_lgtm=requested_lgtm,
+            checked_files=checked_files,
+            skipped_files=skipped_files,
+            claimed_without_tool=claimed_without_tool,
+            unaccounted_files=unaccounted_files,
+            fetch_limit_hit=tool_handler.fetch_limit_hit,
+        )
+
+    def _merge_review_coverage(
+        self,
+        reports: list[ReviewCoverage],
+        diff_scope: DiffScope,
+    ) -> ReviewCoverage:
+        ordered_paths = [changed_file.path for changed_file in diff_scope.files]
+        checked_set: set[str] = set()
+        skipped_map: dict[str, str] = {}
+        claimed_without_tool: set[str] = set()
+        fetch_limit_hit = False
+        requested_lgtm = True
+
+        for report in reports:
+            checked_set.update(report.checked_files)
+            for path, reason in report.skipped_files:
+                skipped_map.setdefault(path, reason)
+            claimed_without_tool.update(report.claimed_without_tool)
+            fetch_limit_hit = fetch_limit_hit or report.fetch_limit_hit
+            requested_lgtm = requested_lgtm and report.requested_lgtm
+
+        checked_files = [path for path in ordered_paths if path in checked_set]
+        skipped_files = [
+            (path, skipped_map[path])
+            for path in ordered_paths
+            if path in skipped_map and path not in checked_set
+        ]
+        accounted_paths = set(checked_files) | set(skipped_map)
+        unaccounted_files = [
+            path for path in ordered_paths
+            if path not in accounted_paths
+        ]
+        claimed_without_tool_list = [
+            path for path in ordered_paths
+            if path in claimed_without_tool and path not in checked_set
+        ]
+        return ReviewCoverage(
+            requested_lgtm=requested_lgtm,
+            checked_files=checked_files,
+            skipped_files=skipped_files,
+            claimed_without_tool=claimed_without_tool_list,
+            unaccounted_files=unaccounted_files,
+            fetch_limit_hit=fetch_limit_hit,
+        )
 
     def _invoke_json_response(
         self,

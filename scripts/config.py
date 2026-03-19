@@ -94,7 +94,7 @@ class ReviewerConfig:
     review_comment_lgtm: bool = False
     ignore_keyword: str = "/reviewbot: ignore"
     max_files: int = 150
-    max_review_comments: int = 20
+    max_review_comments: int = 5
     path_filters: list[str] = field(default_factory=list)
     daily_token_budget: int = 3_000_000
     bedrock_retries: int = 5
