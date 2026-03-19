@@ -6,8 +6,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from scripts.bedrock_client import BedrockClient
 from scripts.code_reviewer import CodeReviewer, ReviewCoverage, ReviewToolHandler
-from scripts.config import ProjectContext, RetrievalConfig, ReviewerConfig
+from scripts.config import BotConfig, ProjectContext, RetrievalConfig, ReviewerConfig
 from scripts.models import (
     ChangedFile,
     DiffScope,
@@ -350,6 +351,80 @@ def test_review_tool_handler_tracks_checked_paths_and_fetch_limit() -> None:
     assert handler.fetch_limit_hit is True
 
 
+def test_review_tool_handler_requires_explicit_file_fetch_before_submit() -> None:
+    gh = MagicMock()
+    repo = MagicMock()
+    gh.get_repo.return_value = repo
+
+    def get_contents(path: str, ref: str | None = None):
+        if path == "src/failover.c":
+            return MagicMock(decoded_content=b"int failover(void) { return 0; }\n")
+        if path == "tests/failover_timeout.tcl":
+            return MagicMock(decoded_content=b"test failover timeout {}\n")
+        raise FileNotFoundError(path)
+
+    repo.get_contents.side_effect = get_contents
+    required_files = [
+        ChangedFile(
+            path="src/failover.c",
+            status="modified",
+            additions=3,
+            deletions=1,
+            patch="@@ -1 +1 @@\n-old\n+new",
+            contents="int failover(void) { return 0; }",
+            is_binary=False,
+        ),
+        ChangedFile(
+            path="tests/failover_timeout.tcl",
+            status="modified",
+            additions=2,
+            deletions=0,
+            patch="@@ -1 +1 @@\n-old\n+new",
+            contents="test failover timeout {}",
+            is_binary=False,
+        ),
+    ]
+
+    handler = ReviewToolHandler(
+        gh,
+        "owner/repo",
+        "head456",
+        required_files=required_files,
+    )
+    handler.execute("get_file", {"path": "src/failover.c"})
+
+    accepted, message = handler.validate_terminal_tool(
+        "submit_review",
+        {
+            "reviews": [],
+            "lgtm": True,
+            "checked_files": ["src/failover.c"],
+            "skipped_files": [{
+                "path": "tests/failover_timeout.tcl",
+                "reason": "covered by the implementation review",
+            }],
+        },
+    )
+
+    assert accepted is False
+    assert "tests/failover_timeout.tcl" in message
+    assert "must be fetched explicitly" in message
+
+    handler.execute("get_file", {"path": "tests/failover_timeout.tcl"})
+    accepted, message = handler.validate_terminal_tool(
+        "submit_review",
+        {
+            "reviews": [],
+            "lgtm": True,
+            "checked_files": ["src/failover.c", "tests/failover_timeout.tcl"],
+            "skipped_files": [],
+        },
+    )
+
+    assert accepted is True
+    assert message == "Review submitted."
+
+
 def test_review_coverage_note_lists_gaps() -> None:
     coverage = ReviewCoverage(
         requested_lgtm=False,
@@ -519,6 +594,62 @@ def test_code_reviewer_includes_retrieved_context() -> None:
     user_prompt = bedrock.invoke.call_args[0][1]
     assert "Retrieved Valkey Context" in user_prompt
     assert "server notes" in user_prompt
+
+
+def test_code_reviewer_runs_focused_agentic_pass_per_file() -> None:
+    runtime_client = MagicMock()
+    bedrock = BedrockClient(BotConfig(), client=runtime_client)
+    bedrock.converse_with_tools = MagicMock(side_effect=[
+        '{"reviews":[],"lgtm":true,"checked_files":["src/failover.c"],"skipped_files":[]}',
+        '{"reviews":[],"lgtm":true,"checked_files":["tests/failover_timeout.tcl"],"skipped_files":[]}',
+    ])
+    reviewer = CodeReviewer(bedrock, github_client=MagicMock())
+    files = [
+        ChangedFile(
+            path="src/failover.c",
+            status="modified",
+            additions=5,
+            deletions=1,
+            patch="@@ -1 +1 @@\n-old\n+new",
+            contents="int failover(void) { return 1; }",
+            is_binary=False,
+        ),
+        ChangedFile(
+            path="tests/failover_timeout.tcl",
+            status="modified",
+            additions=2,
+            deletions=0,
+            patch="@@ -1 +1 @@\n-old\n+new",
+            contents="test failover timeout {}",
+            is_binary=False,
+        ),
+    ]
+    context = PullRequestContext(
+        repo="owner/repo",
+        number=17,
+        title="Improve failover logic",
+        body="This updates failover behavior.",
+        base_sha="base123",
+        head_sha="head456",
+        author="alice",
+        files=files,
+    )
+    scope = DiffScope(
+        base_sha="base123",
+        head_sha="head456",
+        files=files,
+        incremental=False,
+    )
+
+    reviewer.review(context, scope, ReviewerConfig(max_review_comments=5))
+
+    assert bedrock.converse_with_tools.call_count == 2
+    first_prompt = bedrock.converse_with_tools.call_args_list[0].args[1]
+    second_prompt = bedrock.converse_with_tools.call_args_list[1].args[1]
+    assert "src/failover.c" in first_prompt
+    assert "tests/failover_timeout.tcl" not in first_prompt
+    assert "tests/failover_timeout.tcl" in second_prompt
+    assert "src/failover.c" not in second_prompt
 
 
 def test_review_chat_includes_retrieved_context() -> None:

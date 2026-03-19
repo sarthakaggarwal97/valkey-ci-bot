@@ -63,6 +63,12 @@ _CODE_SEARCH_LANGUAGE_BY_EXTENSION = {
     "tcl": "tcl",
 }
 
+_FOCUSED_AGENTIC_FILE_LIMIT = 25
+_MIN_AGENTIC_FETCHES = 18
+_MAX_AGENTIC_FETCHES = 48
+_MIN_AGENTIC_TURNS = 24
+_MAX_AGENTIC_TURNS = 36
+
 _SPECULATIVE_SUBSTRINGS = (
     "not shown in the diff",
     "not shown in diff",
@@ -158,7 +164,7 @@ class ReviewCoverage:
                 for path, reason in self.skipped_files
             )
         if self.claimed_without_tool:
-            lines.extend(["", "Claimed as checked without explicit tool evidence:"])
+            lines.extend(["", "Claimed as checked without explicit file inspection:"])
             lines.extend(f"- `{path}`" for path in self.claimed_without_tool)
         if self.unaccounted_files:
             lines.extend(["", "Unaccounted files:"])
@@ -427,6 +433,14 @@ def _chunk_diff_scope(scope: DiffScope, *, max_chars_per_chunk: int = 180_000) -
         ))
 
     return chunks if chunks else [scope]
+
+
+def _agentic_review_budgets(scope: DiffScope) -> tuple[int, int]:
+    """Return fetch and turn budgets for one agentic review pass."""
+    file_count = max(1, len(scope.files))
+    max_fetches = min(_MAX_AGENTIC_FETCHES, max(_MIN_AGENTIC_FETCHES, file_count * 4))
+    max_turns = min(_MAX_AGENTIC_TURNS, max(_MIN_AGENTIC_TURNS, file_count * 3))
+    return max_fetches, max_turns
 
 
 def _split_patch_into_groups(patch: str, max_chars: int) -> list[str]:
@@ -984,8 +998,9 @@ class ReviewToolHandler:
         *,
         base_sha: str | None = None,
         project: ProjectContext | None = None,
+        required_files: list[ChangedFile] | None = None,
         max_file_bytes: int = 60_000,
-        max_fetches: int = 20,
+        max_fetches: int = _MIN_AGENTIC_FETCHES,
         github_retries: int = 5,
     ) -> None:
         self._gh = github_client
@@ -1001,12 +1016,21 @@ class ReviewToolHandler:
         self._directory_cache: dict[str, list[str]] = {}
         self._history: list[str] = []
         self._checked_paths: set[str] = set()
+        self._file_inspected_paths: set[str] = set()
         self._fetch_limit_hit = False
         self._repo = None
+        self._required_files = {
+            changed_file.path: changed_file
+            for changed_file in (required_files or [])
+        }
 
     def checked_paths(self) -> list[str]:
-        """Return repository paths explicitly inspected during tool use."""
+        """Return repository paths touched during tool use."""
         return sorted(self._checked_paths)
+
+    def inspected_file_paths(self) -> list[str]:
+        """Return changed files explicitly fetched during tool use."""
+        return sorted(self._file_inspected_paths)
 
     @property
     def fetch_limit_hit(self) -> bool:
@@ -1029,6 +1053,71 @@ class ReviewToolHandler:
                 tool_input.get("path_filter", ""),
             )
         return f"Unknown tool: {tool_name}"
+
+    def validate_terminal_tool(
+        self,
+        tool_name: str,
+        tool_input: dict,
+    ) -> tuple[bool, str]:
+        """Reject premature review submission until required files are fetched."""
+        if tool_name != "submit_review" or not self._required_files:
+            return True, "Review submitted."
+
+        ordered_paths = list(self._required_files)
+        must_inspect = [
+            path for path, changed_file in self._required_files.items()
+            if not changed_file.is_binary and changed_file.status != "removed"
+        ]
+        explicitly_inspected = set(self.inspected_file_paths())
+
+        claimed_checked: list[str] = []
+        if isinstance(tool_input, dict) and isinstance(tool_input.get("checked_files"), list):
+            for raw_path in tool_input["checked_files"]:
+                path = str(raw_path).strip()
+                if path in self._required_files and path not in claimed_checked:
+                    claimed_checked.append(path)
+
+        skipped_paths: list[str] = []
+        if isinstance(tool_input, dict) and isinstance(tool_input.get("skipped_files"), list):
+            for raw_entry in tool_input["skipped_files"]:
+                if not isinstance(raw_entry, dict):
+                    continue
+                path = str(raw_entry.get("path", "")).strip()
+                if path in self._required_files and path not in skipped_paths:
+                    skipped_paths.append(path)
+
+        invalid_skips = [path for path in skipped_paths if path in must_inspect]
+        claimed_without_fetch = [
+            path for path in claimed_checked
+            if path in must_inspect and path not in explicitly_inspected
+        ]
+        missing_paths = [
+            path for path in ordered_paths
+            if path in must_inspect and path not in explicitly_inspected
+        ]
+
+        if not invalid_skips and not claimed_without_fetch and not missing_paths:
+            return True, "Review submitted."
+
+        lines = [
+            "Coverage incomplete. Before calling submit_review, explicitly inspect every required changed file with get_file or get_base_file.",
+            "Do not skip modified code or test files that were triaged as NEEDS_REVIEW.",
+        ]
+        if claimed_without_fetch:
+            lines.extend(["", "Claimed as checked without explicit file fetch:"])
+            lines.extend(f"- `{path}`" for path in claimed_without_fetch)
+        if invalid_skips:
+            lines.extend(["", "These files cannot be skipped and must be fetched explicitly:"])
+            lines.extend(f"- `{path}`" for path in invalid_skips)
+        if missing_paths:
+            lines.extend(["", "Files still missing explicit inspection:"])
+            lines.extend(f"- `{path}`" for path in missing_paths)
+        if self._fetch_limit_hit:
+            lines.extend([
+                "",
+                f"You hit the fetch budget ({self._max_fetches}). Use the remaining turns carefully and prioritize the missing files first.",
+            ])
+        return False, "\n".join(lines)
 
     def _get_file(self, path: str) -> str:
         if not path:
@@ -1062,7 +1151,7 @@ class ReviewToolHandler:
                 self._cache[cache_key] = result
                 self._remember_context(f"Directory {path or '.'}", result)
                 return result
-            self._record_checked_path(path)
+            self._record_file_inspection(path)
             logger.info("Fetched %s (%d bytes) for agentic review.", path, len(raw))
             self._remember_context(f"HEAD file {path}", raw)
             return raw
@@ -1093,7 +1182,7 @@ class ReviewToolHandler:
             )
             if raw is None:
                 return f"{path} is a directory at the base commit."
-            self._record_checked_path(path)
+            self._record_file_inspection(path)
             self._remember_context(f"BASE file {path}", raw)
             return raw
         except Exception as exc:
@@ -1273,6 +1362,13 @@ class ReviewToolHandler:
         normalized = path.strip()
         if normalized:
             self._checked_paths.add(normalized)
+
+    def _record_file_inspection(self, path: str) -> None:
+        normalized = path.strip()
+        if not normalized:
+            return
+        self._checked_paths.add(normalized)
+        self._file_inspected_paths.add(normalized)
 
     def _fetch_limit_message(self, action: str) -> str:
         self._fetch_limit_hit = True
@@ -1560,49 +1656,69 @@ or
         if use_agentic:
             logger.info("Using agentic review with tool-use loop.")
 
+        # Prefer focused file-by-file agentic passes for modest-sized reviews so
+        # every triaged file gets its own explicit inspection pass.
+        chunks: list[DiffScope] | None = None
+        if use_agentic and 1 < len(diff_scope.files) <= _FOCUSED_AGENTIC_FILE_LIMIT:
+            chunks = [
+                DiffScope(
+                    base_sha=diff_scope.base_sha,
+                    head_sha=diff_scope.head_sha,
+                    files=[changed_file],
+                    incremental=diff_scope.incremental,
+                )
+                for changed_file in diff_scope.files
+            ]
+            logger.info(
+                "Running focused agentic review across %d file-specific pass(es).",
+                len(chunks),
+            )
+
         # Check if the scope needs to be split into multiple chunks.
         char_budget = (config.max_input_tokens * 4) * 3 // 4
         scope_size = sum(
             len(f.patch or "") * 2 + min(len(f.contents or ""), 60_000) + 200
             for f in diff_scope.files
         )
-        if scope_size > char_budget:
+        if chunks is None and scope_size > char_budget:
             chunks = _chunk_diff_scope(diff_scope, max_chars_per_chunk=char_budget)
             if len(chunks) > 1:
                 logger.info(
                     "Splitting review into %d chunks (scope_size=%d, budget=%d).",
                     len(chunks), scope_size, char_budget,
                 )
-                all_findings: list[ReviewFinding] = []
-                coverage_reports: list[ReviewCoverage] = []
-                for i, chunk in enumerate(chunks):
-                    logger.info(
-                        "Reviewing chunk %d/%d (%d file(s)).",
-                        i + 1, len(chunks), len(chunk.files),
-                    )
-                    chunk_findings = review_fn(
-                        pr, chunk, config,
-                        short_summary=short_summary,
-                    )
-                    all_findings.extend(chunk_findings)
-                    if self._last_review_coverage is not None:
-                        coverage_reports.append(self._last_review_coverage)
-                # Deduplicate across chunks
-                seen: set[tuple[str, int | None, str]] = set()
-                deduped: list[ReviewFinding] = []
-                for f in all_findings:
-                    key = (f.path, f.line, _normalize_finding_text(f.body))
-                    if key not in seen:
-                        seen.add(key)
-                        deduped.append(f)
-                ranked = sorted(deduped, key=_finding_sort_key, reverse=True)
-                capped = ranked[: config.max_review_comments]
-                if coverage_reports:
-                    self._last_review_coverage = self._merge_review_coverage(
-                        coverage_reports,
-                        diff_scope,
-                    )
-                return capped
+
+        if chunks is not None and len(chunks) > 1:
+            all_findings: list[ReviewFinding] = []
+            coverage_reports: list[ReviewCoverage] = []
+            for i, chunk in enumerate(chunks):
+                logger.info(
+                    "Reviewing chunk %d/%d (%d file(s)).",
+                    i + 1, len(chunks), len(chunk.files),
+                )
+                chunk_findings = review_fn(
+                    pr, chunk, config,
+                    short_summary=short_summary,
+                )
+                all_findings.extend(chunk_findings)
+                if self._last_review_coverage is not None:
+                    coverage_reports.append(self._last_review_coverage)
+            # Deduplicate across chunks
+            seen: set[tuple[str, int | None, str]] = set()
+            deduped: list[ReviewFinding] = []
+            for f in all_findings:
+                key = (f.path, f.line, _normalize_finding_text(f.body))
+                if key not in seen:
+                    seen.add(key)
+                    deduped.append(f)
+            ranked = sorted(deduped, key=_finding_sort_key, reverse=True)
+            capped = ranked[: config.max_review_comments]
+            if coverage_reports:
+                self._last_review_coverage = self._merge_review_coverage(
+                    coverage_reports,
+                    diff_scope,
+                )
+            return capped
 
         findings = review_fn(
             pr, diff_scope, config, short_summary=short_summary,
@@ -1768,6 +1884,13 @@ CRITICAL rules:
         review_paths = "\n".join(
             f"- {changed_file.path}" for changed_file in diff_scope.files
         )
+        max_fetches, max_turns = _agentic_review_budgets(diff_scope)
+        logger.info(
+            "Agentic review budget for %d file(s): max_fetches=%d, max_turns=%d.",
+            len(diff_scope.files),
+            max_fetches,
+            max_turns,
+        )
 
         user_prompt = f"""Review this pull request. You have tools to fetch additional files from the repository if you need more context to verify a potential finding.
 
@@ -1785,13 +1908,14 @@ Files that require detailed review and must be accounted for in `submit_review`:
 {review_paths}
 
 WORKFLOW:
-1. Read the diff and identify only the highest-risk hypotheses.
-2. For each hypothesis, actively try to disprove it before reporting it.
-3. Use get_file for related files at the PR head, get_base_file for the full pre-change file, list_directory to explore, search_code to find definitions/usages, and find_tests_for_path to locate likely regression coverage.
-4. Only keep a finding if the fetched context still supports it.
-5. Prefer 1-5 findings total when there are clearly evidence-backed issues.
-6. Before calling submit_review, account for every file above by putting it in `checked_files` or `skipped_files`.
-7. Once you have enough context, call submit_review with the surviving findings.
+1. Start with a coverage pass. Explicitly inspect every required changed file with `get_file` or `get_base_file` before you try to finish the review.
+2. For source files, use `find_tests_for_path` when you need to understand likely regression coverage. Changed test files must also be inspected directly.
+3. After the coverage pass, identify the strongest hypotheses and actively try to disprove them.
+4. Use `get_file` for related files at the PR head, `get_base_file` for the full pre-change file, `list_directory` to explore, and `search_code` to find definitions/usages in supporting files.
+5. Only keep a finding if the fetched context still supports it.
+6. Prefer 1-5 findings total when there are clearly evidence-backed issues.
+7. Before calling `submit_review`, account for every file above by putting it in `checked_files` or `skipped_files`.
+8. Spending extra turns to inspect the files is acceptable. Do not rush to `submit_review`.
 
 CRITICAL rules:
 - New hunks are annotated with line numbers (e.g. "120: code"). Use these for the "line" field.
@@ -1799,8 +1923,9 @@ CRITICAL rules:
 - Do NOT report speculative issues. If you cannot verify a finding with the available tools, do not report it.
 - Do NOT provide general feedback, summaries, or praise.
 - Each finding must include: title, trigger, impact, severity, confidence, and a concise body with the evidence.
-- A file counts as `checked` only if you explicitly inspected it with `get_file`, `get_base_file`, or `search_code` and saw evidence relevant to that file.
-- Every `skipped_files` entry must include a concrete reason.
+- A required changed file counts as `checked` only if you explicitly inspected that file with `get_file` or `get_base_file`.
+- Do not use `skipped_files` for modified code or test files that were triaged as NEEDS_REVIEW. Those files must be explicitly inspected.
+- Every allowed `skipped_files` entry must include a concrete reason.
 - Prefer precision over recall: it is far better to miss a real bug than to report a false positive.
 - YAML workflow files embed scripts in run: | blocks — YAML strips the base indentation at runtime. Do NOT report indentation errors in these blocks.
 - Use a suggestion only when the exact correction is obvious. Put only the replacement code in `suggestion`.
@@ -1813,6 +1938,8 @@ CRITICAL rules:
             head_sha=pr.head_sha,
             base_sha=diff_scope.base_sha,
             project=config.project,
+            required_files=diff_scope.files,
+            max_fetches=max_fetches,
             github_retries=config.github_retries,
         )
 
@@ -1832,7 +1959,7 @@ CRITICAL rules:
                 tools=tools,
                 tool_handler=tool_handler,
                 terminal_tool="submit_review",
-                max_turns=20,
+                max_turns=max_turns,
                 model_id=config.models.heavy_model_id,
                 max_output_tokens=config.max_output_tokens,
                 temperature=config.models.temperature,
@@ -1891,7 +2018,7 @@ CRITICAL rules:
                 if path and path in allowed_paths and path not in claimed_checked:
                     claimed_checked.append(path)
 
-        explicit_paths = set(tool_handler.checked_paths())
+        explicit_paths = set(tool_handler.inspected_file_paths())
         checked_files = [
             path for path in ordered_paths
             if path in claimed_checked and path in explicit_paths

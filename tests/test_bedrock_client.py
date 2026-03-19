@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -35,6 +36,28 @@ def _make_converse_response(text: str) -> dict:
         "output": {
             "message": {
                 "content": [{"text": text}],
+            }
+        }
+    }
+
+
+def _make_tool_use_response(
+    tool_name: str,
+    tool_input: dict,
+    *,
+    tool_use_id: str = "tool-1",
+) -> dict:
+    """Create a Converse response containing one tool use block."""
+    return {
+        "output": {
+            "message": {
+                "content": [{
+                    "toolUse": {
+                        "name": tool_name,
+                        "toolUseId": tool_use_id,
+                        "input": tool_input,
+                    }
+                }],
             }
         }
     }
@@ -354,6 +377,51 @@ class TestBedrockClientInvoke:
         assert len(messages) == 1
         assert messages[0]["role"] == "user"
         assert messages[0]["content"][0]["text"] == "my user message"
+
+    def test_converse_with_tools_retries_after_terminal_validation_rejection(self):
+        mock_client = MagicMock()
+        submit_input = {
+            "reviews": [],
+            "lgtm": True,
+            "checked_files": ["src/failover.c"],
+            "skipped_files": [],
+        }
+        mock_client.converse.side_effect = [
+            _make_tool_use_response("submit_review", submit_input, tool_use_id="tool-1"),
+            _make_tool_use_response("submit_review", submit_input, tool_use_id="tool-2"),
+        ]
+        client = _make_bedrock_client(mock_client=mock_client)
+
+        class _Handler:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def execute(self, tool_name: str, tool_input: dict) -> str:
+                return "unused"
+
+            def validate_terminal_tool(
+                self,
+                tool_name: str,
+                tool_input: dict,
+            ) -> tuple[bool, str]:
+                self.calls += 1
+                if self.calls == 1:
+                    return False, "Need more coverage."
+                return True, "Review submitted."
+
+        handler = _Handler()
+        result = client.converse_with_tools(
+            "sys",
+            "user",
+            tools=[{"toolSpec": {"name": "submit_review", "inputSchema": {"json": {}}}}],
+            tool_handler=handler,
+            terminal_tool="submit_review",
+            max_turns=4,
+        )
+
+        assert result == json.dumps(submit_input)
+        assert handler.calls == 2
+        assert mock_client.converse.call_count == 2
 
 
 # ---------------------------------------------------------------------------

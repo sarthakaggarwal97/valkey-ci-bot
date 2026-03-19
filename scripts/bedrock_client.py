@@ -96,6 +96,18 @@ class ToolHandler(Protocol):
         ...
 
 
+class TerminalToolValidator(Protocol):
+    """Optional callback for validating terminal tool submissions."""
+
+    def validate_terminal_tool(
+        self,
+        tool_name: str,
+        tool_input: dict,
+    ) -> tuple[bool, str]:
+        """Return whether the terminal tool submission should end the loop."""
+        ...
+
+
 class TokenBudgetLimiter(Protocol):
     """Interface used for coarse Bedrock budget enforcement."""
 
@@ -654,11 +666,40 @@ class BedrockClient:
                 tool_input = tool_use.get("input", {})
 
                 if name == terminal_tool:
-                    terminal_result = _json.dumps(tool_input)
+                    accepted = True
+                    result_text = "Review submitted."
+                    validator = getattr(tool_handler, "validate_terminal_tool", None)
+                    if callable(validator):
+                        try:
+                            validation = validator(name, tool_input)
+                            if (
+                                isinstance(validation, tuple)
+                                and len(validation) == 2
+                            ):
+                                accepted = bool(validation[0])
+                                result_text = str(validation[1] or result_text)
+                        except Exception as exc:
+                            accepted = False
+                            result_text = f"Terminal tool validation failed: {exc}"
+                            logger.warning(
+                                "Terminal tool %s validation failed on turn %d: %s",
+                                terminal_tool,
+                                turn + 1,
+                                exc,
+                            )
+                    if accepted:
+                        terminal_result = _json.dumps(tool_input)
+                    else:
+                        logger.info(
+                            "Terminal tool %s rejected on turn %d: %s",
+                            terminal_tool,
+                            turn + 1,
+                            _summarize_tool_result(result_text),
+                        )
                     tool_results.append({
                         "toolResult": {
                             "toolUseId": tool_use_id,
-                            "content": [{"text": "Review submitted."}],
+                            "content": [{"text": result_text}],
                         }
                     })
                 else:
