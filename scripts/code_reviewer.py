@@ -443,6 +443,98 @@ def _agentic_review_budgets(scope: DiffScope) -> tuple[int, int]:
     return max_fetches, max_turns
 
 
+def _path_tokens(path: str) -> set[str]:
+    """Return normalized path/name tokens for rough related-file matching."""
+    pure = PurePosixPath(path)
+    raw = " ".join([
+        pure.stem,
+        pure.parent.name,
+        " ".join(pure.parts[-3:]),
+    ]).lower()
+    return {
+        token for token in re.split(r"[^a-z0-9]+", raw)
+        if len(token) >= 2
+    }
+
+
+def _is_test_path(path: str, project: ProjectContext) -> bool:
+    lowered = path.lower()
+    return any(lowered.startswith(test_dir.lower()) for test_dir in project.test_dirs)
+
+
+def _extract_include_basenames(text: str) -> set[str]:
+    """Extract quoted include targets from a patch or file body."""
+    includes: set[str] = set()
+    for match in re.finditer(r'#include\s+"([^"]+)"', text or ""):
+        includes.add(PurePosixPath(match.group(1)).name.lower())
+    return includes
+
+
+def _suggest_related_changed_paths(
+    pr: PullRequestContext,
+    diff_scope: DiffScope,
+    project: ProjectContext,
+    *,
+    limit: int = 4,
+) -> list[str]:
+    """Choose likely related changed files/tests for a focused review pass."""
+    current_paths = {changed_file.path for changed_file in diff_scope.files}
+    if not current_paths:
+        return []
+
+    current_tokens: set[str] = set()
+    current_stems: set[str] = set()
+    current_dirs: set[PurePosixPath] = set()
+    include_basenames: set[str] = set()
+    current_has_test = False
+
+    for changed_file in diff_scope.files:
+        current_tokens.update(_path_tokens(changed_file.path))
+        current_stems.add(PurePosixPath(changed_file.path).stem.lower())
+        current_dirs.add(PurePosixPath(changed_file.path).parent)
+        current_has_test = current_has_test or _is_test_path(changed_file.path, project)
+        include_basenames.update(_extract_include_basenames(changed_file.patch or ""))
+        include_basenames.update(_extract_include_basenames(changed_file.contents or ""))
+
+    candidates: list[tuple[int, str]] = []
+    for changed_file in pr.files:
+        path = changed_file.path
+        if path in current_paths or changed_file.is_binary or changed_file.status == "removed":
+            continue
+
+        pure = PurePosixPath(path)
+        other_tokens = _path_tokens(path)
+        other_stem = pure.stem.lower()
+        other_is_test = _is_test_path(path, project)
+        score = 0
+
+        if pure.name.lower() in include_basenames:
+            score += 120
+        if other_stem in current_stems:
+            score += 90
+        score += 18 * len(current_tokens & other_tokens)
+        if pure.parent in current_dirs:
+            score += 20
+        if current_has_test != other_is_test:
+            score += 30
+        if current_has_test and not other_is_test:
+            score += 10
+        if not current_has_test and other_is_test:
+            score += 10
+
+        if score <= 0:
+            continue
+        candidates.append((score, path))
+
+    ordered = [
+        path for _score, path in sorted(
+            candidates,
+            key=lambda item: (-item[0], item[1]),
+        )[:limit]
+    ]
+    return ordered
+
+
 def _split_patch_into_groups(patch: str, max_chars: int) -> list[str]:
     """Split a unified diff patch into groups of hunks that fit within max_chars."""
     hunks: list[str] = []
@@ -999,6 +1091,7 @@ class ReviewToolHandler:
         base_sha: str | None = None,
         project: ProjectContext | None = None,
         required_files: list[ChangedFile] | None = None,
+        suggested_support_paths: list[str] | None = None,
         max_file_bytes: int = 60_000,
         max_fetches: int = _MIN_AGENTIC_FETCHES,
         github_retries: int = 5,
@@ -1023,6 +1116,13 @@ class ReviewToolHandler:
             changed_file.path: changed_file
             for changed_file in (required_files or [])
         }
+        self._suggested_support_paths = [
+            path.strip()
+            for path in (suggested_support_paths or [])
+            if path.strip() and path.strip() not in self._required_files
+        ]
+        self._consecutive_search_misses = 0
+        self._search_miss_counts: dict[str, int] = {}
 
     def checked_paths(self) -> list[str]:
         """Return repository paths touched during tool use."""
@@ -1031,6 +1131,24 @@ class ReviewToolHandler:
     def inspected_file_paths(self) -> list[str]:
         """Return changed files explicitly fetched during tool use."""
         return sorted(self._file_inspected_paths)
+
+    def remaining_required_paths(self) -> list[str]:
+        """Return required changed files that still need explicit inspection."""
+        return [
+            path for path, changed_file in self._required_files.items()
+            if (
+                not changed_file.is_binary
+                and changed_file.status != "removed"
+                and path not in self._file_inspected_paths
+            )
+        ]
+
+    def remaining_suggested_support_paths(self) -> list[str]:
+        """Return suggested neighbor/test files not yet fetched."""
+        return [
+            path for path in self._suggested_support_paths
+            if path not in self._file_inspected_paths
+        ]
 
     @property
     def fetch_limit_hit(self) -> bool:
@@ -1279,12 +1397,21 @@ class ReviewToolHandler:
     def _search_code(self, query: str, path_filter: str = "") -> str:
         if not query:
             return "Error: query is required."
+        guidance = self._search_guidance(query, path_filter)
+        if guidance:
+            logger.info(
+                "Redirecting search_code(%s, %s) to direct file inspection guidance.",
+                query,
+                path_filter,
+            )
+            return guidance
         if self._fetch_count >= self._max_fetches:
             filter_note = f" with filter {path_filter}" if path_filter else ""
             return self._fetch_limit_message(f"search for {query}{filter_note}")
         self._fetch_count += 1
         try:
             repo = self._get_repo()
+            key = self._search_request_key(query, path_filter)
             # Build the GitHub code search query
             search_q = f"{query} repo:{self._repo_name}"
             if path_filter:
@@ -1339,8 +1466,12 @@ class ReviewToolHandler:
                 count += 1
 
             if not lines:
+                self._search_miss_counts[key] = self._search_miss_counts.get(key, 0) + 1
+                self._consecutive_search_misses += 1
                 return f"No results found for '{query}' at {self._head_sha[:12]}."
 
+            self._consecutive_search_misses = 0
+            self._search_miss_counts.pop(key, None)
             logger.info(
                 "Code search for '%s' returned %d verified result(s) at %s.",
                 query,
@@ -1369,6 +1500,56 @@ class ReviewToolHandler:
             return
         self._checked_paths.add(normalized)
         self._file_inspected_paths.add(normalized)
+        self._consecutive_search_misses = 0
+
+    def _search_request_key(self, query: str, path_filter: str) -> str:
+        normalized_query = " ".join(query.lower().split())
+        normalized_filter = " ".join(path_filter.lower().split())
+        return f"{normalized_query}::{normalized_filter}"
+
+    def _search_guidance(self, query: str, path_filter: str) -> str | None:
+        remaining_required = self.remaining_required_paths()
+        if remaining_required:
+            preview = "\n".join(f"- `{path}`" for path in remaining_required[:4])
+            return (
+                "Inspect the required changed file(s) before using broad code search:\n"
+                f"{preview}"
+            )
+
+        remaining_support = self.remaining_suggested_support_paths()
+        inspected_support_count = len(self._suggested_support_paths) - len(remaining_support)
+        if self._suggested_support_paths and inspected_support_count == 0 and remaining_support:
+            preview = "\n".join(f"- `{path}`" for path in remaining_support[:4])
+            return (
+                "Before broad code search, inspect at least one related changed file/test with `get_file`:\n"
+                f"{preview}"
+            )
+
+        key = self._search_request_key(query, path_filter)
+        if self._search_miss_counts.get(key, 0) >= 1:
+            if remaining_support:
+                preview = "\n".join(f"- `{path}`" for path in remaining_support[:4])
+                return (
+                    "That search already returned no results. Fetch a related file/test instead of repeating it:\n"
+                    f"{preview}"
+                )
+            return (
+                "That search already returned no results. Prefer direct file inspection or submit the review "
+                "with the evidence you already have."
+            )
+
+        if self._consecutive_search_misses >= 3:
+            if remaining_support:
+                preview = "\n".join(f"- `{path}`" for path in remaining_support[:4])
+                return (
+                    "Too many no-result searches in a row. Stop searching and inspect one of these related files/tests:\n"
+                    f"{preview}"
+                )
+            return (
+                "Too many no-result searches in a row. Prefer direct file inspection or submit the review "
+                "with the evidence you already have."
+            )
+        return None
 
     def _fetch_limit_message(self, action: str) -> str:
         self._fetch_limit_hit = True
@@ -1884,6 +2065,18 @@ CRITICAL rules:
         review_paths = "\n".join(
             f"- {changed_file.path}" for changed_file in diff_scope.files
         )
+        suggested_support_paths = _suggest_related_changed_paths(
+            pr,
+            diff_scope,
+            config.project,
+        )
+        suggested_support_section = ""
+        if suggested_support_paths:
+            suggested_support_section = (
+                "\nSuggested related changed files/tests to inspect early:\n"
+                + "\n".join(f"- {path}" for path in suggested_support_paths)
+                + "\n"
+            )
         max_fetches, max_turns = _agentic_review_budgets(diff_scope)
         logger.info(
             "Agentic review budget for %d file(s): max_fetches=%d, max_turns=%d.",
@@ -1906,16 +2099,18 @@ Review scope excerpts (patch/content may be truncated):
 
 Files that require detailed review and must be accounted for in `submit_review`:
 {review_paths}
+{suggested_support_section}
 
 WORKFLOW:
 1. Start with a coverage pass. Explicitly inspect every required changed file with `get_file` or `get_base_file` before you try to finish the review.
-2. For source files, use `find_tests_for_path` when you need to understand likely regression coverage. Changed test files must also be inspected directly.
-3. After the coverage pass, identify the strongest hypotheses and actively try to disprove them.
-4. Use `get_file` for related files at the PR head, `get_base_file` for the full pre-change file, `list_directory` to explore, and `search_code` to find definitions/usages in supporting files.
-5. Only keep a finding if the fetched context still supports it.
-6. Prefer 1-5 findings total when there are clearly evidence-backed issues.
-7. Before calling `submit_review`, account for every file above by putting it in `checked_files` or `skipped_files`.
-8. Spending extra turns to inspect the files is acceptable. Do not rush to `submit_review`.
+2. If related changed files/tests are suggested above, fetch at least one of them with `get_file` before relying on broad `search_code`.
+3. For source files, use `find_tests_for_path` when you need to understand likely regression coverage. Changed test files must also be inspected directly.
+4. After the coverage pass, identify the strongest hypotheses and actively try to disprove them.
+5. Use `get_file` for related files at the PR head, `get_base_file` for the full pre-change file, `list_directory` to explore, and `search_code` only when direct file inspection still leaves a specific open question.
+6. Only keep a finding if the fetched context still supports it.
+7. Prefer 1-5 findings total when there are clearly evidence-backed issues.
+8. Before calling `submit_review`, account for every file above by putting it in `checked_files` or `skipped_files`.
+9. Spending extra turns to inspect the files is acceptable. Do not rush to `submit_review`.
 
 CRITICAL rules:
 - New hunks are annotated with line numbers (e.g. "120: code"). Use these for the "line" field.
@@ -1926,6 +2121,7 @@ CRITICAL rules:
 - A required changed file counts as `checked` only if you explicitly inspected that file with `get_file` or `get_base_file`.
 - Do not use `skipped_files` for modified code or test files that were triaged as NEEDS_REVIEW. Those files must be explicitly inspected.
 - Every allowed `skipped_files` entry must include a concrete reason.
+- Do not repeat the same no-result search. After a miss, fetch a related file/test instead.
 - Prefer precision over recall: it is far better to miss a real bug than to report a false positive.
 - YAML workflow files embed scripts in run: | blocks — YAML strips the base indentation at runtime. Do NOT report indentation errors in these blocks.
 - Use a suggestion only when the exact correction is obvious. Put only the replacement code in `suggestion`.
@@ -1939,6 +2135,7 @@ CRITICAL rules:
             base_sha=diff_scope.base_sha,
             project=config.project,
             required_files=diff_scope.files,
+            suggested_support_paths=suggested_support_paths,
             max_fetches=max_fetches,
             github_retries=config.github_retries,
         )

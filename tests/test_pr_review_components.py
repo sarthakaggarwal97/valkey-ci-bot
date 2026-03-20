@@ -425,6 +425,57 @@ def test_review_tool_handler_requires_explicit_file_fetch_before_submit() -> Non
     assert message == "Review submitted."
 
 
+def test_review_tool_handler_prioritizes_related_file_fetches_over_search_misses() -> None:
+    gh = MagicMock()
+    repo = MagicMock()
+    gh.get_repo.return_value = repo
+
+    def get_contents(path: str, ref: str | None = None):
+        if path == "src/failover_timeout.c":
+            return MagicMock(decoded_content=b"int failover_timeout(void) { return 0; }\n")
+        if path == "tests/failover_timeout.tcl":
+            return MagicMock(decoded_content=b"test failover timeout {}\n")
+        raise FileNotFoundError(path)
+
+    repo.get_contents.side_effect = get_contents
+    required_files = [
+        ChangedFile(
+            path="src/failover_timeout.c",
+            status="modified",
+            additions=3,
+            deletions=1,
+            patch='@@ -1 +1 @@\n-#include "old.h"\n+#include "new.h"',
+            contents='int failover_timeout(void) { return 0; }',
+            is_binary=False,
+        ),
+    ]
+    handler = ReviewToolHandler(
+        gh,
+        "owner/repo",
+        "head456",
+        required_files=required_files,
+        suggested_support_paths=["tests/failover_timeout.tcl"],
+    )
+
+    first = handler.execute("search_code", {"query": "failover_timeout"})
+    assert "Inspect the required changed file" in first
+    gh.search_code.assert_not_called()
+
+    handler.execute("get_file", {"path": "src/failover_timeout.c"})
+    second = handler.execute("search_code", {"query": "failover_timeout"})
+    assert "inspect at least one related changed file/test" in second
+    assert "tests/failover_timeout.tcl" in second
+    gh.search_code.assert_not_called()
+
+    handler.execute("get_file", {"path": "tests/failover_timeout.tcl"})
+    gh.search_code.return_value = []
+    miss = handler.execute("search_code", {"query": "failover_timeout"})
+    repeat = handler.execute("search_code", {"query": "failover_timeout"})
+    assert "No results found" in miss
+    assert "already returned no results" in repeat
+    gh.search_code.assert_called_once()
+
+
 def test_review_coverage_note_lists_gaps() -> None:
     coverage = ReviewCoverage(
         requested_lgtm=False,
@@ -600,18 +651,18 @@ def test_code_reviewer_runs_focused_agentic_pass_per_file() -> None:
     runtime_client = MagicMock()
     bedrock = BedrockClient(BotConfig(), client=runtime_client)
     bedrock.converse_with_tools = MagicMock(side_effect=[
-        '{"reviews":[],"lgtm":true,"checked_files":["src/failover.c"],"skipped_files":[]}',
+        '{"reviews":[],"lgtm":true,"checked_files":["src/failover_timeout.c"],"skipped_files":[]}',
         '{"reviews":[],"lgtm":true,"checked_files":["tests/failover_timeout.tcl"],"skipped_files":[]}',
     ])
     reviewer = CodeReviewer(bedrock, github_client=MagicMock())
     files = [
         ChangedFile(
-            path="src/failover.c",
+            path="src/failover_timeout.c",
             status="modified",
             additions=5,
             deletions=1,
             patch="@@ -1 +1 @@\n-old\n+new",
-            contents="int failover(void) { return 1; }",
+            contents='''#include "failover_timeout.h"\nint failover_timeout(void) { return 1; }''',
             is_binary=False,
         ),
         ChangedFile(
@@ -646,10 +697,11 @@ def test_code_reviewer_runs_focused_agentic_pass_per_file() -> None:
     assert bedrock.converse_with_tools.call_count == 2
     first_prompt = bedrock.converse_with_tools.call_args_list[0].args[1]
     second_prompt = bedrock.converse_with_tools.call_args_list[1].args[1]
-    assert "src/failover.c" in first_prompt
-    assert "tests/failover_timeout.tcl" not in first_prompt
+    assert "src/failover_timeout.c" in first_prompt
+    assert "Suggested related changed files/tests to inspect early" in first_prompt
+    assert "tests/failover_timeout.tcl" in first_prompt
     assert "tests/failover_timeout.tcl" in second_prompt
-    assert "src/failover.c" not in second_prompt
+    assert "src/failover_timeout.c" in second_prompt
 
 
 def test_code_reviewer_handles_unparseable_agentic_submission() -> None:
