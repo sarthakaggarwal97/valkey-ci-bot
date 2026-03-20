@@ -652,6 +652,26 @@ def test_code_reviewer_runs_focused_agentic_pass_per_file() -> None:
     assert "src/failover.c" not in second_prompt
 
 
+def test_code_reviewer_handles_unparseable_agentic_submission() -> None:
+    runtime_client = MagicMock()
+    bedrock = BedrockClient(BotConfig(), client=runtime_client)
+    bedrock.converse_with_tools = MagicMock(return_value="not json")
+    reviewer = CodeReviewer(bedrock, github_client=MagicMock())
+    scope = DiffScope(
+        base_sha="base123",
+        head_sha="head456",
+        files=_context().files,
+        incremental=False,
+    )
+
+    findings = reviewer.review(_context(), scope, ReviewerConfig(max_review_comments=5))
+
+    assert findings == []
+    coverage = reviewer.get_last_review_coverage()
+    assert coverage is not None
+    assert coverage.requested_lgtm is False
+
+
 def test_review_chat_includes_retrieved_context() -> None:
     bedrock = MagicMock()
     bedrock.invoke.return_value = "Answer"

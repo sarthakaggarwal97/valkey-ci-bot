@@ -646,14 +646,27 @@ class BedrockClient:
             )
 
             if not tool_use_blocks:
-                # Model produced text without calling a tool — extract it
                 text_parts = [
                     block["text"] for block in assistant_content if "text" in block
                 ]
+                assistant_text = "".join(text_parts).strip()
                 logger.info(
-                    "Model returned text without tool call on turn %d.", turn + 1,
+                    "Model returned text without tool call on turn %d.",
+                    turn + 1,
                 )
-                return "".join(text_parts)
+                reminder = (
+                    f"You must continue using tools or call {terminal_tool} with valid JSON."
+                )
+                if assistant_text:
+                    reminder += (
+                        "\n\nYour last text response was:\n"
+                        f"{assistant_text[:2000]}"
+                    )
+                messages.append({
+                    "role": "user",
+                    "content": [{"text": reminder}],
+                })
+                continue
 
             # Process each tool call
             tool_results: list[dict] = []

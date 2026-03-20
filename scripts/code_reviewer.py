@@ -1977,7 +1977,21 @@ CRITICAL rules:
         try:
             payload = json.loads(response) if isinstance(response, str) else response
         except Exception:
-            payload = _extract_json_payload(response)
+            try:
+                payload = _extract_json_payload(response)
+            except Exception as exc:
+                logger.warning(
+                    "Unparseable agentic review submission for %s#%d: %s",
+                    pr.repo,
+                    pr.number,
+                    exc,
+                )
+                payload = {
+                    "reviews": [],
+                    "lgtm": False,
+                    "checked_files": tool_handler.inspected_file_paths(),
+                    "skipped_files": [],
+                }
 
         raw_findings = []
         if isinstance(payload, dict):

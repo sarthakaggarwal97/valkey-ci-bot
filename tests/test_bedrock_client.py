@@ -423,6 +423,40 @@ class TestBedrockClientInvoke:
         assert handler.calls == 2
         assert mock_client.converse.call_count == 2
 
+    def test_converse_with_tools_reminds_after_plain_text_response(self):
+        mock_client = MagicMock()
+        submit_input = {
+            "reviews": [],
+            "lgtm": True,
+            "checked_files": ["src/failover.c"],
+            "skipped_files": [],
+        }
+        mock_client.converse.side_effect = [
+            _make_converse_response("I need to submit the review now."),
+            _make_tool_use_response("submit_review", submit_input, tool_use_id="tool-2"),
+        ]
+        client = _make_bedrock_client(mock_client=mock_client)
+        handler = MagicMock()
+
+        result = client.converse_with_tools(
+            "sys",
+            "user",
+            tools=[{"toolSpec": {"name": "submit_review", "inputSchema": {"json": {}}}}],
+            tool_handler=handler,
+            terminal_tool="submit_review",
+            max_turns=4,
+        )
+
+        assert result == json.dumps(submit_input)
+        assert mock_client.converse.call_count == 2
+        second_messages = mock_client.converse.call_args_list[1].kwargs["messages"]
+        reminder_messages = [
+            message for message in second_messages
+            if message["role"] == "user"
+            and "continue using tools or call submit_review" in message["content"][0]["text"]
+        ]
+        assert reminder_messages
+
 
 # ---------------------------------------------------------------------------
 # Property-based tests: Bedrock error handling
