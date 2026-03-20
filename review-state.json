@@ -50,5 +50,15 @@
       3965294156
     ],
     "updated_at": "2026-03-19T00:40:10.756441+00:00"
+  },
+  "hpatro/valkey#4": {
+    "repo": "hpatro/valkey",
+    "pr_number": 4,
+    "last_reviewed_head_sha": "5bfe4f178e57f41dfed62b57c3cb50ef93aee95e",
+    "summary_comment_id": 4054853531,
+    "review_comment_ids": [
+      3979576168
+    ],
+    "updated_at": "2026-03-20T05:45:19.951363+00:00"
   }
 }
