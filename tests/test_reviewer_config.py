@@ -16,7 +16,7 @@ def test_load_reviewer_config_defaults() -> None:
     assert config.enabled is True
     assert config.collaborator_only is False
     assert config.ignore_keyword == "/reviewbot: ignore"
-    assert config.daily_token_budget == 100_000_000
+    assert config.daily_token_budget == 1_000_000_000
     assert config.models.light_model_id
     assert config.models.heavy_model_id
 
