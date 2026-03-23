@@ -68,5 +68,15 @@
       3983114125
     ],
     "updated_at": "2026-03-20T17:48:56.819662+00:00"
+  },
+  "valkey-io/valkey#3358": {
+    "repo": "valkey-io/valkey",
+    "pr_number": 3358,
+    "last_reviewed_head_sha": "d522fb7e1e59ccb897692c1b7ff205db07a7de26",
+    "summary_comment_id": 4077644892,
+    "review_comment_ids": [
+      3992453090
+    ],
+    "updated_at": "2026-03-23T15:05:24.934974+00:00"
   }
 }
