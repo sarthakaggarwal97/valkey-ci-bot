@@ -136,3 +136,41 @@ def test_fetch_review_thread_marks_non_bot_reply_context() -> None:
     )
 
     assert thread.reply_to_bot is False
+
+
+def test_fetch_includes_existing_review_comments() -> None:
+    repo = MagicMock()
+    pr = MagicMock()
+    gh = MagicMock()
+    gh.get_repo.return_value = repo
+    repo.get_pull.return_value = pr
+
+    raw_file = MagicMock()
+    raw_file.filename = "src/a.c"
+    raw_file.status = "modified"
+    raw_file.additions = 3
+    raw_file.deletions = 1
+    raw_file.patch = "@@ -1 +1 @@\n-old\n+new"
+
+    review_comment = MagicMock()
+    review_comment.path = "src/a.c"
+    review_comment.line = 12
+    review_comment.original_line = None
+    review_comment.body = "Please double-check the timeout cleanup path."
+    review_comment.in_reply_to_id = None
+    review_comment.user.login = "bob"
+
+    pr.title = "Title"
+    pr.body = "Body"
+    pr.base.sha = "base123"
+    pr.head.sha = "head456"
+    pr.user.login = "alice"
+    pr.get_files.return_value = [raw_file]
+    pr.get_review_comments.return_value = [review_comment]
+
+    context = PRContextFetcher(gh).fetch("owner/repo", 1)
+
+    assert len(context.review_comments) == 1
+    assert context.review_comments[0].path == "src/a.c"
+    assert context.review_comments[0].line == 12
+    assert context.review_comments[0].author == "bob"

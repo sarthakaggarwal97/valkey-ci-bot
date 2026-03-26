@@ -13,6 +13,7 @@ from scripts.config import BotConfig, ProjectContext, RetrievalConfig, ReviewerC
 from scripts.models import (
     ChangedFile,
     DiffScope,
+    ExistingReviewComment,
     PullRequestContext,
     ReviewThread,
 )
@@ -594,6 +595,27 @@ def test_review_tool_handler_prioritizes_related_file_fetches_over_search_misses
     gh.search_code.assert_called_once()
 
 
+def test_review_tool_handler_blocks_symbol_rephrasing_after_variant_searches() -> None:
+    gh = MagicMock()
+    handler = ReviewToolHandler(
+        gh,
+        "owner/repo",
+        "head456",
+        head_file_texts={
+            "src/cluster.h": "void resetClusterStats(void);\n",
+        },
+    )
+
+    first = handler.execute("search_code", {"query": "resetClusterStats"})
+    second = handler.execute("search_code", {"query": "void resetClusterStats"})
+    third = handler.execute("search_code", {"query": "resetClusterStats(void)"})
+
+    assert "Found 1 local result(s)" in first
+    assert "Found 1 local result(s)" in second
+    assert "already searched this symbol several times" in third
+    gh.search_code.assert_not_called()
+
+
 def test_review_coverage_note_lists_gaps() -> None:
     coverage = ReviewCoverage(
         requested_lgtm=False,
@@ -802,13 +824,63 @@ def test_code_reviewer_includes_retrieved_context() -> None:
     assert "server notes" in user_prompt
 
 
-def test_code_reviewer_runs_focused_agentic_pass_per_file() -> None:
+def test_code_reviewer_includes_existing_review_discussion_in_prompts() -> None:
     runtime_client = MagicMock()
     bedrock = BedrockClient(BotConfig(), client=runtime_client)
-    bedrock.converse_with_tools = MagicMock(side_effect=[
-        '{"reviews":[],"lgtm":true,"checked_files":["src/failover_timeout.c"],"skipped_files":[]}',
-        '{"reviews":[],"lgtm":true,"checked_files":["tests/failover_timeout.tcl"],"skipped_files":[]}',
-    ])
+    bedrock.converse_with_tools = MagicMock(
+        return_value='{"reviews":[],"lgtm":true,"checked_files":["src/failover_timeout.c"],"skipped_files":[]}'
+    )
+    reviewer = CodeReviewer(bedrock, github_client=MagicMock())
+    files = [
+        ChangedFile(
+            path="src/failover_timeout.c",
+            status="modified",
+            additions=5,
+            deletions=1,
+            patch="@@ -1 +1 @@\n-old\n+new",
+            contents='int failover_timeout(void) { return 1; }',
+            is_binary=False,
+        ),
+    ]
+    context = PullRequestContext(
+        repo="owner/repo",
+        number=17,
+        title="Improve failover logic",
+        body="This updates failover behavior.",
+        base_sha="base123",
+        head_sha="head456",
+        author="alice",
+        files=files,
+        review_comments=[
+            ExistingReviewComment(
+                path="src/failover_timeout.c",
+                line=14,
+                author="bob",
+                body="This already looks risky when the timeout path retries twice.",
+            ),
+        ],
+    )
+    scope = DiffScope(
+        base_sha="base123",
+        head_sha="head456",
+        files=files,
+        incremental=False,
+    )
+
+    reviewer.review(context, scope, ReviewerConfig(max_review_comments=5))
+
+    user_prompt = bedrock.converse_with_tools.call_args.args[1]
+    assert "Existing review discussion already on this scope" in user_prompt
+    assert "bob" in user_prompt
+    assert "already looks risky" in user_prompt
+
+
+def test_code_reviewer_groups_related_files_into_single_agentic_pass() -> None:
+    runtime_client = MagicMock()
+    bedrock = BedrockClient(BotConfig(), client=runtime_client)
+    bedrock.converse_with_tools = MagicMock(
+        return_value='{"reviews":[],"lgtm":true,"checked_files":["src/failover_timeout.c","tests/failover_timeout.tcl"],"skipped_files":[]}'
+    )
     reviewer = CodeReviewer(bedrock, github_client=MagicMock())
     files = [
         ChangedFile(
@@ -849,22 +921,19 @@ def test_code_reviewer_runs_focused_agentic_pass_per_file() -> None:
 
     reviewer.review(context, scope, ReviewerConfig(max_review_comments=5))
 
-    assert bedrock.converse_with_tools.call_count == 2
-    first_prompt = bedrock.converse_with_tools.call_args_list[0].args[1]
-    second_prompt = bedrock.converse_with_tools.call_args_list[1].args[1]
-    assert "src/failover_timeout.c" in first_prompt
-    assert "Suggested related changed files/tests to inspect early" in first_prompt
-    assert "tests/failover_timeout.tcl" in first_prompt
-    assert "tests/failover_timeout.tcl" in second_prompt
-    assert "src/failover_timeout.c" in second_prompt
+    assert bedrock.converse_with_tools.call_count == 1
+    prompt = bedrock.converse_with_tools.call_args.args[1]
+    assert "src/failover_timeout.c" in prompt
+    assert "tests/failover_timeout.tcl" in prompt
+    assert "Suggested related changed files/tests to inspect early" not in prompt
 
 
 def test_code_reviewer_reuses_shared_tool_state_across_focused_agentic_passes() -> None:
     runtime_client = MagicMock()
     bedrock = BedrockClient(BotConfig(), client=runtime_client)
     bedrock.converse_with_tools = MagicMock(side_effect=[
-        '{"reviews":[],"lgtm":true,"checked_files":["src/failover_timeout.c"],"skipped_files":[]}',
-        '{"reviews":[],"lgtm":true,"checked_files":["tests/failover_timeout.tcl"],"skipped_files":[]}',
+        '{"reviews":[],"lgtm":true,"checked_files":["src/failover_timeout.c","tests/failover_timeout.tcl"],"skipped_files":[]}',
+        '{"reviews":[],"lgtm":true,"checked_files":["docs/overview.md"],"skipped_files":[]}',
     ])
     reviewer = CodeReviewer(bedrock, github_client=MagicMock())
     files = [
@@ -884,6 +953,15 @@ def test_code_reviewer_reuses_shared_tool_state_across_focused_agentic_passes() 
             deletions=0,
             patch="@@ -1 +1 @@\n-old\n+new",
             contents="test failover timeout {}",
+            is_binary=False,
+        ),
+        ChangedFile(
+            path="docs/overview.md",
+            status="modified",
+            additions=4,
+            deletions=1,
+            patch="@@ -1 +1 @@\n-old\n+new",
+            contents="Updated operational overview.",
             is_binary=False,
         ),
     ]
@@ -934,6 +1012,7 @@ def test_code_reviewer_reuses_shared_tool_state_across_focused_agentic_passes() 
     with patch("scripts.code_reviewer.ReviewToolHandler", _FakeHandler):
         reviewer.review(context, scope, ReviewerConfig(max_review_comments=5))
 
+    assert bedrock.converse_with_tools.call_count == 2
     assert len(set(shared_cache_ids)) == 1
     assert len(set(shared_search_state_ids)) == 1
 
@@ -956,6 +1035,27 @@ def test_code_reviewer_handles_unparseable_agentic_submission() -> None:
     coverage = reviewer.get_last_review_coverage()
     assert coverage is not None
     assert coverage.requested_lgtm is False
+
+
+def test_code_reviewer_withholds_findings_when_agentic_review_fails() -> None:
+    runtime_client = MagicMock()
+    bedrock = BedrockClient(BotConfig(), client=runtime_client)
+    bedrock.converse_with_tools = MagicMock(side_effect=RuntimeError("tool loop exhausted"))
+    reviewer = CodeReviewer(bedrock, github_client=MagicMock())
+    scope = DiffScope(
+        base_sha="base123",
+        head_sha="head456",
+        files=_context().files,
+        incremental=False,
+    )
+
+    findings = reviewer.review(_context(), scope, ReviewerConfig(max_review_comments=5))
+
+    assert findings == []
+    coverage = reviewer.get_last_review_coverage()
+    assert coverage is not None
+    assert coverage.requested_lgtm is False
+    assert coverage.unaccounted_files == ["src/failover.c"]
 
 
 def test_review_chat_includes_retrieved_context() -> None:

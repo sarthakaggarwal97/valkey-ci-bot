@@ -7,7 +7,13 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from scripts.github_client import retry_github_call
-from scripts.models import ChangedFile, DiffScope, PullRequestContext, ReviewThread
+from scripts.models import (
+    ChangedFile,
+    DiffScope,
+    ExistingReviewComment,
+    PullRequestContext,
+    ReviewThread,
+)
 
 if TYPE_CHECKING:
     from github import Github
@@ -60,6 +66,39 @@ class PRContextFetcher:
                     is_binary=patch is None,
                 )
             )
+        review_comments: list[ExistingReviewComment] = []
+        try:
+            for raw_comment in retry_github_call(
+                lambda: list(pr.get_review_comments()),
+                retries=self._github_retries,
+                description=f"list review comments for {repo_name}#{pr_number}",
+            ):
+                path = str(getattr(raw_comment, "path", "") or "").strip()
+                body = str(getattr(raw_comment, "body", "") or "").strip()
+                if not path or not body:
+                    continue
+                line = getattr(raw_comment, "line", None)
+                if line is None:
+                    line = getattr(raw_comment, "original_line", None)
+                review_comments.append(
+                    ExistingReviewComment(
+                        path=path,
+                        line=int(line) if isinstance(line, int) else None,
+                        author=(
+                            getattr(getattr(raw_comment, "user", None), "login", "")
+                            or "unknown"
+                        ),
+                        body=body,
+                        in_reply_to_id=getattr(raw_comment, "in_reply_to_id", None),
+                    )
+                )
+        except Exception as exc:
+            logger.warning(
+                "Failed to load review comments for %s#%d: %s",
+                repo_name,
+                pr_number,
+                exc,
+            )
         return PullRequestContext(
             repo=repo_name,
             number=pr_number,
@@ -69,6 +108,7 @@ class PRContextFetcher:
             head_sha=pr.head.sha,
             author=pr.user.login if pr.user else "",
             files=files,
+            review_comments=review_comments,
         )
 
     def hydrate_contents(

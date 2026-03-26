@@ -173,6 +173,17 @@ class ChangedFile:
 
 
 @dataclass
+class ExistingReviewComment:
+    """An existing review comment already present on the pull request."""
+
+    path: str
+    line: int | None
+    author: str
+    body: str
+    in_reply_to_id: int | None = None
+
+
+@dataclass
 class PullRequestContext:
     """Context fetched for a pull request review."""
 
@@ -184,6 +195,7 @@ class PullRequestContext:
     head_sha: str
     author: str
     files: list[ChangedFile]
+    review_comments: list[ExistingReviewComment] = field(default_factory=list)
 
 
 @dataclass

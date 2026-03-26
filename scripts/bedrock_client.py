@@ -753,21 +753,18 @@ class BedrockClient:
             "Forcing final submission.", max_turns,
         )
 
-        # Force the model to submit by sending a user message asking it
-        # to call submit_review NOW, with only the terminal tool available.
-        tool_results_for_pending = []
-        for block in tool_use_blocks:
-            tool_use = block["toolUse"]
-            tool_results_for_pending.append({
-                "toolResult": {
-                    "toolUseId": tool_use["toolUseId"],
-                    "content": [{"text": (
-                        f"Turn limit reached. You MUST call {terminal_tool} now "
-                        "with whatever findings you have so far."
-                    )}],
-                }
-            })
-        messages.append({"role": "user", "content": tool_results_for_pending})
+        # Every prior toolUse already received a matching toolResult in the
+        # loop above. Sending more toolResult blocks here corrupts the Bedrock
+        # message history, so force the final turn with a plain user reminder.
+        messages.append({
+            "role": "user",
+            "content": [{
+                "text": (
+                    f"Turn limit reached. You MUST call {terminal_tool} now with "
+                    "whatever findings you have so far. Do not answer in plain text."
+                ),
+            }],
+        })
 
         # Only offer the terminal tool so the model is forced to use it
         forced_kwargs = {**converse_kwargs}

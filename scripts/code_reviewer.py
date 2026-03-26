@@ -63,6 +63,39 @@ _CODE_SEARCH_LANGUAGE_BY_EXTENSION = {
     "tcl": "tcl",
 }
 
+_SEARCH_QUERY_STOPWORDS = frozenset({
+    "void",
+    "int",
+    "char",
+    "long",
+    "short",
+    "unsigned",
+    "signed",
+    "const",
+    "static",
+    "struct",
+    "bool",
+    "return",
+    "class",
+    "public",
+    "private",
+    "protected",
+    "function",
+    "proc",
+})
+
+_GROUPING_TOKEN_BLACKLIST = frozenset({
+    "src",
+    "source",
+    "sources",
+    "test",
+    "tests",
+    "unit",
+    "integration",
+    "docs",
+    "doc",
+})
+
 _FOCUSED_AGENTIC_FILE_LIMIT = 25
 _MIN_AGENTIC_FETCHES = 24
 _MAX_AGENTIC_FETCHES = 48
@@ -454,6 +487,16 @@ def _agentic_review_budgets(scope: DiffScope) -> tuple[int, int]:
     return max_fetches, max_turns
 
 
+def _estimate_scope_size(scope: DiffScope) -> int:
+    """Estimate serialized scope size for prompt chunking decisions."""
+    return sum(
+        len(changed_file.patch or "") * 2
+        + min(len(changed_file.contents or ""), 60_000)
+        + 200
+        for changed_file in scope.files
+    )
+
+
 def _path_tokens(path: str) -> set[str]:
     """Return normalized path/name tokens for rough related-file matching."""
     pure = PurePosixPath(path)
@@ -546,6 +589,95 @@ def _suggest_related_changed_paths(
     return ordered
 
 
+def _focused_group_edge_score(
+    current_file: ChangedFile,
+    other_file: ChangedFile,
+    project: ProjectContext,
+) -> int:
+    """Return a conservative relatedness score for focused review grouping."""
+    current_path = current_file.path
+    other_path = other_file.path
+    current_pure = PurePosixPath(current_path)
+    other_pure = PurePosixPath(other_path)
+    current_tokens = _path_tokens(current_path) - _GROUPING_TOKEN_BLACKLIST
+    other_tokens = _path_tokens(other_path) - _GROUPING_TOKEN_BLACKLIST
+    shared_tokens = current_tokens & other_tokens
+    include_basenames = _extract_include_basenames(current_file.patch or "")
+    include_basenames.update(_extract_include_basenames(current_file.contents or ""))
+
+    score = 0
+    if other_pure.name.lower() in include_basenames:
+        score += 120
+    if current_pure.stem.lower() == other_pure.stem.lower():
+        score += 90
+    score += 18 * len(shared_tokens)
+    if current_pure.parent == other_pure.parent and shared_tokens:
+        score += 20
+    if _is_test_path(current_path, project) != _is_test_path(other_path, project) and shared_tokens:
+        score += 30
+    return score
+
+
+def _build_grouped_focus_scopes(
+    diff_scope: DiffScope,
+    project: ProjectContext,
+) -> list[DiffScope]:
+    """Group obviously related changed files so the reviewer sees them together."""
+    if len(diff_scope.files) <= 1:
+        return [diff_scope]
+
+    path_to_file = {changed_file.path: changed_file for changed_file in diff_scope.files}
+    order = {changed_file.path: index for index, changed_file in enumerate(diff_scope.files)}
+    adjacency: dict[str, set[str]] = {path: set() for path in path_to_file}
+
+    for index, changed_file in enumerate(diff_scope.files):
+        for other_file in diff_scope.files[index + 1:]:
+            score = _focused_group_edge_score(changed_file, other_file, project)
+            if score < 60:
+                continue
+            adjacency[changed_file.path].add(other_file.path)
+            adjacency[other_file.path].add(changed_file.path)
+
+    if not any(neighbors for neighbors in adjacency.values()):
+        return [
+            DiffScope(
+                base_sha=diff_scope.base_sha,
+                head_sha=diff_scope.head_sha,
+                files=[changed_file],
+                incremental=diff_scope.incremental,
+            )
+            for changed_file in diff_scope.files
+        ]
+
+    components: list[list[str]] = []
+    visited: set[str] = set()
+    for changed_file in diff_scope.files:
+        root = changed_file.path
+        if root in visited:
+            continue
+        stack = [root]
+        component: list[str] = []
+        while stack:
+            current = stack.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            component.append(current)
+            stack.extend(sorted(adjacency[current] - visited, reverse=True))
+        components.append(sorted(component, key=order.get))
+
+    components.sort(key=lambda paths: min(order[path] for path in paths))
+    return [
+        DiffScope(
+            base_sha=diff_scope.base_sha,
+            head_sha=diff_scope.head_sha,
+            files=[path_to_file[path] for path in paths],
+            incremental=diff_scope.incremental,
+        )
+        for paths in components
+    ]
+
+
 def _split_patch_into_groups(patch: str, max_chars: int) -> list[str]:
     """Split a unified diff patch into groups of hunks that fit within max_chars."""
     hunks: list[str] = []
@@ -579,6 +711,48 @@ def _split_patch_into_groups(patch: str, max_chars: int) -> list[str]:
         groups.append("\n".join(current_group))
 
     return groups if groups else [patch]
+
+
+def _render_existing_review_context(
+    pr: PullRequestContext,
+    diff_scope: DiffScope,
+    *,
+    max_comments: int = 8,
+    max_chars: int = 4_000,
+) -> str:
+    """Render existing review-thread context touching the current scope."""
+    review_comments = getattr(pr, "review_comments", []) or []
+    if not review_comments:
+        return ""
+
+    allowed_paths = {changed_file.path for changed_file in diff_scope.files}
+    rendered_lines = ["Existing review discussion already on this scope:"]
+    seen: set[tuple[str, int | None, str]] = set()
+    used = len(rendered_lines[0])
+
+    relevant = [
+        comment for comment in review_comments
+        if comment.path in allowed_paths and str(comment.body or "").strip()
+    ]
+    for comment in relevant[-max_comments:]:
+        normalized_body = _normalize_finding_text(comment.body)
+        dedupe_key = (comment.path, comment.line, normalized_body)
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        location = f"{comment.path}:{comment.line}" if comment.line is not None else comment.path
+        snippet = " ".join(comment.body.split())
+        if len(snippet) > 240:
+            snippet = snippet[:237].rstrip() + "..."
+        entry = f"- {location} ({comment.author}): {snippet}"
+        if used + len(entry) > max_chars:
+            break
+        rendered_lines.append(entry)
+        used += len(entry)
+
+    return "\n".join(rendered_lines) if len(rendered_lines) > 1 else ""
+
+
 def _annotate_patch(patch: str) -> str:
     """Prefix each diff line with its right-side line number.
 
@@ -1157,6 +1331,7 @@ class ReviewToolHandler:
         ]
         self._consecutive_search_misses = 0
         self._search_miss_counts: dict[str, int] = {}
+        self._search_family_attempt_counts: dict[str, int] = {}
 
     def checked_paths(self) -> list[str]:
         """Return repository paths touched during tool use."""
@@ -1447,6 +1622,7 @@ class ReviewToolHandler:
                 path_filter,
             )
             return guidance
+        self._record_search_attempt(query, path_filter)
         local_result = self._search_local_head_content(query, path_filter)
         if local_result is not None:
             self._consecutive_search_misses = 0
@@ -1634,11 +1810,29 @@ class ReviewToolHandler:
         self._checked_paths.add(normalized)
         self._file_inspected_paths.add(normalized)
         self._consecutive_search_misses = 0
+        self._search_miss_counts.clear()
+        self._search_family_attempt_counts.clear()
 
     def _search_request_key(self, query: str, path_filter: str) -> str:
         normalized_query = " ".join(query.lower().split())
         normalized_filter = " ".join(path_filter.lower().split())
         return f"{normalized_query}::{normalized_filter}"
+
+    def _search_family_key(self, query: str, path_filter: str) -> str:
+        identifiers = [
+            token.lower()
+            for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", query or "")
+        ]
+        filtered = [token for token in identifiers if token not in _SEARCH_QUERY_STOPWORDS]
+        family = " ".join(filtered) or re.sub(r"[^a-z0-9]+", " ", (query or "").lower()).strip()
+        normalized_filter = " ".join(path_filter.lower().split())
+        return f"{family}::{normalized_filter}"
+
+    def _record_search_attempt(self, query: str, path_filter: str) -> None:
+        family_key = self._search_family_key(query, path_filter)
+        self._search_family_attempt_counts[family_key] = (
+            self._search_family_attempt_counts.get(family_key, 0) + 1
+        )
 
     def _search_guidance(self, query: str, path_filter: str) -> str | None:
         remaining_required = self.remaining_required_paths()
@@ -1669,6 +1863,20 @@ class ReviewToolHandler:
             return (
                 "That search already returned no results. Prefer direct file inspection or submit the review "
                 "with the evidence you already have."
+            )
+
+        family_key = self._search_family_key(query, path_filter)
+        if self._search_family_attempt_counts.get(family_key, 0) >= 2:
+            if remaining_support:
+                preview = "\n".join(f"- `{path}`" for path in remaining_support[:4])
+                return (
+                    "You already searched this symbol several times with small query variations. "
+                    "Stop rephrasing it and inspect a related file/test instead:\n"
+                    f"{preview}"
+                )
+            return (
+                "You already searched this symbol several times with small query variations. "
+                "Stop searching and rely on direct file inspection or submit the review with the evidence you have."
             )
 
         if self._consecutive_search_misses >= 3:
@@ -1985,30 +2193,25 @@ or
             if use_agentic else None
         )
 
-        # Prefer focused file-by-file agentic passes for modest-sized reviews so
-        # every triaged file gets its own explicit inspection pass.
+        # Prefer focused agentic scopes for modest-sized reviews so obviously
+        # related files are reviewed together instead of burning a full tool-use
+        # budget on each file in isolation.
         chunks: list[DiffScope] | None = None
         if use_agentic and 1 < len(diff_scope.files) <= _FOCUSED_AGENTIC_FILE_LIMIT:
-            chunks = [
-                DiffScope(
-                    base_sha=diff_scope.base_sha,
-                    head_sha=diff_scope.head_sha,
-                    files=[changed_file],
-                    incremental=diff_scope.incremental,
-                )
-                for changed_file in diff_scope.files
-            ]
-            logger.info(
-                "Running focused agentic review across %d file-specific pass(es).",
-                len(chunks),
+            grouped_scopes = _build_grouped_focus_scopes(
+                diff_scope,
+                config.project,
             )
+            if len(grouped_scopes) > 1:
+                chunks = grouped_scopes
+                logger.info(
+                    "Running focused agentic review across %d related scope group(s).",
+                    len(chunks),
+                )
 
         # Check if the scope needs to be split into multiple chunks.
         char_budget = (config.max_input_tokens * 4) * 3 // 4
-        scope_size = sum(
-            len(f.patch or "") * 2 + min(len(f.contents or ""), 60_000) + 200
-            for f in diff_scope.files
-        )
+        scope_size = _estimate_scope_size(diff_scope)
         if chunks is None and scope_size > char_budget:
             chunks = _chunk_diff_scope(diff_scope, max_chars_per_chunk=char_budget)
             if len(chunks) > 1:
@@ -2016,6 +2219,16 @@ or
                     "Splitting review into %d chunks (scope_size=%d, budget=%d).",
                     len(chunks), scope_size, char_budget,
                 )
+        elif chunks is not None:
+            expanded_chunks: list[DiffScope] = []
+            for chunk in chunks:
+                if _estimate_scope_size(chunk) > char_budget:
+                    expanded_chunks.extend(
+                        _chunk_diff_scope(chunk, max_chars_per_chunk=char_budget)
+                    )
+                else:
+                    expanded_chunks.append(chunk)
+            chunks = expanded_chunks
 
         if chunks is not None and len(chunks) > 1:
             all_findings: list[ReviewFinding] = []
@@ -2095,6 +2308,12 @@ Summary of all changes in this PR (for cross-file context):
 ## Project-Specific Review Guidelines
 {config.custom_instructions}
 """
+        existing_review_context = _render_existing_review_context(pr, diff_scope)
+        existing_review_section = ""
+        if existing_review_context:
+            existing_review_section = f"""
+{existing_review_context}
+"""
 
         user_prompt = f"""Review this pull request and return only actionable findings.
 
@@ -2107,6 +2326,7 @@ Review scope excerpts (patch/content may be truncated):
 
 {retrieved_context}
 {custom_instructions_section}
+{existing_review_section}
 
 Return JSON in one of these shapes:
 {{ "reviews": [ ... ], "lgtm": false }}
@@ -2117,13 +2337,14 @@ CRITICAL rules:
 - New hunks are annotated with line numbers (e.g. "120: code"). Old hunks show the replaced code without line numbers. Use the line numbers from new_hunk for the "line" field.
 - Only return findings with direct evidence in the shown patch/content excerpts.
 - Do NOT provide general feedback, summaries, explanations of changes, or praises for making good additions.
-- Prefer 1-5 findings when the diff supports them. It is better to return [] than a weak claim.
+- Prefer 0-3 findings when the diff supports them. It is better to return [] than a weak claim.
 - Each finding must include: title, trigger, impact, severity, confidence, and a concise body with the evidence.
 - The body must explain the concrete failure mode; do not write generic review advice.
 - Do NOT speculate about array sizes, buffer lengths, variable values, or code structure that is not fully visible in the provided excerpts.
 - Do not infer missing definitions from other files or from omitted parts of a file.
 - Do not report that a file, diff, or workflow looks truncated.
 - Do not ask maintainers to verify whether a symbol exists.
+- Avoid repeating a concern already raised in the existing review discussion unless you add materially new evidence or a well-supported conflicting interpretation.
 - Prefer one strongest finding per root cause; if unsure, return [].
 - Do not emit generic praise.
 - Use a suggestion only when the exact correction is obvious. Put only the replacement code in `suggestion`.
@@ -2185,9 +2406,9 @@ CRITICAL rules:
         additional context from the repository before submitting its
         final findings via ``submit_review``.
 
-        Falls back to ``_review_single_scope`` if the bedrock client
-        does not support ``converse_with_tools`` or if the GitHub client
-        is not available.
+        Uses ``_review_single_scope`` only when tool-use review is unavailable.
+        If the agentic loop itself fails, it withholds findings instead of
+        degrading into a weaker review pass.
         """
         if not isinstance(self._bedrock, BedrockClient):
             logger.info("Agentic review requires BedrockClient; falling back.")
@@ -2232,6 +2453,10 @@ CRITICAL rules:
                 + "\n".join(f"- {path}" for path in suggested_support_paths)
                 + "\n"
             )
+        existing_review_context = _render_existing_review_context(pr, diff_scope)
+        existing_review_section = ""
+        if existing_review_context:
+            existing_review_section = f"\n{existing_review_context}\n"
         max_fetches, max_turns = _agentic_review_budgets(diff_scope)
         logger.info(
             "Agentic review budget for %d file(s): max_fetches=%d, max_turns=%d.",
@@ -2251,6 +2476,7 @@ Review scope excerpts (patch/content may be truncated):
 
 {retrieved_context}
 {custom_instructions_section}
+{existing_review_section}
 
 Files that require detailed review and must be accounted for in `submit_review`:
 {review_paths}
@@ -2263,7 +2489,7 @@ WORKFLOW:
 4. After the coverage pass, identify the strongest hypotheses and actively try to disprove them.
 5. Use `get_file` for related files at the PR head, `get_base_file` for the full pre-change file, `list_directory` to explore, and `search_code` only when direct file inspection still leaves a specific open question.
 6. Only keep a finding if the fetched context still supports it.
-7. Prefer 1-5 findings total when there are clearly evidence-backed issues.
+7. Prefer 0-3 findings total when there are clearly evidence-backed issues.
 8. Before calling `submit_review`, account for every file above by putting it in `checked_files` or `skipped_files`.
 9. Spending extra turns to inspect the files is acceptable. Do not rush to `submit_review`.
 
@@ -2277,6 +2503,7 @@ CRITICAL rules:
 - Do not use `skipped_files` for modified code or test files that were triaged as NEEDS_REVIEW. Those files must be explicitly inspected.
 - Every allowed `skipped_files` entry must include a concrete reason.
 - Do not repeat the same no-result search. After a miss, fetch a related file/test instead.
+- Do not keep a finding that only restates an existing review comment unless you add materially new evidence or a clearly stronger impact statement.
 - Prefer precision over recall: it is far better to miss a real bug than to report a false positive.
 - YAML workflow files embed scripts in run: | blocks — YAML strips the base indentation at runtime. Do NOT report indentation errors in these blocks.
 - Use a suggestion only when the exact correction is obvious. Put only the replacement code in `suggestion`.
@@ -2338,12 +2565,29 @@ CRITICAL rules:
             )
         except Exception as exc:
             logger.warning(
-                "Agentic review failed (%s); falling back to single-scope.",
+                "Agentic review failed (%s); withholding findings rather than falling back to single-scope.",
                 exc,
             )
-            return self._review_single_scope(
-                pr, diff_scope, config, short_summary=short_summary,
+            required_paths = [
+                changed_file.path
+                for changed_file in diff_scope.files
+                if not changed_file.is_binary and changed_file.status != "removed"
+            ]
+            inspected_paths = tool_handler.inspected_file_paths()
+            claimed_without_tool = [
+                path for path in tool_handler.checked_paths()
+                if path in required_paths and path not in inspected_paths
+            ]
+            self._last_review_coverage = ReviewCoverage(
+                requested_lgtm=False,
+                checked_files=inspected_paths,
+                claimed_without_tool=claimed_without_tool,
+                unaccounted_files=[
+                    path for path in required_paths if path not in inspected_paths
+                ],
+                fetch_limit_hit=tool_handler.fetch_limit_hit,
             )
+            return []
 
         # Parse the submit_review JSON
         try:
@@ -2705,6 +2949,12 @@ CRITICAL rules:
             "Review scope excerpts:",
             _serialize_scope(diff_scope, max_chars=120_000),
         ]
+        existing_review_context = _render_existing_review_context(pr, diff_scope)
+        if existing_review_context:
+            context_parts.extend([
+                "",
+                existing_review_context,
+            ])
         if extra_context:
             context_parts.extend([
                 "",
@@ -2723,6 +2973,8 @@ Review the candidate findings skeptically.
 Rules:
 - Drop a candidate if it is speculative, duplicate, style-only, or not strongly supported by the shown diff/context.
 - Keep a candidate only if the trigger and impact are both concrete.
+- Drop a candidate that merely repeats an existing review comment without adding materially new evidence.
+- Drop a candidate that relies on the absence of behavior in code outside the shown diff/context.
 - You may downgrade severity or confidence if the evidence is weaker than claimed.
 - Prefer dropping a weak finding over keeping it.
 

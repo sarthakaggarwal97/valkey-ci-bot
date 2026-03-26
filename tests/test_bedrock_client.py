@@ -457,6 +457,54 @@ class TestBedrockClientInvoke:
         ]
         assert reminder_messages
 
+    def test_converse_with_tools_forces_terminal_turn_with_plain_text_reminder(self):
+        mock_client = MagicMock()
+        submit_input = {
+            "reviews": [],
+            "lgtm": True,
+            "checked_files": ["src/failover.c"],
+            "skipped_files": [],
+        }
+        mock_client.converse.side_effect = [
+            _make_tool_use_response(
+                "search_code",
+                {"query": "resetClusterStats"},
+                tool_use_id="tool-1",
+            ),
+            _make_tool_use_response(
+                "submit_review",
+                submit_input,
+                tool_use_id="tool-2",
+            ),
+        ]
+        client = _make_bedrock_client(mock_client=mock_client)
+
+        class _Handler:
+            def execute(self, tool_name: str, tool_input: dict) -> str:
+                return "Found 1 local result."
+
+        result = client.converse_with_tools(
+            "sys",
+            "user",
+            tools=[
+                {"toolSpec": {"name": "search_code", "inputSchema": {"json": {}}}},
+                {"toolSpec": {"name": "submit_review", "inputSchema": {"json": {}}}},
+            ],
+            tool_handler=_Handler(),
+            terminal_tool="submit_review",
+            max_turns=1,
+        )
+
+        assert result == json.dumps(submit_input)
+        assert mock_client.converse.call_count == 2
+        forced_call = mock_client.converse.call_args_list[1].kwargs
+        assert forced_call["toolConfig"]["tools"] == [
+            {"toolSpec": {"name": "submit_review", "inputSchema": {"json": {}}}},
+        ]
+        final_message = forced_call["messages"][-1]
+        assert final_message["role"] == "user"
+        assert "MUST call submit_review now" in final_message["content"][0]["text"]
+
 
 # ---------------------------------------------------------------------------
 # Property-based tests: Bedrock error handling
