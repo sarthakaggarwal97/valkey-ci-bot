@@ -309,6 +309,21 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-03-26T05:52:19.938410+00:00",
+          "commit_sha": "f7a64c55099efb4ee3885a2df473ab89c3948abe",
+          "workflow_run_id": 23571036111,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-fedorarawhide-tls-module-no-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-fedorarawhide-tls-module-no-tls",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null
         }
       ]
     },
@@ -644,6 +659,21 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-03-26T05:52:18.695924+00:00",
+          "commit_sha": "f7a64c55099efb4ee3885a2df473ab89c3948abe",
+          "workflow_run_id": 23571036111,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-alpine-jemalloc",
+          "matrix_params": {},
+          "failure_identifier": "test-alpine-jemalloc",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null
         }
       ]
     },
@@ -774,6 +804,21 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-03-26T05:52:19.938446+00:00",
+          "commit_sha": "f7a64c55099efb4ee3885a2df473ab89c3948abe",
+          "workflow_run_id": 23571036111,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-fedorarawhide-tls-module",
+          "matrix_params": {},
+          "failure_identifier": "test-fedorarawhide-tls-module",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null
         }
       ]
     },
@@ -859,6 +904,21 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-03-26T05:52:18.695890+00:00",
+          "commit_sha": "f7a64c55099efb4ee3885a2df473ab89c3948abe",
+          "workflow_run_id": 23571036111,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-jemalloc",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-jemalloc",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null
         }
       ]
     },
@@ -899,6 +959,21 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-03-26T05:52:18.695914+00:00",
+          "commit_sha": "f7a64c55099efb4ee3885a2df473ab89c3948abe",
+          "workflow_run_id": 23571036111,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-valgrind-no-malloc-usable-size-test",
+          "matrix_params": {},
+          "failure_identifier": "test-valgrind-no-malloc-usable-size-test",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null
         }
       ]
     },
@@ -924,6 +999,21 @@
           "error_signature": "2026-03-25T00:19:12.9120000Z Evaluating test-ubuntu-arm.if\n2026-03-25T00:19:12.9120000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && ((!contains(github.event.inputs.skipjobs, 'ubuntu') || !contains(github.event.inputs.skipjobs, 'arm'))))))\n2026-03-25T00:19:12.9120000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && (!contains(null, 'ubuntu') || !contains(github.event.inputs.skipjobs, 'arm'))))\n2026-03-25T00:19:12.9120000Z Result: true\n2026-03-25T00:19:13.0310000Z Job is about to start running on the hosted runner: GitHub Actions 1000602103\n2026-03-25T00:19:12.9140000Z Requested labels: ubuntu-24.04-arm\n2026-03-25T00:19:12.9140000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-25T00:19:12.9140000Z Waiting for a runner to pick up this job...\n2026-03-25T00:19:13.0300000Z Job is waiting for a hosted runner to come online.",
           "file_path": "",
           "fingerprint": "6c5ad4844d4c376d4fed2db1c28659f0793d5e4068dfe76eaaf108fd1b527d09"
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-03-26T05:52:18.695849+00:00",
+          "commit_sha": "f7a64c55099efb4ee3885a2df473ab89c3948abe",
+          "workflow_run_id": 23571036111,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-arm",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-arm",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null
         }
       ]
     }
