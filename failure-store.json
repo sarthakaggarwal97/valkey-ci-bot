@@ -1194,6 +1194,21 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-03-28T07:16:27.025607+00:00",
+          "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
+          "workflow_run_id": 23673018026,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-arm",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-arm",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null
         }
       ]
     },
