@@ -664,7 +664,7 @@ def _build_grouped_focus_scopes(
             visited.add(current)
             component.append(current)
             stack.extend(sorted(adjacency[current] - visited, reverse=True))
-        components.append(sorted(component, key=order.get))
+        components.append(sorted(component, key=lambda path: order[path]))
 
     components.sort(key=lambda paths: min(order[path] for path in paths))
     return [

@@ -466,16 +466,19 @@ def _analyze_and_fix(
     # Generate fix
     generation_start = time.perf_counter()
     try:
-        generate_kwargs: dict[str, object] = {
-            "repo_ref": report.commit_sha,
-        }
         if failed_hypotheses:
-            generate_kwargs["failed_hypotheses"] = failed_hypotheses
-        diff = fix_generator.generate(
-            root_cause,
-            source_files,
-            **generate_kwargs,
-        )
+            diff = fix_generator.generate(
+                root_cause,
+                source_files,
+                failed_hypotheses=failed_hypotheses,
+                repo_ref=report.commit_sha,
+            )
+        else:
+            diff = fix_generator.generate(
+                root_cause,
+                source_files,
+                repo_ref=report.commit_sha,
+            )
     except Exception as exc:
         logger.error("Fix generation failed for job %s: %s", report.job_name, exc)
         return root_cause, None
@@ -604,17 +607,21 @@ def _validate_fix(
 
             try:
                 generation_start = time.perf_counter()
-                regenerate_kwargs: dict[str, object] = {
-                    "validation_error": result.output,
-                    "repo_ref": report.commit_sha,
-                }
                 if failed_hypotheses:
-                    regenerate_kwargs["failed_hypotheses"] = failed_hypotheses
-                new_diff = fix_generator.generate(
-                    root_cause,
-                    source_files,
-                    **regenerate_kwargs,
-                )
+                    new_diff = fix_generator.generate(
+                        root_cause,
+                        source_files,
+                        validation_error=result.output,
+                        failed_hypotheses=failed_hypotheses,
+                        repo_ref=report.commit_sha,
+                    )
+                else:
+                    new_diff = fix_generator.generate(
+                        root_cause,
+                        source_files,
+                        validation_error=result.output,
+                        repo_ref=report.commit_sha,
+                    )
             except Exception as exc:
                 logger.error("Fix regeneration failed for job %s: %s", report.job_name, exc)
                 return None
