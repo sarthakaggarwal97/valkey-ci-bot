@@ -68,6 +68,10 @@ class BotConfig:
     daily_token_budget: int = 1_000_000
     min_failure_streak_before_queue: int = 2
     max_history_entries_per_test: int = 20
+    flaky_campaign_enabled: bool = True
+    flaky_max_attempts_per_run: int = 3
+    flaky_validation_passes: int = 3
+    flaky_max_failed_hypotheses: int = 20
     project: ProjectContext = field(default_factory=ProjectContext)
     validation_profiles: list[ValidationProfile] = field(default_factory=list)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
@@ -296,6 +300,11 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
     limits = raw.get("limits", {}) if isinstance(raw.get("limits"), dict) else {}
     fix_gen = raw.get("fix_generation", {}) if isinstance(raw.get("fix_generation"), dict) else {}
     retrieval = raw.get("retrieval", {}) if isinstance(raw.get("retrieval"), dict) else {}
+    flaky_campaign = (
+        raw.get("flaky_campaign", {})
+        if isinstance(raw.get("flaky_campaign"), dict)
+        else {}
+    )
 
     return BotConfig(
         bedrock_model_id=_coerce_str(
@@ -358,6 +367,22 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
         max_history_entries_per_test=_coerce_int(
             limits.get("max_history_entries_per_test"),
             defaults.max_history_entries_per_test,
+        ),
+        flaky_campaign_enabled=_coerce_bool(
+            flaky_campaign.get("enabled"),
+            defaults.flaky_campaign_enabled,
+        ),
+        flaky_max_attempts_per_run=_coerce_int(
+            flaky_campaign.get("max_attempts_per_run"),
+            defaults.flaky_max_attempts_per_run,
+        ),
+        flaky_validation_passes=_coerce_int(
+            flaky_campaign.get("validation_passes"),
+            defaults.flaky_validation_passes,
+        ),
+        flaky_max_failed_hypotheses=_coerce_int(
+            flaky_campaign.get("max_failed_hypotheses"),
+            defaults.flaky_max_failed_hypotheses,
         ),
         project=_merge_project(raw.get("project", {})) if isinstance(raw.get("project"), dict) else defaults.project,
         validation_profiles=_merge_validation_profiles(raw.get("validation_profiles", [])) if isinstance(raw.get("validation_profiles"), list) else defaults.validation_profiles,

@@ -219,6 +219,116 @@ def test_success_observation_matches_existing_failure_identity() -> None:
     assert [obs.outcome for obs in history_entry.observations] == ["fail", "pass"]
 
 
+def test_flaky_campaign_attempts_round_trip() -> None:
+    store = FailureStore()
+    report = FailureReport(
+        workflow_name="Daily",
+        workflow_file="daily.yml",
+        job_name="test-ubuntu-jemalloc",
+        matrix_params={"os": "ubuntu"},
+        commit_sha="badsha",
+        failure_source="trusted",
+        repo_full_name="valkey-io/valkey",
+        workflow_run_id=10,
+        target_branch="unstable",
+        parsed_failures=[],
+        is_unparseable=True,
+        raw_log_excerpt="boom",
+    )
+    root_cause = RootCauseReport(
+        description="Timing-sensitive cleanup hook leaks state",
+        files_to_change=["tests/unit/foo.tcl"],
+        confidence="medium",
+        rationale="Repeated failures point at shared cleanup.",
+        is_flaky=True,
+        flakiness_indicators=["timing"],
+    )
+
+    store.record("fp1", "test-ubuntu-jemalloc", "boom", "")
+    campaign = store.record_flaky_campaign_attempt(
+        "fp1",
+        report,
+        root_cause,
+        "diff-1",
+        "Tests failed: cleanup hook still races",
+        passed=False,
+        passed_runs=1,
+        attempted_runs=2,
+        summary="cleanup isolation attempt failed after 1/3 clean runs",
+        strategy="local",
+        max_failed_hypotheses=10,
+    )
+
+    assert campaign.status == "active"
+    assert campaign.total_attempts == 1
+    assert campaign.failed_hypotheses == [
+        "cleanup isolation attempt failed after 1/3 clean runs"
+    ]
+
+    restored = FailureStore()
+    restored.from_dict(store.to_dict())
+
+    restored_campaign = restored.get_flaky_campaign("fp1")
+    assert restored_campaign is not None
+    assert restored_campaign.total_attempts == 1
+    assert restored_campaign.failed_hypotheses == campaign.failed_hypotheses
+    assert restored_campaign.attempts[0].attempted_runs == 2
+    assert restored_campaign.attempts[0].strategy == "local"
+
+
+def test_clear_queued_pr_resets_campaign_status_to_validated() -> None:
+    store = FailureStore()
+    report = FailureReport(
+        workflow_name="Daily",
+        workflow_file="daily.yml",
+        job_name="test-ubuntu-jemalloc",
+        matrix_params={"os": "ubuntu"},
+        commit_sha="badsha",
+        failure_source="trusted",
+        repo_full_name="valkey-io/valkey",
+        workflow_run_id=10,
+        target_branch="unstable",
+        parsed_failures=[],
+        is_unparseable=True,
+        raw_log_excerpt="boom",
+    )
+    root_cause = RootCauseReport(
+        description="Timing-sensitive cleanup hook leaks state",
+        files_to_change=["tests/unit/foo.tcl"],
+        confidence="medium",
+        rationale="Repeated failures point at shared cleanup.",
+        is_flaky=True,
+        flakiness_indicators=["timing"],
+    )
+
+    store.record("fp1", "test-ubuntu-jemalloc", "boom", "")
+    store.record_flaky_campaign_attempt(
+        "fp1",
+        report,
+        root_cause,
+        "diff-1",
+        "all green",
+        passed=True,
+        passed_runs=3,
+        attempted_runs=3,
+        summary="cleanup isolation held for 3/3 validation runs",
+        strategy="local",
+        max_failed_hypotheses=10,
+    )
+    store.record_queued_pr("fp1", report, root_cause, "diff-1", "unstable")
+
+    store.clear_queued_pr("fp1")
+
+    entry = store.get_entry("fp1")
+    campaign = store.get_flaky_campaign("fp1")
+    assert entry is not None
+    assert campaign is not None
+    assert entry.campaign_status == "validated"
+    assert campaign.status == "validated"
+    assert entry.queued_pr_payload is None
+    assert campaign.queued_pr_payload is None
+
+
 def test_save_creates_bot_data_branch_when_missing() -> None:
     repo = MagicMock()
     repo.default_branch = "main"

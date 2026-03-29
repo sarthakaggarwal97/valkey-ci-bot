@@ -287,6 +287,26 @@ def _fix_retry_count(fix_generator: FixGenerator) -> int:
     return max(0, attempts - 1)
 
 
+def _summarize_flaky_attempt(
+    *,
+    root_cause: RootCauseReport,
+    validation_result: ValidationResult,
+    required_passes: int,
+) -> str:
+    """Build a compact backlog entry for a flaky-failure experiment."""
+    outcome = (
+        f"held for {validation_result.passed_runs}/{required_passes} validation runs"
+        if validation_result.passed
+        else f"failed after {validation_result.passed_runs}/{required_passes} clean runs"
+    )
+    detail = validation_result.output.strip().splitlines()[0] if validation_result.output.strip() else ""
+    detail = detail[:180]
+    parts = [root_cause.description.strip(), outcome]
+    if detail:
+        parts.append(detail)
+    return " | ".join(part for part in parts if part)
+
+
 def _process_failure(
     job: FailedJob,
     workflow_run: WorkflowRun,
@@ -391,6 +411,7 @@ def _analyze_and_fix(
     root_cause_analyzer: RootCauseAnalyzer,
     fix_generator: FixGenerator,
     project: "ProjectContext",
+    failed_hypotheses: list[str] | None = None,
     metrics: dict[str, float | int] | None = None,
 ) -> tuple[RootCauseReport | None, str | None]:
     """Run Analyze → Fix stages on a single failure report.
@@ -445,10 +466,15 @@ def _analyze_and_fix(
     # Generate fix
     generation_start = time.perf_counter()
     try:
+        generate_kwargs: dict[str, object] = {
+            "repo_ref": report.commit_sha,
+        }
+        if failed_hypotheses:
+            generate_kwargs["failed_hypotheses"] = failed_hypotheses
         diff = fix_generator.generate(
             root_cause,
             source_files,
-            repo_ref=report.commit_sha,
+            **generate_kwargs,
         )
     except Exception as exc:
         logger.error("Fix generation failed for job %s: %s", report.job_name, exc)
@@ -472,20 +498,44 @@ def _validate_fix(
     config: BotConfig,
     root_cause_analyzer: RootCauseAnalyzer,
     project: ProjectContext,
+    failure_store: FailureStore | None = None,
+    fingerprint: str | None = None,
     metrics: dict[str, float | int] | None = None,
 ) -> str | None:
     """Run validation with retry-driven fix regeneration.
 
     Returns the validated diff on success, or ``None`` if validation fails.
     """
+    use_flaky_campaign = root_cause.is_flaky and config.flaky_campaign_enabled
     max_validation_attempts = config.max_retries_validation + 1
+    if use_flaky_campaign:
+        max_validation_attempts = max(
+            max_validation_attempts,
+            max(1, config.flaky_max_attempts_per_run),
+        )
+    repeat_count = max(
+        1,
+        config.flaky_validation_passes if use_flaky_campaign else 1,
+    )
     current_diff = diff
+    failed_hypotheses: list[str] = []
+    if use_flaky_campaign and failure_store is not None and fingerprint:
+        existing_campaign = failure_store.get_flaky_campaign(fingerprint)
+        if existing_campaign is not None:
+            failed_hypotheses = list(existing_campaign.failed_hypotheses)
 
     for attempt in range(max_validation_attempts):
         # Validate the fix
         validation_start = time.perf_counter()
         try:
-            result: ValidationResult = validation_runner.validate(current_diff, report)
+            if repeat_count > 1:
+                result = validation_runner.validate(
+                    current_diff,
+                    report,
+                    repeat_count=repeat_count,
+                )
+            else:
+                result = validation_runner.validate(current_diff, report)
         except Exception as exc:
             logger.error(
                 "Validation error for job %s (attempt %d/%d): %s",
@@ -497,6 +547,27 @@ def _validate_fix(
                 metrics["validation_duration"] = metrics.get("validation_duration", 0.0) + (
                     time.perf_counter() - validation_start
                 )
+
+        if use_flaky_campaign and failure_store is not None and fingerprint:
+            summary = _summarize_flaky_attempt(
+                root_cause=root_cause,
+                validation_result=result,
+                required_passes=repeat_count,
+            )
+            campaign = failure_store.record_flaky_campaign_attempt(
+                fingerprint,
+                report,
+                root_cause,
+                current_diff,
+                result.output,
+                passed=result.passed,
+                passed_runs=result.passed_runs,
+                attempted_runs=result.attempted_runs,
+                summary=summary,
+                strategy=result.strategy,
+                max_failed_hypotheses=config.flaky_max_failed_hypotheses,
+            )
+            failed_hypotheses = list(campaign.failed_hypotheses)
 
         if result.passed:
             logger.info(
@@ -533,10 +604,16 @@ def _validate_fix(
 
             try:
                 generation_start = time.perf_counter()
+                regenerate_kwargs: dict[str, object] = {
+                    "validation_error": result.output,
+                    "repo_ref": report.commit_sha,
+                }
+                if failed_hypotheses:
+                    regenerate_kwargs["failed_hypotheses"] = failed_hypotheses
                 new_diff = fix_generator.generate(
-                    root_cause, source_files,
-                    validation_error=result.output,
-                    repo_ref=report.commit_sha,
+                    root_cause,
+                    source_files,
+                    **regenerate_kwargs,
                 )
             except Exception as exc:
                 logger.error("Fix regeneration failed for job %s: %s", report.job_name, exc)
@@ -719,7 +796,12 @@ def run_pipeline(
     # Build validation runner and PR manager (allow injection for testing)
     if validation_runner is None:
         clone_url = f"https://github.com/{repo_name}.git"
-        validation_runner = ValidationRunner(config, repo_clone_url=clone_url)
+        validation_runner = ValidationRunner(
+            config,
+            repo_clone_url=clone_url,
+            github_client=gh,
+            repo_full_name=repo_name,
+        )
     if pr_manager is None:
         pr_manager = PRManager(gh, repo_name, failure_store)
 
@@ -798,12 +880,26 @@ def run_pipeline(
                     fingerprint=fingerprint,
                     max_entries=max(1, config.max_history_entries_per_test),
                 )
+            existing_campaign = (
+                failure_store.get_flaky_campaign(fingerprint)
+                if fingerprint
+                else None
+            )
 
             failure_id = report.parsed_failures[0].failure_identifier if report.parsed_failures else ""
 
             # Analyze → Fix
             root_cause, diff = _analyze_and_fix(
-                report, root_cause_analyzer, fix_generator, config.project, metrics,
+                report,
+                root_cause_analyzer,
+                fix_generator,
+                config.project,
+                failed_hypotheses=(
+                    list(existing_campaign.failed_hypotheses)
+                    if existing_campaign is not None
+                    else None
+                ),
+                metrics=metrics,
             )
 
             if not diff or not root_cause:
@@ -821,7 +917,9 @@ def run_pipeline(
                 config,
                 root_cause_analyzer,
                 config.project,
-                metrics,
+                failure_store=failure_store,
+                fingerprint=fingerprint,
+                metrics=metrics,
             )
             if validated_diff is None:
                 summary.add_result(job.name, failure_id, "validation-failed")
@@ -897,6 +995,11 @@ def run_pipeline(
                 )
                 pr_creation_duration = time.perf_counter() - pr_creation_start
                 if pr_url:
+                    if fingerprint:
+                        failure_store.mark_flaky_campaign_status(
+                            fingerprint,
+                            "pr-created",
+                        )
                     pr_manager.post_summary_comment(
                         pr_url,
                         _build_pr_summary_comment(
@@ -1083,6 +1186,7 @@ def run_reconciliation(
         try:
             pr_url = pr_manager.create_pr(patch, report, root_cause, target_branch)
             rate_limiter.record_pr_created()
+            failure_store.mark_flaky_campaign_status(fingerprint, "pr-created")
             failure_store.clear_queued_pr(fingerprint)
             rate_limiter.dequeue_failure(fingerprint)
             summary.add_result(

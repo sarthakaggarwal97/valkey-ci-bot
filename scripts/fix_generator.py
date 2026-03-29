@@ -66,6 +66,7 @@ def _build_user_prompt(
     retrieved_context: str = "",
     apply_error: str | None = None,
     validation_error: str | None = None,
+    failed_hypotheses: list[str] | None = None,
 ) -> str:
     """Build the user prompt for fix generation."""
     parts: list[str] = []
@@ -84,6 +85,15 @@ def _build_user_prompt(
 
     if retrieved_context:
         parts.append(f"\n{retrieved_context}")
+
+    if failed_hypotheses:
+        parts.append("\n## Previous Failed Approaches")
+        parts.append(
+            "Avoid repeating these prior ideas unless the new evidence directly "
+            "contradicts them."
+        )
+        for item in failed_hypotheses:
+            parts.append(f"- {item}")
 
     if apply_error:
         parts.append("\n## Previous Attempt Failed")
@@ -194,6 +204,7 @@ class FixGenerator:
         root_cause: RootCauseReport,
         source_files: dict[str, str],
         validation_error: str | None = None,
+        failed_hypotheses: list[str] | None = None,
         *,
         repo_ref: str | None = None,
     ) -> str | None:
@@ -255,6 +266,7 @@ class FixGenerator:
             user_prompt = _build_user_prompt(
                 root_cause, source_files, retrieved_context, apply_error,
                 validation_error=validation_error if attempt == 0 else None,
+                failed_hypotheses=failed_hypotheses,
             )
 
             # Call Bedrock
@@ -338,6 +350,7 @@ class FixGenerator:
         root_cause: RootCauseReport,
         source_files: dict[str, str],
         validation_error: str | None = None,
+        failed_hypotheses: list[str] | None = None,
         *,
         repo_ref: str | None = None,
     ) -> str | None:
@@ -390,6 +403,7 @@ class FixGenerator:
         user_prompt = _build_user_prompt(
             root_cause, source_files, retrieved_context, None,
             validation_error=validation_error,
+            failed_hypotheses=failed_hypotheses,
         )
         user_prompt += (
             "\n\nYou have tools to fetch additional files from the repository "

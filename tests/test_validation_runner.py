@@ -447,3 +447,47 @@ class TestValidationPipeline:
             assert env is not None
             assert env.get("SANITIZER") == "address"
             assert env.get("BUILD_TLS") == "no"
+
+    def test_repeat_count_requires_multiple_clean_runs(self):
+        config = _make_config()
+        runner = ValidationRunner(config, repo_clone_url="https://github.com/owner/repo.git")
+        report = _make_failure_report()
+
+        with patch.object(
+            runner,
+            "_validate_once",
+            side_effect=[
+                ValidationResult(passed=True, output="ok-1"),
+                ValidationResult(passed=True, output="ok-2"),
+                ValidationResult(passed=True, output="ok-3"),
+            ],
+        ) as validate_once:
+            result = runner.validate("diff content", report, repeat_count=3)
+
+        assert result.passed is True
+        assert result.passed_runs == 3
+        assert result.attempted_runs == 3
+        assert validate_once.call_count == 3
+        assert "[run 3/3]" in result.output
+
+    def test_repeat_count_stops_after_first_failed_run(self):
+        config = _make_config()
+        runner = ValidationRunner(config, repo_clone_url="https://github.com/owner/repo.git")
+        report = _make_failure_report()
+
+        with patch.object(
+            runner,
+            "_validate_once",
+            side_effect=[
+                ValidationResult(passed=True, output="ok-1"),
+                ValidationResult(passed=False, output="boom"),
+                ValidationResult(passed=True, output="should-not-run"),
+            ],
+        ) as validate_once:
+            result = runner.validate("diff content", report, repeat_count=3)
+
+        assert result.passed is False
+        assert result.passed_runs == 1
+        assert result.attempted_runs == 2
+        assert validate_once.call_count == 2
+        assert "boom" in result.output

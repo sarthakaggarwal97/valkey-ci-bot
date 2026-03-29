@@ -74,6 +74,27 @@ fix_generation:
   max_validation_retries: 1
 
 # ---------------------------------------------------------------------------
+# Flaky failure campaigns
+# ---------------------------------------------------------------------------
+flaky_campaign:
+  # When enabled, flaky failures use a persistent experiment loop instead of
+  # a one-shot fix attempt. Failed ideas are recorded and fed back into future
+  # attempts so the model avoids repeating them.
+  enabled: true
+
+  # Maximum number of new patch experiments the bot should try for a flaky
+  # failure during a single pipeline invocation.
+  max_attempts_per_run: 3
+
+  # Number of clean validation passes required before a flaky fix is treated
+  # as stable enough to queue or open as a PR.
+  validation_passes: 3
+
+  # Cap the persistent backlog of failed hypotheses retained per flaky
+  # failure fingerprint.
+  max_failed_hypotheses: 20
+
+# ---------------------------------------------------------------------------
 # Monitored workflows
 # ---------------------------------------------------------------------------
 # List of CI workflow FILENAMES to monitor for failures.

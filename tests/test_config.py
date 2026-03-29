@@ -82,6 +82,12 @@ full_config_strategy = st.fixed_dictionaries({
         "max_retries": st.integers(min_value=0, max_value=10),
         "max_validation_retries": st.integers(min_value=0, max_value=10),
     }),
+    "flaky_campaign": st.fixed_dictionaries({
+        "enabled": st.booleans(),
+        "max_attempts_per_run": st.integers(min_value=1, max_value=10),
+        "validation_passes": st.integers(min_value=1, max_value=10),
+        "max_failed_hypotheses": st.integers(min_value=1, max_value=100),
+    }),
     "monitored_workflows": st.lists(workflow_file, min_size=1, max_size=6),
     "retrieval": st.fixed_dictionaries({
         "enabled": st.booleans(),
@@ -130,6 +136,12 @@ def test_config_round_trip_all_fields(config_data: dict) -> None:
         assert cfg.confidence_threshold == config_data["fix_generation"]["confidence_threshold"]
         assert cfg.max_retries_fix == config_data["fix_generation"]["max_retries"]
         assert cfg.max_retries_validation == config_data["fix_generation"]["max_validation_retries"]
+
+        # Flaky campaign section
+        assert cfg.flaky_campaign_enabled == config_data["flaky_campaign"]["enabled"]
+        assert cfg.flaky_max_attempts_per_run == config_data["flaky_campaign"]["max_attempts_per_run"]
+        assert cfg.flaky_validation_passes == config_data["flaky_campaign"]["validation_passes"]
+        assert cfg.flaky_max_failed_hypotheses == config_data["flaky_campaign"]["max_failed_hypotheses"]
 
         # Monitored workflows
         assert cfg.monitored_workflows == config_data["monitored_workflows"]
@@ -184,6 +196,10 @@ def test_missing_config_returns_defaults() -> None:
     assert cfg.max_failures_per_run == defaults.max_failures_per_run
     assert cfg.max_open_bot_prs == defaults.max_open_bot_prs
     assert cfg.daily_token_budget == defaults.daily_token_budget
+    assert cfg.flaky_campaign_enabled == defaults.flaky_campaign_enabled
+    assert cfg.flaky_max_attempts_per_run == defaults.flaky_max_attempts_per_run
+    assert cfg.flaky_validation_passes == defaults.flaky_validation_passes
+    assert cfg.flaky_max_failed_hypotheses == defaults.flaky_max_failed_hypotheses
     assert cfg.retrieval == defaults.retrieval
 
     # Project defaults
@@ -249,6 +265,13 @@ partial_fix_generation = st.fixed_dictionaries({}, optional={
     "max_validation_retries": st.integers(min_value=0, max_value=10),
 })
 
+partial_flaky_campaign = st.fixed_dictionaries({}, optional={
+    "enabled": st.booleans(),
+    "max_attempts_per_run": st.integers(min_value=1, max_value=10),
+    "validation_passes": st.integers(min_value=1, max_value=10),
+    "max_failed_hypotheses": st.integers(min_value=1, max_value=100),
+})
+
 
 # --- Property 18 Tests ---
 
@@ -286,6 +309,10 @@ def test_invalid_yaml_returns_full_defaults(invalid_content: str) -> None:
         assert cfg.max_failures_per_run == defaults.max_failures_per_run
         assert cfg.max_open_bot_prs == defaults.max_open_bot_prs
         assert cfg.daily_token_budget == defaults.daily_token_budget
+        assert cfg.flaky_campaign_enabled == defaults.flaky_campaign_enabled
+        assert cfg.flaky_max_attempts_per_run == defaults.flaky_max_attempts_per_run
+        assert cfg.flaky_validation_passes == defaults.flaky_validation_passes
+        assert cfg.flaky_max_failed_hypotheses == defaults.flaky_max_failed_hypotheses
         assert cfg.retrieval == defaults.retrieval
         assert cfg.project.language == ProjectContext().language
         assert cfg.project.build_system == ProjectContext().build_system
@@ -326,6 +353,10 @@ def test_unrecognized_fields_ignored_with_defaults(extra_fields: dict) -> None:
         assert cfg.max_failures_per_run == defaults.max_failures_per_run
         assert cfg.max_open_bot_prs == defaults.max_open_bot_prs
         assert cfg.daily_token_budget == defaults.daily_token_budget
+        assert cfg.flaky_campaign_enabled == defaults.flaky_campaign_enabled
+        assert cfg.flaky_max_attempts_per_run == defaults.flaky_max_attempts_per_run
+        assert cfg.flaky_validation_passes == defaults.flaky_validation_passes
+        assert cfg.flaky_max_failed_hypotheses == defaults.flaky_max_failed_hypotheses
         assert cfg.retrieval == defaults.retrieval
         assert cfg.project.language == ProjectContext().language
         assert cfg.validation_profiles == []
@@ -342,12 +373,14 @@ def test_unrecognized_fields_ignored_with_defaults(extra_fields: dict) -> None:
     bedrock_data=partial_bedrock,
     limits_data=partial_limits,
     fix_gen_data=partial_fix_generation,
+    flaky_data=partial_flaky_campaign,
     extra_fields=unrecognized_fields_strategy,
 )
 def test_valid_fields_preserved_with_unrecognized_ignored(
     bedrock_data: dict,
     limits_data: dict,
     fix_gen_data: dict,
+    flaky_data: dict,
     extra_fields: dict,
 ) -> None:
     """Property 18 (part 3): Valid recognized fields are preserved while
@@ -362,6 +395,8 @@ def test_valid_fields_preserved_with_unrecognized_ignored(
         config_data["limits"] = limits_data
     if fix_gen_data:
         config_data["fix_generation"] = fix_gen_data
+    if flaky_data:
+        config_data["flaky_campaign"] = flaky_data
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as f:
         yaml.safe_dump(config_data, f)
@@ -387,6 +422,10 @@ def test_valid_fields_preserved_with_unrecognized_ignored(
         assert cfg.confidence_threshold == fix_gen_data.get("confidence_threshold", defaults.confidence_threshold)
         assert cfg.max_retries_fix == fix_gen_data.get("max_retries", defaults.max_retries_fix)
         assert cfg.max_retries_validation == fix_gen_data.get("max_validation_retries", defaults.max_retries_validation)
+        assert cfg.flaky_campaign_enabled == flaky_data.get("enabled", defaults.flaky_campaign_enabled)
+        assert cfg.flaky_max_attempts_per_run == flaky_data.get("max_attempts_per_run", defaults.flaky_max_attempts_per_run)
+        assert cfg.flaky_validation_passes == flaky_data.get("validation_passes", defaults.flaky_validation_passes)
+        assert cfg.flaky_max_failed_hypotheses == flaky_data.get("max_failed_hypotheses", defaults.flaky_max_failed_hypotheses)
 
         # Unrecognized top-level fields should not affect anything
         assert cfg.monitored_workflows == defaults.monitored_workflows

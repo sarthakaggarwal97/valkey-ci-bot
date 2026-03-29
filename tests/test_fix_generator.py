@@ -301,6 +301,21 @@ class TestPatchValidation:
         assert "Retrieved Valkey Context" in user_prompt
         assert "replication subsystem notes" in user_prompt
 
+    def test_includes_failed_hypotheses_when_provided(self):
+        gen, mock_bedrock = _make_generator()
+        rc = _make_root_cause()
+
+        with patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
+            gen.generate(
+                rc,
+                {"src/server.c": "void handle_request(void) {}"},
+                failed_hypotheses=["null-guard only did not hold in repeated validation"],
+            )
+
+        user_prompt = mock_bedrock.invoke.call_args[0][1]
+        assert "Previous Failed Approaches" in user_prompt
+        assert "null-guard only did not hold" in user_prompt
+
 
 # ---------------------------------------------------------------------------
 # FixGenerator.generate — agentic path safety

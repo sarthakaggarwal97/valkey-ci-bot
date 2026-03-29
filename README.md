@@ -5,6 +5,7 @@ An AI agent for Valkey CI failure remediation, PR review, and automated backport
 ## Features
 
 - **CI Failure Agent** — analyzes workflow failures, generates and validates fixes, opens PRs with approval gating
+- **Flaky Failure Campaigns** — persists experiment history for flaky failures, repeats validation runs, and feeds failed hypotheses back into later attempts
 - **PR Review Agent** — reviews pull requests via the GitHub API, posts summaries, publishes review comments, answers follow-up questions
 - **Backport Agent** — cherry-picks merged PRs onto release branches with LLM-based conflict resolution
 - **Fuzzer Monitor** — watches fuzzer runs, detects anomalies, creates GitHub issues
@@ -39,8 +40,13 @@ When a CI workflow fails in `valkey-io/valkey`, the agent:
 2. retrieves and parses logs using format-specific parsers (gtest, tcl, build errors, sentinel/cluster)
 3. analyzes root cause using Amazon Bedrock
 4. generates a candidate fix
-5. validates the fix by re-running the failing workflow
+5. validates the fix by rebuilding and re-running the failing job locally
 6. queues the validated fix for human approval before opening a PR
+
+For flaky failures, the agent now switches to a campaign mode: it stores prior
+failed ideas in the failure store, repeats validation multiple times before
+trusting a fix, and reuses that backlog on later attempts so it does not keep
+trying the same weak patch.
 
 Required GitHub configuration:
 

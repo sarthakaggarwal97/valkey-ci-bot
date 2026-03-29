@@ -12,12 +12,16 @@ from typing import TYPE_CHECKING
 from github.GithubException import GithubException
 
 from scripts.models import (
+    FlakyCampaignAttempt,
+    FlakyCampaignState,
     FailureHistoryEntry,
     FailureHistorySummary,
     FailureObservation,
     FailureReport,
     FailureStoreEntry,
     RootCauseReport,
+    flaky_campaign_state_from_dict,
+    flaky_campaign_state_to_dict,
     failure_report_to_dict,
     root_cause_report_to_dict,
 )
@@ -49,6 +53,7 @@ class FailureStore:
         self._state_repo_name = state_repo_full_name or repo_full_name
         self._entries: dict[str, FailureStoreEntry] = {}
         self._history: dict[str, FailureHistoryEntry] = {}
+        self._campaigns: dict[str, FlakyCampaignState] = {}
 
     @property
     def entries(self) -> dict[str, FailureStoreEntry]:
@@ -57,6 +62,10 @@ class FailureStore:
     @property
     def history(self) -> dict[str, FailureHistoryEntry]:
         return self._history
+
+    @property
+    def campaigns(self) -> dict[str, FlakyCampaignState]:
+        return self._campaigns
 
     @staticmethod
     def compute_fingerprint(
@@ -124,11 +133,135 @@ class FailureStore:
             created_at=existing.created_at if existing else now,
             updated_at=now,
             queued_pr_payload=existing.queued_pr_payload if existing else None,
+            campaign_status=existing.campaign_status if existing else None,
         )
         logger.info(
             "Recorded failure: fingerprint=%s, identifier=%s, status=%s",
             fingerprint[:12], failure_identifier, status,
         )
+
+    def get_flaky_campaign(self, fingerprint: str) -> FlakyCampaignState | None:
+        """Return the stored flaky campaign state for a fingerprint."""
+        return self._campaigns.get(fingerprint)
+
+    def _get_or_create_campaign(
+        self,
+        fingerprint: str,
+        report: FailureReport,
+        failure_identifier: str,
+    ) -> FlakyCampaignState:
+        campaign = self._campaigns.get(fingerprint)
+        if campaign is not None:
+            return campaign
+        now = datetime.now(timezone.utc).isoformat()
+        history_key = self.compute_history_key(
+            report.workflow_file,
+            report.job_name,
+            report.matrix_params,
+            failure_identifier,
+        )
+        campaign = FlakyCampaignState(
+            fingerprint=fingerprint,
+            history_key=history_key,
+            failure_identifier=failure_identifier,
+            workflow_file=report.workflow_file,
+            job_name=report.job_name,
+            matrix_params=dict(report.matrix_params),
+            repo_full_name=report.repo_full_name,
+            branch=report.target_branch,
+            status="active",
+            created_at=now,
+            updated_at=now,
+        )
+        self._campaigns[fingerprint] = campaign
+        return campaign
+
+    def record_flaky_campaign_attempt(
+        self,
+        fingerprint: str,
+        report: FailureReport,
+        root_cause: RootCauseReport,
+        patch: str,
+        validation_output: str,
+        *,
+        passed: bool,
+        passed_runs: int,
+        attempted_runs: int,
+        summary: str,
+        strategy: str,
+        max_failed_hypotheses: int,
+    ) -> FlakyCampaignState:
+        """Append one experiment attempt to the persistent flaky campaign."""
+        failure_identifier = (
+            report.parsed_failures[0].failure_identifier
+            if report.parsed_failures
+            else report.job_name
+        )
+        campaign = self._get_or_create_campaign(
+            fingerprint,
+            report,
+            failure_identifier,
+        )
+        now = datetime.now(timezone.utc).isoformat()
+        attempt_number = campaign.total_attempts + 1
+        campaign.total_attempts = attempt_number
+        campaign.updated_at = now
+        campaign.root_cause = root_cause_report_to_dict(root_cause)
+        campaign.current_patch = patch
+        campaign.last_validation_output = validation_output
+        campaign.last_strategy = strategy
+        if not campaign.best_validation_output or passed:
+            campaign.best_validation_output = validation_output
+        attempt = FlakyCampaignAttempt(
+            attempt_number=attempt_number,
+            created_at=now,
+            patch=patch,
+            summary=summary,
+            strategy=strategy,
+            validation_output=validation_output,
+            passed=passed,
+            passed_runs=passed_runs,
+            attempted_runs=attempted_runs,
+        )
+        campaign.attempts.append(attempt)
+        if passed:
+            campaign.consecutive_full_passes = passed_runs
+            campaign.status = "validated"
+        else:
+            campaign.status = "active"
+            campaign.consecutive_full_passes = 0
+            if max_failed_hypotheses == 0:
+                campaign.failed_hypotheses = []
+            else:
+                if summary not in campaign.failed_hypotheses:
+                    campaign.failed_hypotheses.append(summary)
+            if max_failed_hypotheses > 0:
+                campaign.failed_hypotheses = campaign.failed_hypotheses[-max_failed_hypotheses:]
+        entry = self._entries.get(fingerprint)
+        if entry is not None:
+            entry.campaign_status = campaign.status
+            entry.updated_at = now
+        return campaign
+
+    def mark_flaky_campaign_status(
+        self,
+        fingerprint: str,
+        status: str,
+        *,
+        queued_pr_payload: dict | None = None,
+    ) -> None:
+        """Update the campaign lifecycle status for a fingerprint."""
+        campaign = self._campaigns.get(fingerprint)
+        if campaign is None:
+            return
+        campaign.status = status
+        campaign.updated_at = datetime.now(timezone.utc).isoformat()
+        if queued_pr_payload is not None:
+            campaign.queued_pr_payload = queued_pr_payload
+        entry = self._entries.get(fingerprint)
+        if entry is not None:
+            entry.campaign_status = status
+            entry.updated_at = campaign.updated_at
 
     def record_queued_pr(
         self,
@@ -165,6 +298,11 @@ class FailureStore:
             "patch": patch,
             "target_branch": target_branch,
         }
+        self.mark_flaky_campaign_status(
+            fingerprint,
+            "queued",
+            queued_pr_payload=self._entries[fingerprint].queued_pr_payload,
+        )
 
     def clear_queued_pr(self, fingerprint: str) -> None:
         """Clear any queued PR payload associated with a fingerprint."""
@@ -172,6 +310,15 @@ class FailureStore:
         if entry is not None:
             entry.queued_pr_payload = None
             entry.updated_at = datetime.now(timezone.utc).isoformat()
+        campaign = self._campaigns.get(fingerprint)
+        if campaign is not None:
+            campaign.queued_pr_payload = None
+            if campaign.status == "queued":
+                campaign.status = "validated"
+            campaign.updated_at = datetime.now(timezone.utc).isoformat()
+            if entry is not None:
+                entry.campaign_status = campaign.status
+                entry.updated_at = campaign.updated_at
 
     def record_failure_observation(
         self,
@@ -374,6 +521,12 @@ class FailureStore:
         if entry:
             entry.status = "abandoned"
             entry.updated_at = datetime.now(timezone.utc).isoformat()
+            if entry.campaign_status in {"active", "validated", "queued"}:
+                entry.campaign_status = "abandoned"
+        campaign = self._campaigns.get(fingerprint)
+        if campaign is not None:
+            campaign.status = "abandoned"
+            campaign.updated_at = datetime.now(timezone.utc).isoformat()
 
     def reconcile_pr_states(self) -> None:
         """Reconcile store entries against actual PR states via GitHub API."""
@@ -393,8 +546,20 @@ class FailureStore:
                 pr = repo.get_pull(pr_number)
                 if pr.merged:
                     entry.status = "merged"
+                    if entry.campaign_status:
+                        entry.campaign_status = "pr-created"
+                    campaign = self._campaigns.get(fingerprint)
+                    if campaign is not None:
+                        campaign.status = "pr-created"
+                        campaign.updated_at = datetime.now(timezone.utc).isoformat()
                 elif pr.state == "closed":
                     entry.status = "abandoned"
+                    if entry.campaign_status:
+                        entry.campaign_status = "abandoned"
+                    campaign = self._campaigns.get(fingerprint)
+                    if campaign is not None:
+                        campaign.status = "abandoned"
+                        campaign.updated_at = datetime.now(timezone.utc).isoformat()
                 entry.updated_at = datetime.now(timezone.utc).isoformat()
             except Exception as exc:
                 logger.warning("Failed to reconcile PR for %s: %s", fingerprint, exc)
@@ -414,6 +579,7 @@ class FailureStore:
                     "created_at": e.created_at,
                     "updated_at": e.updated_at,
                     "queued_pr_payload": e.queued_pr_payload,
+                    "campaign_status": e.campaign_status,
                 }
                 for fp, e in self._entries.items()
             },
@@ -421,12 +587,17 @@ class FailureStore:
                 key: asdict(entry)
                 for key, entry in self._history.items()
             },
+            "campaigns": {
+                fp: flaky_campaign_state_to_dict(state)
+                for fp, state in self._campaigns.items()
+            },
         }
 
     def from_dict(self, data: dict) -> None:
         """Deserialize the store from a dict."""
         self._entries.clear()
         self._history.clear()
+        self._campaigns.clear()
 
         entries_raw = data.get("entries") if isinstance(data.get("entries"), dict) else data
         if not isinstance(entries_raw, dict):
@@ -443,6 +614,7 @@ class FailureStore:
                 created_at=raw["created_at"],
                 updated_at=raw["updated_at"],
                 queued_pr_payload=raw.get("queued_pr_payload"),
+                campaign_status=raw.get("campaign_status"),
             )
         history_raw = data.get("history", {}) if isinstance(data, dict) else {}
         if not isinstance(history_raw, dict):
@@ -482,6 +654,12 @@ class FailureStore:
                 test_name=raw.get("test_name"),
                 observations=observations,
             )
+        campaigns_raw = data.get("campaigns", {}) if isinstance(data, dict) else {}
+        if isinstance(campaigns_raw, dict):
+            for fingerprint, raw in campaigns_raw.items():
+                if not isinstance(raw, dict):
+                    continue
+                self._campaigns[str(fingerprint)] = flaky_campaign_state_from_dict(raw)
 
     def _ensure_store_branch(self, repo) -> None:
         """Create the data branch from the default branch when missing."""
@@ -517,6 +695,7 @@ class FailureStore:
             logger.info("Could not load failure store (may not exist yet): %s", exc)
             self._entries.clear()
             self._history.clear()
+            self._campaigns.clear()
 
     def save(self) -> None:
         """Save the store to the dedicated branch via GitHub API."""

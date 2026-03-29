@@ -14,6 +14,7 @@ import re
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Any
 
 from scripts.config import BotConfig, ValidationProfile
 from scripts.models import FailureReport, ValidationResult
@@ -156,14 +157,20 @@ class ValidationRunner:
         config: BotConfig,
         *,
         repo_clone_url: str | None = None,
+        github_client: Any | None = None,
+        repo_full_name: str = "",
     ):
         self._config = config
         self._repo_clone_url = repo_clone_url
+        self._github_client = github_client
+        self._repo_full_name = repo_full_name
 
     def validate(
         self,
         patch: str,
         failure_report: FailureReport,
+        *,
+        repeat_count: int = 1,
     ) -> ValidationResult:
         """Run validation for a proposed fix.
 
@@ -183,14 +190,40 @@ class ValidationRunner:
             return ValidationResult(
                 passed=False,
                 output="untrusted-fork",
+                strategy="local",
             )
+        requested_runs = max(1, repeat_count)
+        outputs: list[str] = []
+        for run_number in range(1, requested_runs + 1):
+            result = self._validate_once(patch, failure_report)
+            outputs.append(f"[run {run_number}/{requested_runs}]\n{result.output}")
+            if not result.passed:
+                return ValidationResult(
+                    passed=False,
+                    output="\n\n".join(outputs),
+                    strategy="local",
+                    passed_runs=run_number - 1,
+                    attempted_runs=run_number,
+                )
+        return ValidationResult(
+            passed=True,
+            output="\n\n".join(outputs),
+            strategy="local",
+            passed_runs=requested_runs,
+            attempted_runs=requested_runs,
+        )
 
+    def _validate_once(
+        self,
+        patch: str,
+        failure_report: FailureReport,
+    ) -> ValidationResult:
+        """Run a single clean validation pass for the proposed fix."""
         logger.info(
             "Validation started for job %s (commit %s).",
             failure_report.job_name, failure_report.commit_sha[:12],
         )
 
-        # Select matching validation profile
         profile = _match_profile(
             failure_report.job_name,
             failure_report.matrix_params,
@@ -211,23 +244,29 @@ class ValidationRunner:
             profile.job_name_pattern, failure_report.job_name,
         )
 
-        # Run in a temporary directory
         with tempfile.TemporaryDirectory(prefix="ci-bot-validate-") as tmpdir:
             work_dir = Path(tmpdir) / "repo"
 
-            # Step 1: Clone / checkout consumer repo at target SHA
             clone_ok, clone_output = self._checkout_repo(
                 failure_report.commit_sha, work_dir
             )
             if not clone_ok:
-                return ValidationResult(passed=False, output=clone_output)
+                return ValidationResult(
+                    passed=False,
+                    output=clone_output,
+                    strategy="local",
+                    attempted_runs=1,
+                )
 
-            # Step 2: Apply patch
             apply_ok, apply_output = self._apply_patch(patch, work_dir)
             if not apply_ok:
-                return ValidationResult(passed=False, output=apply_output)
+                return ValidationResult(
+                    passed=False,
+                    output=apply_output,
+                    strategy="local",
+                    attempted_runs=1,
+                )
 
-            # Step 3: Run install commands (if any)
             if profile.install_commands:
                 install_ok, install_output = _run_commands(
                     profile.install_commands, work_dir, env=profile.env
@@ -236,9 +275,10 @@ class ValidationRunner:
                     return ValidationResult(
                         passed=False,
                         output=f"Install failed:\n{install_output}",
+                        strategy="local",
+                        attempted_runs=1,
                     )
 
-            # Step 4: Build
             if profile.build_commands:
                 build_ok, build_output = _run_commands(
                     profile.build_commands, work_dir, env=profile.env
@@ -247,11 +287,12 @@ class ValidationRunner:
                     return ValidationResult(
                         passed=False,
                         output=f"Build failed:\n{build_output}",
+                        strategy="local",
+                        attempted_runs=1,
                     )
             else:
                 build_output = ""
 
-            # Step 5: Run tests (build-only profiles may have no test commands)
             if profile.test_commands:
                 test_cmds = _substitute_test_commands(
                     profile.test_commands, failure_report
@@ -263,6 +304,8 @@ class ValidationRunner:
                     return ValidationResult(
                         passed=False,
                         output=f"Tests failed:\n{test_output}",
+                        strategy="local",
+                        attempted_runs=1,
                     )
             else:
                 test_output = ""
@@ -271,7 +314,6 @@ class ValidationRunner:
                     failure_report.job_name,
                 )
 
-        # All steps passed
         combined = "\n".join(
             part for part in [build_output, test_output] if part
         )
@@ -279,7 +321,13 @@ class ValidationRunner:
             "Validation complete for job %s: passed.",
             failure_report.job_name,
         )
-        return ValidationResult(passed=True, output=combined or "Validation passed.")
+        return ValidationResult(
+            passed=True,
+            output=combined or "Validation passed.",
+            strategy="local",
+            passed_runs=1,
+            attempted_runs=1,
+        )
 
     def _checkout_repo(
         self, commit_sha: str, work_dir: Path

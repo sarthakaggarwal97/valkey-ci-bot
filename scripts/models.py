@@ -126,6 +126,51 @@ class ValidationResult:
     """Result of running validation against a proposed fix."""
     passed: bool
     output: str  # build/test output on failure
+    strategy: str = "local"  # "local" or "ci-rerun"
+    passed_runs: int = 0
+    attempted_runs: int = 0
+
+
+@dataclass
+class FlakyCampaignAttempt:
+    """One persistent experiment attempt for a flaky failure campaign."""
+
+    attempt_number: int
+    created_at: str
+    patch: str
+    summary: str
+    strategy: str
+    validation_output: str
+    passed: bool
+    passed_runs: int = 0
+    attempted_runs: int = 0
+
+
+@dataclass
+class FlakyCampaignState:
+    """Persistent state for long-running flaky-failure remediation."""
+
+    fingerprint: str
+    history_key: str
+    failure_identifier: str
+    workflow_file: str
+    job_name: str
+    matrix_params: dict[str, str]
+    repo_full_name: str
+    branch: str
+    status: str  # "active", "validated", "queued", "pr-created", "abandoned"
+    created_at: str
+    updated_at: str
+    root_cause: dict | None = None
+    current_patch: str | None = None
+    best_validation_output: str = ""
+    last_validation_output: str = ""
+    last_strategy: str = ""
+    consecutive_full_passes: int = 0
+    total_attempts: int = 0
+    attempts: list[FlakyCampaignAttempt] = field(default_factory=list)
+    failed_hypotheses: list[str] = field(default_factory=list)
+    queued_pr_payload: dict | None = None
 
 
 @dataclass
@@ -141,6 +186,7 @@ class FailureStoreEntry:
     created_at: str
     updated_at: str
     queued_pr_payload: dict | None = None
+    campaign_status: str | None = None
 
 
 @dataclass
@@ -354,6 +400,49 @@ def root_cause_report_from_dict(data: dict) -> RootCauseReport:
         total_failure_observations=int(data.get("total_failure_observations", 0)),
         last_known_good_sha=data.get("last_known_good_sha"),
         first_bad_sha=data.get("first_bad_sha"),
+    )
+
+
+def flaky_campaign_state_to_dict(state: FlakyCampaignState) -> dict:
+    """Serialize a flaky campaign state for persistence."""
+    return asdict(state)
+
+
+def flaky_campaign_state_from_dict(data: dict) -> FlakyCampaignState:
+    """Deserialize a persisted flaky campaign state."""
+    attempts = [
+        FlakyCampaignAttempt(**raw_attempt)
+        for raw_attempt in data.get("attempts", [])
+        if isinstance(raw_attempt, dict)
+    ]
+    return FlakyCampaignState(
+        fingerprint=str(data.get("fingerprint", "")),
+        history_key=str(data.get("history_key", "")),
+        failure_identifier=str(data.get("failure_identifier", "")),
+        workflow_file=str(data.get("workflow_file", "")),
+        job_name=str(data.get("job_name", "")),
+        matrix_params=dict(data.get("matrix_params", {})),
+        repo_full_name=str(data.get("repo_full_name", "")),
+        branch=str(data.get("branch", "")),
+        status=str(data.get("status", "active")),
+        created_at=str(data.get("created_at", "")),
+        updated_at=str(data.get("updated_at", "")),
+        root_cause=data.get("root_cause") if isinstance(data.get("root_cause"), dict) else None,
+        current_patch=data.get("current_patch"),
+        best_validation_output=str(data.get("best_validation_output", "")),
+        last_validation_output=str(data.get("last_validation_output", "")),
+        last_strategy=str(data.get("last_strategy", "")),
+        consecutive_full_passes=int(data.get("consecutive_full_passes", 0)),
+        total_attempts=int(data.get("total_attempts", 0)),
+        attempts=attempts,
+        failed_hypotheses=[
+            str(item)
+            for item in data.get("failed_hypotheses", [])
+            if isinstance(item, str)
+        ],
+        queued_pr_payload=data.get("queued_pr_payload")
+        if isinstance(data.get("queued_pr_payload"), dict)
+        else None,
     )
 
 
