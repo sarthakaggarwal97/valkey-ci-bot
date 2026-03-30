@@ -389,6 +389,71 @@
       "updated_at": "2026-03-29T07:31:48.882669+00:00",
       "queued_pr_payload": null,
       "campaign_status": null
+    },
+    "667562c28bd2a1e77440e3e5ae39f853b949a997aea0c89f788cee0c9faa7fc9": {
+      "fingerprint": "667562c28bd2a1e77440e3e5ae39f853b949a997aea0c89f788cee0c9faa7fc9",
+      "failure_identifier": "reply-schemas-validator",
+      "test_name": null,
+      "error_signature": "2026-03-30T00:22:00.9800000Z Evaluating reply-schemas-validator.if\n2026-03-30T00:22:00.9800000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'reply-schema'))))\n2026-03-30T00:22:00.9800000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'reply-schema')))\n2026-03-30T00:22:00.9800000Z Result: true\n2026-03-30T00:22:01.2210000Z Requested labels: ubuntu-latest\n2026-03-30T00:22:01.2210000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-30T00:22:01.2210000Z Waiting for a runner to pick up this job...\n2026-03-30T00:22:01.2300000Z Job is waiting for a hosted runner to come online.\n2026-03-30T00:22:01.2300000Z Job is about to start running on the hosted runner: GitHub Actions 1000612694",
+      "file_path": "",
+      "pr_url": null,
+      "status": "processing",
+      "created_at": "2026-03-30T06:11:13.752394+00:00",
+      "updated_at": "2026-03-30T06:11:13.752394+00:00",
+      "queued_pr_payload": null,
+      "campaign_status": null
+    },
+    "891d096030e1496f10ddba826e9da0228ff2605cf9f39295a33b4dae20c3f660": {
+      "fingerprint": "891d096030e1496f10ddba826e9da0228ff2605cf9f39295a33b4dae20c3f660",
+      "failure_identifier": "test-almalinux8-jemalloc",
+      "test_name": null,
+      "error_signature": "2026-03-30T00:22:00.8860000Z Evaluating test-rpm-distros-jemalloc.if\n2026-03-30T00:22:00.8860000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-03-30T00:22:00.8860000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-03-30T00:22:00.8860000Z Result: true\n2026-03-30T00:22:01.2260000Z Job is waiting for a hosted runner to come online.\n2026-03-30T00:22:01.2200000Z Requested labels: ubuntu-latest\n2026-03-30T00:22:01.2200000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-30T00:22:01.2200000Z Waiting for a runner to pick up this job...\n2026-03-30T00:22:01.2270000Z Job is about to start running on the hosted runner: GitHub Actions 1000612690",
+      "file_path": "",
+      "pr_url": null,
+      "status": "processing",
+      "created_at": "2026-03-30T06:11:28.995580+00:00",
+      "updated_at": "2026-03-30T06:11:28.995580+00:00",
+      "queued_pr_payload": null,
+      "campaign_status": null
+    },
+    "0879613582f2914c20c154aa6feaae4e7b2c3516453b61edcf00f09c71fa178b": {
+      "fingerprint": "0879613582f2914c20c154aa6feaae4e7b2c3516453b61edcf00f09c71fa178b",
+      "failure_identifier": "test-almalinux8-tls-module",
+      "test_name": null,
+      "error_signature": "2026-03-30T00:22:00.9930000Z Evaluating test-rpm-distros-tls-module.if\n2026-03-30T00:22:00.9930000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-03-30T00:22:00.9930000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'tls')))\n2026-03-30T00:22:00.9930000Z Result: true\n2026-03-30T00:22:01.2370000Z Requested labels: ubuntu-latest\n2026-03-30T00:22:01.2370000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-30T00:22:01.2370000Z Waiting for a runner to pick up this job...\n2026-03-30T00:22:01.7230000Z Job is waiting for a hosted runner to come online.\n2026-03-30T00:22:01.7230000Z Job is about to start running on the hosted runner: GitHub Actions 1000612715",
+      "file_path": "",
+      "pr_url": null,
+      "status": "processing",
+      "created_at": "2026-03-30T06:11:45.801995+00:00",
+      "updated_at": "2026-03-30T06:11:45.801995+00:00",
+      "queued_pr_payload": null,
+      "campaign_status": null
+    },
+    "94cc8d1f14985f3f387bcea482ef9dbb0eadf98928db2c2c43c7c089f39f92db": {
+      "fingerprint": "94cc8d1f14985f3f387bcea482ef9dbb0eadf98928db2c2c43c7c089f39f92db",
+      "failure_identifier": "test-almalinux8-tls-module-no-tls",
+      "test_name": null,
+      "error_signature": "2026-03-30T00:22:00.9800000Z Evaluating test-rpm-distros-tls-module-no-tls.if\n2026-03-30T00:22:00.9800000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-03-30T00:22:00.9800000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'tls')))\n2026-03-30T00:22:00.9800000Z Result: true\n2026-03-30T00:22:01.2290000Z Job is waiting for a hosted runner to come online.\n2026-03-30T00:22:01.2290000Z Job is about to start running on the hosted runner: GitHub Actions 1000612692\n2026-03-30T00:22:01.2220000Z Requested labels: ubuntu-latest\n2026-03-30T00:22:01.2220000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-30T00:22:01.2220000Z Waiting for a runner to pick up this job...",
+      "file_path": "",
+      "pr_url": null,
+      "status": "processing",
+      "created_at": "2026-03-30T06:12:10.074737+00:00",
+      "updated_at": "2026-03-30T06:12:10.074737+00:00",
+      "queued_pr_payload": null,
+      "campaign_status": null
+    },
+    "959f8e6df193caf83c7c67b7d6b505a30d26dc28b46076ffd86b667a52075d3d": {
+      "fingerprint": "959f8e6df193caf83c7c67b7d6b505a30d26dc28b46076ffd86b667a52075d3d",
+      "failure_identifier": "test-almalinux9-jemalloc",
+      "test_name": null,
+      "error_signature": "2026-03-30T00:22:00.9860000Z Evaluating test-rpm-distros-jemalloc.if\n2026-03-30T00:22:00.9860000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-03-30T00:22:00.9860000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-03-30T00:22:00.9860000Z Result: true\n2026-03-30T00:22:01.2330000Z Requested labels: ubuntu-latest\n2026-03-30T00:22:01.2330000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-30T00:22:01.2330000Z Waiting for a runner to pick up this job...\n2026-03-30T00:22:01.2400000Z Job is waiting for a hosted runner to come online.\n2026-03-30T00:22:01.2400000Z Job is about to start running on the hosted runner: GitHub Actions 1000612708",
+      "file_path": "",
+      "pr_url": null,
+      "status": "processing",
+      "created_at": "2026-03-30T06:12:26.608549+00:00",
+      "updated_at": "2026-03-30T06:12:26.608549+00:00",
+      "queued_pr_payload": null,
+      "campaign_status": null
     }
   },
   "history": {
@@ -1504,6 +1569,21 @@
           "error_signature": "2026-03-29T00:21:32.6030000Z Evaluating test-rpm-distros-jemalloc.if\n2026-03-29T00:21:32.6030000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-03-29T00:21:32.6030000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-03-29T00:21:32.6030000Z Result: true\n2026-03-29T00:21:32.8500000Z Job is about to start running on the hosted runner: GitHub Actions 1000610877\n2026-03-29T00:21:32.8340000Z Requested labels: ubuntu-latest\n2026-03-29T00:21:32.8340000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-29T00:21:32.8340000Z Waiting for a runner to pick up this job...\n2026-03-29T00:21:32.8500000Z Job is waiting for a hosted runner to come online.",
           "file_path": "",
           "fingerprint": "2caa5dcb3d658579afbf5e45cb528dcb78cb9c56202d0f8388a5b44fd04a567a"
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-03-30T06:12:26.608654+00:00",
+          "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
+          "workflow_run_id": 23722657826,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-almalinux9-jemalloc",
+          "matrix_params": {},
+          "failure_identifier": "test-almalinux9-jemalloc",
+          "test_name": null,
+          "error_signature": "2026-03-30T00:22:00.9860000Z Evaluating test-rpm-distros-jemalloc.if\n2026-03-30T00:22:00.9860000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-03-30T00:22:00.9860000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-03-30T00:22:00.9860000Z Result: true\n2026-03-30T00:22:01.2330000Z Requested labels: ubuntu-latest\n2026-03-30T00:22:01.2330000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-30T00:22:01.2330000Z Waiting for a runner to pick up this job...\n2026-03-30T00:22:01.2400000Z Job is waiting for a hosted runner to come online.\n2026-03-30T00:22:01.2400000Z Job is about to start running on the hosted runner: GitHub Actions 1000612708",
+          "file_path": "",
+          "fingerprint": "959f8e6df193caf83c7c67b7d6b505a30d26dc28b46076ffd86b667a52075d3d"
         }
       ]
     },
@@ -1723,6 +1803,21 @@
           "error_signature": "2026-03-29T00:21:32.6040000Z Evaluating test-rpm-distros-tls-module.if\n2026-03-29T00:21:32.6040000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-03-29T00:21:32.6040000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'tls')))\n2026-03-29T00:21:32.6040000Z Result: true\n2026-03-29T00:21:32.8520000Z Job is waiting for a hosted runner to come online.\n2026-03-29T00:21:32.8530000Z Job is about to start running on the hosted runner: GitHub Actions 1000610885\n2026-03-29T00:21:32.8400000Z Requested labels: ubuntu-latest\n2026-03-29T00:21:32.8400000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-29T00:21:32.8400000Z Waiting for a runner to pick up this job...",
           "file_path": "",
           "fingerprint": "2e6032209da5f8001dcda50b769447f73eb83083d9c4c7f186e0d154ddebc3d9"
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-03-30T06:11:45.802095+00:00",
+          "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
+          "workflow_run_id": 23722657826,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-almalinux8-tls-module",
+          "matrix_params": {},
+          "failure_identifier": "test-almalinux8-tls-module",
+          "test_name": null,
+          "error_signature": "2026-03-30T00:22:00.9930000Z Evaluating test-rpm-distros-tls-module.if\n2026-03-30T00:22:00.9930000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-03-30T00:22:00.9930000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'tls')))\n2026-03-30T00:22:00.9930000Z Result: true\n2026-03-30T00:22:01.2370000Z Requested labels: ubuntu-latest\n2026-03-30T00:22:01.2370000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-30T00:22:01.2370000Z Waiting for a runner to pick up this job...\n2026-03-30T00:22:01.7230000Z Job is waiting for a hosted runner to come online.\n2026-03-30T00:22:01.7230000Z Job is about to start running on the hosted runner: GitHub Actions 1000612715",
+          "file_path": "",
+          "fingerprint": "0879613582f2914c20c154aa6feaae4e7b2c3516453b61edcf00f09c71fa178b"
         }
       ]
     },
@@ -1778,6 +1873,21 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-03-30T06:12:10.074836+00:00",
+          "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
+          "workflow_run_id": 23722657826,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-almalinux8-tls-module-no-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-almalinux8-tls-module-no-tls",
+          "test_name": null,
+          "error_signature": "2026-03-30T00:22:00.9800000Z Evaluating test-rpm-distros-tls-module-no-tls.if\n2026-03-30T00:22:00.9800000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-03-30T00:22:00.9800000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'tls')))\n2026-03-30T00:22:00.9800000Z Result: true\n2026-03-30T00:22:01.2290000Z Job is waiting for a hosted runner to come online.\n2026-03-30T00:22:01.2290000Z Job is about to start running on the hosted runner: GitHub Actions 1000612692\n2026-03-30T00:22:01.2220000Z Requested labels: ubuntu-latest\n2026-03-30T00:22:01.2220000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-30T00:22:01.2220000Z Waiting for a runner to pick up this job...",
+          "file_path": "",
+          "fingerprint": "94cc8d1f14985f3f387bcea482ef9dbb0eadf98928db2c2c43c7c089f39f92db"
         }
       ]
     },
@@ -1873,6 +1983,46 @@
           "error_signature": "2026-03-29T00:21:32.6030000Z Evaluating test-rpm-distros-jemalloc.if\n2026-03-29T00:21:32.6030000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-03-29T00:21:32.6030000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-03-29T00:21:32.6030000Z Result: true\n2026-03-29T00:21:32.8500000Z Job is waiting for a hosted runner to come online.\n2026-03-29T00:21:32.8350000Z Requested labels: ubuntu-latest\n2026-03-29T00:21:32.8350000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-29T00:21:32.8350000Z Waiting for a runner to pick up this job...\n2026-03-29T00:21:32.8500000Z Job is about to start running on the hosted runner: GitHub Actions 1000610878",
           "file_path": "",
           "fingerprint": "60728ca8700a46b666eed93ea883d918d492b53bac0904bb250d78b87bbf9b9d"
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-03-30T06:11:28.995685+00:00",
+          "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
+          "workflow_run_id": 23722657826,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-almalinux8-jemalloc",
+          "matrix_params": {},
+          "failure_identifier": "test-almalinux8-jemalloc",
+          "test_name": null,
+          "error_signature": "2026-03-30T00:22:00.8860000Z Evaluating test-rpm-distros-jemalloc.if\n2026-03-30T00:22:00.8860000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-03-30T00:22:00.8860000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-03-30T00:22:00.8860000Z Result: true\n2026-03-30T00:22:01.2260000Z Job is waiting for a hosted runner to come online.\n2026-03-30T00:22:01.2200000Z Requested labels: ubuntu-latest\n2026-03-30T00:22:01.2200000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-30T00:22:01.2200000Z Waiting for a runner to pick up this job...\n2026-03-30T00:22:01.2270000Z Job is about to start running on the hosted runner: GitHub Actions 1000612690",
+          "file_path": "",
+          "fingerprint": "891d096030e1496f10ddba826e9da0228ff2605cf9f39295a33b4dae20c3f660"
+        }
+      ]
+    },
+    "0e309a5d7cffa933474c72f16b0bc3923171df80b630b0cd8385d0eb22b14f7c": {
+      "key": "0e309a5d7cffa933474c72f16b0bc3923171df80b630b0cd8385d0eb22b14f7c",
+      "workflow_file": "daily.yml",
+      "job_name": "reply-schemas-validator",
+      "matrix_params": {},
+      "failure_identifier": "reply-schemas-validator",
+      "test_name": null,
+      "observations": [
+        {
+          "outcome": "fail",
+          "observed_at": "2026-03-30T06:11:13.752492+00:00",
+          "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
+          "workflow_run_id": 23722657826,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "reply-schemas-validator",
+          "matrix_params": {},
+          "failure_identifier": "reply-schemas-validator",
+          "test_name": null,
+          "error_signature": "2026-03-30T00:22:00.9800000Z Evaluating reply-schemas-validator.if\n2026-03-30T00:22:00.9800000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'reply-schema'))))\n2026-03-30T00:22:00.9800000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'reply-schema')))\n2026-03-30T00:22:00.9800000Z Result: true\n2026-03-30T00:22:01.2210000Z Requested labels: ubuntu-latest\n2026-03-30T00:22:01.2210000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-30T00:22:01.2210000Z Waiting for a runner to pick up this job...\n2026-03-30T00:22:01.2300000Z Job is waiting for a hosted runner to come online.\n2026-03-30T00:22:01.2300000Z Job is about to start running on the hosted runner: GitHub Actions 1000612694",
+          "file_path": "",
+          "fingerprint": "667562c28bd2a1e77440e3e5ae39f853b949a997aea0c89f788cee0c9faa7fc9"
         }
       ]
     }
