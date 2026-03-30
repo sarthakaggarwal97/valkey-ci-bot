@@ -91,6 +91,15 @@ def test_monitor_workflow_runs_central_monitor_script() -> None:
         for step in workflow["jobs"]["create-approved-prs"]["steps"]
         if step["name"] == "Create draft PRs for approved queued fixes"
     )
+    preflight_step = next(
+        step
+        for step in workflow["jobs"]["create-approved-prs"]["steps"]
+        if step["name"] == "Validate fork base branches for queued fixes"
+    )
+    preflight_script = preflight_step["run"]
+    assert "-m scripts.preflight_reconciliation" in preflight_script
+    assert "--repo \"${VALKEY_FORK_REPO}\"" in preflight_script
+
     reconcile_script = reconcile_step["run"]
     assert "--mode reconcile" in reconcile_script
     assert "--repo \"${VALKEY_FORK_REPO}\"" in reconcile_script

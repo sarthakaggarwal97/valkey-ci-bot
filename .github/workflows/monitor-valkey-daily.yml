@@ -219,6 +219,15 @@ jobs:
             exit 1
           fi
 
+      - name: Validate fork base branches for queued fixes
+        shell: bash
+        run: |
+          python -m scripts.preflight_reconciliation \
+            --repo "${VALKEY_FORK_REPO}" \
+            --token "${{ steps.fork-token.outputs.token }}" \
+            --state-token "${{ github.token }}" \
+            --state-repo "${{ github.repository }}" | tee reconcile-preflight.json
+
       - name: Create draft PRs for approved queued fixes
         shell: bash
         run: |

@@ -149,7 +149,7 @@ Runs from this repo, watches new scheduled `Daily` runs in `valkey-io/valkey`, a
 The workflow has two stages:
 
 - `monitor`: runs automatically on schedule, analyzes failures, applies history-based queue gating, and queues validated fixes in this agent repo
-- `create-approved-prs`: runs only after approval on the protected environment `valkey-pr-approval` and opens draft PRs in `sarthakaggarwal97/valkey` by default
+- `create-approved-prs`: runs only after approval on the protected environment `valkey-pr-approval`, verifies the queued base branches exist in `sarthakaggarwal97/valkey`, and then opens draft PRs there by default
 
 No PR is opened during the monitor stage. After approval, the queued fixes are reconciled into draft PRs in your fork first so they can be reviewed before anything targets upstream.
 
