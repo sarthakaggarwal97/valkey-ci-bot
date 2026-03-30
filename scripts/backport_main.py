@@ -34,12 +34,29 @@ from scripts.backport_pr_creator import BackportPRCreator
 from scripts.backport_utils import build_branch_name
 from scripts.bedrock_client import BedrockClient
 from scripts.cherry_pick import CherryPickExecutor
+from scripts.commit_signoff import (
+    CommitSigner,
+    load_signer_from_env,
+    require_dco_signoff_from_env,
+)
 from scripts.config import BotConfig, ProjectContext
 from scripts.conflict_resolver import ConflictResolver
 from scripts.github_client import retry_github_call
 from scripts.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_commit_signer() -> tuple[CommitSigner, bool]:
+    """Load commit signer policy from environment variables."""
+    signer = load_signer_from_env()
+    require_dco = require_dco_signoff_from_env()
+    if require_dco and not signer.configured:
+        raise ValueError(
+            "DCO signoff is required, but CI_BOT_COMMIT_NAME or "
+            "CI_BOT_COMMIT_EMAIL is not configured."
+        )
+    return signer, require_dco
 
 
 @dataclass
@@ -138,6 +155,12 @@ def run_backport(
     9.1, 9.2, 9.3, 9.4**
     """
     gh = Github(auth=Auth.Token(github_token))
+    try:
+        signer, require_dco_signoff = _resolve_commit_signer()
+    except ValueError as exc:
+        msg = str(exc)
+        logger.error(msg)
+        return BackportResult(outcome="error", error_message=msg)
     repo = retry_github_call(
         lambda: gh.get_repo(repo_full_name),
         retries=3,
@@ -250,7 +273,13 @@ def run_backport(
     branch_name = build_branch_name(source_pr_number, target_branch)
     with tempfile.TemporaryDirectory() as tmp_dir:
         # Clone the repo with full history for cherry-pick
-        git_env = _clone_repo(repo_full_name, github_token, tmp_dir, target_branch)
+        git_env = _clone_repo(
+            repo_full_name,
+            github_token,
+            tmp_dir,
+            target_branch,
+            signer=signer,
+        )
 
         # Create the backport branch locally from target branch HEAD
         _run_git(tmp_dir, "checkout", "-b", branch_name)
@@ -294,7 +323,12 @@ def run_backport(
             total_tokens = sum(r.tokens_used for r in resolution_results)
 
             # Apply resolved files to the working tree and commit
-            _apply_resolutions(tmp_dir, resolution_results)
+            _apply_resolutions(
+                tmp_dir,
+                resolution_results,
+                signer=signer,
+                require_dco_signoff=require_dco_signoff,
+            )
 
         # Push the backport branch to the remote
         logger.info("Pushing branch %s to origin.", branch_name)
@@ -389,6 +423,8 @@ def _clone_repo(
     github_token: str,
     dest_dir: str,
     target_branch: str,
+    *,
+    signer: CommitSigner,
 ) -> dict[str, str]:
     """Clone the repository with full history into *dest_dir*.
 
@@ -423,12 +459,18 @@ def _clone_repo(
         env=env,
     )
     # Configure git identity for cherry-pick commits
+    user_name = signer.name if signer.configured else "valkey-ci-agent"
+    user_email = (
+        signer.email
+        if signer.configured
+        else "valkey-ci-agent@users.noreply.github.com"
+    )
     subprocess.run(
-        ["git", "config", "user.name", "valkey-ci-agent"],
+        ["git", "config", "user.name", user_name],
         cwd=dest_dir, check=True, capture_output=True, text=True,
     )
     subprocess.run(
-        ["git", "config", "user.email", "valkey-ci-agent@users.noreply.github.com"],
+        ["git", "config", "user.email", user_email],
         cwd=dest_dir, check=True, capture_output=True, text=True,
     )
     # Fetch all branches so cherry-pick can reference any commit
@@ -453,6 +495,9 @@ def _run_git(repo_dir: str, *args: str, env: dict[str, str] | None = None) -> No
 def _apply_resolutions(
     repo_dir: str,
     resolution_results: list[ResolutionResult],
+    *,
+    signer: CommitSigner,
+    require_dco_signoff: bool,
 ) -> None:
     """Write resolved file contents to the working tree and commit.
 
@@ -483,21 +528,49 @@ def _apply_resolutions(
         # Set core.editor=true to prevent git from opening an editor
         # in the non-interactive CI environment.
         try:
-            _run_git(
-                repo_dir, "-c", "user.name=backport-agent",
-                "-c", "user.email=backport-agent@users.noreply.github.com",
+            continue_args = [
+                repo_dir,
+                "-c", f"user.name={signer.name or 'backport-agent'}",
+                "-c", (
+                    f"user.email={signer.email or 'backport-agent@users.noreply.github.com'}"
+                ),
                 "-c", "core.editor=true",
-                "cherry-pick", "--continue",
+                "cherry-pick",
+                "--continue",
+            ]
+            _run_git(
+                *continue_args,
             )
+            if require_dco_signoff:
+                _run_git(
+                    repo_dir,
+                    "-c", f"user.name={signer.name or 'backport-agent'}",
+                    "-c", (
+                        f"user.email={signer.email or 'backport-agent@users.noreply.github.com'}"
+                    ),
+                    "commit",
+                    "--amend",
+                    "--no-edit",
+                    "--signoff",
+                )
         except Exception:
             # If cherry-pick --continue fails (e.g. no cherry-pick in
             # progress because all files were staged), commit directly.
             logger.warning("cherry-pick --continue failed, committing directly.")
+            commit_args = [
+                repo_dir,
+                "-c", f"user.name={signer.name or 'backport-agent'}",
+                "-c", (
+                    f"user.email={signer.email or 'backport-agent@users.noreply.github.com'}"
+                ),
+                "commit",
+                "--allow-empty",
+            ]
+            if require_dco_signoff:
+                commit_args.append("--signoff")
+            commit_args.extend(["-m", "Backport with conflict resolutions"])
             _run_git(
-                repo_dir, "-c", "user.name=backport-agent",
-                "-c", "user.email=backport-agent@users.noreply.github.com",
-                "commit", "--allow-empty", "-m",
-                "Backport with conflict resolutions",
+                *commit_args,
             )
 
 

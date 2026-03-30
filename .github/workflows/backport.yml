@@ -38,6 +38,10 @@ jobs:
       pull-requests: write
       actions: read
       id-token: write
+    env:
+      CI_BOT_COMMIT_NAME: ${{ vars.CI_BOT_COMMIT_NAME || '' }}
+      CI_BOT_COMMIT_EMAIL: ${{ vars.CI_BOT_COMMIT_EMAIL || '' }}
+      CI_BOT_REQUIRE_DCO_SIGNOFF: ${{ vars.CI_BOT_REQUIRE_DCO_SIGNOFF || 'false' }}
     steps:
       - name: Checkout agent repository
         uses: actions/checkout@v6

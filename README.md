@@ -28,6 +28,7 @@ Local development:
 
 - copy `.env.example` to `.env.local`
 - fill in your own `GITHUB_TOKEN`, `AWS_REGION`, and `AWS_PROFILE`
+- when targeting repositories that require DCO, also set `CI_BOT_COMMIT_NAME`, `CI_BOT_COMMIT_EMAIL`, and `CI_BOT_REQUIRE_DCO_SIGNOFF=true`
 - source `.env.local` manually before running scripts
 
 ## CI Failure Agent
@@ -53,6 +54,9 @@ Required GitHub configuration:
 - secret: `AWS_ROLE_ARN`
 - either secret: `VALKEY_GITHUB_TOKEN`
 - or variable: `VALKEY_GITHUB_APP_ID` plus secret: `VALKEY_GITHUB_APP_PRIVATE_KEY`
+- optional variable: `CI_BOT_COMMIT_NAME`
+- optional variable: `CI_BOT_COMMIT_EMAIL`
+- optional variable: `CI_BOT_REQUIRE_DCO_SIGNOFF` (set to `true` for repositories such as Valkey that require DCO-signed commits)
 
 ## PR Review Agent
 
@@ -132,6 +136,9 @@ Required GitHub configuration in the consumer repo:
 
 - secret: `CI_BOT_AWS_ROLE_ARN` — IAM role assumable via GitHub OIDC for Bedrock access
 - variable: `CI_BOT_AWS_REGION` (optional, defaults to `us-east-1`)
+- optional variable: `CI_BOT_COMMIT_NAME`
+- optional variable: `CI_BOT_COMMIT_EMAIL`
+- optional variable: `CI_BOT_REQUIRE_DCO_SIGNOFF`
 
 ## Central Valkey Monitor
 
@@ -142,9 +149,9 @@ Runs from this repo, watches new scheduled `Daily` runs in `valkey-io/valkey`, a
 The workflow has two stages:
 
 - `monitor`: runs automatically on schedule, analyzes failures, applies history-based queue gating, and queues validated fixes in this agent repo
-- `create-approved-prs`: runs only after approval on the protected environment `valkey-pr-approval`
+- `create-approved-prs`: runs only after approval on the protected environment `valkey-pr-approval` and opens draft PRs in `sarthakaggarwal97/valkey` by default
 
-No PR is opened against `valkey-io/valkey` until that environment approval is granted.
+No PR is opened during the monitor stage. After approval, the queued fixes are reconciled into draft PRs in your fork first so they can be reviewed before anything targets upstream.
 
 Approval context is written into the workflow summary so you can review the root-cause rationale, files the agent wants to change, observed failure streak, and last known good / first bad commits when history exists.
 
@@ -155,6 +162,25 @@ Required GitHub configuration:
 - secret: `AWS_ROLE_ARN`
 - either secret: `VALKEY_GITHUB_TOKEN`
 - or variable: `VALKEY_GITHUB_APP_ID` plus secret: `VALKEY_GITHUB_APP_PRIVATE_KEY`
+- optional variable: `VALKEY_FORK_REPO` (defaults to `sarthakaggarwal97/valkey`)
+- secret: `VALKEY_FORK_GITHUB_TOKEN` (or reuse `VALKEY_GITHUB_TOKEN` if it also has write access to the fork)
+- optional variable: `CI_BOT_COMMIT_NAME`
+- optional variable: `CI_BOT_COMMIT_EMAIL`
+- optional variable: `CI_BOT_REQUIRE_DCO_SIGNOFF`
+
+## Acceptance Harness
+
+Use `python -m scripts.valkey_acceptance` with
+`examples/valkey-acceptance.yml` to evaluate whether the current bot behavior
+matches Valkey's acceptance bar before enabling it on `valkey-io/valkey`.
+
+The harness:
+
+- runs deterministic policy checks such as DCO, docs follow-up, security handling, and `@core-team` escalation
+- can execute report-only PR summary and review passes against real Valkey PRs
+- renders exact replay commands for CI failure and backport cases to run against a fork
+
+See `docs/valkey-acceptance.md` for usage.
 
 ## Central Valkey Fuzzer Monitor
 

@@ -566,6 +566,43 @@ class TestRunReconciliation:
     @patch("scripts.main.FailureStore")
     @patch("scripts.main.PRManager")
     @patch("scripts.main.Github")
+    def test_reconciliation_can_open_draft_prs(
+        self, mock_gh, mock_pr_mgr, mock_store, mock_load_config,
+    ):
+        """Queued failures can be reconciled into draft PRs."""
+        mock_load_config.return_value = BotConfig()
+
+        rate_limiter = MagicMock()
+        rate_limiter.get_queued_failures.return_value = ["fp1"]
+        rate_limiter.can_create_pr.return_value = True
+
+        store_instance = MagicMock()
+        entry = MagicMock(failure_identifier="TestSuite.TestCase")
+        entry.queued_pr_payload = self._queued_payload()
+        store_instance.get_entry.return_value = entry
+        store_instance.has_open_pr.return_value = False
+        mock_store.return_value = store_instance
+
+        pr_manager = MagicMock()
+        pr_manager.create_pr.return_value = "https://github.com/owner/repo/pull/1"
+        mock_pr_mgr.return_value = pr_manager
+
+        count = run_reconciliation(
+            "owner/repo",
+            "config.yml",
+            "token",
+            rate_limiter=rate_limiter,
+            draft_prs=True,
+        )
+
+        assert count == 1
+        pr_manager.create_pr.assert_called_once()
+        assert pr_manager.create_pr.call_args.kwargs["draft"] is True
+
+    @patch("scripts.main._load_runtime_config")
+    @patch("scripts.main.FailureStore")
+    @patch("scripts.main.PRManager")
+    @patch("scripts.main.Github")
     def test_skips_already_open_pr(
         self, mock_gh, mock_pr_mgr, mock_store, mock_load_config,
     ):

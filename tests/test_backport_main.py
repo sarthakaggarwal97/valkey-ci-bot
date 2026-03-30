@@ -584,3 +584,23 @@ class TestRunBackportGitHubAPIError:
 
         assert result.outcome == "error"
         assert "GitHub API error" in (result.error_message or "")
+
+
+def test_run_backport_requires_commit_identity_when_dco_is_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CI_BOT_REQUIRE_DCO_SIGNOFF", "true")
+    monkeypatch.delenv("CI_BOT_COMMIT_NAME", raising=False)
+    monkeypatch.delenv("CI_BOT_COMMIT_EMAIL", raising=False)
+
+    result = run_backport(
+        repo_full_name="valkey-io/valkey",
+        source_pr_number=100,
+        target_branch="8.1",
+        config=_default_config(),
+        github_token="fake-token",
+        aws_region="us-east-1",
+    )
+
+    assert result.outcome == "error"
+    assert "CI_BOT_COMMIT_NAME" in (result.error_message or "")

@@ -23,6 +23,19 @@ reviewer:
     - Module API: public API changes must maintain backward compatibility.
     - TCL tests in tests/unit/ and tests/integration/ use the Valkey
       test framework. New features should include test coverage.
+    - Flag missing DCO trailers in commit messages. Every commit should include
+      Signed-off-by: Name <email>.
+    - If a PR appears to fix a security vulnerability, do not discuss the fix
+      in detail in public review. Tell the author security fixes should be
+      reported privately to security@lists.valkey.io.
+    - If the change appears to be a technical major decision, mention
+      @core-team and ask whether consensus was reached in a linked issue.
+      This includes fundamental data-structure changes, backward-incompatible
+      behavior, new public APIs, new long-term user-visible fields, and new
+      runtime dependencies.
+    - Remind authors about valkey-doc follow-up and the needs-doc-pr label when
+      a change looks user-facing, especially for command behavior or config.
+    - Any change to GOVERNANCE.md requires @core-team review.
   project:
     language: "C"
     build_system: "CMake"

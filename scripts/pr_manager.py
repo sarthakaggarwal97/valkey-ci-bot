@@ -9,6 +9,12 @@ from typing import TYPE_CHECKING
 from github.GithubException import GithubException
 from github.InputGitTreeElement import InputGitTreeElement
 
+from scripts.commit_signoff import (
+    CommitSigner,
+    append_signoff,
+    load_signer_from_env,
+    require_dco_signoff_from_env,
+)
 from scripts.github_client import retry_github_call
 from scripts.failure_store import FailureStore
 from scripts.models import FailureReport, RootCauseReport
@@ -43,7 +49,13 @@ def _compute_fingerprint(report: FailureReport) -> str:
     )
 
 
-def _build_commit_message(report: FailureReport, root_cause: RootCauseReport) -> str:
+def _build_commit_message(
+    report: FailureReport,
+    root_cause: RootCauseReport,
+    signer: CommitSigner | None = None,
+    *,
+    require_dco_signoff: bool = False,
+) -> str:
     """Build a descriptive commit message per Requirement 6.2.
 
     Includes: stable failure identifier (test name when available),
@@ -66,7 +78,11 @@ def _build_commit_message(report: FailureReport, root_cause: RootCauseReport) ->
     summary = root_cause.description.split("\n")[0][:200]
     parts.append(f"Root cause: {summary}")
 
-    return "\n".join(parts)
+    return append_signoff(
+        "\n".join(parts),
+        signer or CommitSigner(),
+        require_signoff=require_dco_signoff,
+    )
 
 
 def _build_pr_body(
@@ -215,10 +231,17 @@ class PRManager:
         github_client: "Github",
         repo_full_name: str,
         failure_store: FailureStore,
+        *,
+        signer: CommitSigner | None = None,
+        require_dco_signoff: bool | None = None,
     ) -> None:
         self._gh = github_client
         self._repo_name = repo_full_name
         self._failure_store = failure_store
+        self._signer = signer or load_signer_from_env()
+        if require_dco_signoff is None:
+            require_dco_signoff = require_dco_signoff_from_env()
+        self._require_dco_signoff = require_dco_signoff
 
     def create_pr(
         self,
@@ -226,6 +249,8 @@ class PRManager:
         failure_report: FailureReport,
         root_cause: RootCauseReport,
         target_branch: str,
+        *,
+        draft: bool = False,
     ) -> str:
         """Create a branch, apply patch, commit, open PR, apply label.
 
@@ -285,7 +310,12 @@ class PRManager:
 
             # 2. Apply patch by creating/updating files via the Git Data API
             #    Parse the unified diff to extract file changes and commit them.
-            commit_message = _build_commit_message(failure_report, root_cause)
+            commit_message = _build_commit_message(
+                failure_report,
+                root_cause,
+                self._signer,
+                require_dco_signoff=self._require_dco_signoff,
+            )
             self._apply_patch_and_commit(write_repo, branch_name, base_sha, patch, commit_message)
 
             # 3. Build PR body
@@ -309,6 +339,7 @@ class PRManager:
                     body=pr_body,
                     head=pr_head,
                     base=target_branch,
+                    draft=draft,
                 )
             logger.info("Opened PR #%d: %s", pr.number, pr.html_url)
 

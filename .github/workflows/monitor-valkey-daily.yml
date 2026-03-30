@@ -35,11 +35,18 @@ jobs:
     concurrency:
       group: monitor-valkey-daily-scan
       cancel-in-progress: false
+    outputs:
+      monitor_dry_run: ${{ steps.capture-monitor.outputs.monitor_dry_run }}
+      has_queued_failures: ${{ steps.capture-monitor.outputs.has_queued_failures }}
+      queued_failure_count: ${{ steps.capture-monitor.outputs.queued_failure_count }}
     env:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       MONITOR_DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || github.event.inputs.dry_run || 'true' }}
       MONITOR_MAX_RUNS: ${{ github.event.inputs.max_runs || '14' }}
       MONITOR_VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
+      CI_BOT_COMMIT_NAME: ${{ vars.CI_BOT_COMMIT_NAME || '' }}
+      CI_BOT_COMMIT_EMAIL: ${{ vars.CI_BOT_COMMIT_EMAIL || '' }}
+      CI_BOT_REQUIRE_DCO_SIGNOFF: ${{ vars.CI_BOT_REQUIRE_DCO_SIGNOFF || 'false' }}
       VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
       VALKEY_GITHUB_APP_ID: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
       VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
@@ -96,7 +103,7 @@ jobs:
           role-session-name: valkey-daily-monitor-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Monitor and process Valkey Daily failures
+      - name: Monitor and queue Valkey Daily failures
         id: run-monitor
         shell: bash
         run: |
@@ -111,6 +118,7 @@ jobs:
             --state-repo "${{ github.repository }}"
             --max-runs "${MONITOR_MAX_RUNS}"
             --aws-region "${AWS_REGION}"
+            --queue-only
           )
 
           if [[ "${MONITOR_DRY_RUN}" == "true" ]]; then
@@ -122,3 +130,103 @@ jobs:
           fi
 
           python "${args[@]}" | tee monitor-result.json
+
+      - name: Capture monitor outputs
+        id: capture-monitor
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          output_path = Path(os.environ["GITHUB_OUTPUT"])
+          result_path = Path("monitor-result.json")
+
+          monitor_dry_run = os.environ["MONITOR_DRY_RUN"].lower() == "true"
+          has_queued_failures = False
+          queued_failure_count = 0
+
+          if result_path.exists():
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+            monitor_dry_run = bool(result.get("dry_run", monitor_dry_run))
+            has_queued_failures = bool(result.get("has_queued_failures", False))
+            queued_failure_count = int(result.get("queued_failure_count", 0))
+
+          with output_path.open("a", encoding="utf-8") as fh:
+            fh.write(
+              f"monitor_dry_run={'true' if monitor_dry_run else 'false'}\n"
+            )
+            fh.write(
+              f"has_queued_failures={'true' if has_queued_failures else 'false'}\n"
+            )
+            fh.write(f"queued_failure_count={queued_failure_count}\n")
+          PY
+
+      - name: Upload daily monitor result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: valkey-daily-monitor-result-${{ github.run_id }}
+          path: monitor-result.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  create-approved-prs:
+    needs: monitor
+    if: ${{ needs.monitor.result == 'success' && needs.monitor.outputs.monitor_dry_run != 'true' && needs.monitor.outputs.has_queued_failures == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: monitor-valkey-daily-prs
+      cancel-in-progress: false
+    environment: valkey-pr-approval
+    env:
+      VALKEY_FORK_REPO: ${{ vars.VALKEY_FORK_REPO || 'sarthakaggarwal97/valkey' }}
+      VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+      VALKEY_FORK_GITHUB_TOKEN: ${{ secrets.VALKEY_FORK_GITHUB_TOKEN }}
+      CI_BOT_COMMIT_NAME: ${{ vars.CI_BOT_COMMIT_NAME || '' }}
+      CI_BOT_COMMIT_EMAIL: ${{ vars.CI_BOT_COMMIT_EMAIL || '' }}
+      CI_BOT_REQUIRE_DCO_SIGNOFF: ${{ vars.CI_BOT_REQUIRE_DCO_SIGNOFF || 'false' }}
+    steps:
+      - name: Check out bot repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Select fork repository token
+        id: fork-token
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${VALKEY_FORK_GITHUB_TOKEN}" ]]; then
+            echo "token=${VALKEY_FORK_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
+            echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
+          else
+            echo "Configure VALKEY_FORK_GITHUB_TOKEN or a VALKEY_GITHUB_TOKEN with write access to ${VALKEY_FORK_REPO}." >&2
+            exit 1
+          fi
+
+      - name: Create draft PRs for approved queued fixes
+        shell: bash
+        run: |
+          python -m scripts.main \
+            --mode reconcile \
+            --repo "${VALKEY_FORK_REPO}" \
+            --config ".github/valkey-daily-bot.yml" \
+            --token "${{ steps.fork-token.outputs.token }}" \
+            --state-token "${{ github.token }}" \
+            --state-repo "${{ github.repository }}" \
+            --draft-prs

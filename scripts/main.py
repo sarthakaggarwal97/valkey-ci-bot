@@ -1088,6 +1088,8 @@ def run_reconciliation(
     state_github_token: str | None = None,
     state_repo_name: str | None = None,
     rate_limiter: RateLimiter | None = None,
+    *,
+    draft_prs: bool = False,
 ) -> int:
     """Drain queued failures when rate limits have reset.
 
@@ -1191,7 +1193,13 @@ def run_reconciliation(
         )
 
         try:
-            pr_url = pr_manager.create_pr(patch, report, root_cause, target_branch)
+            pr_url = pr_manager.create_pr(
+                patch,
+                report,
+                root_cause,
+                target_branch,
+                draft=draft_prs,
+            )
             rate_limiter.record_pr_created()
             failure_store.mark_flaky_campaign_status(fingerprint, "pr-created")
             failure_store.clear_queued_pr(fingerprint)
@@ -1240,6 +1248,11 @@ def main() -> None:
         action="store_true",
         help="Analyze and validate fixes, but queue them for approval instead of opening PRs.",
     )
+    parser.add_argument(
+        "--draft-prs",
+        action="store_true",
+        help="Open draft pull requests when reconciling queued fixes.",
+    )
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
@@ -1256,6 +1269,7 @@ def main() -> None:
             aws_region=args.aws_region,
             state_github_token=args.state_token,
             state_repo_name=args.state_repo,
+            draft_prs=args.draft_prs,
         )
         logger.info("Reconciliation drained %d queued failure(s).", count)
         sys.exit(0)

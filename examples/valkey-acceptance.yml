@@ -1,0 +1,36 @@
+target_repo: valkey-io/valkey
+
+# Use a fork here for any replay that may create branches or PRs.
+execution_repo: your-user/valkey
+
+reviewer_config_path: .github/pr-review-bot.yml
+
+review_cases:
+  - name: "recent core change"
+    pr_number: 12345
+    expectations:
+      missing_dco: false
+      needs_core_team: true
+      needs_docs: false
+      security_sensitive: false
+
+  - name: "user-facing command change"
+    pr_number: 12346
+    expectations:
+      missing_dco: false
+      needs_core_team: false
+      needs_docs: true
+      security_sensitive: false
+
+ci_cases:
+  - name: "daily failure replay"
+    workflow_run_id: 123456789
+    config_path: .github/valkey-daily-bot.yml
+    notes: "Run against your fork with queue-only enabled. Confirm the generated patch stays narrow."
+
+backport_cases:
+  - name: "8.1 backport replay"
+    source_pr_number: 12345
+    target_branch: "8.1"
+    config_path: .github/backport-agent.yml
+    notes: "Run against your fork first. Reject any LLM-resolved conflict that changes semantics."

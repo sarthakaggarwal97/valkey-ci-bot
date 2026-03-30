@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 from github.GithubException import GithubException
 
+from scripts.commit_signoff import CommitSigner
 from scripts.failure_store import FailureStore
 from scripts.models import FailureReport, ParsedFailure, RootCauseReport
 from scripts.pr_manager import (
@@ -220,6 +221,19 @@ class TestBuildCommitMessage:
         msg = _build_commit_message(report, root_cause)
         assert "test-ubuntu-latest" in msg
 
+    def test_appends_dco_signoff_when_signer_is_provided(self):
+        report = _make_failure_report()
+        root_cause = _make_root_cause()
+
+        msg = _build_commit_message(
+            report,
+            root_cause,
+            CommitSigner(name="Val Key", email="valkey@example.com"),
+            require_dco_signoff=True,
+        )
+
+        assert "Signed-off-by: Val Key <valkey@example.com>" in msg
+
 
 class TestBuildPRBody:
     def test_contains_required_sections(self):
@@ -370,6 +384,15 @@ class TestCreatePR:
         ref_call = repo.create_git_ref.call_args
         created_ref = ref_call.kwargs.get("ref") or ref_call[1].get("ref")
         assert created_ref == f"refs/heads/bot/fix/{fp}"
+
+    def test_can_open_draft_pr(self):
+        mgr, repo, _ = _make_pr_manager()
+        report = _make_failure_report()
+        root_cause = _make_root_cause()
+
+        mgr.create_pr(SAMPLE_PATCH, report, root_cause, "unstable", draft=True)
+
+        assert repo.create_pull.call_args.kwargs["draft"] is True
 
     def test_pr_body_contains_required_content(self):
         """Req 6.4: PR body has CI link, summary, root cause, confidence, disclaimer."""
