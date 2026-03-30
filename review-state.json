@@ -62,12 +62,13 @@
   "sarthakaggarwal97/valkey#101": {
     "repo": "sarthakaggarwal97/valkey",
     "pr_number": 101,
-    "last_reviewed_head_sha": "cdf806c27add38866aad4633330984d328b4cb1e",
+    "last_reviewed_head_sha": "fe66e6a01e925898e11795c917d61b1c31b12a01",
     "summary_comment_id": 4099507319,
     "review_comment_ids": [
-      3983114125
+      3983114125,
+      3012225451
     ],
-    "updated_at": "2026-03-20T17:48:56.819662+00:00"
+    "updated_at": "2026-03-30T21:11:13.433266+00:00"
   },
   "valkey-io/valkey#3358": {
     "repo": "valkey-io/valkey",
