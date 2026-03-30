@@ -10,7 +10,8 @@
       "status": "processing",
       "created_at": "2026-03-14T22:24:08.418567+00:00",
       "updated_at": "2026-03-14T22:24:08.418567+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "2e60bb8aab20f8d28eb5346a6f801d80206d7d486678c2e7da05c2315145e8b6": {
       "fingerprint": "2e60bb8aab20f8d28eb5346a6f801d80206d7d486678c2e7da05c2315145e8b6",
@@ -22,7 +23,8 @@
       "status": "processing",
       "created_at": "2026-03-14T22:24:43.098416+00:00",
       "updated_at": "2026-03-14T22:24:43.098416+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "0752c5a6c4afa8ffa38a6bd4b4192fc6f957ecd1f591e5bfb9fb2dfa7c16ac7b": {
       "fingerprint": "0752c5a6c4afa8ffa38a6bd4b4192fc6f957ecd1f591e5bfb9fb2dfa7c16ac7b",
@@ -34,7 +36,8 @@
       "status": "processing",
       "created_at": "2026-03-16T07:50:47.238851+00:00",
       "updated_at": "2026-03-16T07:50:47.238851+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "90a20b193126cbc808ca35dd8d576d0a40e40fb920b2955c824902c563944362": {
       "fingerprint": "90a20b193126cbc808ca35dd8d576d0a40e40fb920b2955c824902c563944362",
@@ -46,7 +49,8 @@
       "status": "processing",
       "created_at": "2026-03-17T06:16:03.196249+00:00",
       "updated_at": "2026-03-17T06:16:03.196249+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "f3fed52ab3dc66b32f0413819da8b487080b375d7993d77ba9992f69ac53103a": {
       "fingerprint": "f3fed52ab3dc66b32f0413819da8b487080b375d7993d77ba9992f69ac53103a",
@@ -58,7 +62,8 @@
       "status": "processing",
       "created_at": "2026-03-18T09:09:49.432716+00:00",
       "updated_at": "2026-03-18T09:09:49.432716+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "23b86545679bedd7d54b453144bcc899a13d20409619ac19bc088fa793e483a4": {
       "fingerprint": "23b86545679bedd7d54b453144bcc899a13d20409619ac19bc088fa793e483a4",
@@ -70,7 +75,8 @@
       "status": "processing",
       "created_at": "2026-03-21T05:57:15.504899+00:00",
       "updated_at": "2026-03-21T05:57:15.504899+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "0c28235a59cd3335c0aa3b175e9a0765fce179a01c8ff1695814dd8ed7edfa50": {
       "fingerprint": "0c28235a59cd3335c0aa3b175e9a0765fce179a01c8ff1695814dd8ed7edfa50",
@@ -82,7 +88,8 @@
       "status": "processing",
       "created_at": "2026-03-24T06:16:25.853061+00:00",
       "updated_at": "2026-03-24T06:16:25.853061+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "f13a6899538047ce0e6aae11140aecdb3fca5638e0d869e5913cae60d3c1e1b7": {
       "fingerprint": "f13a6899538047ce0e6aae11140aecdb3fca5638e0d869e5913cae60d3c1e1b7",
@@ -94,7 +101,8 @@
       "status": "processing",
       "created_at": "2026-03-24T06:16:49.423759+00:00",
       "updated_at": "2026-03-24T06:16:49.423759+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "03240aa7f20ebfd10d003667ba2dbb1355edb27cba46ac2b8d583720fb94ab3d": {
       "fingerprint": "03240aa7f20ebfd10d003667ba2dbb1355edb27cba46ac2b8d583720fb94ab3d",
@@ -106,7 +114,8 @@
       "status": "processing",
       "created_at": "2026-03-24T06:17:06.543066+00:00",
       "updated_at": "2026-03-24T06:17:06.543066+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "6c5ad4844d4c376d4fed2db1c28659f0793d5e4068dfe76eaaf108fd1b527d09": {
       "fingerprint": "6c5ad4844d4c376d4fed2db1c28659f0793d5e4068dfe76eaaf108fd1b527d09",
@@ -118,7 +127,8 @@
       "status": "processing",
       "created_at": "2026-03-25T07:31:15.328036+00:00",
       "updated_at": "2026-03-25T07:31:15.328036+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "2844aeb94ae7160e79e719534646df798528586475a56aaad003166f707a6f02": {
       "fingerprint": "2844aeb94ae7160e79e719534646df798528586475a56aaad003166f707a6f02",
@@ -130,7 +140,8 @@
       "status": "processing",
       "created_at": "2026-03-26T05:52:34.498657+00:00",
       "updated_at": "2026-03-26T05:52:34.498657+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "02c7d09a15c1c85c162e59a142035a6669f84333bde3f25ebaa5cf1abc4955e2": {
       "fingerprint": "02c7d09a15c1c85c162e59a142035a6669f84333bde3f25ebaa5cf1abc4955e2",
@@ -142,7 +153,8 @@
       "status": "processing",
       "created_at": "2026-03-26T05:52:54.525552+00:00",
       "updated_at": "2026-03-26T05:52:54.525552+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "ff3a72ab9b6b2a0c08fecbc8f4f1ca920b391ef7ab9870adb7b03c1c403f913f": {
       "fingerprint": "ff3a72ab9b6b2a0c08fecbc8f4f1ca920b391ef7ab9870adb7b03c1c403f913f",
@@ -154,7 +166,8 @@
       "status": "processing",
       "created_at": "2026-03-26T05:53:08.436204+00:00",
       "updated_at": "2026-03-26T05:53:08.436204+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "5d62c80b9acf86db91c0e25b0d56348407fe5c1fbc70cee9721092f22aca274d": {
       "fingerprint": "5d62c80b9acf86db91c0e25b0d56348407fe5c1fbc70cee9721092f22aca274d",
@@ -166,7 +179,8 @@
       "status": "processing",
       "created_at": "2026-03-26T05:53:22.238667+00:00",
       "updated_at": "2026-03-26T05:53:22.238667+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "0d066d03279e449471a70e7c17cc163f8000dca6e29a73b10c5c98cb946b7927": {
       "fingerprint": "0d066d03279e449471a70e7c17cc163f8000dca6e29a73b10c5c98cb946b7927",
@@ -178,7 +192,8 @@
       "status": "processing",
       "created_at": "2026-03-26T05:53:39.132751+00:00",
       "updated_at": "2026-03-26T05:53:39.132751+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "f39df03ef67f7514c54e5c091225577b5f1b5b6a730cfc90427025a40329ddcc": {
       "fingerprint": "f39df03ef67f7514c54e5c091225577b5f1b5b6a730cfc90427025a40329ddcc",
@@ -190,7 +205,8 @@
       "status": "processing",
       "created_at": "2026-03-27T05:52:23.263645+00:00",
       "updated_at": "2026-03-27T05:52:23.263645+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "d850784cb8bbd76f2f25d21c37720fc6b5ebdd891381b885cdd5f5f8e3064654": {
       "fingerprint": "d850784cb8bbd76f2f25d21c37720fc6b5ebdd891381b885cdd5f5f8e3064654",
@@ -202,7 +218,8 @@
       "status": "processing",
       "created_at": "2026-03-27T05:52:37.471201+00:00",
       "updated_at": "2026-03-27T05:52:37.471201+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "67ee02bda0c4a304467f4c8d7bb4a9d86d5ab4a709b3e0ddc014e8519971e062": {
       "fingerprint": "67ee02bda0c4a304467f4c8d7bb4a9d86d5ab4a709b3e0ddc014e8519971e062",
@@ -214,7 +231,8 @@
       "status": "processing",
       "created_at": "2026-03-27T05:52:50.796419+00:00",
       "updated_at": "2026-03-27T05:52:50.796419+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "ab2295890a9f490dcfc2bc08c48f196321f239612d8d9901d9ab386dd997f69a": {
       "fingerprint": "ab2295890a9f490dcfc2bc08c48f196321f239612d8d9901d9ab386dd997f69a",
@@ -226,7 +244,8 @@
       "status": "processing",
       "created_at": "2026-03-27T05:53:06.340586+00:00",
       "updated_at": "2026-03-27T05:53:06.340586+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "80b6d7c72c25730ba13fe5dc5325a1f92234ccff0be97f27236229d781c00804": {
       "fingerprint": "80b6d7c72c25730ba13fe5dc5325a1f92234ccff0be97f27236229d781c00804",
@@ -238,7 +257,8 @@
       "status": "processing",
       "created_at": "2026-03-27T05:53:23.852674+00:00",
       "updated_at": "2026-03-27T05:53:23.852674+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "61d73623a817f455d8e185e2739721fd7eabe87ea65d40e9621cdea28260a8c4": {
       "fingerprint": "61d73623a817f455d8e185e2739721fd7eabe87ea65d40e9621cdea28260a8c4",
@@ -250,7 +270,8 @@
       "status": "processing",
       "created_at": "2026-03-28T07:16:42.192197+00:00",
       "updated_at": "2026-03-28T07:16:42.192197+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "b5dce64534389b195638349cba9cf8a143d52a2742be8d04857376f1f79bd27c": {
       "fingerprint": "b5dce64534389b195638349cba9cf8a143d52a2742be8d04857376f1f79bd27c",
@@ -262,7 +283,8 @@
       "status": "processing",
       "created_at": "2026-03-28T07:16:55.785798+00:00",
       "updated_at": "2026-03-28T07:16:55.785798+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "a1a10604894fe2c2a5e618ffae33fd1d89eedf719924a2101f3cf5b91aef6cd8": {
       "fingerprint": "a1a10604894fe2c2a5e618ffae33fd1d89eedf719924a2101f3cf5b91aef6cd8",
@@ -274,7 +296,8 @@
       "status": "processing",
       "created_at": "2026-03-28T07:17:09.276144+00:00",
       "updated_at": "2026-03-28T07:17:09.276144+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "64e331334c3dcbb29514a43bb2296956a61021ebad476a7e3e4d29822c41d900": {
       "fingerprint": "64e331334c3dcbb29514a43bb2296956a61021ebad476a7e3e4d29822c41d900",
@@ -286,7 +309,8 @@
       "status": "processing",
       "created_at": "2026-03-28T07:17:22.678869+00:00",
       "updated_at": "2026-03-28T07:17:22.678869+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "c90dedc64a8b7a18a44d75382101771ad1ac48a78e8640b41ac97e4aa3f77d7f": {
       "fingerprint": "c90dedc64a8b7a18a44d75382101771ad1ac48a78e8640b41ac97e4aa3f77d7f",
@@ -298,7 +322,8 @@
       "status": "processing",
       "created_at": "2026-03-28T07:17:36.994300+00:00",
       "updated_at": "2026-03-28T07:17:36.994300+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "60728ca8700a46b666eed93ea883d918d492b53bac0904bb250d78b87bbf9b9d": {
       "fingerprint": "60728ca8700a46b666eed93ea883d918d492b53bac0904bb250d78b87bbf9b9d",
@@ -310,7 +335,8 @@
       "status": "processing",
       "created_at": "2026-03-29T07:30:39.922118+00:00",
       "updated_at": "2026-03-29T07:30:39.922118+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "2e6032209da5f8001dcda50b769447f73eb83083d9c4c7f186e0d154ddebc3d9": {
       "fingerprint": "2e6032209da5f8001dcda50b769447f73eb83083d9c4c7f186e0d154ddebc3d9",
@@ -322,7 +348,8 @@
       "status": "processing",
       "created_at": "2026-03-29T07:31:06.499894+00:00",
       "updated_at": "2026-03-29T07:31:06.499894+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "2caa5dcb3d658579afbf5e45cb528dcb78cb9c56202d0f8388a5b44fd04a567a": {
       "fingerprint": "2caa5dcb3d658579afbf5e45cb528dcb78cb9c56202d0f8388a5b44fd04a567a",
@@ -334,7 +361,8 @@
       "status": "processing",
       "created_at": "2026-03-29T07:31:19.662381+00:00",
       "updated_at": "2026-03-29T07:31:19.662381+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "c9422b742e3e79e5b4ad15c7c096337896dea2cd75ce9c626dbc91f032128deb": {
       "fingerprint": "c9422b742e3e79e5b4ad15c7c096337896dea2cd75ce9c626dbc91f032128deb",
@@ -346,7 +374,8 @@
       "status": "processing",
       "created_at": "2026-03-29T07:31:33.669545+00:00",
       "updated_at": "2026-03-29T07:31:33.669545+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     },
     "ffc77922d1782d1b6fa4922bf26af3aba57afa898d299a583e5f970433be8c3c": {
       "fingerprint": "ffc77922d1782d1b6fa4922bf26af3aba57afa898d299a583e5f970433be8c3c",
@@ -358,7 +387,8 @@
       "status": "processing",
       "created_at": "2026-03-29T07:31:48.882669+00:00",
       "updated_at": "2026-03-29T07:31:48.882669+00:00",
-      "queued_pr_payload": null
+      "queued_pr_payload": null,
+      "campaign_status": null
     }
   },
   "history": {
@@ -775,6 +805,21 @@
           "observed_at": "2026-03-29T07:30:24.910129+00:00",
           "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
           "workflow_run_id": 23697576475,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-32bit",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-32bit",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-03-30T06:10:58.130692+00:00",
+          "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
+          "workflow_run_id": 23722657826,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-ubuntu-32bit",
@@ -1274,6 +1319,21 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-03-30T06:10:58.130710+00:00",
+          "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
+          "workflow_run_id": 23722657826,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-valgrind-no-malloc-usable-size-test",
+          "matrix_params": {},
+          "failure_identifier": "test-valgrind-no-malloc-usable-size-test",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null
         }
       ]
     },
@@ -1350,6 +1410,21 @@
           "observed_at": "2026-03-29T07:30:24.910100+00:00",
           "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
           "workflow_run_id": 23697576475,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-arm",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-arm",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-03-30T06:10:58.130657+00:00",
+          "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
+          "workflow_run_id": 23722657826,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-ubuntu-arm",
@@ -1801,5 +1876,6 @@
         }
       ]
     }
-  }
+  },
+  "campaigns": {}
 }
