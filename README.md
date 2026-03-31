@@ -149,13 +149,13 @@ Runs from this repo, watches new scheduled `Daily` runs in `valkey-io/valkey`, a
 The workflow has two stages:
 
 - `monitor`: runs automatically on schedule, analyzes failures, applies history-based queue gating, and queues validated fixes in this agent repo
-- `create-approved-prs`: runs only after approval on the protected environment `valkey-pr-approval`, verifies the queued base branches exist in `sarthakaggarwal97/valkey`, and then opens draft PRs there by default
+- `create-draft-prs`: runs automatically after `monitor`, verifies the queued base branches exist in `sarthakaggarwal97/valkey`, and then opens draft PRs there by default
 
-No PR is opened during the monitor stage. After approval, the queued fixes are reconciled into draft PRs in your fork first so they can be reviewed before anything targets upstream.
+No PR is opened during the monitor stage. When queued fixes exist, they are immediately reconciled into draft PRs in your fork first so they can be reviewed before anything targets upstream.
 
 Approval context is written into the workflow summary so you can review the root-cause rationale, files the agent wants to change, observed failure streak, and last known good / first bad commits when history exists.
 
-Manual dispatch defaults to `dry_run=true` so you can inspect candidate runs without advancing state or queueing fixes. Dispatch with `dry_run=false` for a real automated pass; the workflow still stops at the approval gate before opening any PRs.
+Manual dispatch defaults to `dry_run=true` so you can inspect candidate runs without advancing state or queueing fixes. Dispatch with `dry_run=false` for a real automated pass; any queued fixes will be reconciled automatically into draft PRs in your fork.
 
 Required GitHub configuration:
 

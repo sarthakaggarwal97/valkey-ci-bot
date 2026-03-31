@@ -23,7 +23,7 @@ def test_monitor_workflow_uses_oidc_and_app_token_support() -> None:
     workflow = _load_yaml(REPO_ROOT / ".github/workflows/monitor-valkey-daily.yml")
     on_block = _get_on_block(workflow)
     monitor_job = workflow["jobs"]["monitor"]
-    approval_job = workflow["jobs"]["create-approved-prs"]
+    draft_pr_job = workflow["jobs"]["create-draft-prs"]
     job_env = monitor_job["env"]
 
     assert workflow["permissions"] == {"contents": "write", "id-token": "write"}
@@ -36,11 +36,11 @@ def test_monitor_workflow_uses_oidc_and_app_token_support() -> None:
     assert "VALKEY_GITHUB_APP_PRIVATE_KEY" in job_env
     assert monitor_job["concurrency"]["group"] == "monitor-valkey-daily-scan"
     assert monitor_job["outputs"]["monitor_dry_run"] == "${{ steps.capture-monitor.outputs.monitor_dry_run }}"
-    assert approval_job["needs"] == "monitor"
-    assert approval_job["environment"] == "valkey-pr-approval"
-    assert approval_job["concurrency"]["group"] == "monitor-valkey-daily-prs"
-    assert approval_job["env"]["VALKEY_FORK_REPO"] == "${{ vars.VALKEY_FORK_REPO || 'sarthakaggarwal97/valkey' }}"
-    assert "VALKEY_FORK_GITHUB_TOKEN" in approval_job["env"]
+    assert draft_pr_job["needs"] == "monitor"
+    assert "environment" not in draft_pr_job
+    assert draft_pr_job["concurrency"]["group"] == "monitor-valkey-daily-prs"
+    assert draft_pr_job["env"]["VALKEY_FORK_REPO"] == "${{ vars.VALKEY_FORK_REPO || 'sarthakaggarwal97/valkey' }}"
+    assert "VALKEY_FORK_GITHUB_TOKEN" in draft_pr_job["env"]
 
     app_token_step = next(
         step
@@ -88,12 +88,12 @@ def test_monitor_workflow_runs_central_monitor_script() -> None:
 
     reconcile_step = next(
         step
-        for step in workflow["jobs"]["create-approved-prs"]["steps"]
-        if step["name"] == "Create draft PRs for approved queued fixes"
+        for step in workflow["jobs"]["create-draft-prs"]["steps"]
+        if step["name"] == "Create draft PRs for queued fixes"
     )
     preflight_step = next(
         step
-        for step in workflow["jobs"]["create-approved-prs"]["steps"]
+        for step in workflow["jobs"]["create-draft-prs"]["steps"]
         if step["name"] == "Validate fork base branches for queued fixes"
     )
     preflight_script = preflight_step["run"]
