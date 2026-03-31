@@ -894,6 +894,21 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-03-31T07:46:25.472901+00:00",
+          "commit_sha": "2cde059da1b746eb7917147b16412678a9e5e12f",
+          "workflow_run_id": 23774277197,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-32bit",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-32bit",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null
         }
       ]
     },
@@ -1490,6 +1505,21 @@
           "observed_at": "2026-03-30T06:10:58.130657+00:00",
           "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
           "workflow_run_id": 23722657826,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-arm",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-arm",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-03-31T07:46:25.472865+00:00",
+          "commit_sha": "2cde059da1b746eb7917147b16412678a9e5e12f",
+          "workflow_run_id": 23774277197,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-ubuntu-arm",
