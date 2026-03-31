@@ -17,7 +17,7 @@ from hypothesis import strategies as st
 from github.GithubException import GithubException
 
 from scripts.failure_store import FailureStore
-from scripts.models import FailureStoreEntry, FailureReport, RootCauseReport
+from scripts.models import FailureStoreEntry, FailureReport, ParsedFailure, RootCauseReport
 
 # --- Strategies ---
 
@@ -35,6 +35,7 @@ _entry_strategy = st.fixed_dictionaries(
         "fingerprint": st.text(min_size=1, max_size=64),
         "failure_identifier": st.text(min_size=1, max_size=80),
         "test_name": _optional_text,
+        "incident_key": st.text(min_size=1, max_size=64),
         "error_signature": st.text(min_size=1, max_size=100),
         "file_path": st.text(
             alphabet=st.characters(min_codepoint=32, max_codepoint=126),
@@ -78,6 +79,7 @@ def test_failure_store_serialization_round_trip(
             fingerprint=raw["fingerprint"],
             failure_identifier=raw["failure_identifier"],
             test_name=raw["test_name"],
+            incident_key=raw["incident_key"],
             error_signature=raw["error_signature"],
             file_path=raw["file_path"],
             pr_url=raw["pr_url"],
@@ -103,6 +105,7 @@ def test_failure_store_serialization_round_trip(
         assert restored_entry.fingerprint == original.fingerprint
         assert restored_entry.failure_identifier == original.failure_identifier
         assert restored_entry.test_name == original.test_name
+        assert restored_entry.incident_key == original.incident_key
         assert restored_entry.error_signature == original.error_signature
         assert restored_entry.file_path == original.file_path
         assert restored_entry.pr_url == original.pr_url
@@ -110,6 +113,7 @@ def test_failure_store_serialization_round_trip(
         assert restored_entry.created_at == original.created_at
         assert restored_entry.updated_at == original.updated_at
         assert restored_entry.queued_pr_payload == original.queued_pr_payload
+        assert restored_entry.incident_observations == original.incident_observations
 
 
 def test_record_queued_pr_persists_payload() -> None:
@@ -139,6 +143,95 @@ def test_record_queued_pr_persists_payload() -> None:
     assert entry.status == "queued"
     assert entry.queued_pr_payload is not None
     assert entry.queued_pr_payload["patch"] == "diff"
+    assert entry.incident_key == "fp1"
+
+
+def test_compute_incident_key_ignores_runner_specific_error_text() -> None:
+    key_a = FailureStore.compute_incident_key(
+        "TestSuite.TestCase",
+        "src/foo.c",
+        test_name="TestSuite.TestCase",
+    )
+    key_b = FailureStore.compute_incident_key(
+        "TestSuite.TestCase",
+        "src/foo.c",
+        test_name="TestSuite.TestCase",
+    )
+
+    assert key_a == key_b
+
+
+def test_record_incident_observation_aggregates_same_failure_across_runners() -> None:
+    store = FailureStore()
+    report_a = FailureReport(
+        workflow_name="Daily",
+        workflow_file="daily.yml",
+        job_name="test-ubuntu-jemalloc",
+        matrix_params={"os": "ubuntu"},
+        commit_sha="sha-1",
+        failure_source="trusted",
+        repo_full_name="valkey-io/valkey",
+        workflow_run_id=10,
+        target_branch="unstable",
+        parsed_failures=[
+            ParsedFailure(
+                failure_identifier="TestSuite.TestCase",
+                test_name="TestSuite.TestCase",
+                file_path="src/foo.c",
+                error_message="assertion failed on ubuntu",
+                assertion_details=None,
+                line_number=42,
+                stack_trace=None,
+                parser_type="gtest",
+            )
+        ],
+    )
+    report_b = FailureReport(
+        workflow_name="Daily",
+        workflow_file="daily.yml",
+        job_name="test-alpine-jemalloc",
+        matrix_params={"os": "alpine"},
+        commit_sha="sha-1",
+        failure_source="trusted",
+        repo_full_name="valkey-io/valkey",
+        workflow_run_id=10,
+        target_branch="unstable",
+        parsed_failures=[
+            ParsedFailure(
+                failure_identifier="TestSuite.TestCase",
+                test_name="TestSuite.TestCase",
+                file_path="src/foo.c",
+                error_message="assertion failed on alpine",
+                assertion_details=None,
+                line_number=42,
+                stack_trace=None,
+                parser_type="gtest",
+            )
+        ],
+    )
+
+    incident_key = FailureStore.compute_incident_key(
+        "TestSuite.TestCase",
+        "src/foo.c",
+        test_name="TestSuite.TestCase",
+    )
+    store.record(
+        incident_key,
+        "TestSuite.TestCase",
+        "assertion failed on ubuntu",
+        "src/foo.c",
+        test_name="TestSuite.TestCase",
+    )
+    store.record_incident_observation(report_a, incident_key=incident_key, max_entries=10)
+    store.record_incident_observation(report_b, incident_key=incident_key, max_entries=10)
+
+    entry = store.get_entry(incident_key)
+    assert entry is not None
+    assert len(entry.incident_observations) == 2
+    assert {obs.job_name for obs in entry.incident_observations} == {
+        "test-ubuntu-jemalloc",
+        "test-alpine-jemalloc",
+    }
 
 
 def test_records_history_and_summarizes_failure_streak() -> None:

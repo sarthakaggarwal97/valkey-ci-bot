@@ -750,7 +750,7 @@ class TestRunPipeline:
         )
 
         failure_store = mock_failure_store.return_value
-        failure_store.compute_fingerprint.return_value = "fp1"
+        failure_store.compute_incident_key.return_value = "fp1"
         failure_store.has_open_pr.return_value = False
         failure_store.get_entry.return_value = None
         failure_store.summarize_history.return_value = MagicMock(
@@ -854,7 +854,7 @@ class TestRunPipeline:
         )
 
         failure_store = mock_failure_store.return_value
-        failure_store.compute_fingerprint.return_value = "fp1"
+        failure_store.compute_incident_key.return_value = "fp1"
         failure_store.has_open_pr.return_value = False
         failure_store.get_entry.return_value = None
         failure_store.summarize_history.return_value = MagicMock(
@@ -1003,7 +1003,7 @@ class TestRunPipeline:
         )
 
         failure_store = mock_failure_store.return_value
-        failure_store.compute_fingerprint.return_value = "fp1"
+        failure_store.compute_incident_key.return_value = "fp1"
         failure_store.has_open_pr.return_value = False
         failure_store.get_entry.return_value = None
         failure_store.summarize_history.return_value = MagicMock(
@@ -1096,7 +1096,7 @@ class TestRunPipeline:
         )
 
         failure_store = mock_failure_store.return_value
-        failure_store.compute_fingerprint.return_value = "fp1"
+        failure_store.compute_incident_key.return_value = "fp1"
         failure_store.has_open_pr.return_value = False
         failure_store.get_entry.return_value = None
         failure_store.summarize_history.return_value = MagicMock(
@@ -1196,7 +1196,7 @@ class TestRunPipeline:
         )
 
         failure_store = mock_failure_store.return_value
-        failure_store.compute_fingerprint.return_value = "fp1"
+        failure_store.compute_incident_key.return_value = "fp1"
         failure_store.has_open_pr.return_value = False
         failure_store.get_entry.return_value = None
         failure_store.get_flaky_campaign.return_value = MagicMock(
@@ -1392,7 +1392,7 @@ class TestProcessFailure:
         parser_router = MagicMock()
         parser_router.parse.return_value = ([], "plain output\nwith no parser markers", True)
         failure_store = MagicMock()
-        failure_store.compute_fingerprint.return_value = "fp-unparseable"
+        failure_store.compute_incident_key.return_value = "incident-unparseable"
         failure_store.get_entry.return_value = None
         failure_store.has_open_pr.return_value = False
 
@@ -1403,15 +1403,76 @@ class TestProcessFailure:
             log_retriever,
             parser_router,
             failure_store,
+            max_history_entries=5,
         )
 
         assert report is not None
-        failure_store.compute_fingerprint.assert_called_once_with(
-            "test-unit", "plain output\nwith no parser markers", "",
+        failure_store.compute_incident_key.assert_called_once_with(
+            "test-unit", "",
         )
         failure_store.record.assert_called_once_with(
-            "fp-unparseable",
+            "incident-unparseable",
             "test-unit",
             "plain output\nwith no parser markers",
             "",
         )
+        failure_store.record_incident_observation.assert_called_once()
+
+    def test_same_incident_across_runners_is_skipped_within_one_run(self):
+        workflow_run = WorkflowRun(
+            id=1,
+            name="Daily",
+            event="schedule",
+            head_sha="abc123",
+            head_branch="unstable",
+            head_repository="valkey-io/valkey",
+            is_fork=False,
+            conclusion="failure",
+            workflow_file="daily.yml",
+        )
+        alpine_job = FailedJob(
+            id=11,
+            name="test-alpine-jemalloc",
+            conclusion="failure",
+            step_name="Run tests",
+            matrix_params={"os": "alpine"},
+        )
+        log_retriever = MagicMock()
+        log_retriever.get_job_log.return_value = "parsed log"
+        parser_router = MagicMock()
+        parser_router.parse.return_value = (
+            [
+                ParsedFailure(
+                    failure_identifier="TestSuite.TestCase",
+                    test_name="TestSuite.TestCase",
+                    file_path="src/foo.c",
+                    error_message="runner-specific assertion text",
+                    assertion_details=None,
+                    line_number=42,
+                    stack_trace=None,
+                    parser_type="gtest",
+                )
+            ],
+            "",
+            False,
+        )
+        failure_store = MagicMock()
+        failure_store.compute_incident_key.return_value = "incident-123"
+        failure_store.get_entry.return_value = MagicMock(status="processing")
+        failure_store.has_open_pr.return_value = False
+
+        seen_incidents = {"incident-123"}
+        report = _process_failure(
+            alpine_job,
+            workflow_run,
+            "trusted",
+            log_retriever,
+            parser_router,
+            failure_store,
+            seen_incidents=seen_incidents,
+            max_history_entries=5,
+        )
+
+        assert report is None
+        failure_store.record.assert_not_called()
+        failure_store.record_incident_observation.assert_called_once()

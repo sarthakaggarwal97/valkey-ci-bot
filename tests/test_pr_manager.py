@@ -183,8 +183,10 @@ class TestComputeFingerprint:
     def test_uses_first_parsed_failure(self):
         report = _make_failure_report()
         fp = _compute_fingerprint(report)
-        expected = FailureStore.compute_fingerprint(
-            "TestSuite.TestCase", "Expected 1 got 0", "src/foo.c"
+        expected = FailureStore.compute_incident_key(
+            "TestSuite.TestCase",
+            "src/foo.c",
+            test_name="TestCase",
         )
         assert fp == expected
 
@@ -193,8 +195,9 @@ class TestComputeFingerprint:
             parsed_failures=[], raw_log_excerpt="some log", is_unparseable=True
         )
         fp = _compute_fingerprint(report)
-        expected = FailureStore.compute_fingerprint(
-            "test-ubuntu-latest", "some log", ""
+        expected = FailureStore.compute_incident_key(
+            "test-ubuntu-latest",
+            "",
         )
         assert fp == expected
 

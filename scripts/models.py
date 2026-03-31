@@ -91,6 +91,7 @@ class FailureObservation:
     error_signature: str = ""
     file_path: str = ""
     fingerprint: str | None = None
+    incident_key: str | None = None
 
 
 @dataclass
@@ -179,6 +180,7 @@ class FailureStoreEntry:
     fingerprint: str
     failure_identifier: str
     test_name: str | None
+    incident_key: str
     error_signature: str
     file_path: str
     pr_url: str | None
@@ -187,6 +189,7 @@ class FailureStoreEntry:
     updated_at: str
     queued_pr_payload: dict | None = None
     campaign_status: str | None = None
+    incident_observations: list[FailureObservation] = field(default_factory=list)
 
 
 @dataclass

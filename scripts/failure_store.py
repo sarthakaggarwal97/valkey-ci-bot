@@ -76,6 +76,33 @@ class FailureStore:
         return hashlib.sha256(payload.encode()).hexdigest()
 
     @staticmethod
+    def compute_incident_key(
+        failure_identifier: str,
+        file_path: str,
+        *,
+        test_name: str | None = None,
+    ) -> str:
+        """Stable identity for one underlying failure across runners.
+
+        Uses the parsed failure identity and source file path, but intentionally
+        ignores runner-specific job or matrix details and raw error text.
+        """
+        stable_identifier = test_name or failure_identifier
+        payload = f"{stable_identifier}\0{file_path}"
+        return hashlib.sha256(payload.encode()).hexdigest()
+
+    @staticmethod
+    def _entry_incident_key(entry: FailureStoreEntry) -> str:
+        """Return the canonical incident key for a persisted entry."""
+        if entry.incident_key:
+            return entry.incident_key
+        return FailureStore.compute_incident_key(
+            entry.failure_identifier,
+            entry.file_path,
+            test_name=entry.test_name,
+        )
+
+    @staticmethod
     def compute_history_key(
         workflow_file: str,
         job_name: str,
@@ -91,7 +118,7 @@ class FailureStore:
 
     def has_open_pr(self, fingerprint: str) -> bool:
         """Return True if this fingerprint has an open or merged PR."""
-        entry = self._entries.get(fingerprint)
+        entry = self.get_entry(fingerprint)
         if entry is None:
             return False
         has_pr = entry.status in ("open", "merged")
@@ -104,7 +131,13 @@ class FailureStore:
 
     def get_entry(self, fingerprint: str) -> FailureStoreEntry | None:
         """Return the store entry for a fingerprint, or None if not found."""
-        return self._entries.get(fingerprint)
+        entry = self._entries.get(fingerprint)
+        if entry is not None:
+            return entry
+        for candidate in self._entries.values():
+            if self._entry_incident_key(candidate) == fingerprint:
+                return candidate
+        return None
 
     def record(
         self,
@@ -118,14 +151,16 @@ class FailureStore:
     ) -> None:
         """Record a failure in the store."""
         now = datetime.now(timezone.utc).isoformat()
-        existing = self._entries.get(fingerprint)
+        existing = self.get_entry(fingerprint)
+        store_key = existing.fingerprint if existing is not None else fingerprint
         # Truncate large error signatures to prevent store bloat.
         if len(error_signature) > _MAX_ERROR_SIGNATURE_CHARS:
             error_signature = error_signature[:_MAX_ERROR_SIGNATURE_CHARS] + "\n[truncated]"
-        self._entries[fingerprint] = FailureStoreEntry(
-            fingerprint=fingerprint,
+        self._entries[store_key] = FailureStoreEntry(
+            fingerprint=store_key,
             failure_identifier=failure_identifier,
             test_name=test_name,
+            incident_key=fingerprint,
             error_signature=error_signature,
             file_path=file_path,
             pr_url=pr_url if pr_url is not None else (existing.pr_url if existing else None),
@@ -134,10 +169,77 @@ class FailureStore:
             updated_at=now,
             queued_pr_payload=existing.queued_pr_payload if existing else None,
             campaign_status=existing.campaign_status if existing else None,
+            incident_observations=(
+                list(existing.incident_observations)
+                if existing is not None
+                else []
+            ),
         )
         logger.info(
             "Recorded failure: fingerprint=%s, identifier=%s, status=%s",
             fingerprint[:12], failure_identifier, status,
+        )
+
+    def record_incident_observation(
+        self,
+        report: FailureReport,
+        *,
+        incident_key: str,
+        max_entries: int,
+    ) -> None:
+        """Attach one runner-specific observation to a canonical incident entry."""
+        entry = self.get_entry(incident_key)
+        if entry is None:
+            self.record(
+                incident_key,
+                report.job_name,
+                report.raw_log_excerpt or "",
+                "",
+                status="processing",
+            )
+            entry = self.get_entry(incident_key)
+        if entry is None:
+            return
+
+        if report.parsed_failures:
+            parsed_failure = report.parsed_failures[0]
+            observation = FailureObservation(
+                outcome="fail",
+                observed_at=datetime.now(timezone.utc).isoformat(),
+                commit_sha=report.commit_sha,
+                workflow_run_id=report.workflow_run_id,
+                workflow_name=report.workflow_name,
+                workflow_file=report.workflow_file,
+                job_name=report.job_name,
+                matrix_params=dict(report.matrix_params),
+                failure_identifier=parsed_failure.failure_identifier,
+                test_name=parsed_failure.test_name,
+                error_signature=parsed_failure.error_message,
+                file_path=parsed_failure.file_path,
+                fingerprint=incident_key,
+                incident_key=incident_key,
+            )
+        else:
+            observation = FailureObservation(
+                outcome="fail",
+                observed_at=datetime.now(timezone.utc).isoformat(),
+                commit_sha=report.commit_sha,
+                workflow_run_id=report.workflow_run_id,
+                workflow_name=report.workflow_name,
+                workflow_file=report.workflow_file,
+                job_name=report.job_name,
+                matrix_params=dict(report.matrix_params),
+                failure_identifier=report.job_name,
+                test_name=None,
+                error_signature=(report.raw_log_excerpt or "")[:_MAX_ERROR_SIGNATURE_CHARS],
+                file_path="",
+                fingerprint=incident_key,
+                incident_key=incident_key,
+            )
+        self._append_entry_observation(
+            entry,
+            observation,
+            max_entries=max_entries,
         )
 
     def get_flaky_campaign(self, fingerprint: str) -> FlakyCampaignState | None:
@@ -258,7 +360,7 @@ class FailureStore:
         campaign.updated_at = datetime.now(timezone.utc).isoformat()
         if queued_pr_payload is not None:
             campaign.queued_pr_payload = queued_pr_payload
-        entry = self._entries.get(fingerprint)
+        entry = self.get_entry(fingerprint)
         if entry is not None:
             entry.campaign_status = status
             entry.updated_at = campaign.updated_at
@@ -292,7 +394,10 @@ class FailureStore:
             status="queued",
             test_name=test_name,
         )
-        self._entries[fingerprint].queued_pr_payload = {
+        entry = self.get_entry(fingerprint)
+        if entry is None:
+            return
+        entry.queued_pr_payload = {
             "failure_report": failure_report_to_dict(failure_report),
             "root_cause": root_cause_report_to_dict(root_cause),
             "patch": patch,
@@ -301,12 +406,12 @@ class FailureStore:
         self.mark_flaky_campaign_status(
             fingerprint,
             "queued",
-            queued_pr_payload=self._entries[fingerprint].queued_pr_payload,
+            queued_pr_payload=entry.queued_pr_payload,
         )
 
     def clear_queued_pr(self, fingerprint: str) -> None:
         """Clear any queued PR payload associated with a fingerprint."""
-        entry = self._entries.get(fingerprint)
+        entry = self.get_entry(fingerprint)
         if entry is not None:
             entry.queued_pr_payload = None
             entry.updated_at = datetime.now(timezone.utc).isoformat()
@@ -515,9 +620,30 @@ class FailureStore:
         if max_entries > 0 and len(entry.observations) > max_entries:
             entry.observations[:] = entry.observations[-max_entries:]
 
+    @staticmethod
+    def _append_entry_observation(
+        entry: FailureStoreEntry,
+        observation: FailureObservation,
+        *,
+        max_entries: int,
+    ) -> None:
+        """Append one incident-level observation to a store entry."""
+        if entry.incident_observations:
+            latest = entry.incident_observations[-1]
+            if (
+                latest.workflow_run_id == observation.workflow_run_id
+                and latest.job_name == observation.job_name
+                and latest.outcome == observation.outcome
+                and latest.commit_sha == observation.commit_sha
+            ):
+                return
+        entry.incident_observations.append(observation)
+        if max_entries > 0 and len(entry.incident_observations) > max_entries:
+            entry.incident_observations[:] = entry.incident_observations[-max_entries:]
+
     def mark_abandoned(self, fingerprint: str) -> None:
         """Mark a failure entry as abandoned (PR closed without merge)."""
-        entry = self._entries.get(fingerprint)
+        entry = self.get_entry(fingerprint)
         if entry:
             entry.status = "abandoned"
             entry.updated_at = datetime.now(timezone.utc).isoformat()
@@ -572,6 +698,7 @@ class FailureStore:
                     "fingerprint": e.fingerprint,
                     "failure_identifier": e.failure_identifier,
                     "test_name": e.test_name,
+                    "incident_key": e.incident_key,
                     "error_signature": e.error_signature,
                     "file_path": e.file_path,
                     "pr_url": e.pr_url,
@@ -580,6 +707,7 @@ class FailureStore:
                     "updated_at": e.updated_at,
                     "queued_pr_payload": e.queued_pr_payload,
                     "campaign_status": e.campaign_status,
+                    "incident_observations": [asdict(obs) for obs in e.incident_observations],
                 }
                 for fp, e in self._entries.items()
             },
@@ -607,6 +735,7 @@ class FailureStore:
                 fingerprint=raw["fingerprint"],
                 failure_identifier=raw["failure_identifier"],
                 test_name=raw.get("test_name"),
+                incident_key=str(raw.get("incident_key", fp)),
                 error_signature=raw["error_signature"],
                 file_path=raw["file_path"],
                 pr_url=raw.get("pr_url"),
@@ -615,6 +744,11 @@ class FailureStore:
                 updated_at=raw["updated_at"],
                 queued_pr_payload=raw.get("queued_pr_payload"),
                 campaign_status=raw.get("campaign_status"),
+                incident_observations=[
+                    FailureObservation(**obs)
+                    for obs in raw.get("incident_observations", [])
+                    if isinstance(obs, dict)
+                ],
             )
         history_raw = data.get("history", {}) if isinstance(data, dict) else {}
         if not isinstance(history_raw, dict):

@@ -153,6 +153,8 @@ The flow is intentionally simple:
 - verify the target branches exist in your fork
 - open draft PRs automatically in your fork
 
+Runner-specific duplicates are collapsed at a canonical incident level, so the same underlying test failure across multiple runners produces one queued fix / one draft PR while still preserving the per-runner observations in bot state.
+
 The internal queue is still used for persistence and rate limiting, but there is no separate approval job or manual gate in the workflow anymore.
 
 Approval context is written into the workflow summary so you can review the root-cause rationale, files the agent wants to change, observed failure streak, and last known good / first bad commits when history exists.

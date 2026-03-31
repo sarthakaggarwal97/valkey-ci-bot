@@ -314,6 +314,9 @@ def _process_failure(
     log_retriever: LogRetriever,
     parser_router: LogParserRouter,
     failure_store: FailureStore,
+    *,
+    seen_incidents: set[str] | None = None,
+    max_history_entries: int = 0,
 ) -> FailureReport | None:
     """Process a single failed job through Detect → Parse stages.
 
@@ -360,48 +363,108 @@ def _process_failure(
     # Check deduplication for each parsed failure
     if parsed_failures:
         first = parsed_failures[0]
-        fp = failure_store.compute_fingerprint(
-            first.failure_identifier, first.error_message, first.file_path
+        incident_key = failure_store.compute_incident_key(
+            first.failure_identifier,
+            first.file_path,
+            test_name=first.test_name,
         )
-        existing = failure_store.get_entry(fp)
-        if existing and existing.status == "queued":
+        existing = failure_store.get_entry(incident_key)
+        if seen_incidents is not None and incident_key in seen_incidents:
+            if existing is not None:
+                failure_store.record_incident_observation(
+                    report,
+                    incident_key=incident_key,
+                    max_entries=max_history_entries,
+                )
             logger.info(
-                "Skipping already queued failure: identifier=%s, fingerprint=%s",
-                first.failure_identifier, fp[:12],
+                "Skipping duplicate incident within run: identifier=%s, incident=%s",
+                first.failure_identifier, incident_key[:12],
             )
             return None
-        if failure_store.has_open_pr(fp):
+        if existing and existing.status == "queued":
+            failure_store.record_incident_observation(
+                report,
+                incident_key=incident_key,
+                max_entries=max_history_entries,
+            )
             logger.info(
-                "Skipping duplicate failure: identifier=%s, fingerprint=%s",
-                first.failure_identifier, fp[:12],
+                "Skipping already queued failure: identifier=%s, incident=%s",
+                first.failure_identifier, incident_key[:12],
+            )
+            return None
+        if failure_store.has_open_pr(incident_key):
+            failure_store.record_incident_observation(
+                report,
+                incident_key=incident_key,
+                max_entries=max_history_entries,
+            )
+            logger.info(
+                "Skipping duplicate failure: identifier=%s, incident=%s",
+                first.failure_identifier, incident_key[:12],
             )
             return None
         # Record as processing
         failure_store.record(
-            fp, first.failure_identifier, first.error_message,
+            incident_key, first.failure_identifier, first.error_message,
             first.file_path, test_name=first.test_name,
         )
+        failure_store.record_incident_observation(
+            report,
+            incident_key=incident_key,
+            max_entries=max_history_entries,
+        )
+        if seen_incidents is not None:
+            seen_incidents.add(incident_key)
     elif is_unparseable:
-        fp = failure_store.compute_fingerprint(job.name, raw_excerpt or "", "")
-        existing = failure_store.get_entry(fp)
-        if existing and existing.status == "queued":
+        incident_key = failure_store.compute_incident_key(job.name, "")
+        existing = failure_store.get_entry(incident_key)
+        if seen_incidents is not None and incident_key in seen_incidents:
+            if existing is not None:
+                failure_store.record_incident_observation(
+                    report,
+                    incident_key=incident_key,
+                    max_entries=max_history_entries,
+                )
             logger.info(
-                "Skipping already queued unparseable failure: job=%s, fingerprint=%s",
-                job.name, fp[:12],
+                "Skipping duplicate unparseable incident within run: job=%s, incident=%s",
+                job.name, incident_key[:12],
             )
             return None
-        if failure_store.has_open_pr(fp):
+        if existing and existing.status == "queued":
+            failure_store.record_incident_observation(
+                report,
+                incident_key=incident_key,
+                max_entries=max_history_entries,
+            )
             logger.info(
-                "Skipping duplicate unparseable failure: job=%s, fingerprint=%s",
-                job.name, fp[:12],
+                "Skipping already queued unparseable failure: job=%s, incident=%s",
+                job.name, incident_key[:12],
+            )
+            return None
+        if failure_store.has_open_pr(incident_key):
+            failure_store.record_incident_observation(
+                report,
+                incident_key=incident_key,
+                max_entries=max_history_entries,
+            )
+            logger.info(
+                "Skipping duplicate unparseable failure: job=%s, incident=%s",
+                job.name, incident_key[:12],
             )
             return None
         failure_store.record(
-            fp,
+            incident_key,
             job.name,
             raw_excerpt or "",
             "",
         )
+        failure_store.record_incident_observation(
+            report,
+            incident_key=incident_key,
+            max_entries=max_history_entries,
+        )
+        if seen_incidents is not None:
+            seen_incidents.add(incident_key)
 
     return report
 
@@ -852,6 +915,7 @@ def run_pipeline(
 
     # Process each failure through Detect → Parse → Analyze → Fix → Validate → PR
     reports: list[FailureReport] = []
+    seen_incidents: set[str] = set()
     for job in failed_jobs:
         try:
             metrics: dict[str, float | int] = {
@@ -873,6 +937,8 @@ def run_pipeline(
             report = _process_failure(
                 job, workflow_run, failure_source,
                 log_retriever, parser_router, failure_store,
+                seen_incidents=seen_incidents,
+                max_history_entries=max(1, config.max_history_entries_per_test),
             )
             parse_duration = time.perf_counter() - parse_start
             if not report:
@@ -1069,14 +1135,16 @@ def run_pipeline(
 def _get_report_fingerprint(
     report: FailureReport, failure_store: FailureStore
 ) -> str | None:
-    """Compute the fingerprint for a report."""
+    """Compute the canonical incident key for a report."""
     if not report.parsed_failures:
-        return failure_store.compute_fingerprint(
-            report.job_name, report.raw_log_excerpt or "", "",
+        return failure_store.compute_incident_key(
+            report.job_name, "",
         )
     first = report.parsed_failures[0]
-    return failure_store.compute_fingerprint(
-        first.failure_identifier, first.error_message, first.file_path
+    return failure_store.compute_incident_key(
+        first.failure_identifier,
+        first.file_path,
+        test_name=first.test_name,
     )
 
 

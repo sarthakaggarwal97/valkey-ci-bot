@@ -37,15 +37,17 @@ def _escape_table_cell(value: object) -> str:
 
 
 def _compute_fingerprint(report: FailureReport) -> str:
-    """Derive the failure fingerprint from the first parsed failure."""
+    """Derive the canonical incident key from the first parsed failure."""
     if report.parsed_failures:
         pf = report.parsed_failures[0]
-        return FailureStore.compute_fingerprint(
-            pf.failure_identifier, pf.error_message, pf.file_path
+        return FailureStore.compute_incident_key(
+            pf.failure_identifier,
+            pf.file_path,
+            test_name=pf.test_name,
         )
     # Fallback for unparseable failures — use job name as identifier
-    return FailureStore.compute_fingerprint(
-        report.job_name, report.raw_log_excerpt or "", ""
+    return FailureStore.compute_incident_key(
+        report.job_name, ""
     )
 
 
