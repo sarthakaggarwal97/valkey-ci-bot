@@ -23,7 +23,6 @@ def test_monitor_workflow_uses_oidc_and_app_token_support() -> None:
     workflow = _load_yaml(REPO_ROOT / ".github/workflows/monitor-valkey-daily.yml")
     on_block = _get_on_block(workflow)
     monitor_job = workflow["jobs"]["monitor"]
-    draft_pr_job = workflow["jobs"]["create-draft-prs"]
     job_env = monitor_job["env"]
 
     assert workflow["permissions"] == {"contents": "write", "id-token": "write"}
@@ -34,13 +33,10 @@ def test_monitor_workflow_uses_oidc_and_app_token_support() -> None:
     assert "VALKEY_GITHUB_TOKEN" in job_env
     assert "VALKEY_GITHUB_APP_ID" in job_env
     assert "VALKEY_GITHUB_APP_PRIVATE_KEY" in job_env
+    assert "VALKEY_FORK_REPO" in job_env
+    assert "VALKEY_FORK_GITHUB_TOKEN" in job_env
     assert monitor_job["concurrency"]["group"] == "monitor-valkey-daily-scan"
-    assert monitor_job["outputs"]["monitor_dry_run"] == "${{ steps.capture-monitor.outputs.monitor_dry_run }}"
-    assert draft_pr_job["needs"] == "monitor"
-    assert "environment" not in draft_pr_job
-    assert draft_pr_job["concurrency"]["group"] == "monitor-valkey-daily-prs"
-    assert draft_pr_job["env"]["VALKEY_FORK_REPO"] == "${{ vars.VALKEY_FORK_REPO || 'sarthakaggarwal97/valkey' }}"
-    assert "VALKEY_FORK_GITHUB_TOKEN" in draft_pr_job["env"]
+    assert "create-draft-prs" not in workflow["jobs"]
 
     app_token_step = next(
         step
@@ -86,19 +82,26 @@ def test_monitor_workflow_runs_central_monitor_script() -> None:
     assert '--config ".github/valkey-daily-bot.yml"' in script
     assert "--queue-only" in script
 
-    reconcile_step = next(
-        step
-        for step in workflow["jobs"]["create-draft-prs"]["steps"]
-        if step["name"] == "Create draft PRs for queued fixes"
-    )
     preflight_step = next(
         step
-        for step in workflow["jobs"]["create-draft-prs"]["steps"]
+        for step in workflow["jobs"]["monitor"]["steps"]
         if step["name"] == "Validate fork base branches for queued fixes"
+    )
+    reconcile_step = next(
+        step
+        for step in workflow["jobs"]["monitor"]["steps"]
+        if step["name"] == "Create draft PRs for queued fixes"
+    )
+    select_fork_token_step = next(
+        step
+        for step in workflow["jobs"]["monitor"]["steps"]
+        if step["name"] == "Select fork repository token"
     )
     preflight_script = preflight_step["run"]
     assert "-m scripts.preflight_reconciliation" in preflight_script
     assert "--repo \"${VALKEY_FORK_REPO}\"" in preflight_script
+    assert "steps.capture-monitor.outputs.has_queued_failures" in preflight_step["if"]
+    assert "steps.capture-monitor.outputs.has_queued_failures" in select_fork_token_step["if"]
 
     reconcile_script = reconcile_step["run"]
     assert "--mode reconcile" in reconcile_script

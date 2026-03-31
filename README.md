@@ -144,14 +144,16 @@ Required GitHub configuration in the consumer repo:
 
 Workflow at `.github/workflows/monitor-valkey-daily.yml`.
 
-Runs from this repo, watches new scheduled `Daily` runs in `valkey-io/valkey`, analyzes new failures, records per-job pass/fail history, validates candidate fixes, and queues approved-ready patches using the local config at `.github/valkey-daily-bot.yml`.
+Runs from this repo, watches new scheduled `Daily` runs in `valkey-io/valkey`, analyzes new failures, records per-job pass/fail history, validates candidate fixes, and then, in the same workflow job, reconciles any queue-worthy fixes into draft PRs in `sarthakaggarwal97/valkey` using the local config at `.github/valkey-daily-bot.yml`.
 
-The workflow has two stages:
+The flow is intentionally simple:
 
-- `monitor`: runs automatically on schedule, analyzes failures, applies history-based queue gating, and queues validated fixes in this agent repo
-- `create-draft-prs`: runs automatically after `monitor`, verifies the queued base branches exist in `sarthakaggarwal97/valkey`, and then opens draft PRs there by default
+- monitor new `Daily` runs
+- queue only the fixes that validate and pass the normal safety heuristics
+- verify the target branches exist in your fork
+- open draft PRs automatically in your fork
 
-No PR is opened during the monitor stage. When queued fixes exist, they are immediately reconciled into draft PRs in your fork first so they can be reviewed before anything targets upstream.
+The internal queue is still used for persistence and rate limiting, but there is no separate approval job or manual gate in the workflow anymore.
 
 Approval context is written into the workflow summary so you can review the root-cause rationale, files the agent wants to change, observed failure streak, and last known good / first bad commits when history exists.
 
