@@ -665,6 +665,216 @@ class TestRunPipeline:
     @patch("scripts.main._build_workflow_run")
     @patch("scripts.main._load_runtime_config")
     @patch("scripts.main.Github")
+    @patch("scripts.main.ApprovalSummary")
+    @patch("scripts.main.FailureDetector")
+    @patch("scripts.main.LogRetriever")
+    @patch("scripts.main.FailureStore")
+    @patch("scripts.main.BedrockClient")
+    @patch("scripts.main.RootCauseAnalyzer")
+    @patch("scripts.main.FixGenerator")
+    @patch("scripts.main.ValidationRunner")
+    @patch("scripts.main.PRManager")
+    def test_skips_unparseable_jobs_without_consuming_structured_failure_cap(
+        self,
+        mock_pr_manager,
+        mock_validation_runner,
+        mock_fix_generator,
+        mock_root_cause_analyzer,
+        mock_bedrock_client,
+        mock_failure_store,
+        mock_log_retriever,
+        mock_detector,
+        mock_approval_summary,
+        mock_gh,
+        mock_load_config,
+        mock_build_workflow_run,
+    ):
+        mock_build_workflow_run.return_value = WorkflowRun(
+            id=1,
+            name="CI",
+            event="push",
+            head_sha="abc123",
+            head_branch="unstable",
+            head_repository="owner/repo",
+            is_fork=False,
+            conclusion="failure",
+            workflow_file="ci.yml",
+        )
+        mock_load_config.return_value = BotConfig(
+            monitored_workflows=["ci.yml"],
+            max_failures_per_run=2,
+        )
+        mock_detector.return_value.detect.return_value = [
+            FailedJob(id=1, name="job-a-unparseable", conclusion="failure", step_name=None, matrix_params={}),
+            FailedJob(id=2, name="job-b-parseable", conclusion="failure", step_name=None, matrix_params={}),
+            FailedJob(id=3, name="job-c-unparseable", conclusion="failure", step_name=None, matrix_params={}),
+            FailedJob(id=4, name="job-d-parseable", conclusion="failure", step_name=None, matrix_params={}),
+            FailedJob(id=5, name="job-e-parseable-over-limit", conclusion="failure", step_name=None, matrix_params={}),
+        ]
+
+        log_retriever = mock_log_retriever.return_value
+        logs = {
+            1: "plain text with no structured parser match",
+            2: "src/foo.c:42: Failure\nExpected: 1\n  Actual: 0\n[  FAILED  ] TestSuite.ParseableOne\n",
+            3: "still plain text without parser markers",
+            4: "src/bar.c:43: Failure\nExpected: 1\n  Actual: 0\n[  FAILED  ] TestSuite.ParseableTwo\n",
+            5: "src/baz.c:44: Failure\nExpected: 1\n  Actual: 0\n[  FAILED  ] TestSuite.ParseableThree\n",
+        }
+        log_retriever.get_job_log.side_effect = lambda _repo, job_id: logs[job_id]
+
+        failure_store = mock_failure_store.return_value
+        failure_store.compute_incident_key.side_effect = (
+            lambda failure_identifier, file_path, *, test_name=None: f"{test_name or failure_identifier}|{file_path}"
+        )
+        failure_store.has_open_pr.return_value = False
+        failure_store.get_entry.return_value = None
+        failure_store.get_flaky_campaign.return_value = None
+        failure_store.summarize_history.return_value = MagicMock(
+            consecutive_failures=2,
+            failure_count=2,
+            last_known_good_sha="goodsha",
+            first_bad_sha="badsha",
+        )
+
+        mock_root_cause_analyzer.return_value.analyze.return_value = _make_root_cause()
+        mock_root_cause_analyzer.return_value.identify_relevant_files.return_value = []
+        mock_root_cause_analyzer.return_value._retrieve_file_contents.return_value = {}
+        mock_fix_generator.return_value.generate.return_value = "diff"
+        mock_validation_runner.return_value.validate.return_value = ValidationResult(
+            passed=True, output="ok",
+        )
+
+        rate_limiter = MagicMock()
+        rate_limiter.can_use_tokens.return_value = True
+        rate_limiter.can_create_pr.return_value = True
+
+        result = run_pipeline(
+            "owner/repo",
+            1,
+            ".github/ci-failure-bot.yml",
+            "token",
+            allow_pr_creation=False,
+            rate_limiter=rate_limiter,
+        )
+
+        outcomes = {
+            (item["job_name"], item["outcome"])
+            for item in result.job_outcomes
+        }
+        assert ("job-a-unparseable", "unparseable") in outcomes
+        assert ("job-c-unparseable", "unparseable") in outcomes
+        assert ("job-e-parseable-over-limit", "skipped-rate-limit") in outcomes
+        assert ("job-b-parseable", "queued-manual-approval") in outcomes
+        assert ("job-d-parseable", "queued-manual-approval") in outcomes
+        assert len(result.reports) == 2
+        assert mock_fix_generator.return_value.generate.call_count == 2
+        assert failure_store.record_queued_pr.call_count == 2
+
+    @patch("scripts.main._build_workflow_run")
+    @patch("scripts.main._load_runtime_config")
+    @patch("scripts.main.Github")
+    @patch("scripts.main.ApprovalSummary")
+    @patch("scripts.main.FailureDetector")
+    @patch("scripts.main.LogRetriever")
+    @patch("scripts.main.FailureStore")
+    @patch("scripts.main.BedrockClient")
+    @patch("scripts.main.RootCauseAnalyzer")
+    @patch("scripts.main.FixGenerator")
+    @patch("scripts.main.ValidationRunner")
+    @patch("scripts.main.PRManager")
+    def test_groups_duplicate_incidents_before_applying_structured_failure_cap(
+        self,
+        mock_pr_manager,
+        mock_validation_runner,
+        mock_fix_generator,
+        mock_root_cause_analyzer,
+        mock_bedrock_client,
+        mock_failure_store,
+        mock_log_retriever,
+        mock_detector,
+        mock_approval_summary,
+        mock_gh,
+        mock_load_config,
+        mock_build_workflow_run,
+    ):
+        mock_build_workflow_run.return_value = WorkflowRun(
+            id=1,
+            name="CI",
+            event="push",
+            head_sha="abc123",
+            head_branch="unstable",
+            head_repository="owner/repo",
+            is_fork=False,
+            conclusion="failure",
+            workflow_file="ci.yml",
+        )
+        mock_load_config.return_value = BotConfig(
+            monitored_workflows=["ci.yml"],
+            max_failures_per_run=1,
+        )
+        mock_detector.return_value.detect.return_value = [
+            FailedJob(id=1, name="job-a-representative", conclusion="failure", step_name=None, matrix_params={}),
+            FailedJob(id=2, name="job-b-duplicate-incident", conclusion="failure", step_name=None, matrix_params={}),
+            FailedJob(id=3, name="job-c-distinct-incident", conclusion="failure", step_name=None, matrix_params={}),
+        ]
+
+        log_retriever = mock_log_retriever.return_value
+        logs = {
+            1: "src/foo.c:42: Failure\nExpected: 1\n  Actual: 0\n[  FAILED  ] TestSuite.SharedIncident\n",
+            2: "src/foo.c:42: Failure\nExpected: 1\n  Actual: 0\n[  FAILED  ] TestSuite.SharedIncident\n",
+            3: "src/bar.c:43: Failure\nExpected: 1\n  Actual: 0\n[  FAILED  ] TestSuite.UniqueIncident\n",
+        }
+        log_retriever.get_job_log.side_effect = lambda _repo, job_id: logs[job_id]
+
+        failure_store = mock_failure_store.return_value
+        failure_store.compute_incident_key.side_effect = (
+            lambda failure_identifier, file_path, *, test_name=None: f"{test_name or failure_identifier}|{file_path}"
+        )
+        failure_store.has_open_pr.return_value = False
+        failure_store.get_entry.return_value = None
+        failure_store.get_flaky_campaign.return_value = None
+        failure_store.summarize_history.return_value = MagicMock(
+            consecutive_failures=2,
+            failure_count=2,
+            last_known_good_sha="goodsha",
+            first_bad_sha="badsha",
+        )
+
+        mock_root_cause_analyzer.return_value.analyze.return_value = _make_root_cause()
+        mock_root_cause_analyzer.return_value.identify_relevant_files.return_value = []
+        mock_root_cause_analyzer.return_value._retrieve_file_contents.return_value = {}
+        mock_fix_generator.return_value.generate.return_value = "diff"
+        mock_validation_runner.return_value.validate.return_value = ValidationResult(
+            passed=True, output="ok",
+        )
+
+        rate_limiter = MagicMock()
+        rate_limiter.can_use_tokens.return_value = True
+        rate_limiter.can_create_pr.return_value = True
+
+        result = run_pipeline(
+            "owner/repo",
+            1,
+            ".github/ci-failure-bot.yml",
+            "token",
+            allow_pr_creation=False,
+            rate_limiter=rate_limiter,
+        )
+
+        outcomes = {
+            (item["job_name"], item["outcome"])
+            for item in result.job_outcomes
+        }
+        assert ("job-a-representative", "queued-manual-approval") in outcomes
+        assert ("job-b-duplicate-incident", "skipped") in outcomes
+        assert ("job-c-distinct-incident", "skipped-rate-limit") in outcomes
+        assert len(result.reports) == 1
+        assert mock_fix_generator.return_value.generate.call_count == 1
+        assert failure_store.record_queued_pr.call_count == 1
+
+    @patch("scripts.main._build_workflow_run")
+    @patch("scripts.main._load_runtime_config")
+    @patch("scripts.main.Github")
     @patch("scripts.main.FailureDetector")
     def test_skips_unmonitored_workflow(
         self, mock_detector, mock_gh, mock_load_config, mock_build_workflow_run,

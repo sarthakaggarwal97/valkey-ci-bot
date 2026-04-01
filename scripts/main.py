@@ -66,7 +66,14 @@ class PipelineResult:
         return PipelineResult(reports=[], job_outcomes=[])
 
 
+@dataclass
+class PreparedFailureCandidate:
+    """Pre-parsed failure candidate selected for full analysis."""
 
+    job: FailedJob
+    report: FailureReport
+    fingerprint: str | None
+    parse_duration: float
 
 def _build_workflow_run(gh: Github, repo_name: str, run_id: int) -> WorkflowRun:
     """Fetch a workflow run from GitHub and convert to our model."""
@@ -307,21 +314,14 @@ def _summarize_flaky_attempt(
     return " | ".join(part for part in parts if part)
 
 
-def _process_failure(
+def _retrieve_failure_report(
     job: FailedJob,
     workflow_run: WorkflowRun,
     failure_source: str,
     log_retriever: LogRetriever,
     parser_router: LogParserRouter,
-    failure_store: FailureStore,
-    *,
-    seen_incidents: set[str] | None = None,
-    max_history_entries: int = 0,
 ) -> FailureReport | None:
-    """Process a single failed job through Detect → Parse stages.
-
-    Returns a FailureReport, or None if the failure should be skipped.
-    """
+    """Retrieve logs and parse one failed job into a report."""
     # Retrieve log
     try:
         log_content = log_retriever.get_job_log(
@@ -360,9 +360,20 @@ def _process_failure(
             job.name,
         )
 
+    return report
+
+
+def _record_or_skip_failure(
+    report: FailureReport,
+    failure_store: FailureStore,
+    *,
+    seen_incidents: set[str] | None = None,
+    max_history_entries: int = 0,
+) -> FailureReport | None:
+    """Apply dedupe / persistence rules to a parsed failure report."""
     # Check deduplication for each parsed failure
-    if parsed_failures:
-        first = parsed_failures[0]
+    if report.parsed_failures:
+        first = report.parsed_failures[0]
         incident_key = failure_store.compute_incident_key(
             first.failure_identifier,
             first.file_path,
@@ -415,8 +426,8 @@ def _process_failure(
         )
         if seen_incidents is not None:
             seen_incidents.add(incident_key)
-    elif is_unparseable:
-        incident_key = failure_store.compute_incident_key(job.name, "")
+    elif report.is_unparseable:
+        incident_key = failure_store.compute_incident_key(report.job_name, "")
         existing = failure_store.get_entry(incident_key)
         if seen_incidents is not None and incident_key in seen_incidents:
             if existing is not None:
@@ -427,7 +438,7 @@ def _process_failure(
                 )
             logger.info(
                 "Skipping duplicate unparseable incident within run: job=%s, incident=%s",
-                job.name, incident_key[:12],
+                report.job_name, incident_key[:12],
             )
             return None
         if existing and existing.status == "queued":
@@ -438,7 +449,7 @@ def _process_failure(
             )
             logger.info(
                 "Skipping already queued unparseable failure: job=%s, incident=%s",
-                job.name, incident_key[:12],
+                report.job_name, incident_key[:12],
             )
             return None
         if failure_store.has_open_pr(incident_key):
@@ -449,13 +460,13 @@ def _process_failure(
             )
             logger.info(
                 "Skipping duplicate unparseable failure: job=%s, incident=%s",
-                job.name, incident_key[:12],
+                report.job_name, incident_key[:12],
             )
             return None
         failure_store.record(
             incident_key,
-            job.name,
-            raw_excerpt or "",
+            report.job_name,
+            report.raw_log_excerpt or "",
             "",
         )
         failure_store.record_incident_observation(
@@ -467,6 +478,38 @@ def _process_failure(
             seen_incidents.add(incident_key)
 
     return report
+
+
+def _process_failure(
+    job: FailedJob,
+    workflow_run: WorkflowRun,
+    failure_source: str,
+    log_retriever: LogRetriever,
+    parser_router: LogParserRouter,
+    failure_store: FailureStore,
+    *,
+    seen_incidents: set[str] | None = None,
+    max_history_entries: int = 0,
+) -> FailureReport | None:
+    """Process a single failed job through Detect → Parse stages.
+
+    Returns a FailureReport, or None if the failure should be skipped.
+    """
+    report = _retrieve_failure_report(
+        job,
+        workflow_run,
+        failure_source,
+        log_retriever,
+        parser_router,
+    )
+    if report is None:
+        return None
+    return _record_or_skip_failure(
+        report,
+        failure_store,
+        seen_incidents=seen_incidents,
+        max_history_entries=max_history_entries,
+    )
 
 
 def _analyze_and_fix(
@@ -901,22 +944,79 @@ def run_pipeline(
     summary = WorkflowSummary(mode="analyze")
     approval_summary = ApprovalSummary()
 
-    # Enforce max_failures_per_run with alphabetical ordering
+    # Pre-scan all failed jobs so only structured, unique incidents consume the cap.
     failed_jobs.sort(key=lambda j: j.name)
-    if len(failed_jobs) > config.max_failures_per_run:
-        skipped = failed_jobs[config.max_failures_per_run:]
-        for j in skipped:
-            logger.warning(
-                "Skipping job %s: skipped-rate-limit (max %d per run exceeded).",
-                j.name, config.max_failures_per_run,
-            )
-            summary.add_result(j.name, "", "skipped-rate-limit")
-        failed_jobs = failed_jobs[: config.max_failures_per_run]
-
-    # Process each failure through Detect → Parse → Analyze → Fix → Validate → PR
     reports: list[FailureReport] = []
+    prepared_candidates: list[PreparedFailureCandidate] = []
     seen_incidents: set[str] = set()
+    max_history_entries = max(1, config.max_history_entries_per_test)
+
     for job in failed_jobs:
+        parse_start = time.perf_counter()
+        report = _retrieve_failure_report(
+            job,
+            workflow_run,
+            failure_source,
+            log_retriever,
+            parser_router,
+        )
+        parse_duration = time.perf_counter() - parse_start
+        if not report:
+            summary.add_result(job.name, "", "skipped")
+            continue
+
+        report = _record_or_skip_failure(
+            report,
+            failure_store,
+            seen_incidents=seen_incidents,
+            max_history_entries=max_history_entries,
+        )
+        if not report:
+            summary.add_result(job.name, "", "skipped")
+            continue
+
+        fingerprint = _get_report_fingerprint(report, failure_store)
+        if fingerprint:
+            failure_store.record_failure_observation(
+                report,
+                fingerprint=fingerprint,
+                max_entries=max_history_entries,
+            )
+
+        if report.is_unparseable or not report.parsed_failures:
+            logger.info(
+                "Skipping job %s from analysis: unparseable failures do not consume "
+                "the per-run analysis cap.",
+                job.name,
+            )
+            summary.add_result(job.name, "", "unparseable")
+            continue
+
+        prepared_candidates.append(
+            PreparedFailureCandidate(
+                job=job,
+                report=report,
+                fingerprint=fingerprint,
+                parse_duration=parse_duration,
+            )
+        )
+
+    if len(prepared_candidates) > config.max_failures_per_run:
+        skipped = prepared_candidates[config.max_failures_per_run:]
+        for candidate in skipped:
+            logger.warning(
+                "Skipping job %s: skipped-rate-limit (max %d structured failures per run exceeded).",
+                candidate.job.name, config.max_failures_per_run,
+            )
+            summary.add_result(candidate.job.name, "", "skipped-rate-limit")
+        prepared_candidates = prepared_candidates[: config.max_failures_per_run]
+
+    # Process each selected structured failure through Analyze → Fix → Validate → PR
+    for candidate in prepared_candidates:
+        job = candidate.job
+        report = candidate.report
+        fingerprint = candidate.fingerprint
+        parse_duration = candidate.parse_duration
         try:
             metrics: dict[str, float | int] = {
                 "analysis_duration": 0.0,
@@ -933,26 +1033,7 @@ def run_pipeline(
                 summary.add_result(job.name, "", "skipped-token-budget-exhausted")
                 continue
 
-            parse_start = time.perf_counter()
-            report = _process_failure(
-                job, workflow_run, failure_source,
-                log_retriever, parser_router, failure_store,
-                seen_incidents=seen_incidents,
-                max_history_entries=max(1, config.max_history_entries_per_test),
-            )
-            parse_duration = time.perf_counter() - parse_start
-            if not report:
-                summary.add_result(job.name, "", "skipped")
-                continue
-
             reports.append(report)
-            fingerprint = _get_report_fingerprint(report, failure_store)
-            if fingerprint:
-                failure_store.record_failure_observation(
-                    report,
-                    fingerprint=fingerprint,
-                    max_entries=max(1, config.max_history_entries_per_test),
-                )
             existing_campaign = (
                 failure_store.get_flaky_campaign(fingerprint)
                 if fingerprint
