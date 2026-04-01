@@ -17,7 +17,13 @@ from github import Auth, Github
 
 from scripts.bedrock_client import BedrockClient, BedrockError
 from scripts.bedrock_retriever import BedrockRetriever
-from scripts.config import BotConfig, ProjectContext, load_config, load_config_text
+from scripts.config import (
+    BotConfig,
+    ProjectContext,
+    load_config,
+    load_config_text,
+    load_repo_file_text,
+)
 from scripts.failure_detector import FailureDetector
 from scripts.failure_store import FailureStore
 from scripts.fix_generator import FixGenerator
@@ -54,6 +60,8 @@ def _build_parser_router() -> LogParserRouter:
     router.register(SentinelClusterParser())
     router.register(BuildErrorParser())
     return router
+
+
 @dataclass
 class PipelineResult:
     """Result of a full pipeline run with per-job visibility."""
@@ -74,6 +82,7 @@ class PreparedFailureCandidate:
     report: FailureReport
     fingerprint: str | None
     parse_duration: float
+
 
 def _build_workflow_run(gh: Github, repo_name: str, run_id: int) -> WorkflowRun:
     """Fetch a workflow run from GitHub and convert to our model."""
@@ -106,12 +115,12 @@ def _load_runtime_config(
         return load_config(local_path)
 
     try:
-        repo = gh.get_repo(repo_name)
-        config_ref = ref or repo.default_branch
-        contents = repo.get_contents(config_path, ref=config_ref)
-        if isinstance(contents, list):
-            raise ValueError("Config path resolved to a directory.")
-        text = contents.decoded_content.decode("utf-8", errors="replace")
+        text, config_ref = load_repo_file_text(
+            gh,
+            repo_name,
+            config_path,
+            ref=ref,
+        )
         return load_config_text(
             text,
             source=f"{repo_name}@{config_ref}:{config_path}",
@@ -283,7 +292,6 @@ def _should_queue_validated_fix(
     # A validated fix should always be queued — the analysis and validation
     # stages already confirmed the fix is sound.
     return True, "validated-fix"
-
 
 
 def _fix_retry_count(fix_generator: FixGenerator) -> int:

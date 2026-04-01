@@ -19,10 +19,16 @@ from github import Auth, Github
 
 from scripts.bedrock_client import BedrockClient
 from scripts.bedrock_retriever import BedrockRetriever
-from scripts.config import BotConfig, load_config
+from scripts.config import BotConfig
 from scripts.fuzzer_issue_publisher import FuzzerIssuePublisher
 from scripts.fuzzer_run_analyzer import FuzzerRunAnalyzer
 from scripts.models import fuzzer_run_analysis_to_dict
+from scripts.monitor_common import (
+    build_monitor_key,
+    configure_monitor_logging,
+    fetch_recent_completed_runs,
+    load_local_bot_config,
+)
 from scripts.monitor_state_store import MonitorStateStore
 from scripts.summary import FuzzerRunSummaryRow, FuzzerWorkflowSummary
 
@@ -63,14 +69,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def configure_logging(verbose: bool) -> None:
-    """Configure process logging."""
-    logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
-    )
-
-
 def parse_args(argv: list[str] | None = None) -> MonitorArgs:
     """Parse CLI arguments."""
     ns = build_parser().parse_args(argv)
@@ -87,35 +85,6 @@ def parse_args(argv: list[str] | None = None) -> MonitorArgs:
         dry_run=ns.dry_run,
         verbose=ns.verbose,
     )
-
-
-def _build_monitor_key(target_repo: str, workflow_file: str, event: str) -> str:
-    return f"{target_repo}:{workflow_file}:{event}"
-
-
-def _fetch_recent_completed_runs(args: MonitorArgs, last_seen_run_id: int) -> list[Any]:
-    gh = Github(auth=Auth.Token(args.target_token))
-    repo = gh.get_repo(args.target_repo)
-    workflow = repo.get_workflow(args.workflow_file)
-    runs = workflow.get_runs(event=args.event, status="completed")
-
-    fresh_runs: list[Any] = []
-    for index, run in enumerate(runs):
-        if index >= args.max_runs:
-            break
-        if run.id <= last_seen_run_id:
-            break
-        fresh_runs.append(run)
-
-    fresh_runs.sort(key=lambda run: run.id)
-    return fresh_runs
-
-
-def _load_local_bot_config(config_path: str) -> BotConfig:
-    path = Path(config_path)
-    if not path.exists():
-        return BotConfig()
-    return load_config(path)
 
 
 def _make_bedrock_client(config: BotConfig, aws_region: str | None) -> tuple[BedrockClient, BedrockRetriever | None]:
@@ -138,7 +107,7 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
     """Analyze newly completed Valkey fuzzer workflow runs."""
     target_gh = Github(auth=Auth.Token(args.target_token))
     state_gh = Github(auth=Auth.Token(args.state_token))
-    config = _load_local_bot_config(args.config_path)
+    config = load_local_bot_config(args.config_path)
     bedrock_client, retriever = _make_bedrock_client(config, args.aws_region)
     analyzer = FuzzerRunAnalyzer(
         target_gh,
@@ -148,11 +117,18 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
         retrieval_config=config.retrieval,
     )
     issue_publisher = FuzzerIssuePublisher(target_gh)
-    monitor_key = _build_monitor_key(args.target_repo, args.workflow_file, args.event)
+    monitor_key = build_monitor_key(args.target_repo, args.workflow_file, args.event)
     state_store = MonitorStateStore(state_gh, args.state_repo)
     state_store.load()
     last_seen_run_id = state_store.get_last_seen_run_id(monitor_key)
-    recent_runs = _fetch_recent_completed_runs(args, last_seen_run_id)
+    recent_runs = fetch_recent_completed_runs(
+        target_gh=target_gh,
+        target_repo=args.target_repo,
+        workflow_file=args.workflow_file,
+        event=args.event,
+        max_runs=args.max_runs,
+        last_seen_run_id=last_seen_run_id,
+    )
     summary = FuzzerWorkflowSummary()
     run_results: list[dict[str, object]] = []
 
@@ -189,10 +165,17 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                 workflow_file=args.workflow_file,
             )
         except Exception as exc:
+            logger.error(
+                "Fuzzer analysis error for run %d: %s. "
+                "Advancing watermark to avoid re-processing.",
+                run.id,
+                exc,
+            )
             run_result["action"] = "analysis-error"
             run_result["error"] = str(exc)
             run_results.append(run_result)
-            break
+            new_last_seen = max(new_last_seen, run.id)
+            continue
 
         run_result["action"] = "analyzed"
         run_result["analysis"] = fuzzer_run_analysis_to_dict(analysis)
@@ -256,7 +239,7 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    configure_logging(args.verbose)
+    configure_monitor_logging(args.verbose)
     result = monitor(args)
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0

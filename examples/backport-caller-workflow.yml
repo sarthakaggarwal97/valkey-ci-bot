@@ -8,8 +8,11 @@
 # is merged, extracts target branches from all matching labels, and triggers
 # one backport run per target branch.
 #
-# No secrets or variables are needed in the consumer repo — the agent repo
-# owns all credentials.
+# Recommended repository configuration:
+#   Secret:   CI_BOT_AWS_ROLE_ARN        — IAM role assumable via GitHub OIDC
+#   Variable: CI_BOT_AWS_REGION          — optional, defaults to us-east-1
+#   Secret:   VALKEY_GITHUB_TOKEN        — optional when github.token already
+#                                          has the required write access
 name: Backport Agent
 
 permissions:

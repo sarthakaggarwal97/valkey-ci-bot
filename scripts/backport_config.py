@@ -10,6 +10,7 @@ from github import Github
 from github.GithubException import GithubException
 
 from scripts.backport_models import BackportConfig
+from scripts.config import load_repo_file_text
 from scripts.github_client import retry_github_call
 
 logger = logging.getLogger(__name__)
@@ -85,13 +86,12 @@ def load_backport_config_from_repo(
     returned instead.
     """
     try:
-        def _fetch_config() -> str:
-            repo = github_client.get_repo(repo_full_name)
-            content_file = repo.get_contents(config_path)
-            return content_file.decoded_content.decode("utf-8")  # type: ignore[union-attr]
-
-        raw_text = retry_github_call(
-            _fetch_config,
+        raw_text, resolved_ref = retry_github_call(
+            lambda: load_repo_file_text(
+                github_client,
+                repo_full_name,
+                config_path,
+            ),
             retries=3,
             description=f"fetch backport config from {repo_full_name}:{config_path}",
         )
@@ -109,8 +109,9 @@ def load_backport_config_from_repo(
         raw = yaml.safe_load(raw_text)
     except yaml.YAMLError as exc:
         logger.warning(
-            "Invalid YAML in backport config %s:%s: %s. Using defaults.",
+            "Invalid YAML in backport config %s@%s:%s: %s. Using defaults.",
             repo_full_name,
+            resolved_ref,
             config_path,
             exc,
         )

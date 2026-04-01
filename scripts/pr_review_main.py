@@ -23,7 +23,12 @@ from scripts.bedrock_client import BedrockClient, PromptClient
 from scripts.bedrock_retriever import BedrockRetriever
 from scripts.code_reviewer import CodeReviewer, ReviewCoverage
 from scripts.comment_publisher import CommentPublisher
-from scripts.config import ReviewerConfig, load_reviewer_config, load_reviewer_config_text
+from scripts.config import (
+    ReviewerConfig,
+    load_repo_file_text,
+    load_reviewer_config,
+    load_reviewer_config_text,
+)
 from scripts.models import PullRequestContext, ReviewState, SummaryResult
 from scripts.models import DiffScope as _DiffScope
 from scripts.path_filter import PathFilter
@@ -49,12 +54,12 @@ def _load_runtime_reviewer_config(
     """Load reviewer config from GitHub first, then fall back to local disk."""
     try:
         if repo_name:
-            repo = gh.get_repo(repo_name)
-            config_ref = ref or repo.default_branch
-            contents = repo.get_contents(config_path, ref=config_ref)
-            if isinstance(contents, list):
-                raise ValueError("Reviewer config path resolved to a directory.")
-            text = contents.decoded_content.decode("utf-8", errors="replace")
+            text, config_ref = load_repo_file_text(
+                gh,
+                repo_name,
+                config_path,
+                ref=ref,
+            )
             return load_reviewer_config_text(
                 text,
                 source=f"{repo_name}@{config_ref}:{config_path}",

@@ -1,4 +1,4 @@
-"""Configuration loader for the CI Failure Bot."""
+"""Configuration loader helpers for the CI failure and review pipelines."""
 
 from __future__ import annotations
 
@@ -10,6 +10,27 @@ from typing import Any
 import yaml  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
+
+
+def load_repo_file_text(
+    github_client: Any,
+    repo_name: str,
+    path: str,
+    *,
+    ref: str | None = None,
+) -> tuple[str, str]:
+    """Return decoded text for a file in a GitHub repository.
+
+    The returned ref is the resolved branch/commit used for the lookup so
+    callers can report an accurate source label in logs and summaries.
+    """
+    repo = github_client.get_repo(repo_name)
+    resolved_ref = ref or repo.default_branch
+    contents = repo.get_contents(path, ref=resolved_ref)
+    if isinstance(contents, list):
+        raise ValueError(f"Path {path} in {repo_name} resolved to a directory.")
+    text = contents.decoded_content.decode("utf-8", errors="replace")
+    return text, resolved_ref
 
 
 @dataclass

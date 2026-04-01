@@ -15,10 +15,16 @@ if __package__ in {None, ""}:
 
 from github import Auth, Github
 
-from scripts.config import BotConfig, load_config
+from scripts.config import BotConfig
 from scripts.failure_detector import FailureDetector
 from scripts.failure_store import FailureStore
 from scripts.main import run_pipeline
+from scripts.monitor_common import (
+    build_monitor_key,
+    configure_monitor_logging,
+    fetch_recent_completed_runs,
+    load_local_bot_config,
+)
 from scripts.rate_limiter import RateLimiter
 from scripts.monitor_state_store import MonitorStateStore
 
@@ -61,14 +67,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def configure_logging(verbose: bool) -> None:
-    """Configure process logging."""
-    logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
-    )
-
-
 def parse_args(argv: list[str] | None = None) -> MonitorArgs:
     """Parse CLI arguments."""
     ns = build_parser().parse_args(argv)
@@ -86,38 +84,6 @@ def parse_args(argv: list[str] | None = None) -> MonitorArgs:
         queue_only=ns.queue_only,
         verbose=ns.verbose,
     )
-
-
-def _build_monitor_key(target_repo: str, workflow_file: str, event: str) -> str:
-    """Build a stable monitor key for persisted state."""
-    return f"{target_repo}:{workflow_file}:{event}"
-
-
-def _fetch_recent_completed_runs(args: MonitorArgs, last_seen_run_id: int) -> list[Any]:
-    """Fetch recent completed workflow runs newer than the stored watermark."""
-    gh = Github(auth=Auth.Token(args.target_token))
-    repo = gh.get_repo(args.target_repo)
-    workflow = repo.get_workflow(args.workflow_file)
-    runs = workflow.get_runs(event=args.event, status="completed")
-
-    fresh_runs: list[Any] = []
-    for index, run in enumerate(runs):
-        if index >= args.max_runs:
-            break
-        if run.id <= last_seen_run_id:
-            break
-        fresh_runs.append(run)
-
-    fresh_runs.sort(key=lambda run: run.id)
-    return fresh_runs
-
-
-def _load_local_bot_config(config_path: str) -> BotConfig:
-    """Load local bot config when present, else fall back to defaults."""
-    path = Path(config_path)
-    if not path.exists():
-        return BotConfig()
-    return load_config(path)
 
 
 def _record_successful_job_observations(
@@ -164,8 +130,8 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
     """Monitor new workflow runs and process newly failed ones."""
     target_gh = Github(auth=Auth.Token(args.target_token))
     state_gh = Github(auth=Auth.Token(args.state_token))
-    config = _load_local_bot_config(args.config_path)
-    monitor_key = _build_monitor_key(
+    config = load_local_bot_config(args.config_path)
+    monitor_key = build_monitor_key(
         args.target_repo,
         args.workflow_file,
         args.event,
@@ -176,7 +142,14 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
     )
     state_store.load()
     last_seen_run_id = state_store.get_last_seen_run_id(monitor_key)
-    recent_runs = _fetch_recent_completed_runs(args, last_seen_run_id)
+    recent_runs = fetch_recent_completed_runs(
+        target_gh=target_gh,
+        target_repo=args.target_repo,
+        workflow_file=args.workflow_file,
+        event=args.event,
+        max_runs=args.max_runs,
+        last_seen_run_id=last_seen_run_id,
+    )
     run_results: list[dict[str, object]] = []
 
     result: dict[str, object] = {
@@ -295,7 +268,7 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
 def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint."""
     args = parse_args(argv)
-    configure_logging(args.verbose)
+    configure_monitor_logging(args.verbose)
     try:
         result = monitor(args)
     except Exception as exc:

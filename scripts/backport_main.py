@@ -13,7 +13,6 @@ import stat
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 
 if __package__ in {None, ""}:
@@ -39,7 +38,7 @@ from scripts.commit_signoff import (
     load_signer_from_env,
     require_dco_signoff_from_env,
 )
-from scripts.config import BotConfig, ProjectContext
+from scripts.config import BotConfig
 from scripts.conflict_resolver import ConflictResolver
 from scripts.github_client import retry_github_call
 from scripts.rate_limiter import RateLimiter
@@ -57,39 +56,6 @@ def _resolve_commit_signer() -> tuple[CommitSigner, bool]:
             "CI_BOT_COMMIT_EMAIL is not configured."
         )
     return signer, require_dco
-
-
-@dataclass
-class _BedrockConfigAdapter:
-    """Adapts :class:`BackportConfig` to the :class:`BedrockConfig` protocol.
-
-    Provides sensible defaults for fields that ``BackportConfig`` does not
-    carry (``max_input_tokens``, ``max_output_tokens``, ``max_retries_bedrock``,
-    ``project``).
-    """
-
-    _backport_config: BackportConfig
-
-    @property
-    def bedrock_model_id(self) -> str:
-        return self._backport_config.bedrock_model_id
-
-    @property
-    def max_input_tokens(self) -> int:
-        return 200_000
-
-    @property
-    def max_output_tokens(self) -> int:
-        return 4096
-
-    @property
-    def max_retries_bedrock(self) -> int:
-        return 3
-
-    @property
-    def project(self) -> ProjectContext:
-        return ProjectContext()
-
 
 # ------------------------------------------------------------------
 # Summary helpers
@@ -304,9 +270,8 @@ def run_backport(
                 "Cherry-pick produced %d conflict(s). Invoking conflict resolver.",
                 len(cherry_result.conflicting_files),
             )
-            bedrock_adapter = _BedrockConfigAdapter(_backport_config=config)
             bedrock_client = BedrockClient(
-                bedrock_adapter,
+                config,
                 client=boto3.client("bedrock-runtime", region_name=aws_region),
             )
             resolver = ConflictResolver(

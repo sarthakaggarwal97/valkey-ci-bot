@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from scripts.config import ProjectContext
+
 
 @dataclass
 class ConflictedFile:
@@ -74,3 +76,23 @@ class BackportConfig:
     per_backport_token_budget: int = 100_000
     backport_label: str = "backport"
     llm_conflict_label: str = "llm-resolved-conflicts"
+
+    @property
+    def max_input_tokens(self) -> int:
+        """Compatibility surface for the shared Bedrock client."""
+        return 200_000
+
+    @property
+    def max_output_tokens(self) -> int:
+        """Compatibility surface for the shared Bedrock client."""
+        return 4096
+
+    @property
+    def max_retries_bedrock(self) -> int:
+        """Compatibility surface for the shared Bedrock client."""
+        return 3
+
+    @property
+    def project(self) -> ProjectContext:
+        """Backport prompts do not need extra project-specific context."""
+        return ProjectContext()

@@ -22,7 +22,7 @@ on:
         default: ".github/backport-agent.yml"
     secrets:
       AWS_ROLE_ARN:
-        required: false
+        required: true
       VALKEY_GITHUB_TOKEN:
         required: false
 
@@ -43,10 +43,9 @@ jobs:
       CI_BOT_COMMIT_EMAIL: ${{ vars.CI_BOT_COMMIT_EMAIL || '' }}
       CI_BOT_REQUIRE_DCO_SIGNOFF: ${{ vars.CI_BOT_REQUIRE_DCO_SIGNOFF || 'false' }}
     steps:
-      - name: Checkout agent repository
+      - name: Checkout bot repository
         uses: actions/checkout@v6
         with:
-          repository: sarthakaggarwal97/valkey-ci-agent
           persist-credentials: false
           fetch-depth: 1
 
