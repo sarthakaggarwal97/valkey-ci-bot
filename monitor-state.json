@@ -1,10 +1,10 @@
 {
   "valkey-io/valkey:daily.yml:schedule": {
-    "last_seen_run_id": 23967098766,
+    "last_seen_run_id": 23990637784,
     "target_repo": "valkey-io/valkey",
     "workflow_file": "daily.yml",
     "event": "schedule",
-    "updated_at": "2026-04-04T05:04:50.766540+00:00"
+    "updated_at": "2026-04-05T03:40:46.322037+00:00"
   },
   "valkey-io/valkey-fuzzer:fuzzer-run.yml:schedule": {
     "last_seen_run_id": 23986533719,
