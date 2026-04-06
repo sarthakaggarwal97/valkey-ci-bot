@@ -8,7 +8,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from scripts.bedrock_client import BedrockClient
-from scripts.code_reviewer import CodeReviewer, ReviewCoverage, ReviewToolHandler
+from scripts.code_reviewer import (
+    CodeReviewer,
+    ReviewCoverage,
+    ReviewToolHandler,
+    _agentic_review_budgets,
+)
 from scripts.config import BotConfig, ProjectContext, RetrievalConfig, ReviewerConfig
 from scripts.models import (
     ChangedFile,
@@ -926,6 +931,17 @@ def test_code_reviewer_groups_related_files_into_single_agentic_pass() -> None:
     assert "src/failover_timeout.c" in prompt
     assert "tests/failover_timeout.tcl" in prompt
     assert "Suggested related changed files/tests to inspect early" not in prompt
+
+
+def test_agentic_review_budgets_allow_100_fetches_and_turns() -> None:
+    scope = DiffScope(
+        base_sha="base123",
+        head_sha="head456",
+        files=_context().files,
+        incremental=False,
+    )
+
+    assert _agentic_review_budgets(scope) == (100, 100)
 
 
 def test_code_reviewer_reuses_shared_tool_state_across_focused_agentic_passes() -> None:
