@@ -208,6 +208,7 @@ class ConflictResolver:
                     system_prompt,
                     user_prompt,
                     model_id=self._config.bedrock_model_id,
+                    temperature=0.0,
                 )
             except Exception:
                 logger.exception(
@@ -402,6 +403,48 @@ class ConflictResolver:
             max_fetches=8,
         )
 
+        def _validate_submit_resolution(
+            tool_name: str,
+            tool_input: dict,
+        ) -> tuple[bool, str]:
+            if tool_name != "submit_resolution":
+                return True, "Tool accepted."
+            if not isinstance(tool_input, dict):
+                return False, "submit_resolution input must be a JSON object."
+
+            resolved_text = _strip_code_fences(
+                str(tool_input.get("resolved_content", ""))
+            )
+            tool_input["resolved_content"] = resolved_text
+            if not resolved_text:
+                return False, "Resolved content is empty."
+            if has_conflict_markers(resolved_text):
+                return (
+                    False,
+                    (
+                        "Resolved content still contains conflict markers "
+                        "(<<<<<<<, =======, >>>>>>>). Remove every marker and "
+                        "submit the complete file again."
+                    ),
+                )
+            validation_label = validation_label_for_path(conflict.path)
+            if not validate_resolved_content(conflict.path, resolved_text):
+                return (
+                    False,
+                    (
+                        f"Resolved content failed {validation_label} validation. "
+                        "Re-read the conflict and submit syntactically valid "
+                        "complete file content."
+                    ),
+                )
+            return True, "Resolution accepted."
+
+        setattr(
+            tool_handler,
+            "validate_terminal_tool",
+            _validate_submit_resolution,
+        )
+
         tools = [_GET_FILE_TOOL, _LIST_FILES_TOOL, _SEARCH_CODE_TOOL, _SUBMIT_RESOLUTION_TOOL]
 
         import json as _json
@@ -414,6 +457,7 @@ class ConflictResolver:
                 terminal_tool="submit_resolution",
                 max_turns=20,
                 model_id=self._config.bedrock_model_id,
+                temperature=0.0,
             )
         except Exception as exc:
             logger.warning(

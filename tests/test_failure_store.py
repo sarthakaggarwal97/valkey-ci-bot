@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from github.GithubException import GithubException
@@ -144,6 +145,17 @@ def test_record_queued_pr_persists_payload() -> None:
     assert entry.queued_pr_payload is not None
     assert entry.queued_pr_payload["patch"] == "diff"
     assert entry.incident_key == "fp1"
+
+
+def test_load_raises_on_non_missing_remote_error() -> None:
+    repo = MagicMock()
+    repo.get_contents.side_effect = GithubException(500, {"message": "boom"})
+    gh = MagicMock()
+    gh.get_repo.return_value = repo
+    store = FailureStore(gh, "owner/repo")
+
+    with pytest.raises(RuntimeError, match="failed to load failure store"):
+        store.load()
 
 
 def test_compute_incident_key_ignores_runner_specific_error_text() -> None:

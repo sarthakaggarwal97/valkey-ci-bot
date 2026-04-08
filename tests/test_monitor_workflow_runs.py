@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from github.GithubException import GithubException
+
 from scripts.main import PipelineResult
 from scripts.monitor_workflow_runs import MonitorArgs, monitor
 
@@ -57,6 +59,7 @@ def test_monitor_processes_only_new_failed_runs_and_updates_watermark(
     ]
     repo = MagicMock()
     repo.get_workflow.return_value = workflow
+    repo.get_contents.side_effect = GithubException(404, {"message": "missing state"})
     mock_github_cls.return_value.get_repo.return_value = repo
     mock_run_pipeline.return_value = PipelineResult(
         reports=[MagicMock()],
@@ -101,6 +104,7 @@ def test_monitor_dry_run_does_not_process_or_advance_state(
     workflow.get_runs.return_value = [_run(101, "failure")]
     repo = MagicMock()
     repo.get_workflow.return_value = workflow
+    repo.get_contents.side_effect = GithubException(404, {"message": "missing state"})
     mock_github_cls.return_value.get_repo.return_value = repo
 
     result = monitor(_args(dry_run=True))
@@ -128,6 +132,7 @@ def test_monitor_advances_watermark_on_pipeline_error(
     workflow.get_runs.return_value = [_run(101, "failure"), _run(102, "failure")]
     repo = MagicMock()
     repo.get_workflow.return_value = workflow
+    repo.get_contents.side_effect = GithubException(404, {"message": "missing state"})
     mock_github_cls.return_value.get_repo.return_value = repo
     mock_run_pipeline.side_effect = RuntimeError("boom")
 
@@ -158,6 +163,7 @@ def test_monitor_passes_queue_only_to_pipeline(
     workflow.get_runs.return_value = [_run(101, "failure")]
     repo = MagicMock()
     repo.get_workflow.return_value = workflow
+    repo.get_contents.side_effect = GithubException(404, {"message": "missing state"})
     mock_github_cls.return_value.get_repo.return_value = repo
     mock_run_pipeline.return_value = PipelineResult(reports=[MagicMock()], job_outcomes=[])
 

@@ -170,7 +170,7 @@ def test_code_reviewer_triage_skips_comment_only_code_changes() -> None:
     verdict = CodeReviewer(bedrock).triage_file(
         changed_file,
         _context(),
-        ReviewerConfig(),
+        ReviewerConfig(model_file_triage=True),
     )
 
     assert verdict == "APPROVED"
@@ -196,6 +196,63 @@ def test_code_reviewer_triage_reviews_c_preprocessor_changes() -> None:
     )
 
     assert verdict == "NEEDS_REVIEW"
+
+
+def test_code_reviewer_triage_reviews_patchless_code_changes() -> None:
+    bedrock = MagicMock()
+    changed_file = ChangedFile(
+        path="src/large_change.c",
+        status="modified",
+        additions=2500,
+        deletions=1800,
+        patch=None,
+        contents="int changed(void) { return 1; }",
+        is_binary=False,
+    )
+
+    verdict = CodeReviewer(bedrock).triage_file(
+        changed_file,
+        _context(),
+        ReviewerConfig(model_file_triage=True),
+    )
+
+    assert verdict == "NEEDS_REVIEW"
+    bedrock.invoke.assert_not_called()
+
+
+def test_code_reviewer_uses_file_level_findings_when_patch_unavailable() -> None:
+    changed_file = ChangedFile(
+        path="src/large_change.c",
+        status="modified",
+        additions=2500,
+        deletions=1800,
+        patch=None,
+        contents="int changed(void) { return 1; }",
+        is_binary=False,
+    )
+    scope = DiffScope(
+        base_sha="base123",
+        head_sha="head456",
+        files=[changed_file],
+        incremental=False,
+    )
+
+    drafts = CodeReviewer(MagicMock())._normalize_raw_findings(
+        [
+            {
+                "path": "src/large_change.c",
+                "line": 42,
+                "severity": "high",
+                "confidence": "high",
+                "body": "This visible control-flow change can skip cleanup.",
+            }
+        ],
+        scope,
+        ReviewerConfig(),
+    )
+
+    assert len(drafts) == 1
+    assert drafts[0].line is None
 
 
 def test_code_reviewer_filters_speculative_and_file_level_findings() -> None:
@@ -274,11 +331,14 @@ def test_review_chat_uses_heavy_model() -> None:
         ),
         "/reviewbot can you suggest a test?",
         config,
+        requester="alice",
     )
 
     assert "targeted failover timeout regression test" in reply
     kwargs = bedrock.invoke.call_args.kwargs
     assert kwargs["model_id"] == config.models.heavy_model_id
+    user_prompt = bedrock.invoke.call_args[0][1]
+    assert "Requester: @alice" in user_prompt
 
 
 def test_review_tool_handler_search_code_verifies_hits_at_head_sha() -> None:

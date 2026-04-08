@@ -415,7 +415,7 @@ def _is_comment_or_whitespace_only_patch(path: str, patch: str) -> bool:
 def _is_deterministically_trivial_review_change(changed_file: ChangedFile) -> bool:
     """Return True when a file can be safely skipped without model triage."""
     if not changed_file.patch:
-        return True
+        return not _looks_like_code(changed_file.path)
 
     delta = changed_file.additions + changed_file.deletions
     if delta <= 3 and not _looks_like_code(changed_file.path):
@@ -2140,6 +2140,12 @@ class CodeReviewer:
         """
         if _is_deterministically_trivial_review_change(changed_file):
             return "APPROVED"
+        if changed_file.patch is None:
+            logger.info(
+                "Triage: %s -> NEEDS_REVIEW (patch unavailable)",
+                changed_file.path,
+            )
+            return "NEEDS_REVIEW"
         if not config.model_file_triage:
             logger.info(
                 "Triage: %s -> NEEDS_REVIEW (model_file_triage disabled)",
@@ -2147,6 +2153,10 @@ class CodeReviewer:
             )
             return "NEEDS_REVIEW"
 
+        patch_excerpt = (
+            changed_file.patch
+            or "[patch unavailable; use hydrated file contents if review is needed]"
+        )[:4000]
         triage_prompt = f"""Triage this file diff as NEEDS_REVIEW or APPROVED.
 
 Rules:
@@ -2160,7 +2170,7 @@ File: {changed_file.path}
 Status: {changed_file.status}
 
 Diff:
-{changed_file.patch[:4000]}
+{patch_excerpt}
 
 Respond with ONLY one line:
 [TRIAGE]: NEEDS_REVIEW
@@ -2929,17 +2939,24 @@ CRITICAL rules:
             changed_file = reviewable_files[path]
             raw_line = raw_finding.get("line")
             normalized_line = int(raw_line) if isinstance(raw_line, int) and raw_line > 0 else None
-            if normalized_line is not None and changed_file.patch:
-                added_lines, context_lines = _parse_diff_lines(changed_file.patch)
-                snapped = _snap_line_to_diff(normalized_line, added_lines, context_lines)
-                if snapped != normalized_line:
-                    logger.info(
-                        "Line %d for %s snapped to %s",
+            if normalized_line is not None:
+                if changed_file.patch:
+                    added_lines, context_lines = _parse_diff_lines(changed_file.patch)
+                    snapped = _snap_line_to_diff(
                         normalized_line,
-                        path,
-                        snapped,
+                        added_lines,
+                        context_lines,
                     )
-                normalized_line = snapped
+                    if snapped != normalized_line:
+                        logger.info(
+                            "Line %d for %s snapped to %s",
+                            normalized_line,
+                            path,
+                            snapped,
+                        )
+                    normalized_line = snapped
+                else:
+                    normalized_line = None
 
             if _is_false_indentation_finding(
                 combined_text, path, normalized_line, changed_file.contents,

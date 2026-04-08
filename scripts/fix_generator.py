@@ -60,6 +60,60 @@ def _meets_confidence_threshold(confidence: str, threshold: str) -> bool:
     return rank.get(confidence, -1) >= rank.get(threshold, 1)
 
 
+def _effective_patch_file_limit(config: BotConfig) -> int:
+    """Return the active modified-file limit for generated patches."""
+    return (
+        config.max_patch_files_override
+        if config.max_patch_files_override is not None
+        and config.max_patch_files_override > 0
+        else config.max_patch_files
+    )
+
+
+def _validate_generated_patch(
+    diff: str,
+    root_cause: RootCauseReport,
+    source_files: dict[str, str],
+    config: BotConfig,
+) -> tuple[bool, str, set[str]]:
+    """Validate a generated patch before the model leaves the loop."""
+    cleaned = _strip_markdown_fences(diff)
+    if not cleaned:
+        return False, "Empty diff returned.", set()
+
+    modified_files = _count_patch_files(cleaned)
+    if not modified_files:
+        return False, "Patch did not contain any modified files.", modified_files
+
+    effective_limit = _effective_patch_file_limit(config)
+    if len(modified_files) > effective_limit:
+        return (
+            False,
+            (
+                f"Patch modified {len(modified_files)} files which exceeds "
+                f"the limit of {effective_limit}."
+            ),
+            modified_files,
+        )
+
+    if root_cause.files_to_change:
+        unexpected_files = modified_files.difference(root_cause.files_to_change)
+        if unexpected_files:
+            return (
+                False,
+                (
+                    "Patch modified files outside the allowed scope: "
+                    f"{', '.join(sorted(unexpected_files))}."
+                ),
+                modified_files,
+            )
+
+    success, error_output = _validate_patch_applies(cleaned, source_files)
+    if not success:
+        return False, error_output or "Patch did not apply cleanly.", modified_files
+    return True, "", modified_files
+
+
 def _build_user_prompt(
     root_cause: RootCauseReport,
     source_files: dict[str, str],
@@ -272,7 +326,9 @@ class FixGenerator:
             # Call Bedrock
             try:
                 raw_response = self._bedrock.invoke(
-                    _SYSTEM_PROMPT, user_prompt
+                    _SYSTEM_PROMPT,
+                    user_prompt,
+                    temperature=0.0,
                 )
             except BedrockError as exc:
                 logger.error(
@@ -291,40 +347,12 @@ class FixGenerator:
                 apply_error = "Empty diff returned."
                 continue
 
-            # Check patch scope — reject if too many files
-            modified_files = _count_patch_files(diff)
-            effective_limit = (
-                self._config.max_patch_files_override
-                if self._config.max_patch_files_override is not None
-                and self._config.max_patch_files_override > 0
-                else self._config.max_patch_files
+            success, error_output, modified_files = _validate_generated_patch(
+                diff,
+                root_cause,
+                source_files,
+                self._config,
             )
-            if len(modified_files) > effective_limit:
-                logger.warning(
-                    "Patch modifies %d files (limit %d). Rejecting.",
-                    len(modified_files), effective_limit,
-                )
-                apply_error = (
-                    f"Patch modified {len(modified_files)} files which exceeds the "
-                    f"limit of {effective_limit}."
-                )
-                continue
-
-            if root_cause.files_to_change:
-                unexpected_files = modified_files.difference(root_cause.files_to_change)
-                if unexpected_files:
-                    logger.warning(
-                        "Patch modified files outside the allowed scope: %s",
-                        ", ".join(sorted(unexpected_files)),
-                    )
-                    apply_error = (
-                        "Patch modified files outside the allowed scope: "
-                        f"{', '.join(sorted(unexpected_files))}."
-                    )
-                    continue
-
-            # Validate patch applies cleanly
-            success, error_output = _validate_patch_applies(diff, source_files)
             if success:
                 logger.info(
                     "Patch generated successfully on attempt %d/%d "
@@ -333,9 +361,8 @@ class FixGenerator:
                 )
                 return diff
 
-            # Apply failed — retry with feedback
             logger.warning(
-                "Patch apply failed (attempt %d/%d): %s",
+                "Patch candidate rejected (attempt %d/%d): %s",
                 attempt + 1, max_attempts, error_output,
             )
             apply_error = error_output
@@ -420,6 +447,36 @@ class FixGenerator:
             max_fetches=8,
         )
 
+        def _validate_submit_fix(tool_name: str, tool_input: dict) -> tuple[bool, str]:
+            if tool_name != "submit_fix":
+                return True, "Tool accepted."
+            if not isinstance(tool_input, dict):
+                return False, "submit_fix input must be a JSON object."
+            diff = _strip_markdown_fences(str(tool_input.get("diff", "")))
+            tool_input["diff"] = diff
+            success, error_output, modified_files = _validate_generated_patch(
+                diff,
+                root_cause,
+                source_files,
+                self._config,
+            )
+            if success:
+                return (
+                    True,
+                    f"Patch accepted ({len(modified_files)} file(s) modified).",
+                )
+            return (
+                False,
+                (
+                    "Patch rejected before submission: "
+                    f"{error_output}\n"
+                    "Use the available tools to fetch more context if needed, "
+                    "then call submit_fix again with a corrected unified diff."
+                ),
+            )
+
+        setattr(tool_handler, "validate_terminal_tool", _validate_submit_fix)
+
         tools = [_GET_FILE_TOOL, _LIST_FILES_TOOL, _SEARCH_CODE_TOOL, _SUBMIT_FIX_TOOL]
 
         import json as _json
@@ -431,6 +488,7 @@ class FixGenerator:
                 tool_handler=tool_handler,
                 terminal_tool="submit_fix",
                 max_turns=20,
+                temperature=0.0,
             )
         except Exception as exc:
             logger.warning("Agentic fix generation failed: %s. Falling back.", exc)
@@ -447,31 +505,15 @@ class FixGenerator:
         if not diff:
             return None
 
-        # Validate the patch
-        modified_files = _count_patch_files(diff)
-        effective_limit = (
-            self._config.max_patch_files_override
-            if self._config.max_patch_files_override is not None
-            and self._config.max_patch_files_override > 0
-            else self._config.max_patch_files
+        success, error_output, modified_files = _validate_generated_patch(
+            diff,
+            root_cause,
+            source_files,
+            self._config,
         )
-        if len(modified_files) > effective_limit:
-            logger.warning("Agentic patch modifies too many files (%d).", len(modified_files))
-            return None
-
-        if root_cause.files_to_change:
-            unexpected_files = modified_files.difference(root_cause.files_to_change)
-            if unexpected_files:
-                logger.warning(
-                    "Agentic patch modified files outside the allowed scope: %s",
-                    ", ".join(sorted(unexpected_files)),
-                )
-                return None
-
-        success, error_output = _validate_patch_applies(diff, source_files)
         if success:
             logger.info("Agentic fix generation succeeded (%d file(s)).", len(modified_files))
             return diff
 
-        logger.warning("Agentic patch failed to apply: %s", error_output)
+        logger.warning("Agentic patch failed validation: %s", error_output)
         return None

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
+import pytest
 from github.GithubException import GithubException
 
 from scripts.models import ReviewState
@@ -43,6 +44,10 @@ def test_save_creates_bot_data_branch_when_missing() -> None:
         GithubException(404, {"message": "missing bot-data"}),
         MagicMock(object=MagicMock(sha="base-sha")),
     ]
+    repo.get_contents.side_effect = [
+        GithubException(404, {"message": "missing review-state"}),
+        GithubException(404, {"message": "missing review-state"}),
+    ]
     gh = MagicMock()
     gh.get_repo.return_value = repo
     store = ReviewStateStore(gh, "owner/repo")
@@ -73,18 +78,30 @@ def test_save_does_not_fallback_to_create_on_non_404_lookup_error() -> None:
     gh.get_repo.return_value = repo
     store = ReviewStateStore(gh, "owner/repo")
 
-    store.save(
-        ReviewState(
-            repo="owner/repo",
-            pr_number=5,
-            last_reviewed_head_sha="abc123",
-            summary_comment_id=1,
-            review_comment_ids=[],
-            updated_at="2026-03-12T00:00:00+00:00",
+    with pytest.raises(RuntimeError, match="failed to load review state store"):
+        store.save(
+            ReviewState(
+                repo="owner/repo",
+                pr_number=5,
+                last_reviewed_head_sha="abc123",
+                summary_comment_id=1,
+                review_comment_ids=[],
+                updated_at="2026-03-12T00:00:00+00:00",
+            )
         )
-    )
 
     repo.create_file.assert_not_called()
+
+
+def test_load_raises_on_non_missing_remote_error() -> None:
+    repo = MagicMock()
+    repo.get_contents.side_effect = GithubException(500, {"message": "boom"})
+    gh = MagicMock()
+    gh.get_repo.return_value = repo
+    store = ReviewStateStore(gh, "owner/repo")
+
+    with pytest.raises(RuntimeError, match="failed to load review state store"):
+        store.load("owner/repo", 5)
 
 
 def test_save_retries_on_write_conflict_and_merges_remote_updates() -> None:

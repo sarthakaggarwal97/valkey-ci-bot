@@ -92,6 +92,7 @@ class ReviewerConfig:
 
     enabled: bool = True
     collaborator_only: bool = False
+    chat_collaborator_only: bool = True
     disable_review: bool = False
     disable_release_notes: bool = False
     review_simple_changes: bool = True
@@ -451,6 +452,11 @@ def load_reviewer_config_data(raw: Any, *, source: str = "<memory>") -> Reviewer
             root.get("collaborator_only", defaults.collaborator_only)
             if "collaborator_only" in root else defaults.collaborator_only,
             defaults.collaborator_only,
+        ),
+        chat_collaborator_only=_coerce_bool(
+            root.get("chat_collaborator_only", defaults.chat_collaborator_only)
+            if "chat_collaborator_only" in root else defaults.chat_collaborator_only,
+            defaults.chat_collaborator_only,
         ),
         disable_review=_coerce_bool(
             root.get("disable_review"), defaults.disable_review

@@ -36,6 +36,13 @@ _STORE_FILE = "failure-store.json"
 _MAX_ERROR_SIGNATURE_CHARS = 10_000
 
 
+def _is_missing_store_error(exc: Exception) -> bool:
+    """Return True when the remote failure store branch or file is absent."""
+    if isinstance(exc, GithubException):
+        return exc.status == 404
+    return isinstance(exc, FileNotFoundError)
+
+
 class FailureStore:
     """Persistent failure tracking backed by a JSON file on a dedicated branch."""
 
@@ -826,6 +833,8 @@ class FailureStore:
             self.from_dict(data)
             logger.info("Loaded %d entries from failure store.", len(self._entries))
         except Exception as exc:
+            if not _is_missing_store_error(exc):
+                raise RuntimeError(f"failed to load failure store: {exc}") from exc
             logger.info("Could not load failure store (may not exist yet): %s", exc)
             self._entries.clear()
             self._history.clear()

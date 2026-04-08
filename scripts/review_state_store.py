@@ -32,6 +32,13 @@ def _is_write_conflict(exc: Exception) -> bool:
     return "sha" in message or "already exists" in message or "conflict" in message
 
 
+def _is_missing_state_error(exc: Exception) -> bool:
+    """Return True when the remote review state branch or file is absent."""
+    if isinstance(exc, GithubException):
+        return exc.status == 404
+    return isinstance(exc, FileNotFoundError)
+
+
 class ReviewStateStore:
     """Branch-backed persistence for PR reviewer incremental state."""
 
@@ -132,6 +139,8 @@ class ReviewStateStore:
             data, _contents = self._read_remote_states(repo)
             self._states = data
         except Exception as exc:
+            if not _is_missing_state_error(exc):
+                raise RuntimeError(f"failed to load review state store: {exc}") from exc
             logger.info("Could not load review state store (may not exist yet): %s", exc)
             self._states = {}
 

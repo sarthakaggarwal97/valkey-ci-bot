@@ -5,9 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.commit_signoff import CommitSigner
+from scripts.code_reviewer import ReviewCoverage
+from scripts.models import SummaryResult
 from scripts.valkey_acceptance import (
     CICase,
     BackportCase,
+    ReviewCaseResult,
+    ReviewPolicySignals,
     _has_signed_off_by,
     _load_manifest,
     _needs_core_team,
@@ -95,3 +99,31 @@ def test_render_backport_command_includes_branch_and_identity() -> None:
     assert "--pr-number 123" in command
     assert "--target-branch 8.1" in command
     assert "CI_BOT_COMMIT_EMAIL='valkey@example.com'" in command
+
+
+def test_review_case_result_blocks_on_incomplete_model_coverage() -> None:
+    result = ReviewCaseResult(
+        name="model-case",
+        pr_number=123,
+        policy=ReviewPolicySignals(
+            missing_dco_commits=[],
+            needs_core_team=False,
+            needs_docs=False,
+            security_sensitive=False,
+            governance_changed=False,
+            changed_files=["src/server.c"],
+        ),
+        summary=SummaryResult(
+            walkthrough="Adds a guarded server path.",
+            file_groups_markdown="",
+            release_notes=None,
+            short_summary="",
+        ),
+        coverage=ReviewCoverage(
+            requested_lgtm=True,
+            unaccounted_files=["src/server.c"],
+        ),
+    )
+
+    assert result.passed is False
+    assert result.model_followups == ["review-coverage-incomplete"]
