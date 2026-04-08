@@ -1,6 +1,7 @@
 {
   "pr_timestamps": [],
-  "token_usage": 26118566,
-  "token_window_start": "2026-04-06T03:44:33.948123+00:00",
-  "queued_failures": []
+  "token_usage": 0,
+  "token_window_start": "2026-04-08T07:55:42.346172+00:00",
+  "queued_failures": [],
+  "ai_metrics": {}
 }
