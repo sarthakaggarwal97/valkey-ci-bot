@@ -24,6 +24,7 @@ from scripts.fuzzer_issue_publisher import FuzzerIssuePublisher
 from scripts.fuzzer_run_analyzer import FuzzerRunAnalyzer
 from scripts.models import fuzzer_run_analysis_to_dict
 from scripts.monitor_state_store import MonitorStateStore
+from scripts.rate_limiter import RateLimiter
 from scripts.summary import FuzzerRunSummaryRow, FuzzerWorkflowSummary
 
 logger = logging.getLogger(__name__)
@@ -118,13 +119,19 @@ def _load_local_bot_config(config_path: str) -> BotConfig:
     return load_config(path)
 
 
-def _make_bedrock_client(config: BotConfig, aws_region: str | None) -> tuple[BedrockClient, BedrockRetriever | None]:
+def _make_bedrock_client(
+    config: BotConfig,
+    aws_region: str | None,
+    *,
+    rate_limiter: RateLimiter | None = None,
+) -> tuple[BedrockClient, BedrockRetriever | None]:
     client_kwargs: dict[str, str] = {}
     if aws_region:
         client_kwargs["region_name"] = aws_region
     bedrock_client = BedrockClient(
         config,
         client=boto3.client("bedrock-runtime", **client_kwargs),
+        rate_limiter=rate_limiter,
     )
     retriever: BedrockRetriever | None = None
     if config.retrieval.enabled:
@@ -139,7 +146,17 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
     target_gh = Github(auth=Auth.Token(args.target_token))
     state_gh = Github(auth=Auth.Token(args.state_token))
     config = _load_local_bot_config(args.config_path)
-    bedrock_client, retriever = _make_bedrock_client(config, args.aws_region)
+    rate_limiter = RateLimiter(
+        config,
+        state_github_client=state_gh,
+        state_repo_full_name=args.state_repo,
+    )
+    rate_limiter.load()
+    bedrock_client, retriever = _make_bedrock_client(
+        config,
+        args.aws_region,
+        rate_limiter=rate_limiter,
+    )
     analyzer = FuzzerRunAnalyzer(
         target_gh,
         bedrock_client,
@@ -251,6 +268,8 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
         state_store.save()
         summary.write()
 
+    if not args.dry_run:
+        rate_limiter.save()
     return result
 
 

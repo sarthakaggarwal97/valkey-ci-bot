@@ -1,0 +1,59 @@
+name: CI Agent Capability Dashboard
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: ci-agent-capability-dashboard
+      cancel-in-progress: true
+    steps:
+      - name: Check out bot repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Check out bot data snapshots
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          ref: bot-data
+          path: bot-data
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Generate capability dashboard
+        shell: bash
+        run: |
+          python3 -m scripts.agent_dashboard \
+            --failure-store bot-data/failure-store.json \
+            --rate-state bot-data/rate-state.json \
+            --monitor-state bot-data/monitor-state.json \
+            --review-state bot-data/review-state.json \
+            --output-markdown agent-dashboard.md \
+            --output-json agent-dashboard.json
+
+      - name: Publish dashboard to workflow summary
+        shell: bash
+        run: cat agent-dashboard.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload dashboard artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-agent-capability-dashboard-${{ github.run_id }}
+          path: |
+            agent-dashboard.md
+            agent-dashboard.json
+          retention-days: 30

@@ -215,6 +215,14 @@ class BedrockClient:
         self._project_context = _build_project_context_text(config.project)
         self._rate_limiter = rate_limiter
 
+    def _record_ai_metric(self, name: str, amount: int = 1) -> None:
+        """Record a best-effort AI execution metric when the limiter supports it."""
+        if self._rate_limiter is None:
+            return
+        recorder = getattr(self._rate_limiter, "record_ai_metric", None)
+        if callable(recorder):
+            recorder(name, amount)
+
     def invoke(
         self,
         system_prompt: str,
@@ -246,10 +254,12 @@ class BedrockClient:
             f"{system_prompt}\n\n"
             f"## Project Context\n{self._project_context}"
         )
+        self._record_ai_metric("bedrock.invoke.calls")
         estimated_input_tokens = (
             _estimate_tokens(full_system_prompt) + _estimate_tokens(user_prompt)
         )
         if estimated_input_tokens > self._config.max_input_tokens:
+            self._record_ai_metric("bedrock.errors.input_too_large")
             raise BedrockError(
                 "Bedrock input prompt exceeds max_input_tokens.",
                 error_code="InputTooLarge",
@@ -284,6 +294,7 @@ class BedrockClient:
         # success, _adjust_token_usage corrects the estimate to actuals.
         if self._rate_limiter is not None:
             if not self._rate_limiter.can_use_tokens(reserved_tokens):
+                self._record_ai_metric("bedrock.errors.token_budget_exceeded")
                 raise BedrockError(
                     "daily token budget exhausted",
                     error_code="TokenBudgetExceeded",
@@ -296,6 +307,7 @@ class BedrockClient:
                 response = self._client.converse(**converse_kwargs)
                 # Track actual token usage from the API response when available
                 self._adjust_token_usage(response, reserved_tokens)
+                self._record_ai_metric("bedrock.invoke.success")
                 return self._extract_response_text(response)
 
             except ClientError as exc:
@@ -304,6 +316,7 @@ class BedrockClient:
                 error_message = exc.response.get("Error", {}).get("Message", str(exc))
 
                 if not _is_retryable_error(exc):
+                    self._record_ai_metric("bedrock.errors.non_retryable")
                     logger.error(
                         "Non-retryable Bedrock error (code=%s): %s",
                         error_code, error_message,
@@ -316,6 +329,7 @@ class BedrockClient:
 
                 retries_left = max_attempts - attempt - 1
                 if retries_left == 0:
+                    self._record_ai_metric("bedrock.errors.retry_exhausted")
                     logger.error(
                         "Bedrock retries exhausted after %d attempts (code=%s): %s",
                         max_attempts, error_code, error_message,
@@ -327,6 +341,7 @@ class BedrockClient:
                     ) from exc
 
                 delay = _compute_backoff_delay(attempt)
+                self._record_ai_metric("bedrock.retries")
                 logger.warning(
                     "Retryable Bedrock error (code=%s), attempt %d/%d. "
                     "Retrying in %.2fs. Error: %s",
@@ -445,10 +460,12 @@ class BedrockClient:
             f"{system_prompt}\n\n"
             f"## Project Context\n{self._project_context}"
         )
+        self._record_ai_metric("bedrock.invoke_schema.calls")
         estimated_input_tokens = (
             _estimate_tokens(full_system_prompt) + _estimate_tokens(user_prompt)
         )
         if estimated_input_tokens > self._config.max_input_tokens:
+            self._record_ai_metric("bedrock.errors.input_too_large")
             raise BedrockError(
                 "Bedrock input prompt exceeds max_input_tokens.",
                 error_code="InputTooLarge",
@@ -499,6 +516,7 @@ class BedrockClient:
         # Reserve tokens once before the retry loop (same as invoke).
         if self._rate_limiter is not None:
             if not self._rate_limiter.can_use_tokens(reserved_tokens):
+                self._record_ai_metric("bedrock.errors.token_budget_exceeded")
                 raise BedrockError(
                     "daily token budget exhausted",
                     error_code="TokenBudgetExceeded",
@@ -510,6 +528,7 @@ class BedrockClient:
             try:
                 response = self._client.converse(**converse_kwargs)
                 self._adjust_token_usage(response, reserved_tokens)
+                self._record_ai_metric("bedrock.invoke_schema.success")
                 return self._extract_tool_use_json(response)
 
             except ClientError as exc:
@@ -518,6 +537,7 @@ class BedrockClient:
                 error_message = exc.response.get("Error", {}).get("Message", str(exc))
 
                 if _is_tool_choice_rejected(exc):
+                    self._record_ai_metric("bedrock.schema_tool_choice_rejected")
                     logger.info(
                         "Structured toolChoice was rejected; retrying schema "
                         "tool-use without forced toolChoice."
@@ -529,14 +549,22 @@ class BedrockClient:
                     try:
                         response = self._converse_with_retry(fallback_kwargs)
                         self._adjust_token_usage(response, reserved_tokens)
+                        self._record_ai_metric(
+                            "bedrock.schema_tool_choice_fallback_success"
+                        )
+                        self._record_ai_metric("bedrock.invoke_schema.success")
                         return self._extract_tool_use_json(response)
                     except ClientError as fallback_exc:
+                        self._record_ai_metric(
+                            "bedrock.schema_tool_choice_fallback_error"
+                        )
                         last_error = fallback_exc
                         error_code = fallback_exc.response.get("Error", {}).get("Code", "")
                         error_message = fallback_exc.response.get("Error", {}).get(
                             "Message", str(fallback_exc)
                         )
                         if not _is_retryable_error(fallback_exc):
+                            self._record_ai_metric("bedrock.errors.non_retryable")
                             raise BedrockError(
                                 f"Bedrock API error: {error_message}",
                                 error_code=error_code,
@@ -550,6 +578,7 @@ class BedrockClient:
                         ) from fallback_exc
 
                 if not _is_retryable_error(exc):
+                    self._record_ai_metric("bedrock.errors.non_retryable")
                     raise BedrockError(
                         f"Bedrock API error: {error_message}",
                         error_code=error_code,
@@ -558,6 +587,7 @@ class BedrockClient:
 
                 retries_left = max_attempts - attempt - 1
                 if retries_left == 0:
+                    self._record_ai_metric("bedrock.errors.retry_exhausted")
                     raise BedrockError(
                         f"Bedrock API error after {max_attempts} attempts: {error_message}",
                         error_code=error_code,
@@ -565,6 +595,7 @@ class BedrockClient:
                     ) from exc
 
                 delay = _compute_backoff_delay(attempt)
+                self._record_ai_metric("bedrock.retries")
                 logger.warning(
                     "Retryable Bedrock error (code=%s), attempt %d/%d. "
                     "Retrying in %.2fs. Error: %s",
@@ -586,9 +617,14 @@ class BedrockClient:
                 return self._client.converse(**converse_kwargs)
             except ClientError as exc:
                 if not _is_retryable_error(exc) or attempt == max_attempts - 1:
+                    if _is_retryable_error(exc):
+                        self._record_ai_metric("bedrock.errors.retry_exhausted")
+                    else:
+                        self._record_ai_metric("bedrock.errors.non_retryable")
                     raise
                 delay = _compute_backoff_delay(attempt)
                 error_code = exc.response.get("Error", {}).get("Code", "")
+                self._record_ai_metric("bedrock.retries")
                 logger.warning(
                     "Retryable error in converse (code=%s), attempt %d/%d, "
                     "retrying in %.2fs.",
@@ -638,6 +674,7 @@ class BedrockClient:
             f"{system_prompt}\n\n"
             f"## Project Context\n{self._project_context}"
         )
+        self._record_ai_metric("bedrock.tool_loop.calls")
         output_tokens = max_output_tokens or self._config.max_output_tokens
         messages: list[dict[str, Any]] = [
             {"role": "user", "content": [{"text": user_prompt}]},
@@ -663,6 +700,7 @@ class BedrockClient:
             ) + output_tokens
             if self._rate_limiter is not None:
                 if not self._rate_limiter.can_use_tokens(estimated):
+                    self._record_ai_metric("bedrock.errors.token_budget_exceeded")
                     raise BedrockError(
                         "daily token budget exhausted during tool-use loop",
                         error_code="TokenBudgetExceeded",
@@ -672,6 +710,7 @@ class BedrockClient:
 
             turn_started = time.monotonic()
             response = self._converse_with_retry(converse_kwargs)
+            self._record_ai_metric("bedrock.tool_loop.turns")
             turn_elapsed = time.monotonic() - turn_started
             self._adjust_token_usage(response, estimated)
 
@@ -690,6 +729,7 @@ class BedrockClient:
             )
 
             if not tool_use_blocks:
+                self._record_ai_metric("bedrock.tool_loop.text_without_tool")
                 text_parts = [
                     block["text"] for block in assistant_content if "text" in block
                 ]
@@ -738,6 +778,9 @@ class BedrockClient:
                         except Exception as exc:
                             accepted = False
                             result_text = f"Terminal tool validation failed: {exc}"
+                            self._record_ai_metric(
+                                "bedrock.tool_loop.terminal_validation_errors"
+                            )
                             logger.warning(
                                 "Terminal tool %s validation failed on turn %d: %s",
                                 terminal_tool,
@@ -747,6 +790,9 @@ class BedrockClient:
                     if accepted:
                         terminal_result = _json.dumps(tool_input)
                     else:
+                        self._record_ai_metric(
+                            "bedrock.tool_loop.terminal_validation_rejections"
+                        )
                         logger.info(
                             "Terminal tool %s rejected on turn %d: %s",
                             terminal_tool,
@@ -769,6 +815,7 @@ class BedrockClient:
                         result_text = tool_handler.execute(name, tool_input)
                     except Exception as exc:
                         result_text = f"Error: {exc}"
+                        self._record_ai_metric("bedrock.tool_loop.tool_errors")
                         logger.warning("Tool %s failed: %s", name, exc)
                     logger.info(
                         "Tool result turn %d: %s -> %s",
@@ -787,6 +834,7 @@ class BedrockClient:
                 logger.info(
                     "Terminal tool %s called on turn %d.", terminal_tool, turn + 1,
                 )
+                self._record_ai_metric("bedrock.tool_loop.success")
                 return terminal_result
 
             # Feed tool results back for the next turn
@@ -796,6 +844,7 @@ class BedrockClient:
             "Tool-use loop exhausted %d turns without terminal tool. "
             "Forcing final submission.", max_turns,
         )
+        self._record_ai_metric("bedrock.tool_loop.forced_submissions")
 
         # Every prior toolUse already received a matching toolResult in the
         # loop above. Sending more toolResult blocks here corrupts the Bedrock
@@ -833,6 +882,7 @@ class BedrockClient:
             ) + output_tokens
             if self._rate_limiter is not None:
                 if not self._rate_limiter.can_use_tokens(estimated):
+                    self._record_ai_metric("bedrock.errors.token_budget_exceeded")
                     raise BedrockError(
                         "daily token budget exhausted during forced submission",
                         error_code="TokenBudgetExceeded",
@@ -845,6 +895,7 @@ class BedrockClient:
             except ClientError as exc:
                 if not _is_tool_choice_rejected(exc):
                     raise
+                self._record_ai_metric("bedrock.forced_terminal_tool_choice_rejected")
                 logger.info(
                     "Forced terminal toolChoice was rejected; retrying forced "
                     "submission with only the terminal tool exposed."
@@ -869,6 +920,9 @@ class BedrockClient:
                             and not bool(validation[0])
                         ):
                             reason = str(validation[1] or "terminal tool rejected")
+                            self._record_ai_metric(
+                                "bedrock.tool_loop.terminal_validation_rejections"
+                            )
                             raise BedrockError(
                                 f"Forced terminal tool rejected: {reason}",
                                 error_code="TerminalToolRejected",
@@ -877,6 +931,7 @@ class BedrockClient:
                     logger.info(
                         "Terminal tool %s called on forced turn.", terminal_tool,
                     )
+                    self._record_ai_metric("bedrock.tool_loop.success")
                     return _json.dumps(tool_input)
 
             # If still no terminal tool, extract any text
@@ -884,10 +939,13 @@ class BedrockClient:
                 block["text"] for block in assistant_content if "text" in block
             ]
             if text_parts:
+                self._record_ai_metric("bedrock.tool_loop.forced_plain_text_returns")
                 return "".join(text_parts)
         except Exception as exc:
+            self._record_ai_metric("bedrock.tool_loop.forced_submission_errors")
             logger.warning("Forced submission failed: %s", exc)
 
+        self._record_ai_metric("bedrock.tool_loop.exhausted")
         raise BedrockError(
             f"Tool-use loop did not complete within {max_turns} turns.",
             error_code="ToolUseLoopExhausted",

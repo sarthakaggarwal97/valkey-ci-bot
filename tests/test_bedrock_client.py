@@ -407,6 +407,8 @@ class TestBedrockClientInvoke:
 
     def test_invoke_with_schema_retries_without_tool_choice_when_rejected(self):
         mock_client = MagicMock()
+        limiter = MagicMock()
+        limiter.can_use_tokens.return_value = True
         payload = {"answer": "structured"}
         mock_client.converse.side_effect = [
             _make_client_error(
@@ -415,7 +417,7 @@ class TestBedrockClientInvoke:
             ),
             _make_tool_use_response("submit_schema", payload),
         ]
-        client = _make_bedrock_client(mock_client=mock_client)
+        client = _make_bedrock_client(mock_client=mock_client, rate_limiter=limiter)
 
         result = client.invoke_with_schema(
             "sys",
@@ -436,9 +438,18 @@ class TestBedrockClientInvoke:
         assert "toolChoice" in first_call["toolConfig"]
         assert "toolChoice" not in second_call["toolConfig"]
         assert second_call["toolConfig"]["tools"] == first_call["toolConfig"]["tools"]
+        limiter.record_ai_metric.assert_any_call("bedrock.invoke_schema.calls", 1)
+        limiter.record_ai_metric.assert_any_call("bedrock.schema_tool_choice_rejected", 1)
+        limiter.record_ai_metric.assert_any_call(
+            "bedrock.schema_tool_choice_fallback_success",
+            1,
+        )
+        limiter.record_ai_metric.assert_any_call("bedrock.invoke_schema.success", 1)
 
     def test_converse_with_tools_retries_after_terminal_validation_rejection(self):
         mock_client = MagicMock()
+        limiter = MagicMock()
+        limiter.can_use_tokens.return_value = True
         submit_input = {
             "reviews": [],
             "lgtm": True,
@@ -449,7 +460,7 @@ class TestBedrockClientInvoke:
             _make_tool_use_response("submit_review", submit_input, tool_use_id="tool-1"),
             _make_tool_use_response("submit_review", submit_input, tool_use_id="tool-2"),
         ]
-        client = _make_bedrock_client(mock_client=mock_client)
+        client = _make_bedrock_client(mock_client=mock_client, rate_limiter=limiter)
 
         class _Handler:
             def __init__(self) -> None:
@@ -481,6 +492,12 @@ class TestBedrockClientInvoke:
         assert result == json.dumps(submit_input)
         assert handler.calls == 2
         assert mock_client.converse.call_count == 2
+        limiter.record_ai_metric.assert_any_call("bedrock.tool_loop.calls", 1)
+        limiter.record_ai_metric.assert_any_call(
+            "bedrock.tool_loop.terminal_validation_rejections",
+            1,
+        )
+        limiter.record_ai_metric.assert_any_call("bedrock.tool_loop.success", 1)
 
     def test_converse_with_tools_reminds_after_plain_text_response(self):
         mock_client = MagicMock()
