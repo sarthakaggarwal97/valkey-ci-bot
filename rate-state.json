@@ -1,10 +1,15 @@
 {
   "pr_timestamps": [],
-  "token_usage": 109608,
+  "token_usage": 164531,
   "token_window_start": "2026-04-08T07:55:42.346172+00:00",
   "queued_failures": [],
   "ai_metrics": {
-    "bedrock.invoke_schema.calls": 2,
-    "bedrock.invoke_schema.success": 2
+    "bedrock.invoke_schema.calls": 3,
+    "bedrock.invoke_schema.success": 3,
+    "bedrock.retrieval.calls": 2,
+    "bedrock.retrieval.snippets": 6,
+    "bedrock.retrieval.hits": 1,
+    "bedrock.prompt_safety_guard.checked": 1,
+    "bedrock.prompt_safety_guard.present": 1
   }
 }
