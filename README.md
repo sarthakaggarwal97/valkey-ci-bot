@@ -111,7 +111,7 @@ When a maintainer adds a `backport <branch>` label to a merged PR in `valkey-io/
 
 The pipeline:
 
-1. validates the target branch exists and no duplicate backport PR is open
+1. validates the target branch exists, the source PR is merged, and no duplicate backport PR is open
 2. checks the daily rate limit (default 10 PRs per 24 hours)
 3. clones the repo, cherry-picks onto a `backport/<pr>-to-<branch>` branch
 4. if conflicts arise, resolves them file-by-file using Bedrock (whitespace-only conflicts are resolved without LLM calls)
@@ -125,7 +125,9 @@ summary, a compact facts table, a reviewer checklist, the cherry-picked commit
 list, conflict details, and a human-review warning when any file was
 LLM-resolved.
 
-Configuration is loaded from `.github/backport-agent.yml` in the consumer repo. When the file is missing, sensible defaults are used. Configurable settings include the Bedrock model ID, max conflict retries, max conflicting files, daily PR limit, per-backport token budget, and label names.
+Configuration is loaded from `.github/backport-agent.yml` in the consumer repo. When the file is missing, sensible defaults are used. Configurable settings include the Bedrock model ID, max conflict retries, max conflicting files, daily PR limit, per-backport token budget, and labels applied to generated backport PRs.
+
+The example caller maps consumer-repo credentials into the reusable workflow explicitly. Pin the reusable workflow reference to a trusted release tag or full commit SHA in production instead of tracking a moving branch, and set the `agent_ref` input to the same trusted ref so the checked-out agent code matches the workflow you invoked.
 
 Example consumer-repo files:
 

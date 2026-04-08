@@ -185,7 +185,12 @@ def run_backport(
 
     # ---- Step 2: Check for duplicate backport PR (Req 6.1) ----
     logger.info("Checking for duplicate backport PR.")
-    pr_creator = BackportPRCreator(gh, repo_full_name)
+    pr_creator = BackportPRCreator(
+        gh,
+        repo_full_name,
+        backport_label=config.backport_label,
+        llm_conflict_label=config.llm_conflict_label,
+    )
     existing_url = pr_creator.check_duplicate(source_pr_number, target_branch)
     if existing_url:
         msg = (
@@ -229,6 +234,12 @@ def run_backport(
         logger.error(msg)
         _post_comment(repo, source_pr_number, f"Backport failed: {msg}")
         return BackportResult(outcome="error", error_message=msg)
+
+    if not bool(getattr(source_pr, "merged", False)):
+        msg = f"Source PR #{source_pr_number} is not merged."
+        logger.warning(msg)
+        _post_comment(repo, source_pr_number, f"Backport skipped: {msg}")
+        return BackportResult(outcome="pr-not-merged", error_message=msg)
 
     commits = [
         c.sha
@@ -597,7 +608,12 @@ def main() -> None:
         help="Path to backport config YAML in the consumer repo",
     )
     parser.add_argument(
-        "--token", required=True, help="GitHub token",
+        "--token",
+        default="",
+        help=(
+            "GitHub token. Prefer BACKPORT_GITHUB_TOKEN or GITHUB_TOKEN in CI "
+            "to avoid putting secrets in process arguments."
+        ),
     )
     parser.add_argument(
         "--aws-region", default="us-east-1", help="AWS region for Bedrock",
@@ -612,8 +628,18 @@ def main() -> None:
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
 
+    github_token = (
+        args.token
+        or os.environ.get("BACKPORT_GITHUB_TOKEN", "")
+        or os.environ.get("GITHUB_TOKEN", "")
+    )
+    if not github_token:
+        parser.error(
+            "GitHub token is required via --token, BACKPORT_GITHUB_TOKEN, or GITHUB_TOKEN."
+        )
+
     # Load config from consumer repo
-    gh = Github(auth=Auth.Token(args.token))
+    gh = Github(auth=Auth.Token(github_token))
     config = load_backport_config_from_repo(gh, args.repo, args.config)
 
     result = run_backport(
@@ -621,7 +647,7 @@ def main() -> None:
         source_pr_number=args.pr_number,
         target_branch=args.target_branch,
         config=config,
-        github_token=args.token,
+        github_token=github_token,
         aws_region=args.aws_region,
     )
 

@@ -53,7 +53,7 @@ class BackportPRContext:
 class BackportResult:
     """Final outcome of a backport run."""
 
-    outcome: str  # "success", "conflicts-unresolved", "duplicate", "rate-limited", "branch-missing", "error"
+    outcome: str  # "success", "conflicts-unresolved", "duplicate", "rate-limited", "branch-missing", "pr-not-merged", "error"
     backport_pr_url: str | None = None
     commits_cherry_picked: int = 0
     files_conflicted: int = 0

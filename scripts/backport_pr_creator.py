@@ -32,9 +32,18 @@ def _escape_table_cell(value: object) -> str:
 class BackportPRCreator:
     """Create backport branches and pull requests via the GitHub API."""
 
-    def __init__(self, github_client: Github, repo_full_name: str) -> None:
+    def __init__(
+        self,
+        github_client: Github,
+        repo_full_name: str,
+        *,
+        backport_label: str = "backport",
+        llm_conflict_label: str = "llm-resolved-conflicts",
+    ) -> None:
         self._github = github_client
         self._repo_full_name = repo_full_name
+        self._backport_label = backport_label or "backport"
+        self._llm_conflict_label = llm_conflict_label or "llm-resolved-conflicts"
 
     # ------------------------------------------------------------------
     # Public API
@@ -94,9 +103,9 @@ class BackportPRCreator:
         )
 
         # Apply labels.
-        labels = ["backport"]
+        labels = [self._backport_label]
         if any_llm_resolved:
-            labels.append("llm-resolved-conflicts")
+            labels.append(self._llm_conflict_label)
 
         logger.info("Applying labels %s to PR #%d", labels, pr.number)
         retry_github_call(

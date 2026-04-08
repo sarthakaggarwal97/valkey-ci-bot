@@ -47,7 +47,7 @@ class TestBuildSummaryProperty:
         tokens=st.integers(min_value=0, max_value=10_000_000),
         outcome=st.sampled_from([
             "success", "conflicts-unresolved", "duplicate",
-            "rate-limited", "branch-missing", "error",
+            "rate-limited", "branch-missing", "pr-not-merged", "error",
         ]),
     )
     @settings(max_examples=100, deadline=None)
@@ -166,6 +166,7 @@ def _make_mock_pr(
     body: str = "Fixes a bug",
     html_url: str = "https://github.com/valkey-io/valkey/pull/100",
     merge_commit_sha: str = "merge_sha_abc",
+    merged: bool = True,
     commits: list | None = None,
 ) -> MagicMock:
     """Create a mock source PR object."""
@@ -174,6 +175,7 @@ def _make_mock_pr(
     pr.body = body
     pr.html_url = html_url
     pr.merge_commit_sha = merge_commit_sha
+    pr.merged = merged
 
     if commits is None:
         commit1 = MagicMock()
@@ -266,6 +268,12 @@ class TestRunBackportCleanCherryPick:
         assert result.files_resolved == 0
         assert result.files_unresolved == 0
         mock_pr_creator.create_backport_pr.assert_called_once()
+        mock_pr_creator_cls.assert_called_once_with(
+            mock_gh,
+            "valkey-io/valkey",
+            backport_label="backport",
+            llm_conflict_label="llm-resolved-conflicts",
+        )
         mock_rate_limiter.record_pr_created.assert_called_once()
 
 
@@ -466,6 +474,58 @@ class TestRunBackportRateLimitSkip:
         assert result.outcome == "rate-limited"
         # Cherry-pick should NOT have been called
         mock_executor_cls.assert_not_called()
+
+
+class TestRunBackportMergedPrValidation:
+    """Test unmerged source PR skip."""
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}._clone_repo")
+    @patch(f"{_PATCH_PREFIX}.RateLimiter")
+    @patch(f"{_PATCH_PREFIX}.BackportPRCreator")
+    @patch(f"{_PATCH_PREFIX}.ConflictResolver")
+    @patch(f"{_PATCH_PREFIX}.CherryPickExecutor")
+    @patch(f"{_PATCH_PREFIX}.load_backport_config_from_repo")
+    @patch(f"{_PATCH_PREFIX}.Github")
+    def test_unmerged_pr_skips_processing(
+        self,
+        mock_gh_cls: MagicMock,
+        mock_load_config: MagicMock,
+        mock_executor_cls: MagicMock,
+        mock_resolver_cls: MagicMock,
+        mock_pr_creator_cls: MagicMock,
+        mock_rate_limiter_cls: MagicMock,
+        mock_clone: MagicMock,
+        mock_boto3: MagicMock,
+    ) -> None:
+        mock_gh = MagicMock()
+        mock_gh_cls.return_value = mock_gh
+        mock_repo = MagicMock()
+        mock_gh.get_repo.return_value = mock_repo
+        mock_repo.get_branch.return_value = MagicMock()
+        mock_repo.get_pull.return_value = _make_mock_pr(merged=False)
+
+        mock_pr_creator = MagicMock()
+        mock_pr_creator_cls.return_value = mock_pr_creator
+        mock_pr_creator.check_duplicate.return_value = None
+
+        mock_rate_limiter = MagicMock()
+        mock_rate_limiter_cls.return_value = mock_rate_limiter
+        mock_rate_limiter.can_create_pr.return_value = True
+
+        result = run_backport(
+            repo_full_name="valkey-io/valkey",
+            source_pr_number=100,
+            target_branch="8.1",
+            config=_default_config(),
+            github_token="fake-token",
+            aws_region="us-east-1",
+        )
+
+        assert result.outcome == "pr-not-merged"
+        assert "not merged" in (result.error_message or "")
+        mock_executor_cls.assert_not_called()
+        mock_clone.assert_not_called()
 
 
 

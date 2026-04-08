@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, PropertyMock
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from scripts.backport_models import BackportPRContext, ResolutionResult
+from scripts.backport_models import BackportPRContext, CherryPickResult, ResolutionResult
 from scripts.backport_pr_creator import BackportPRCreator
 from scripts.backport_utils import build_branch_name
 
@@ -199,6 +199,55 @@ def test_build_pr_body_includes_checklist_and_plain_status_labels() -> None:
     assert "Resolved automatically" in body
     assert "✅" not in body
     assert "❌" not in body
+
+
+def test_create_backport_pr_uses_configured_labels() -> None:
+    mock_github = MagicMock()
+    mock_repo = MagicMock()
+    mock_github.get_repo.return_value = mock_repo
+
+    mock_pr = MagicMock()
+    mock_pr.number = 456
+    mock_pr.html_url = "https://github.com/owner/repo/pull/456"
+    mock_repo.create_pull.return_value = mock_pr
+
+    context = BackportPRContext(
+        source_pr_number=123,
+        source_pr_title="Fix failover edge case",
+        source_pr_body="Body",
+        source_pr_url="https://github.com/owner/repo/pull/123",
+        source_pr_diff="diff",
+        target_branch="8.1",
+        commits=["abc1234"],
+        repo_full_name="owner/repo",
+    )
+    result = ResolutionResult(
+        path="src/server.c",
+        resolved_content="resolved",
+        resolution_summary="Applied the null check from the source branch.",
+        tokens_used=12,
+        attempts=1,
+    )
+
+    creator = BackportPRCreator(
+        mock_github,
+        "owner/repo",
+        backport_label="needs-backport-review",
+        llm_conflict_label="ai-resolved-conflict",
+    )
+
+    pr_url = creator.create_backport_pr(
+        context,
+        CherryPickResult(success=False, conflicting_files=[], applied_commits=["abc1234"]),
+        [result],
+        branch_name="backport/123-to-8.1",
+    )
+
+    assert pr_url == mock_pr.html_url
+    mock_pr.add_to_labels.assert_called_once_with(
+        "needs-backport-review",
+        "ai-resolved-conflict",
+    )
 
 
 # ---------------------------------------------------------------------------

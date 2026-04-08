@@ -69,6 +69,56 @@ def test_analyze_workflow_checks_out_bot_repository() -> None:
     assert "python -m scripts.main" in analyze_step["run"]
 
 
+def test_backport_workflow_contract_and_token_handling() -> None:
+    workflow = _load_yaml(REPO_ROOT / ".github/workflows/backport.yml")
+    on_block = _get_on_block(workflow)
+    inputs = on_block["workflow_call"]["inputs"]
+    secrets = on_block["workflow_call"]["secrets"]
+
+    assert inputs["aws_region"]["default"] == "us-east-1"
+    assert inputs["agent_repository"]["default"] == "sarthakaggarwal97/valkey-ci-agent"
+    assert inputs["agent_ref"]["default"] == "main"
+    assert secrets["AWS_ROLE_ARN"]["required"] is True
+    assert secrets["VALKEY_GITHUB_TOKEN"]["required"] is False
+    assert workflow["env"]["FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"] is True
+    assert "AWS_REGION" not in workflow["env"]
+
+    job = workflow["jobs"]["backport"]
+    assert job["timeout-minutes"] == 60
+    assert job["concurrency"]["group"] == (
+        "backport-${{ inputs.repo_full_name }}-"
+        "${{ inputs.source_pr_number }}-${{ inputs.target_branch }}"
+    )
+    assert job["concurrency"]["cancel-in-progress"] is False
+
+    role_step = next(
+        step
+        for step in job["steps"]
+        if step["name"] == "Configure AWS credentials from OIDC role"
+    )
+    checkout_step = next(
+        step
+        for step in job["steps"]
+        if step["name"] == "Checkout agent repository"
+    )
+    run_step = next(
+        step
+        for step in job["steps"]
+        if step["name"] == "Run backport pipeline"
+    )
+
+    assert checkout_step["with"]["repository"] == "${{ inputs.agent_repository }}"
+    assert checkout_step["with"]["ref"] == "${{ inputs.agent_ref }}"
+    assert role_step["with"]["role-to-assume"] == "${{ secrets.AWS_ROLE_ARN }}"
+    assert role_step["with"]["aws-region"] == "${{ inputs.aws_region }}"
+    assert run_step["env"]["AWS_DEFAULT_REGION"] == "${{ inputs.aws_region }}"
+    assert run_step["env"]["BACKPORT_GITHUB_TOKEN"] == (
+        "${{ secrets.VALKEY_GITHUB_TOKEN || github.token }}"
+    )
+    assert "--token" not in run_step["run"]
+    assert '--aws-region "${{ inputs.aws_region }}"' in run_step["run"]
+
+
 def test_example_caller_passes_bot_checkout_inputs() -> None:
     workflow = _load_yaml(REPO_ROOT / "examples/caller-workflow.yml")
 
@@ -85,6 +135,23 @@ def test_example_caller_passes_bot_checkout_inputs() -> None:
     analyze_secrets = workflow["jobs"]["analyze"]["secrets"]
     assert analyze_secrets["AWS_ROLE_ARN"] == "${{ secrets.CI_BOT_AWS_ROLE_ARN }}"
     assert "GITHUB_TOKEN" not in analyze_secrets
+
+
+def test_example_backport_caller_passes_required_contract() -> None:
+    workflow = _load_yaml(REPO_ROOT / "examples/backport-caller-workflow.yml")
+
+    extract_script = workflow["jobs"]["preflight"]["steps"][0]["with"]["script"]
+    assert "context.payload.label?.name" in extract_script
+    assert "pr.labels" not in extract_script
+
+    backport_with = workflow["jobs"]["backport"]["with"]
+    assert backport_with["aws_region"] == "${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}"
+    assert backport_with["agent_repository"] == "sarthakaggarwal97/valkey-ci-agent"
+    assert backport_with["agent_ref"] == "main"
+
+    backport_secrets = workflow["jobs"]["backport"]["secrets"]
+    assert backport_secrets["AWS_ROLE_ARN"] == "${{ secrets.CI_BOT_AWS_ROLE_ARN }}"
+    assert "VALKEY_GITHUB_TOKEN" not in backport_secrets
 
 
 def test_ci_workflow_declares_checkout_permissions_and_current_action() -> None:

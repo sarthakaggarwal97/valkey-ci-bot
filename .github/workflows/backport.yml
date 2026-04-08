@@ -20,19 +20,37 @@ on:
         required: false
         type: string
         default: ".github/backport-agent.yml"
+      aws_region:
+        description: "AWS region where Bedrock is available"
+        required: false
+        type: string
+        default: "us-east-1"
+      agent_repository:
+        description: "Repository containing the backport agent code"
+        required: false
+        type: string
+        default: "sarthakaggarwal97/valkey-ci-agent"
+      agent_ref:
+        description: "Ref of the backport agent code to check out"
+        required: false
+        type: string
+        default: "main"
     secrets:
       AWS_ROLE_ARN:
-        required: false
+        required: true
       VALKEY_GITHUB_TOKEN:
         required: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  AWS_REGION: us-east-1
 
 jobs:
   backport:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: backport-${{ inputs.repo_full_name }}-${{ inputs.source_pr_number }}-${{ inputs.target_branch }}
+      cancel-in-progress: false
     permissions:
       contents: write
       pull-requests: write
@@ -46,7 +64,8 @@ jobs:
       - name: Checkout agent repository
         uses: actions/checkout@v6
         with:
-          repository: sarthakaggarwal97/valkey-ci-agent
+          repository: ${{ inputs.agent_repository }}
+          ref: ${{ inputs.agent_ref }}
           persist-credentials: false
           fetch-depth: 1
 
@@ -64,16 +83,16 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: valkey-backport-agent-${{ github.run_id }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ inputs.aws_region }}
 
       - name: Run backport pipeline
         env:
-          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+          AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
+          BACKPORT_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN || github.token }}
         run: |
           python -m scripts.backport_main \
             --repo "${{ inputs.repo_full_name }}" \
             --pr-number "${{ inputs.source_pr_number }}" \
             --target-branch "${{ inputs.target_branch }}" \
             --config "${{ inputs.config_path }}" \
-            --token "${{ secrets.VALKEY_GITHUB_TOKEN || github.token }}" \
-            --aws-region "${{ env.AWS_REGION }}"
+            --aws-region "${{ inputs.aws_region }}"

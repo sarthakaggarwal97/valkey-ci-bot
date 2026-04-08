@@ -5,11 +5,16 @@
 #
 # This workflow triggers the Backport Agent when a merged PR is labeled with
 # a `backport <branch>` label (e.g. `backport 8.1`). It checks that the PR
-# is merged, extracts target branches from all matching labels, and triggers
-# one backport run per target branch.
+# is merged, extracts the target branch from the newly added label, and
+# triggers one backport run for that target branch.
 #
-# No secrets or variables are needed in the consumer repo — the agent repo
-# owns all credentials.
+# Required consumer-repo setup:
+#   Secret:   CI_BOT_AWS_ROLE_ARN        — IAM role assumable via GitHub OIDC
+#   Variable: CI_BOT_AWS_REGION          — optional, defaults to us-east-1
+#
+# Pin the reusable workflow to a trusted release tag or full commit SHA in
+# production instead of tracking a moving branch, and set `agent_ref` below to
+# the same trusted ref.
 name: Backport Agent
 
 permissions:
@@ -46,16 +51,21 @@ jobs:
               return;
             }
 
-            // Extract target branches from labels matching "backport <branch>".
+            // Extract the target branch from the label that triggered this event.
             const backportPrefix = "backport ";
-            const branches = pr.labels
-              .map(l => l.name)
-              .filter(name => name.startsWith(backportPrefix))
-              .map(name => name.slice(backportPrefix.length).trim())
-              .filter(branch => branch.length > 0);
+            const labelName = context.payload.label?.name || "";
+            if (!labelName.startsWith(backportPrefix)) {
+              core.info("Added label is not a backport label.");
+              core.setOutput("should_run", "false");
+              core.setOutput("branches", "[]");
+              return;
+            }
+
+            const branch = labelName.slice(backportPrefix.length).trim();
+            const branches = branch ? [branch] : [];
 
             if (branches.length === 0) {
-              core.info("No backport labels found.");
+              core.info("Backport label has no target branch.");
               core.setOutput("should_run", "false");
               core.setOutput("branches", "[]");
               return;
@@ -78,4 +88,8 @@ jobs:
       repo_full_name: ${{ github.repository }}
       target_branch: ${{ matrix.target_branch }}
       config_path: .github/backport-agent.yml
-    secrets: inherit
+      aws_region: ${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}
+      agent_repository: sarthakaggarwal97/valkey-ci-agent
+      agent_ref: main
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}
