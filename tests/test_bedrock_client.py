@@ -405,6 +405,38 @@ class TestBedrockClientInvoke:
             "tool": {"name": "submit_schema"},
         }
 
+    def test_invoke_with_schema_retries_without_tool_choice_when_rejected(self):
+        mock_client = MagicMock()
+        payload = {"answer": "structured"}
+        mock_client.converse.side_effect = [
+            _make_client_error(
+                "ValidationException",
+                "toolChoice is not supported by this model",
+            ),
+            _make_tool_use_response("submit_schema", payload),
+        ]
+        client = _make_bedrock_client(mock_client=mock_client)
+
+        result = client.invoke_with_schema(
+            "sys",
+            "user",
+            tool_name="submit_schema",
+            tool_description="Submit structured output.",
+            json_schema={
+                "type": "object",
+                "properties": {"answer": {"type": "string"}},
+                "required": ["answer"],
+            },
+        )
+
+        assert json.loads(result) == payload
+        assert mock_client.converse.call_count == 2
+        first_call = mock_client.converse.call_args_list[0].kwargs
+        second_call = mock_client.converse.call_args_list[1].kwargs
+        assert "toolChoice" in first_call["toolConfig"]
+        assert "toolChoice" not in second_call["toolConfig"]
+        assert second_call["toolConfig"]["tools"] == first_call["toolConfig"]["tools"]
+
     def test_converse_with_tools_retries_after_terminal_validation_rejection(self):
         mock_client = MagicMock()
         submit_input = {
