@@ -236,6 +236,31 @@ class TestTclParserProperty:
         assert failure.error_message  # non-empty
         assert failure.parser_type == "tcl"
 
+    def test_extracts_runtest_summary_timeout(self) -> None:
+        """**Validates: Requirements 2.2, 2.3**"""
+        log_content = (
+            "Test Summary: 3885 passed, 1 failed\n"
+            "!!! WARNING The following tests failed:\n"
+            "*** [TIMEOUT]: Fix cluster in "
+            "tests/unit/cluster/many-slot-migration.tcl\n"
+            "##[error]Process completed with exit code 1.\n"
+        )
+        parser = TclTestParser()
+
+        assert parser.can_parse(log_content)
+        results = parser.parse(log_content)
+
+        assert len(results) == 1
+        failure = results[0]
+        assert failure.failure_identifier == (
+            "tests/unit/cluster/many-slot-migration.tcl::Fix cluster"
+        )
+        assert failure.test_name == "Fix cluster"
+        assert failure.file_path == "tests/unit/cluster/many-slot-migration.tcl"
+        assert failure.error_message == "[TIMEOUT]: Fix cluster"
+        assert failure.assertion_details == "Runtest summary status: TIMEOUT"
+        assert failure.parser_type == "tcl"
+
 
 class TestBuildErrorParserProperty:
     """Property tests for BuildErrorParser."""

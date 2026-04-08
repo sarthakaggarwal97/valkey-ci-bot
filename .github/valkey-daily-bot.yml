@@ -68,6 +68,24 @@ validation_profiles:
     test_commands:
       - "case \"{parser_type}\" in build) true ;; gtest) ./src/unit/valkey-unit-gtests --accurate --gtest_filter='{test_name}' ;; sentinel) ./runtest-sentinel ;; cluster) ./runtest-cluster ;; *) ./runtest --accurate --verbose --dump-logs ;; esac"
 
+  - job_name_pattern: "^test-valgrind-test$"
+    install_commands:
+      - "sudo apt-get update"
+      - "sudo apt-get install -y tcl8.6 tclx valgrind"
+    build_commands:
+      - "make valgrind SERVER_CFLAGS='-Werror'"
+    test_commands:
+      - "case \"{parser_type}\" in tcl) ./runtest --valgrind --no-latency --verbose --clients 1 --timeout 2400 --dump-logs --single {file_path} ;; *) ./runtest --valgrind --no-latency --verbose --clients 1 --timeout 2400 --dump-logs ;; esac"
+
+  - job_name_pattern: "^test-valgrind-no-malloc-usable-size-test$"
+    install_commands:
+      - "sudo apt-get update"
+      - "sudo apt-get install -y tcl8.6 tclx valgrind"
+    build_commands:
+      - "make valgrind CFLAGS='-DNO_MALLOC_USABLE_SIZE' SERVER_CFLAGS='-Werror'"
+    test_commands:
+      - "case \"{parser_type}\" in tcl) ./runtest --valgrind --no-latency --verbose --clients 1 --timeout 2400 --dump-logs --single {file_path} ;; *) ./runtest --valgrind --no-latency --verbose --clients 1 --timeout 2400 --dump-logs ;; esac"
+
   - job_name_pattern: "^test-sanitizer-address$"
     install_commands:
       - "sudo apt-get update"
