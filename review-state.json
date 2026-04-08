@@ -98,5 +98,15 @@
       4064635452
     ],
     "updated_at": "2026-04-06T21:25:44.169375+00:00"
+  },
+  "valkey-io/valkey-fuzzer#87": {
+    "repo": "valkey-io/valkey-fuzzer",
+    "pr_number": 87,
+    "last_reviewed_head_sha": "e710dca87a4027e375db7a9fdbfbb932ed7fc2c1",
+    "summary_comment_id": 4208354983,
+    "review_comment_ids": [
+      4077166489
+    ],
+    "updated_at": "2026-04-08T17:59:20.081470+00:00"
   }
 }
