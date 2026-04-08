@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.agent_dashboard import build_dashboard, main, render_markdown
+from scripts.agent_dashboard import build_dashboard, main, render_html, render_markdown
 
 
 def _failure_store() -> dict:
@@ -227,12 +227,32 @@ def test_render_markdown_includes_all_dashboards() -> None:
     assert "slot-coverage-drop" in markdown
 
 
+def test_render_html_is_polished_static_dashboard() -> None:
+    dashboard = build_dashboard(
+        failure_store=_failure_store(),
+        fuzzer_results=[_fuzzer_result()],
+        generated_at="2026-04-08T03:00:00+00:00",
+    )
+
+    html = render_html(dashboard)
+
+    assert "<!doctype html>" in html
+    assert "<title>CI Agent Capability Dashboard</title>" in html
+    assert 'class="metrics"' in html
+    assert "Flaky Test Lab" in html
+    assert "Fuzzer Watch" in html
+    assert "AI Reliability" in html
+    assert "slot-coverage-drop" in html
+    assert "border-radius: 8px" in html
+
+
 def test_cli_writes_markdown_and_json(tmp_path: Path) -> None:
     failure_store_path = tmp_path / "failure-store.json"
     fuzzer_result_path = tmp_path / "fuzzer-monitor-result.json"
     event_log_path = tmp_path / "agent-events.jsonl"
     output_markdown_path = tmp_path / "agent-dashboard.md"
     output_json_path = tmp_path / "agent-dashboard.json"
+    output_html_path = tmp_path / "agent-dashboard.html"
     failure_store_path.write_text(json.dumps(_failure_store()), encoding="utf-8")
     fuzzer_result_path.write_text(json.dumps(_fuzzer_result()), encoding="utf-8")
     event_log_path.write_text(
@@ -258,6 +278,8 @@ def test_cli_writes_markdown_and_json(tmp_path: Path) -> None:
             str(output_markdown_path),
             "--output-json",
             str(output_json_path),
+            "--output-html",
+            str(output_html_path),
         ]
     )
 
@@ -269,3 +291,6 @@ def test_cli_writes_markdown_and_json(tmp_path: Path) -> None:
     assert payload["snapshot"]["failure_incidents"] == 2
     assert payload["snapshot"]["fuzzer_anomalous_runs"] == 1
     assert payload["agent_outcomes"]["dead_lettered"] == 1
+    assert "CI Agent Capability Dashboard" in output_html_path.read_text(
+        encoding="utf-8"
+    )

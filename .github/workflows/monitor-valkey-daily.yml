@@ -231,7 +231,8 @@ jobs:
             --event-log bot-data/agent-events.jsonl \
             --daily-result monitor-result.json \
             --output-markdown agent-dashboard.md \
-            --output-json agent-dashboard.json
+            --output-json agent-dashboard.json \
+            --output-html agent-dashboard.html
 
       - name: Publish capability dashboard to summary
         if: always()
@@ -246,4 +247,5 @@ jobs:
           path: |
             agent-dashboard.md
             agent-dashboard.json
+            agent-dashboard.html
           retention-days: 30

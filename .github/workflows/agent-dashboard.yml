@@ -44,7 +44,8 @@ jobs:
             --review-state bot-data/review-state.json \
             --event-log bot-data/agent-events.jsonl \
             --output-markdown agent-dashboard.md \
-            --output-json agent-dashboard.json
+            --output-json agent-dashboard.json \
+            --output-html agent-dashboard.html
 
       - name: Publish dashboard to workflow summary
         shell: bash
@@ -57,4 +58,5 @@ jobs:
           path: |
             agent-dashboard.md
             agent-dashboard.json
+            agent-dashboard.html
           retention-days: 30

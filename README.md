@@ -37,9 +37,9 @@ Local development:
 Workflow at `.github/workflows/agent-dashboard.yml`.
 
 The dashboard generator turns the bot's durable state and monitor artifacts
-into `agent-dashboard.md` and `agent-dashboard.json`. It is intentionally static:
-no service to deploy, no database to operate, and no extra UI to secure. The
-report covers:
+into `agent-dashboard.html`, `agent-dashboard.md`, and `agent-dashboard.json`.
+It is intentionally static: no service to deploy, no database to operate, and
+no extra UI to secure. The report covers:
 
 - flaky campaign status, validation pass counts, attempts, failed hypotheses, and queued PR payloads
 - CI failure incidents, pass/fail history, queued failures, and Daily monitor outcomes
@@ -56,6 +56,10 @@ Fuzzer monitor workflows also generate dashboard artifacts for each run,
 including their current `monitor-result.json` or `fuzzer-monitor-result.json`
 payloads.
 
+Open `agent-dashboard.html` from the workflow artifact for the polished UI.
+The Markdown file stays optimized for GitHub step summaries, and the JSON file
+stays optimized for automation.
+
 Local usage:
 
 ```bash
@@ -68,7 +72,8 @@ python3 -m scripts.agent_dashboard \
   --daily-result monitor-result.json \
   --fuzzer-result fuzzer-monitor-result.json \
   --output-markdown agent-dashboard.md \
-  --output-json agent-dashboard.json
+  --output-json agent-dashboard.json \
+  --output-html agent-dashboard.html
 ```
 
 ## CI Failure Agent

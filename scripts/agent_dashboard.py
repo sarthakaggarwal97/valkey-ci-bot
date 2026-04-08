@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from datetime import datetime, timezone
+import html as html_lib
 import json
 from pathlib import Path
 from typing import Any
@@ -822,6 +823,486 @@ def render_markdown(dashboard: JsonObject) -> str:
     return "\n".join(lines)
 
 
+class _Html(str):
+    """Marker for trusted HTML assembled by this module."""
+
+
+def _safe_html(value: str) -> _Html:
+    return _Html(value)
+
+
+def _html(value: object) -> str:
+    return html_lib.escape(_str(value), quote=False)
+
+
+def _html_attr(value: object) -> str:
+    return html_lib.escape(_str(value), quote=True)
+
+
+def _html_cell(value: object) -> str:
+    if isinstance(value, _Html):
+        return str(value)
+    return _html(value)
+
+
+def _format_number(value: Any) -> str:
+    try:
+        return f"{int(value):,}"
+    except (TypeError, ValueError):
+        return _html(value)
+
+
+def _format_percent(value: Any) -> str:
+    try:
+        return f"{float(value) * 100:.0f}%"
+    except (TypeError, ValueError):
+        return _html(value)
+
+
+def _chip(value: object) -> _Html:
+    label = _str(value, "unknown") or "unknown"
+    normalized = label.lower()
+    tone = "neutral"
+    if any(word in normalized for word in ["passed", "success", "merged", "normal"]):
+        tone = "good"
+    elif any(word in normalized for word in ["failed", "dead", "abandoned", "anomalous", "missing"]):
+        tone = "bad"
+    elif any(word in normalized for word in ["queued", "retry", "warning", "incomplete"]):
+        tone = "warn"
+    return _safe_html(
+        f'<span class="chip chip-{tone}">{_html(label)}</span>'
+    )
+
+
+def _html_link(label: object, url: object) -> _Html:
+    url_text = _str(url)
+    if not url_text:
+        return _safe_html(_html(label))
+    return _safe_html(
+        f'<a href="{_html_attr(url_text)}">{_html(label)}</a>'
+    )
+
+
+def _html_status_counts(counts: JsonObject) -> _Html:
+    if not counts:
+        return _safe_html('<span class="muted">none</span>')
+    chips = [
+        f'{_chip(key)} <span class="count">{_format_number(value)}</span>'
+        for key, value in sorted(counts.items())
+    ]
+    return _safe_html('<span class="chip-list">' + "".join(chips) + "</span>")
+
+
+def _html_table(headers: list[str], rows: list[list[object]], *, empty: str) -> str:
+    if not rows:
+        return f'<p class="empty">{_html(empty)}</p>'
+    head = "".join(f"<th>{_html(header)}</th>" for header in headers)
+    body_rows = []
+    for row in rows:
+        body_rows.append(
+            "<tr>"
+            + "".join(f"<td>{_html_cell(value)}</td>" for value in row)
+            + "</tr>"
+        )
+    return (
+        '<div class="table-wrap"><table><thead><tr>'
+        + head
+        + "</tr></thead><tbody>"
+        + "".join(body_rows)
+        + "</tbody></table></div>"
+    )
+
+
+def _metric_card(label: str, value: object, *, accent: str = "blue") -> str:
+    return (
+        f'<article class="metric metric-{_html_attr(accent)}">'
+        f'<p>{_html(label)}</p>'
+        f'<strong>{_format_number(value)}</strong>'
+        "</article>"
+    )
+
+
+def _summary_grid(rows: list[tuple[str, object]]) -> str:
+    return (
+        '<div class="summary-grid">'
+        + "".join(
+            f'<div><span>{_html(label)}</span><strong>{_html_cell(value)}</strong></div>'
+            for label, value in rows
+        )
+        + "</div>"
+    )
+
+
+def _panel(title: str, body: str, *, wide: bool = False) -> str:
+    class_name = "panel panel-wide" if wide else "panel"
+    return (
+        f'<section class="{class_name}">'
+        f"<h2>{_html(title)}</h2>"
+        f"{body}"
+        "</section>"
+    )
+
+
+def render_html(dashboard: JsonObject) -> str:
+    """Render a polished self-contained HTML dashboard artifact."""
+    snapshot = _mapping(dashboard.get("snapshot"))
+    ci_failures = _mapping(dashboard.get("ci_failures"))
+    flaky_tests = _mapping(dashboard.get("flaky_tests"))
+    pr_reviews = _mapping(dashboard.get("pr_reviews"))
+    fuzzer = _mapping(dashboard.get("fuzzer"))
+    agent_outcomes = _mapping(dashboard.get("agent_outcomes"))
+    ai_reliability = _mapping(dashboard.get("ai_reliability"))
+    state_health = _mapping(dashboard.get("state_health"))
+    generated_at = _str(dashboard.get("generated_at"), "unknown")
+
+    metric_keys = [
+        ("failure_incidents", "Failure Incidents", "blue"),
+        ("queued_failures", "Queued Failures", "amber"),
+        ("active_flaky_campaigns", "Active Flaky Campaigns", "amber"),
+        ("tracked_review_prs", "Tracked Review PRs", "blue"),
+        ("fuzzer_anomalous_runs", "Fuzzer Anomalies", "red"),
+        ("agent_events", "Agent Events", "green"),
+        ("ai_token_usage", "AI Token Usage", "blue"),
+        ("instrumentation_gaps", "Instrumentation Gaps", "red"),
+    ]
+    metrics = "".join(
+        _metric_card(label, snapshot.get(key, 0), accent=accent)
+        for key, label, accent in metric_keys
+    )
+
+    flaky_panel = _panel(
+        "Flaky Test Lab",
+        _summary_grid([
+            ("Campaigns", flaky_tests.get("campaigns", 0)),
+            ("Active", flaky_tests.get("active_campaigns", 0)),
+            ("Attempts", flaky_tests.get("total_attempts", 0)),
+            ("Failed Hypotheses", flaky_tests.get("failed_hypotheses", 0)),
+            ("Full Passes", flaky_tests.get("consecutive_full_passes", 0)),
+            ("Status", _html_status_counts(_mapping(flaky_tests.get("status_counts")))),
+        ])
+        + _html_table(
+            [
+                "Failure",
+                "Status",
+                "Job",
+                "Branch",
+                "Attempts",
+                "Full Passes",
+                "Failed Hypotheses",
+                "Queued PR",
+                "Updated",
+            ],
+            [
+                [
+                    campaign.get("failure_identifier", ""),
+                    _chip(campaign.get("status", "")),
+                    campaign.get("job_name", ""),
+                    campaign.get("branch", ""),
+                    campaign.get("total_attempts", 0),
+                    campaign.get("consecutive_full_passes", 0),
+                    len(_list(campaign.get("failed_hypotheses"))),
+                    _chip("queued" if isinstance(campaign.get("queued_pr_payload"), dict) else "none"),
+                    campaign.get("updated_at", ""),
+                ]
+                for campaign in _list(flaky_tests.get("recent_campaigns"))
+                if isinstance(campaign, dict)
+            ],
+            empty="No flaky campaigns were present.",
+        ),
+        wide=True,
+    )
+
+    ci_panel = _panel(
+        "CI Failure Outcomes",
+        _summary_grid([
+            ("Incidents", ci_failures.get("failure_incidents", 0)),
+            ("Queued", ci_failures.get("queued_failures", 0)),
+            ("Daily Runs", ci_failures.get("daily_runs_seen", 0)),
+            ("History Entries", ci_failures.get("history_entries", 0)),
+            ("Pass Observations", ci_failures.get("history_passes", 0)),
+            ("Fail Observations", ci_failures.get("history_failures", 0)),
+        ])
+        + _html_table(
+            ["Signal", "Value"],
+            [
+                ["Entry Status", _html_status_counts(_mapping(ci_failures.get("entry_status_counts")))],
+                ["Daily Actions", _html_status_counts(_mapping(ci_failures.get("daily_action_counts")))],
+                ["Daily Conclusions", _html_status_counts(_mapping(ci_failures.get("daily_conclusion_counts")))],
+                ["Job Outcomes", _html_status_counts(_mapping(ci_failures.get("daily_job_outcome_counts")))],
+            ],
+            empty="No CI failure data was available.",
+        ),
+    )
+
+    outcome_panel = _panel(
+        "Agent Outcome Ledger",
+        _summary_grid([
+            ("Events", agent_outcomes.get("events", 0)),
+            ("Subjects", agent_outcomes.get("subjects", 0)),
+            ("Validation Passed", agent_outcomes.get("validation_passed", 0)),
+            ("Validation Failed", agent_outcomes.get("validation_failed", 0)),
+            ("PRs Created", agent_outcomes.get("prs_created", 0)),
+            ("PRs Merged", agent_outcomes.get("prs_merged", 0)),
+            ("Closed Without Merge", agent_outcomes.get("prs_closed_without_merge", 0)),
+            ("Dead Lettered", agent_outcomes.get("dead_lettered", 0)),
+        ])
+        + _html_table(
+            ["Time", "Type", "Subject", "Attributes"],
+            [
+                [
+                    event.get("created_at", ""),
+                    _chip(event.get("event_type", "")),
+                    event.get("subject", ""),
+                    json.dumps(_mapping(event.get("attributes")), sort_keys=True)[:240],
+                ]
+                for event in _list(agent_outcomes.get("recent_events"))
+                if isinstance(event, dict)
+            ],
+            empty="No recent agent events were present.",
+        ),
+        wide=True,
+    )
+
+    review_panel = _panel(
+        "PR Review Quality",
+        _summary_grid([
+            ("Tracked PRs", pr_reviews.get("tracked_prs", 0)),
+            ("Summary Comments", pr_reviews.get("summary_comments", 0)),
+            ("Review Comments", pr_reviews.get("review_comments", 0)),
+            ("Acceptance Cases", pr_reviews.get("acceptance_cases", 0)),
+            ("Acceptance Passed", pr_reviews.get("acceptance_passed", 0)),
+            ("Acceptance Failed", pr_reviews.get("acceptance_failed", 0)),
+            ("Coverage Incomplete", pr_reviews.get("coverage_incomplete_cases", 0)),
+            ("Model Followups", _html_status_counts(_mapping(pr_reviews.get("model_followup_counts")))),
+        ])
+        + _html_table(
+            ["PR", "Head SHA", "Summary", "Review Comments", "Updated"],
+            [
+                [
+                    f"{state.get('repo', '')}#{state.get('pr_number', '')}",
+                    state.get("last_reviewed_head_sha", ""),
+                    state.get("summary_comment_id", ""),
+                    len(_list(state.get("review_comment_ids"))),
+                    state.get("updated_at", ""),
+                ]
+                for state in _list(pr_reviews.get("recent_reviews"))
+                if isinstance(state, dict)
+            ],
+            empty="No tracked PR review states were present.",
+        ),
+    )
+
+    fuzzer_panel = _panel(
+        "Fuzzer Watch",
+        _summary_grid([
+            ("Runs Seen", fuzzer.get("runs_seen", 0)),
+            ("Runs Analyzed", fuzzer.get("runs_analyzed", 0)),
+            ("Raw Log Fallbacks", fuzzer.get("raw_log_fallbacks", 0)),
+            ("Status", _html_status_counts(_mapping(fuzzer.get("status_counts")))),
+            ("Issues", _html_status_counts(_mapping(fuzzer.get("issue_action_counts")))),
+            ("Root Causes", _html_status_counts(_mapping(fuzzer.get("root_cause_counts")))),
+        ])
+        + _html_table(
+            ["Run", "Status", "Scenario", "Seed", "Root Cause", "Issue", "Summary"],
+            [
+                [
+                    _html_link(anomaly.get("run_id", ""), anomaly.get("run_url", "")),
+                    _chip(anomaly.get("status", "")),
+                    anomaly.get("scenario_id", ""),
+                    anomaly.get("seed", ""),
+                    anomaly.get("root_cause_category", ""),
+                    _html_link(anomaly.get("issue_action", ""), anomaly.get("issue_url", "")),
+                    anomaly.get("summary", ""),
+                ]
+                for anomaly in _list(fuzzer.get("recent_anomalies"))
+                if isinstance(anomaly, dict)
+            ],
+            empty="No warning or anomalous fuzzer runs were present.",
+        ),
+        wide=True,
+    )
+
+    ai_panel = _panel(
+        "AI Reliability",
+        _summary_grid([
+            ("Token Usage", ai_reliability.get("token_usage", 0)),
+            ("Schema Calls", ai_reliability.get("schema_calls", 0)),
+            ("Schema Successes", ai_reliability.get("schema_successes", 0)),
+            ("Tool Loop Calls", ai_reliability.get("tool_loop_calls", 0)),
+            ("Tool Loop Successes", ai_reliability.get("tool_loop_successes", 0)),
+            ("Terminal Rejections", ai_reliability.get("terminal_validation_rejections", 0)),
+            ("Bedrock Retries", ai_reliability.get("bedrock_retries", 0)),
+            ("Prompt Safety", _format_percent(ai_reliability.get("prompt_safety_coverage", 0.0))),
+        ])
+        + _html_table(
+            ["Measured AI Event", "Count"],
+            [
+                [name, count]
+                for name, count in sorted(
+                    _mapping(ai_reliability.get("ai_metrics")).items()
+                )
+            ],
+            empty="No persisted AI event counters were present.",
+        ),
+        wide=True,
+    )
+
+    state_panel = _panel(
+        "State Health",
+        _html_table(
+            ["Monitor Key", "Last Seen Run", "Target Repo", "Workflow", "Updated"],
+            [
+                [
+                    watermark.get("key", ""),
+                    watermark.get("last_seen_run_id", ""),
+                    watermark.get("target_repo", ""),
+                    watermark.get("workflow_file", ""),
+                    watermark.get("updated_at", ""),
+                ]
+                for watermark in _list(state_health.get("recent_watermarks"))
+                if isinstance(watermark, dict)
+            ],
+            empty="No monitor watermarks were present.",
+        )
+        + _html_table(
+            ["Input Warning"],
+            [[warning] for warning in _list(state_health.get("input_warnings"))],
+            empty="No input warnings.",
+        ),
+    )
+
+    css = """
+:root {
+  color-scheme: dark;
+  --bg: #07111f;
+  --panel: #0f1b2d;
+  --line: #26364f;
+  --text: #e7edf7;
+  --muted: #95a5bb;
+  --blue: #38bdf8;
+  --green: #34d399;
+  --amber: #f59e0b;
+  --red: #f87171;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 48px; }
+.hero {
+  border: 1px solid var(--line);
+  background: #0d1a2b;
+  padding: 28px;
+  border-radius: 8px;
+  margin-bottom: 18px;
+}
+.eyebrow { color: var(--green); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+h1, h2 { margin: 0; line-height: 1.1; }
+h1 { font-size: 38px; margin-top: 8px; max-width: 780px; }
+h2 { font-size: 20px; margin-bottom: 16px; }
+.hero p, .muted, .empty { color: var(--muted); }
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.metric {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--blue);
+  border-radius: 8px;
+  padding: 16px;
+}
+.metric-green { border-top-color: var(--green); }
+.metric-amber { border-top-color: var(--amber); }
+.metric-red { border-top-color: var(--red); }
+.metric p { margin: 0 0 10px; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+.metric strong { display: block; font-size: 28px; }
+.layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  min-width: 0;
+}
+.panel-wide { grid-column: 1 / -1; }
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.summary-grid div {
+  border-left: 2px solid var(--line);
+  padding: 2px 0 2px 10px;
+}
+.summary-grid span { display: block; color: var(--muted); font-size: 12px; }
+.summary-grid strong { display: block; margin-top: 5px; font-size: 18px; overflow-wrap: anywhere; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; min-width: 680px; }
+th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { color: #c6d2e2; background: #101f33; font-size: 12px; text-transform: uppercase; }
+tr:last-child td { border-bottom: 0; }
+td { color: #dce6f3; }
+.chip-list { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #dbe7f5;
+  background: #15243a;
+}
+.chip-good { color: #bbf7d0; border-color: #166534; background: #052e1a; }
+.chip-warn { color: #fde68a; border-color: #92400e; background: #422006; }
+.chip-bad { color: #fecaca; border-color: #991b1b; background: #450a0a; }
+.count { color: var(--muted); margin-right: 8px; }
+@media (max-width: 900px) {
+  .metrics, .layout, .summary-grid { grid-template-columns: 1fr; }
+  .panel-wide { grid-column: auto; }
+  h1 { font-size: 30px; }
+}
+"""
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CI Agent Capability Dashboard</title>
+  <style>{css}</style>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div class="eyebrow">CI Agent</div>
+      <h1>Capability Dashboard</h1>
+      <p>Generated at {_html(generated_at)}</p>
+    </header>
+    <section class="metrics" aria-label="Executive snapshot">{metrics}</section>
+    <div class="layout">
+      {flaky_panel}
+      {ci_panel}
+      {outcome_panel}
+      {review_panel}
+      {fuzzer_panel}
+      {ai_panel}
+      {state_panel}
+    </div>
+  </main>
+</body>
+</html>
+"""
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--failure-store", default="")
@@ -834,6 +1315,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--event-log", action="append", default=[])
     parser.add_argument("--output-markdown", default="agent-dashboard.md")
     parser.add_argument("--output-json", default="agent-dashboard.json")
+    parser.add_argument("--output-html", default="agent-dashboard.html")
     return parser
 
 
@@ -880,6 +1362,7 @@ def main(argv: list[str] | None = None) -> int:
         encoding="utf-8",
     )
     Path(args.output_markdown).write_text(render_markdown(dashboard), encoding="utf-8")
+    Path(args.output_html).write_text(render_html(dashboard), encoding="utf-8")
     return 0
 
 

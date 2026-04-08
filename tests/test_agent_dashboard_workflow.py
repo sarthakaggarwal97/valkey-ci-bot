@@ -50,7 +50,9 @@ def test_dashboard_workflow_generates_static_artifacts() -> None:
     assert "--failure-store bot-data/failure-store.json" in generate_step["run"]
     assert "--review-state bot-data/review-state.json" in generate_step["run"]
     assert "--event-log bot-data/agent-events.jsonl" in generate_step["run"]
+    assert "--output-html agent-dashboard.html" in generate_step["run"]
     assert upload_step["uses"] == "actions/upload-artifact@v4"
+    assert "agent-dashboard.html" in upload_step["with"]["path"]
 
 
 def test_monitor_workflows_publish_capability_dashboard() -> None:
@@ -76,5 +78,9 @@ def test_monitor_workflows_publish_capability_dashboard() -> None:
     assert "--fuzzer-result fuzzer-monitor-result.json" in fuzzer_generate["run"]
     assert "--event-log bot-data/agent-events.jsonl" in daily_generate["run"]
     assert "--event-log bot-data/agent-events.jsonl" in fuzzer_generate["run"]
+    assert "--output-html agent-dashboard.html" in daily_generate["run"]
+    assert "--output-html agent-dashboard.html" in fuzzer_generate["run"]
     assert daily_upload["uses"] == "actions/upload-artifact@v4"
     assert fuzzer_upload["uses"] == "actions/upload-artifact@v4"
+    assert "agent-dashboard.html" in daily_upload["with"]["path"]
+    assert "agent-dashboard.html" in fuzzer_upload["with"]["path"]
