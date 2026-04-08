@@ -41,6 +41,7 @@ from scripts.commit_signoff import (
 )
 from scripts.config import BotConfig, ProjectContext
 from scripts.conflict_resolver import ConflictResolver
+from scripts.event_ledger import EventLedger
 from scripts.github_client import retry_github_call
 from scripts.rate_limiter import RateLimiter
 
@@ -139,6 +140,11 @@ def emit_job_summary(text: str) -> None:
 # ------------------------------------------------------------------
 
 
+def _backport_subject(repo_full_name: str, source_pr_number: int, target_branch: str) -> str:
+    """Build a stable event subject for one backport attempt."""
+    return f"{repo_full_name}#{source_pr_number}->{target_branch}"
+
+
 def run_backport(
     repo_full_name: str,
     source_pr_number: int,
@@ -155,255 +161,345 @@ def run_backport(
     9.1, 9.2, 9.3, 9.4**
     """
     gh = Github(auth=Auth.Token(github_token))
-    try:
-        signer, require_dco_signoff = _resolve_commit_signer()
-    except ValueError as exc:
-        msg = str(exc)
-        logger.error(msg)
-        return BackportResult(outcome="error", error_message=msg)
-    repo = retry_github_call(
-        lambda: gh.get_repo(repo_full_name),
-        retries=3,
-        description=f"get repo {repo_full_name}",
+    subject = _backport_subject(repo_full_name, source_pr_number, target_branch)
+    event_ledger = EventLedger(gh, repo_full_name)
+    event_ledger.record(
+        "workflow.run_seen",
+        subject,
+        workflow="backport",
+        repo=repo_full_name,
+        source_pr_number=source_pr_number,
+        target_branch=target_branch,
     )
-
-    # ---- Step 1: Validate target branch exists (Req 1.5) ----
-    logger.info("Validating target branch %s exists.", target_branch)
+    rate_limiter: RateLimiter | None = None
     try:
-        retry_github_call(
-            lambda: repo.get_branch(target_branch),
+        try:
+            signer, require_dco_signoff = _resolve_commit_signer()
+        except ValueError as exc:
+            msg = str(exc)
+            logger.error(msg)
+            event_ledger.record(
+                "backport.preflight_failed",
+                subject,
+                reason="commit-signer-misconfigured",
+                error=msg,
+            )
+            return BackportResult(outcome="error", error_message=msg)
+        repo = retry_github_call(
+            lambda: gh.get_repo(repo_full_name),
             retries=3,
-            description=f"get branch {target_branch}",
+            description=f"get repo {repo_full_name}",
         )
-    except GithubException as exc:
-        if exc.status == 404:
-            msg = f"Target branch `{target_branch}` does not exist."
+
+        # ---- Step 1: Validate target branch exists (Req 1.5) ----
+        logger.info("Validating target branch %s exists.", target_branch)
+        try:
+            retry_github_call(
+                lambda: repo.get_branch(target_branch),
+                retries=3,
+                description=f"get branch {target_branch}",
+            )
+        except GithubException as exc:
+            if exc.status == 404:
+                msg = f"Target branch `{target_branch}` does not exist."
+                logger.warning(msg)
+                _post_comment(repo, source_pr_number, f"Backport skipped: {msg}")
+                event_ledger.record(
+                    "backport.skipped",
+                    subject,
+                    reason="branch-missing",
+                    error=msg,
+                )
+                return BackportResult(outcome="branch-missing", error_message=msg)
+            raise
+
+        # ---- Step 2: Check for duplicate backport PR (Req 6.1) ----
+        logger.info("Checking for duplicate backport PR.")
+        pr_creator = BackportPRCreator(
+            gh,
+            repo_full_name,
+            backport_label=config.backport_label,
+            llm_conflict_label=config.llm_conflict_label,
+        )
+        existing_url = pr_creator.check_duplicate(source_pr_number, target_branch)
+        if existing_url:
+            msg = (
+                f"A backport PR already exists for #{source_pr_number} → "
+                f"`{target_branch}`: {existing_url}"
+            )
+            logger.info(msg)
+            _post_comment(repo, source_pr_number, f"Backport skipped: {msg}")
+            event_ledger.record(
+                "backport.skipped",
+                subject,
+                reason="duplicate",
+                backport_pr_url=existing_url,
+            )
+            return BackportResult(outcome="duplicate", backport_pr_url=existing_url)
+
+        # ---- Step 3: Rate limit check (Req 8.1) ----
+        logger.info("Checking rate limit.")
+        bot_config = BotConfig(max_prs_per_day=config.max_prs_per_day)
+        # Pass github_client=None so the rate limiter skips the open-PR-label
+        # check (which looks for "agent-fix" labels, not backport labels).
+        # State persistence still works via state_github_client.
+        rate_limiter = RateLimiter(
+            bot_config,
+            None,
+            "",
+            state_github_client=gh,
+            state_repo_full_name=repo_full_name,
+        )
+        rate_limiter.load()
+        if not rate_limiter.can_create_pr():
+            msg = "Daily backport PR rate limit reached. Please try again later."
             logger.warning(msg)
             _post_comment(repo, source_pr_number, f"Backport skipped: {msg}")
-            return BackportResult(outcome="branch-missing", error_message=msg)
-        raise
-
-    # ---- Step 2: Check for duplicate backport PR (Req 6.1) ----
-    logger.info("Checking for duplicate backport PR.")
-    pr_creator = BackportPRCreator(
-        gh,
-        repo_full_name,
-        backport_label=config.backport_label,
-        llm_conflict_label=config.llm_conflict_label,
-    )
-    existing_url = pr_creator.check_duplicate(source_pr_number, target_branch)
-    if existing_url:
-        msg = (
-            f"A backport PR already exists for #{source_pr_number} → "
-            f"`{target_branch}`: {existing_url}"
-        )
-        logger.info(msg)
-        _post_comment(repo, source_pr_number, f"Backport skipped: {msg}")
-        return BackportResult(outcome="duplicate", backport_pr_url=existing_url)
-
-    # ---- Step 3: Rate limit check (Req 8.1) ----
-    logger.info("Checking rate limit.")
-    bot_config = BotConfig(max_prs_per_day=config.max_prs_per_day)
-    # Pass github_client=None so the rate limiter skips the open-PR-label
-    # check (which looks for "agent-fix" labels, not backport labels).
-    # State persistence still works via state_github_client.
-    rate_limiter = RateLimiter(
-        bot_config,
-        None,
-        "",
-        state_github_client=gh,
-        state_repo_full_name=repo_full_name,
-    )
-    rate_limiter.load()
-    if not rate_limiter.can_create_pr():
-        msg = "Daily backport PR rate limit reached. Please try again later."
-        logger.warning(msg)
-        _post_comment(repo, source_pr_number, f"Backport skipped: {msg}")
-        return BackportResult(outcome="rate-limited", error_message=msg)
-
-    # ---- Step 4: Fetch source PR metadata ----
-    logger.info("Fetching source PR #%d metadata.", source_pr_number)
-    try:
-        source_pr = retry_github_call(
-            lambda: repo.get_pull(source_pr_number),
-            retries=3,
-            description=f"get PR #{source_pr_number}",
-        )
-    except GithubException as exc:
-        msg = f"Failed to fetch source PR #{source_pr_number}: {exc}"
-        logger.error(msg)
-        _post_comment(repo, source_pr_number, f"Backport failed: {msg}")
-        return BackportResult(outcome="error", error_message=msg)
-
-    if not bool(getattr(source_pr, "merged", False)):
-        msg = f"Source PR #{source_pr_number} is not merged."
-        logger.warning(msg)
-        _post_comment(repo, source_pr_number, f"Backport skipped: {msg}")
-        return BackportResult(outcome="pr-not-merged", error_message=msg)
-
-    commits = [
-        c.sha
-        for c in retry_github_call(
-            lambda: list(source_pr.get_commits()),
-            retries=3,
-            description=f"get commits for PR #{source_pr_number}",
-        )
-    ]
-    merge_commit_sha = source_pr.merge_commit_sha
-
-    # Fetch PR diff
-    try:
-        # PyGithub doesn't have a direct diff method, but we can get
-        # the patch/diff from the PR's files
-        pr_files = retry_github_call(
-            lambda: list(source_pr.get_files()),
-            retries=3,
-            description=f"get files for PR #{source_pr_number}",
-        )
-        diff_parts = []
-        for f in pr_files:
-            if f.patch:
-                diff_parts.append(f"--- a/{f.filename}\n+++ b/{f.filename}\n{f.patch}")
-        diff_content = "\n".join(diff_parts)
-    except Exception:
-        diff_content = ""
-
-    pr_context = BackportPRContext(
-        source_pr_number=source_pr_number,
-        source_pr_title=source_pr.title or "",
-        source_pr_body=source_pr.body or "",
-        source_pr_url=source_pr.html_url,
-        source_pr_diff=diff_content,
-        target_branch=target_branch,
-        commits=commits,
-        repo_full_name=repo_full_name,
-    )
-
-    # ---- Step 5: Cherry-pick (Req 2.1) ----
-    logger.info("Executing cherry-pick onto %s.", target_branch)
-    branch_name = build_branch_name(source_pr_number, target_branch)
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        # Clone the repo with full history for cherry-pick
-        git_env = _clone_repo(
-            repo_full_name,
-            github_token,
-            tmp_dir,
-            target_branch,
-            signer=signer,
-        )
-
-        # Create the backport branch locally from target branch HEAD
-        _run_git(tmp_dir, "checkout", "-b", branch_name)
-
-        executor = CherryPickExecutor(tmp_dir)
-
-        try:
-            cherry_result = executor.execute(
-                branch_name, merge_commit_sha, commits,
+            event_ledger.record(
+                "backport.skipped",
+                subject,
+                reason="rate-limited",
+                error=msg,
             )
-        except Exception as exc:
-            msg = f"Cherry-pick failed: {exc}"
+            return BackportResult(outcome="rate-limited", error_message=msg)
+
+        # ---- Step 4: Fetch source PR metadata ----
+        logger.info("Fetching source PR #%d metadata.", source_pr_number)
+        try:
+            source_pr = retry_github_call(
+                lambda: repo.get_pull(source_pr_number),
+                retries=3,
+                description=f"get PR #{source_pr_number}",
+            )
+        except GithubException as exc:
+            msg = f"Failed to fetch source PR #{source_pr_number}: {exc}"
             logger.error(msg)
             _post_comment(repo, source_pr_number, f"Backport failed: {msg}")
+            event_ledger.record(
+                "backport.failed",
+                subject,
+                phase="fetch-source-pr",
+                error=msg,
+            )
             return BackportResult(outcome="error", error_message=msg)
 
-        # ---- Step 6: Conflict resolution ----
-        resolution_results = None
-        total_tokens = 0
-        if not cherry_result.success and cherry_result.conflicting_files:
-            logger.info(
-                "Cherry-pick produced %d conflict(s). Invoking conflict resolver.",
-                len(cherry_result.conflicting_files),
+        if not bool(getattr(source_pr, "merged", False)):
+            msg = f"Source PR #{source_pr_number} is not merged."
+            logger.warning(msg)
+            _post_comment(repo, source_pr_number, f"Backport skipped: {msg}")
+            event_ledger.record(
+                "backport.skipped",
+                subject,
+                reason="pr-not-merged",
+                error=msg,
             )
-            bedrock_adapter = _BedrockConfigAdapter(_backport_config=config)
-            bedrock_client = BedrockClient(
-                bedrock_adapter,
-                client=boto3.client("bedrock-runtime", region_name=aws_region),
-            )
-            resolver = ConflictResolver(
-                bedrock_client, config,
-                github_client=gh,
-                repo_full_name=repo_full_name,
-                head_sha=merge_commit_sha or "",
-            )
-            resolution_results = resolver.resolve_conflicts(
-                cherry_result.conflicting_files,
-                pr_context,
-                token_budget=config.per_backport_token_budget,
-            )
-            total_tokens = sum(r.tokens_used for r in resolution_results)
+            return BackportResult(outcome="pr-not-merged", error_message=msg)
 
-            # Apply resolved files to the working tree and commit
-            _apply_resolutions(
+        commits = [
+            c.sha
+            for c in retry_github_call(
+                lambda: list(source_pr.get_commits()),
+                retries=3,
+                description=f"get commits for PR #{source_pr_number}",
+            )
+        ]
+        merge_commit_sha = source_pr.merge_commit_sha
+
+        # Fetch PR diff
+        try:
+            # PyGithub doesn't have a direct diff method, but we can get
+            # the patch/diff from the PR's files
+            pr_files = retry_github_call(
+                lambda: list(source_pr.get_files()),
+                retries=3,
+                description=f"get files for PR #{source_pr_number}",
+            )
+            diff_parts = []
+            for f in pr_files:
+                if f.patch:
+                    diff_parts.append(f"--- a/{f.filename}\n+++ b/{f.filename}\n{f.patch}")
+            diff_content = "\n".join(diff_parts)
+        except Exception:
+            diff_content = ""
+
+        pr_context = BackportPRContext(
+            source_pr_number=source_pr_number,
+            source_pr_title=source_pr.title or "",
+            source_pr_body=source_pr.body or "",
+            source_pr_url=source_pr.html_url,
+            source_pr_diff=diff_content,
+            target_branch=target_branch,
+            commits=commits,
+            repo_full_name=repo_full_name,
+        )
+
+        # ---- Step 5: Cherry-pick (Req 2.1) ----
+        logger.info("Executing cherry-pick onto %s.", target_branch)
+        branch_name = build_branch_name(source_pr_number, target_branch)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Clone the repo with full history for cherry-pick
+            git_env = _clone_repo(
+                repo_full_name,
+                github_token,
                 tmp_dir,
-                resolution_results,
+                target_branch,
                 signer=signer,
-                require_dco_signoff=require_dco_signoff,
             )
 
-        # Push the backport branch to the remote
-        logger.info("Pushing branch %s to origin.", branch_name)
-        _run_git(tmp_dir, "push", "origin", branch_name, env=git_env)
+            # Create the backport branch locally from target branch HEAD
+            _run_git(tmp_dir, "checkout", "-b", branch_name)
 
-    # ---- Step 7: Create backport PR (Req 4.6) ----
-    logger.info("Creating backport PR.")
-    try:
-        backport_pr_url = pr_creator.create_backport_pr(
-            pr_context, cherry_result, resolution_results, branch_name,
+            executor = CherryPickExecutor(tmp_dir)
+
+            try:
+                cherry_result = executor.execute(
+                    branch_name, merge_commit_sha, commits,
+                )
+            except Exception as exc:
+                msg = f"Cherry-pick failed: {exc}"
+                logger.error(msg)
+                _post_comment(repo, source_pr_number, f"Backport failed: {msg}")
+                event_ledger.record(
+                    "backport.failed",
+                    subject,
+                    phase="cherry-pick",
+                    error=msg,
+                )
+                return BackportResult(outcome="error", error_message=msg)
+
+            # ---- Step 6: Conflict resolution ----
+            resolution_results = None
+            total_tokens = 0
+            if not cherry_result.success and cherry_result.conflicting_files:
+                logger.info(
+                    "Cherry-pick produced %d conflict(s). Invoking conflict resolver.",
+                    len(cherry_result.conflicting_files),
+                )
+                event_ledger.record(
+                    "backport.conflicts_detected",
+                    subject,
+                    conflicting_files=len(cherry_result.conflicting_files),
+                )
+                bedrock_adapter = _BedrockConfigAdapter(_backport_config=config)
+                bedrock_client = BedrockClient(
+                    bedrock_adapter,
+                    client=boto3.client("bedrock-runtime", region_name=aws_region),
+                    rate_limiter=rate_limiter,
+                )
+                resolver = ConflictResolver(
+                    bedrock_client, config,
+                    github_client=gh,
+                    repo_full_name=repo_full_name,
+                    head_sha=merge_commit_sha or "",
+                )
+                resolution_results = resolver.resolve_conflicts(
+                    cherry_result.conflicting_files,
+                    pr_context,
+                    token_budget=config.per_backport_token_budget,
+                )
+                total_tokens = sum(r.tokens_used for r in resolution_results)
+
+                # Apply resolved files to the working tree and commit
+                _apply_resolutions(
+                    tmp_dir,
+                    resolution_results,
+                    signer=signer,
+                    require_dco_signoff=require_dco_signoff,
+                )
+
+            # Push the backport branch to the remote
+            logger.info("Pushing branch %s to origin.", branch_name)
+            _run_git(tmp_dir, "push", "origin", branch_name, env=git_env)
+
+        # ---- Step 7: Create backport PR (Req 4.6) ----
+        logger.info("Creating backport PR.")
+        try:
+            backport_pr_url = pr_creator.create_backport_pr(
+                pr_context, cherry_result, resolution_results, branch_name,
+            )
+        except Exception as exc:
+            msg = f"Failed to create backport PR: {exc}"
+            logger.error(msg)
+            _post_comment(repo, source_pr_number, f"Backport failed: {msg}")
+            event_ledger.record(
+                "backport.failed",
+                subject,
+                phase="create-pr",
+                error=msg,
+            )
+            return BackportResult(outcome="error", error_message=msg)
+
+        # ---- Build result ----
+        files_resolved = 0
+        files_unresolved = 0
+        if resolution_results:
+            files_resolved = sum(
+                1 for r in resolution_results if r.resolved_content is not None
+            )
+            files_unresolved = sum(
+                1 for r in resolution_results if r.resolved_content is None
+            )
+
+        outcome = "success" if files_unresolved == 0 else "conflicts-unresolved"
+        result = BackportResult(
+            outcome=outcome,
+            backport_pr_url=backport_pr_url,
+            commits_cherry_picked=len(cherry_result.applied_commits),
+            files_conflicted=len(cherry_result.conflicting_files),
+            files_resolved=files_resolved,
+            files_unresolved=files_unresolved,
+            total_tokens_used=total_tokens,
         )
+
+        # ---- Step 8: Post summary comment on source PR (Req 9.2) ----
+        summary_text = build_summary(result)
+        comment_body = (
+            "## Backport Result\n\n"
+            f"Backport PR created: [view PR]({backport_pr_url})\n\n"
+            f"### Overview\n{summary_text}"
+        )
+        _post_comment(repo, source_pr_number, comment_body)
+
+        # ---- Step 9: Record PR creation and save state (Req 8.1) ----
+        rate_limiter.record_pr_created()
+
+        event_ledger.record(
+            "backport.pr_created",
+            subject,
+            backport_pr_url=backport_pr_url,
+            outcome=outcome,
+            commits_cherry_picked=result.commits_cherry_picked,
+            files_conflicted=result.files_conflicted,
+            files_resolved=result.files_resolved,
+            files_unresolved=result.files_unresolved,
+            total_tokens_used=result.total_tokens_used,
+        )
+
+        # ---- Step 10: Emit GitHub Actions job summary (Req 9.4) ----
+        job_summary = (
+            f"## Backport Result: {result.outcome}\n\n"
+            f"- Source PR: #{source_pr_number}\n"
+            f"- Target branch: `{target_branch}`\n"
+            f"- Backport PR: [view PR]({backport_pr_url})\n\n"
+            f"### Overview\n{summary_text}"
+        )
+        emit_job_summary(job_summary)
+
+        logger.info("Backport complete: %s", result.outcome)
+        return result
     except Exception as exc:
-        msg = f"Failed to create backport PR: {exc}"
-        logger.error(msg)
-        _post_comment(repo, source_pr_number, f"Backport failed: {msg}")
-        return BackportResult(outcome="error", error_message=msg)
-
-    # ---- Build result ----
-    files_resolved = 0
-    files_unresolved = 0
-    if resolution_results:
-        files_resolved = sum(
-            1 for r in resolution_results if r.resolved_content is not None
+        logger.exception("Backport pipeline failed: %s", exc)
+        event_ledger.record(
+            "pipeline.failed",
+            subject,
+            workflow="backport",
+            error=str(exc),
         )
-        files_unresolved = sum(
-            1 for r in resolution_results if r.resolved_content is None
-        )
-
-    outcome = "success" if files_unresolved == 0 else "conflicts-unresolved"
-    result = BackportResult(
-        outcome=outcome,
-        backport_pr_url=backport_pr_url,
-        commits_cherry_picked=len(cherry_result.applied_commits),
-        files_conflicted=len(cherry_result.conflicting_files),
-        files_resolved=files_resolved,
-        files_unresolved=files_unresolved,
-        total_tokens_used=total_tokens,
-    )
-
-    # ---- Step 8: Post summary comment on source PR (Req 9.2) ----
-    summary_text = build_summary(result)
-    comment_body = (
-        "## Backport Result\n\n"
-        f"Backport PR created: [view PR]({backport_pr_url})\n\n"
-        f"### Overview\n{summary_text}"
-    )
-    _post_comment(repo, source_pr_number, comment_body)
-
-    # ---- Step 9: Record PR creation and save state (Req 8.1) ----
-    rate_limiter.record_pr_created()
-    rate_limiter.save()
-
-    # ---- Step 10: Emit GitHub Actions job summary (Req 9.4) ----
-    job_summary = (
-        f"## Backport Result: {result.outcome}\n\n"
-        f"- Source PR: #{source_pr_number}\n"
-        f"- Target branch: `{target_branch}`\n"
-        f"- Backport PR: [view PR]({backport_pr_url})\n\n"
-        f"### Overview\n{summary_text}"
-    )
-    emit_job_summary(job_summary)
-
-    logger.info("Backport complete: %s", result.outcome)
-    return result
+        return BackportResult(outcome="error", error_message=str(exc))
+    finally:
+        if rate_limiter is not None:
+            rate_limiter.save()
+        event_ledger.save()
 
 
 # ------------------------------------------------------------------

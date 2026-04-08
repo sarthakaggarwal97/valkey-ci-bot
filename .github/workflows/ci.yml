@@ -35,3 +35,38 @@ jobs:
 
       - name: Run mypy type checking
         run: mypy scripts/ --ignore-missing-imports
+
+  acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run workflow acceptance gate
+        run: |
+          python3 -m scripts.valkey_acceptance \
+            --manifest examples/ci-agent-acceptance.yml \
+            --output acceptance-report.md \
+            --json-output acceptance-report.json
+
+      - name: Publish acceptance report to summary
+        run: cat acceptance-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload acceptance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-agent-acceptance-${{ github.run_id }}
+          path: |
+            acceptance-report.md
+            acceptance-report.json

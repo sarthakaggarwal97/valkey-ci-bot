@@ -20,10 +20,15 @@ on:
         required: true
         type: string
       test_commands:
-        description: "JSON array of test commands to run (empty array for build-only validation)"
+        description: "JSON array of test commands to run"
         required: false
         type: string
         default: "[]"
+      allow_build_only:
+        description: "Allow build-only validation when test_commands is empty"
+        required: false
+        type: boolean
+        default: false
       env_vars:
         description: "JSON object of environment variables to set during build and test"
         required: false
@@ -105,6 +110,7 @@ jobs:
         if: steps.build.outputs.build_passed == 'true'
         env:
           TEST_COMMANDS_JSON: ${{ inputs.test_commands }}
+          ALLOW_BUILD_ONLY: ${{ inputs.allow_build_only }}
         run: |
           set +e
           touch /tmp/test_output.txt
@@ -115,10 +121,18 @@ jobs:
               print(cmd)
           ")
           if [ -z "$test_cmds" ]; then
-            echo "No test commands — build-only validation." | tee -a /tmp/test_output.txt
-            echo "test_passed=true" >> "$GITHUB_OUTPUT"
-            exit 0
+            if [ "${ALLOW_BUILD_ONLY}" = "true" ]; then
+              echo "No test commands — explicit build-only validation." | tee -a /tmp/test_output.txt
+              echo "test_passed=true" >> "$GITHUB_OUTPUT"
+              echo "build_only=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Missing test commands. Provide at least one test command or set allow_build_only=true." | tee -a /tmp/test_output.txt
+            echo "test_passed=false" >> "$GITHUB_OUTPUT"
+            echo "build_only=false" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
+          echo "build_only=false" >> "$GITHUB_OUTPUT"
           echo "$test_cmds" | while IFS= read -r cmd; do
             echo "::group::Test: $cmd"
             eval "$cmd" 2>&1 | tee -a /tmp/test_output.txt
@@ -176,7 +190,11 @@ jobs:
           echo "passed=true" >> "$GITHUB_OUTPUT"
           {
             echo 'output<<VALIDATE_OUTPUT_EOF'
-            echo "Validation passed."
+            if [ "${{ steps.test.outputs.build_only }}" = "true" ]; then
+              echo "Validation passed with explicit build-only checks."
+            else
+              echo "Validation passed."
+            fi
             tail -1000 /tmp/build_output.txt 2>/dev/null
             tail -1000 /tmp/test_output.txt 2>/dev/null
             echo 'VALIDATE_OUTPUT_EOF'

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from scripts.models import FuzzerSignal
 from scripts.monitor_fuzzer_runs import MonitorArgs, monitor
 
@@ -36,6 +38,12 @@ def _run(run_id: int, conclusion: str) -> MagicMock:
     return run
 
 
+@pytest.fixture(autouse=True)
+def _mock_event_ledger():
+    with patch("scripts.monitor_fuzzer_runs.EventLedger") as mock_cls:
+        yield mock_cls.return_value
+
+
 @patch("scripts.monitor_fuzzer_runs.RateLimiter")
 @patch("scripts.monitor_fuzzer_runs._make_bedrock_client")
 @patch("scripts.monitor_fuzzer_runs.FuzzerIssuePublisher")
@@ -49,6 +57,7 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
     mock_issue_publisher_cls,
     mock_make_bedrock_client,
     mock_rate_limiter_cls,
+    _mock_event_ledger,
 ) -> None:
     state_store = mock_state_store_cls.return_value
     state_store.get_last_seen_run_id.return_value = 100
@@ -113,6 +122,21 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
         event="schedule",
     )
     state_store.save.assert_called_once()
+    _mock_event_ledger.record.assert_any_call(
+        "fuzzer.run_analyzed",
+        "valkey-io/valkey-fuzzer:fuzzer-run:102",
+        overall_status="anomalous",
+        conclusion="failure",
+        anomaly_count=1,
+        normal_signal_count=0,
+    )
+    _mock_event_ledger.record.assert_any_call(
+        "fuzzer.issue_upserted",
+        "valkey-io/valkey-fuzzer:fuzzer-run:102",
+        issue_action="created",
+        issue_url="https://github.com/valkey-io/valkey-fuzzer/issues/1",
+    )
+    _mock_event_ledger.save.assert_called_once()
 
 
 @patch("scripts.monitor_fuzzer_runs.RateLimiter")
@@ -128,6 +152,7 @@ def test_monitor_dry_run_does_not_analyze_or_advance_state(
     mock_issue_publisher_cls,
     mock_make_bedrock_client,
     mock_rate_limiter_cls,
+    _mock_event_ledger,
 ) -> None:
     state_store = mock_state_store_cls.return_value
     state_store.get_last_seen_run_id.return_value = 100
@@ -148,3 +173,8 @@ def test_monitor_dry_run_does_not_analyze_or_advance_state(
     mock_rate_limiter_cls.return_value.save.assert_not_called()
     state_store.mark_seen.assert_not_called()
     state_store.save.assert_not_called()
+    _mock_event_ledger.record.assert_any_call(
+        "fuzzer.run_dry_run",
+        "valkey-io/valkey-fuzzer:fuzzer-run:101",
+        workflow_file="fuzzer-run.yml",
+    )

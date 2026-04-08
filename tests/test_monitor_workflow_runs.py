@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from github.GithubException import GithubException
 
 from scripts.main import PipelineResult
@@ -39,6 +41,12 @@ def _run(run_id: int, conclusion: str) -> MagicMock:
     return run
 
 
+@pytest.fixture(autouse=True)
+def _mock_event_ledger():
+    with patch("scripts.monitor_workflow_runs.EventLedger") as mock_cls:
+        yield mock_cls.return_value
+
+
 @patch("scripts.monitor_workflow_runs.run_pipeline")
 @patch("scripts.monitor_workflow_runs.Github")
 @patch("scripts.monitor_workflow_runs.MonitorStateStore")
@@ -46,6 +54,7 @@ def test_monitor_processes_only_new_failed_runs_and_updates_watermark(
     mock_state_store_cls,
     mock_github_cls,
     mock_run_pipeline,
+    _mock_event_ledger,
 ) -> None:
     state_store = mock_state_store_cls.return_value
     state_store.get_last_seen_run_id.return_value = 100
@@ -87,6 +96,19 @@ def test_monitor_processes_only_new_failed_runs_and_updates_watermark(
         event="schedule",
     )
     state_store.save.assert_called_once()
+    _mock_event_ledger.record.assert_any_call(
+        "monitor.failure_processed",
+        "valkey-io/valkey:daily.yml:101",
+        failure_reports=1,
+        job_outcome_count=1,
+        allow_pr_creation=True,
+    )
+    _mock_event_ledger.record.assert_any_call(
+        "monitor.run_skipped",
+        "valkey-io/valkey:daily.yml:103",
+        reason="non-failure",
+    )
+    _mock_event_ledger.save.assert_called_once()
 
 
 @patch("scripts.monitor_workflow_runs.run_pipeline")
@@ -96,6 +118,7 @@ def test_monitor_dry_run_does_not_process_or_advance_state(
     mock_state_store_cls,
     mock_github_cls,
     mock_run_pipeline,
+    _mock_event_ledger,
 ) -> None:
     state_store = mock_state_store_cls.return_value
     state_store.get_last_seen_run_id.return_value = 100
@@ -113,6 +136,11 @@ def test_monitor_dry_run_does_not_process_or_advance_state(
     mock_run_pipeline.assert_not_called()
     state_store.mark_seen.assert_not_called()
     state_store.save.assert_not_called()
+    _mock_event_ledger.record.assert_any_call(
+        "monitor.run_dry_run",
+        "valkey-io/valkey:daily.yml:101",
+        reason="failure-observed",
+    )
 
 
 @patch("scripts.monitor_workflow_runs.run_pipeline")
@@ -122,6 +150,7 @@ def test_monitor_advances_watermark_on_pipeline_error(
     mock_state_store_cls,
     mock_github_cls,
     mock_run_pipeline,
+    _mock_event_ledger,
 ) -> None:
     """Pipeline errors should advance the watermark so the monitor does not
     get stuck retrying a permanently failing run on every invocation."""
@@ -146,6 +175,11 @@ def test_monitor_advances_watermark_on_pipeline_error(
     assert result["new_last_seen_run_id"] == 102
     state_store.mark_seen.assert_called_once()
     state_store.save.assert_called_once()
+    _mock_event_ledger.record.assert_any_call(
+        "monitor.pipeline_error",
+        "valkey-io/valkey:daily.yml:101",
+        error="boom",
+    )
 
 
 @patch("scripts.monitor_workflow_runs.run_pipeline")
@@ -155,6 +189,7 @@ def test_monitor_passes_queue_only_to_pipeline(
     mock_state_store_cls,
     mock_github_cls,
     mock_run_pipeline,
+    _mock_event_ledger,
 ) -> None:
     state_store = mock_state_store_cls.return_value
     state_store.get_last_seen_run_id.return_value = 100

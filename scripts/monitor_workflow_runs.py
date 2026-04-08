@@ -16,13 +16,19 @@ if __package__ in {None, ""}:
 from github import Auth, Github
 
 from scripts.config import BotConfig, load_config
+from scripts.event_ledger import EventLedger
 from scripts.failure_detector import FailureDetector
 from scripts.failure_store import FailureStore
 from scripts.main import run_pipeline
-from scripts.rate_limiter import RateLimiter
 from scripts.monitor_state_store import MonitorStateStore
+from scripts.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
+
+
+def _monitor_subject(target_repo: str, workflow_file: str, run_id: int) -> str:
+    """Build a stable subject for one monitored workflow run."""
+    return f"{target_repo}:{workflow_file}:{run_id}"
 
 
 @dataclass(frozen=True)
@@ -164,6 +170,12 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
     """Monitor new workflow runs and process newly failed ones."""
     target_gh = Github(auth=Auth.Token(args.target_token))
     state_gh = Github(auth=Auth.Token(args.state_token))
+    event_ledger = EventLedger(
+        target_gh,
+        args.target_repo,
+        state_github_client=state_gh,
+        state_repo_full_name=args.state_repo,
+    )
     config = _load_local_bot_config(args.config_path)
     monitor_key = _build_monitor_key(
         args.target_repo,
@@ -191,105 +203,148 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
         "runs": run_results,
     }
     new_last_seen = last_seen_run_id
-    if recent_runs:
-        for run in recent_runs:
-            run_result: dict[str, object] = {
-                "run_id": run.id,
-                "run_number": run.run_number,
-                "conclusion": run.conclusion or "",
-                "head_sha": run.head_sha,
-                "html_url": run.html_url,
-            }
+    try:
+        if recent_runs:
+            for run in recent_runs:
+                subject = _monitor_subject(args.target_repo, args.workflow_file, run.id)
+                event_ledger.record(
+                    "workflow.run_seen",
+                    subject,
+                    workflow="workflow-monitor",
+                    repo=args.target_repo,
+                    workflow_file=args.workflow_file,
+                    run_id=run.id,
+                    conclusion=run.conclusion or "",
+                    head_sha=run.head_sha,
+                    queue_only=args.queue_only,
+                )
+                run_result: dict[str, object] = {
+                    "run_id": run.id,
+                    "run_number": run.run_number,
+                    "conclusion": run.conclusion or "",
+                    "head_sha": run.head_sha,
+                    "html_url": run.html_url,
+                }
 
-            if run.conclusion != "failure":
-                if not args.dry_run:
-                    _record_successful_job_observations(
-                        target_gh=target_gh,
-                        state_gh=state_gh,
-                        target_repo=args.target_repo,
-                        state_repo=args.state_repo,
-                        workflow_run_id=run.id,
-                        workflow_name=getattr(run, "name", "") or "",
-                        workflow_file=args.workflow_file,
-                        commit_sha=run.head_sha,
-                        max_history_entries=max(1, config.max_history_entries_per_test),
+                if run.conclusion != "failure":
+                    if not args.dry_run:
+                        _record_successful_job_observations(
+                            target_gh=target_gh,
+                            state_gh=state_gh,
+                            target_repo=args.target_repo,
+                            state_repo=args.state_repo,
+                            workflow_run_id=run.id,
+                            workflow_name=getattr(run, "name", "") or "",
+                            workflow_file=args.workflow_file,
+                            commit_sha=run.head_sha,
+                            max_history_entries=max(1, config.max_history_entries_per_test),
+                        )
+                    run_result["action"] = "skip-non-failure"
+                    run_results.append(run_result)
+                    event_ledger.record(
+                        "monitor.run_skipped",
+                        subject,
+                        reason="non-failure",
                     )
-                run_result["action"] = "skip-non-failure"
+                    new_last_seen = max(new_last_seen, run.id)
+                    continue
+
+                if args.dry_run:
+                    run_result["action"] = "would-process-failure"
+                    run_results.append(run_result)
+                    event_ledger.record(
+                        "monitor.run_dry_run",
+                        subject,
+                        reason="failure-observed",
+                    )
+                    continue
+
+                _record_successful_job_observations(
+                    target_gh=target_gh,
+                    state_gh=state_gh,
+                    target_repo=args.target_repo,
+                    state_repo=args.state_repo,
+                    workflow_run_id=run.id,
+                    workflow_name=getattr(run, "name", "") or "",
+                    workflow_file=args.workflow_file,
+                    commit_sha=run.head_sha,
+                    max_history_entries=max(1, config.max_history_entries_per_test),
+                )
+
+                try:
+                    pipeline_result = run_pipeline(
+                        args.target_repo,
+                        run.id,
+                        args.config_path,
+                        args.target_token,
+                        aws_region=args.aws_region,
+                        state_github_token=args.state_token,
+                        state_repo_name=args.state_repo,
+                        allow_pr_creation=not args.queue_only,
+                    )
+                except Exception as exc:
+                    logger.error(
+                        "Pipeline error for run %d: %s. "
+                        "Advancing watermark to avoid re-processing.",
+                        run.id,
+                        exc,
+                    )
+                    run_result["action"] = "pipeline-error"
+                    run_result["error"] = str(exc)
+                    run_results.append(run_result)
+                    event_ledger.record(
+                        "monitor.pipeline_error",
+                        subject,
+                        error=str(exc),
+                    )
+                    # Advance the watermark so the monitor does not get stuck
+                    # retrying a permanently failing run on every invocation.
+                    new_last_seen = max(new_last_seen, run.id)
+                    continue
+
+                run_result["action"] = "processed-failure"
+                run_result["failure_reports"] = len(pipeline_result.reports)
+                run_result["job_outcomes"] = pipeline_result.job_outcomes
                 run_results.append(run_result)
-                new_last_seen = max(new_last_seen, run.id)
-                continue
-
-            if args.dry_run:
-                run_result["action"] = "would-process-failure"
-                run_results.append(run_result)
-                continue
-
-            _record_successful_job_observations(
-                target_gh=target_gh,
-                state_gh=state_gh,
-                target_repo=args.target_repo,
-                state_repo=args.state_repo,
-                workflow_run_id=run.id,
-                workflow_name=getattr(run, "name", "") or "",
-                workflow_file=args.workflow_file,
-                commit_sha=run.head_sha,
-                max_history_entries=max(1, config.max_history_entries_per_test),
-            )
-
-            try:
-                pipeline_result = run_pipeline(
-                    args.target_repo,
-                    run.id,
-                    args.config_path,
-                    args.target_token,
-                    aws_region=args.aws_region,
-                    state_github_token=args.state_token,
-                    state_repo_name=args.state_repo,
+                event_ledger.record(
+                    "monitor.failure_processed",
+                    subject,
+                    failure_reports=len(pipeline_result.reports),
+                    job_outcome_count=len(pipeline_result.job_outcomes),
                     allow_pr_creation=not args.queue_only,
                 )
-            except Exception as exc:
-                logger.error(
-                    "Pipeline error for run %d: %s. "
-                    "Advancing watermark to avoid re-processing.",
-                    run.id,
-                    exc,
-                )
-                run_result["action"] = "pipeline-error"
-                run_result["error"] = str(exc)
-                run_results.append(run_result)
-                # Advance the watermark so the monitor does not get stuck
-                # retrying a permanently failing run on every invocation.
                 new_last_seen = max(new_last_seen, run.id)
-                continue
 
-            run_result["action"] = "processed-failure"
-            run_result["failure_reports"] = len(pipeline_result.reports)
-            run_result["job_outcomes"] = pipeline_result.job_outcomes
-            run_results.append(run_result)
-            new_last_seen = max(new_last_seen, run.id)
-
-    result["new_last_seen_run_id"] = new_last_seen
-    queue_state = RateLimiter(
-        BotConfig(),
-        state_github_client=state_gh,
-        state_repo_full_name=args.state_repo,
-    )
-    queue_state.load()
-    queued_failures = queue_state.get_queued_failures()
-    result["queued_failure_count"] = len(queued_failures)
-    result["has_queued_failures"] = bool(queued_failures)
-
-    if not args.dry_run and new_last_seen > last_seen_run_id:
-        state_store.mark_seen(
-            monitor_key,
-            last_seen_run_id=new_last_seen,
-            target_repo=args.target_repo,
-            workflow_file=args.workflow_file,
-            event=args.event,
+        result["new_last_seen_run_id"] = new_last_seen
+        queue_state = RateLimiter(
+            BotConfig(),
+            state_github_client=state_gh,
+            state_repo_full_name=args.state_repo,
         )
-        state_store.save()
+        queue_state.load()
+        queued_failures = queue_state.get_queued_failures()
+        result["queued_failure_count"] = len(queued_failures)
+        result["has_queued_failures"] = bool(queued_failures)
 
-    return result
+        if not args.dry_run and new_last_seen > last_seen_run_id:
+            state_store.mark_seen(
+                monitor_key,
+                last_seen_run_id=new_last_seen,
+                target_repo=args.target_repo,
+                workflow_file=args.workflow_file,
+                event=args.event,
+            )
+            state_store.save()
+            event_ledger.record(
+                "monitor.state_saved",
+                f"{args.target_repo}:{args.workflow_file}:{args.event}",
+                last_seen_run_id=new_last_seen,
+                queued_failure_count=len(queued_failures),
+            )
+
+        return result
+    finally:
+        event_ledger.save()
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -13,11 +13,15 @@ from scripts.valkey_acceptance import (
     BackportCase,
     ReviewCaseResult,
     ReviewPolicySignals,
+    WorkflowCase,
+    WorkflowCaseResult,
+    WorkflowCaseCheck,
     _build_scorecard,
     _has_signed_off_by,
     _load_manifest,
     _needs_core_team,
     _needs_docs,
+    _run_workflow_case,
     _render_backport_command,
     _render_ci_command,
     _security_sensitive,
@@ -66,6 +70,11 @@ backport_cases:
   - name: release-8-1
     source_pr_number: 789
     target_branch: "8.1"
+workflow_cases:
+  - name: review-pr-workflow
+    workflow_path: .github/workflows/review-pr.yml
+    required_strings:
+      - "python -m scripts.pr_review_main"
 """,
         encoding="utf-8",
     )
@@ -77,6 +86,7 @@ backport_cases:
     assert manifest.review_cases[0].pr_number == 123
     assert manifest.ci_cases[0].workflow_run_id == 456
     assert manifest.backport_cases[0].target_branch == "8.1"
+    assert manifest.workflow_cases[0].workflow_path == ".github/workflows/review-pr.yml"
 
 
 def test_render_ci_command_includes_queue_only_and_identity() -> None:
@@ -171,13 +181,50 @@ def test_acceptance_scorecard_counts_review_and_replay_cases() -> None:
         backport_cases=[
             BackportCase(name="bp", source_pr_number=2, target_branch="8.1")
         ],
+        workflow_cases=[WorkflowCase(name="review", workflow_path=".github/workflows/review-pr.yml")],
     )
+    workflow_results = [
+        WorkflowCaseResult(
+            name="review",
+            workflow_path=".github/workflows/review-pr.yml",
+            checks=[
+                WorkflowCaseCheck(
+                    label="contains:python -m scripts.pr_review_main",
+                    passed=True,
+                    detail="required fragment present",
+                )
+            ],
+        )
+    ]
 
-    scorecard = _build_scorecard(manifest, [passing, failing])
+    scorecard = _build_scorecard(manifest, [passing, failing], workflow_results)
 
     assert scorecard.review_cases == 2
     assert scorecard.review_passed == 1
     assert scorecard.review_failed == 1
+    assert scorecard.workflow_cases == 1
+    assert scorecard.workflow_passed == 1
+    assert scorecard.workflow_failed == 0
     assert scorecard.ci_replay_cases == 1
     assert scorecard.backport_replay_cases == 1
     assert scorecard.readiness == "needs-follow-up"
+
+
+def test_run_workflow_case_checks_required_and_forbidden_fragments(tmp_path: Path) -> None:
+    workflow_path = tmp_path / "review-pr.yml"
+    workflow_path.write_text(
+        "name: Review\njobs:\n  review:\n    steps:\n      - run: python -m scripts.pr_review_main\n",
+        encoding="utf-8",
+    )
+
+    result = _run_workflow_case(
+        WorkflowCase(
+            name="review",
+            workflow_path=str(workflow_path),
+            required_strings=["python -m scripts.pr_review_main"],
+            forbidden_strings=["build-only validation"],
+        )
+    )
+
+    assert result.passed is True
+    assert any(check.label == "yaml-parse" and check.passed for check in result.checks)

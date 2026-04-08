@@ -27,6 +27,12 @@ from scripts.config import BotConfig
 from scripts.rate_limiter import RateLimiter
 
 
+@pytest.fixture(autouse=True)
+def _mock_event_ledger():
+    with patch("scripts.backport_main.EventLedger") as mock_cls:
+        yield mock_cls.return_value
+
+
 # ======================================================================
 # Feature: backport-agent, Property 11: Summary contains all required metrics
 # **Validates: Requirements 9.2, 9.4**
@@ -213,6 +219,7 @@ class TestRunBackportCleanCherryPick:
         mock_run_git: MagicMock,
         mock_clone: MagicMock,
         mock_boto3: MagicMock,
+        _mock_event_ledger: MagicMock,
     ) -> None:
         # Setup GitHub mock
         mock_gh = MagicMock()
@@ -275,6 +282,18 @@ class TestRunBackportCleanCherryPick:
             llm_conflict_label="llm-resolved-conflicts",
         )
         mock_rate_limiter.record_pr_created.assert_called_once()
+        _mock_event_ledger.record.assert_any_call(
+            "backport.pr_created",
+            "valkey-io/valkey#100->8.1",
+            backport_pr_url="https://github.com/valkey-io/valkey/pull/200",
+            outcome="success",
+            commits_cherry_picked=1,
+            files_conflicted=0,
+            files_resolved=0,
+            files_unresolved=0,
+            total_tokens_used=0,
+        )
+        _mock_event_ledger.save.assert_called_once()
 
 
 class TestRunBackportConflictedCherryPick:
@@ -287,6 +306,7 @@ class TestRunBackportConflictedCherryPick:
     @patch(f"{_PATCH_PREFIX}.RateLimiter")
     @patch(f"{_PATCH_PREFIX}.BackportPRCreator")
     @patch(f"{_PATCH_PREFIX}.ConflictResolver")
+    @patch(f"{_PATCH_PREFIX}.BedrockClient")
     @patch(f"{_PATCH_PREFIX}.CherryPickExecutor")
     @patch(f"{_PATCH_PREFIX}.load_backport_config_from_repo")
     @patch(f"{_PATCH_PREFIX}.Github")
@@ -295,6 +315,7 @@ class TestRunBackportConflictedCherryPick:
         mock_gh_cls: MagicMock,
         mock_load_config: MagicMock,
         mock_executor_cls: MagicMock,
+        mock_bedrock_client_cls: MagicMock,
         mock_resolver_cls: MagicMock,
         mock_pr_creator_cls: MagicMock,
         mock_rate_limiter_cls: MagicMock,
@@ -302,6 +323,7 @@ class TestRunBackportConflictedCherryPick:
         mock_run_git: MagicMock,
         mock_clone: MagicMock,
         mock_boto3: MagicMock,
+        _mock_event_ledger: MagicMock,
     ) -> None:
         # Setup GitHub mock
         mock_gh = MagicMock()
@@ -355,8 +377,6 @@ class TestRunBackportConflictedCherryPick:
             ),
         ]
 
-        # Bedrock client mock
-        mock_bedrock_client = MagicMock()
         mock_boto3.client.return_value = MagicMock()
 
         result = run_backport(
@@ -374,6 +394,13 @@ class TestRunBackportConflictedCherryPick:
         assert result.files_unresolved == 0
         assert result.total_tokens_used == 500
         mock_resolver.resolve_conflicts.assert_called_once()
+        _, bedrock_kwargs = mock_bedrock_client_cls.call_args
+        assert bedrock_kwargs["rate_limiter"] is mock_rate_limiter
+        _mock_event_ledger.record.assert_any_call(
+            "backport.conflicts_detected",
+            "valkey-io/valkey#100->8.1",
+            conflicting_files=1,
+        )
 
 
 class TestRunBackportDuplicateDetection:

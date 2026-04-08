@@ -1,0 +1,68 @@
+target_repo: valkey-io/valkey
+
+workflow_cases:
+  - name: "analyze failure reusable workflow"
+    workflow_path: .github/workflows/analyze-failure.yml
+    required_strings:
+      - "Resolve called workflow ref"
+      - "aws-actions/configure-aws-credentials@v5"
+      - "python -m scripts.main"
+
+  - name: "review reusable workflow"
+    workflow_path: .github/workflows/review-pr.yml
+    required_strings:
+      - "Resolve called workflow ref"
+      - "python -m scripts.pr_review_main"
+      - "id-token: write"
+
+  - name: "external review workflow"
+    workflow_path: .github/workflows/review-external-pr.yml
+    required_strings:
+      - "actions/create-github-app-token@v2"
+      - "--state-token \"${{ github.token }}\""
+      - "python -m scripts.pr_review_main"
+
+  - name: "backport workflow"
+    workflow_path: .github/workflows/backport.yml
+    required_strings:
+      - "python -m scripts.backport_main"
+      - "BACKPORT_GITHUB_TOKEN"
+      - "aws-actions/configure-aws-credentials@v5"
+
+  - name: "daily monitor workflow"
+    workflow_path: .github/workflows/monitor-valkey-daily.yml
+    required_strings:
+      - "python -m scripts.monitor_workflow_runs"
+      - "python -m scripts.preflight_reconciliation"
+      - "python -m scripts.main"
+      - "--draft-prs"
+      - "--event-log bot-data/agent-events.jsonl"
+
+  - name: "fuzzer monitor workflow"
+    workflow_path: .github/workflows/monitor-valkey-fuzzer.yml
+    required_strings:
+      - "python -m scripts.monitor_fuzzer_runs"
+      - "actions/create-github-app-token@v2"
+      - "--event-log bot-data/agent-events.jsonl"
+
+  - name: "validate fix workflow"
+    workflow_path: .github/workflows/validate-fix.yml
+    required_strings:
+      - "allow_build_only"
+      - "Missing test commands. Provide at least one test command or set allow_build_only=true."
+      - "Validation passed with explicit build-only checks."
+    forbidden_strings:
+      - "No test commands — build-only validation."
+
+  - name: "replay lab workflow"
+    workflow_path: .github/workflows/agent-replay-lab.yml
+    required_strings:
+      - "-m scripts.valkey_acceptance"
+      - "--json-output acceptance-report.json"
+      - "Upload replay lab artifacts"
+
+  - name: "core CI workflow"
+    workflow_path: .github/workflows/ci.yml
+    required_strings:
+      - "-m scripts.valkey_acceptance"
+      - "Upload acceptance report"

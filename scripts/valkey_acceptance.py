@@ -84,6 +84,17 @@ class BackportCase:
 
 
 @dataclass
+class WorkflowCase:
+    """Repo-local workflow contract case definition."""
+
+    name: str
+    workflow_path: str
+    required_strings: list[str] = field(default_factory=list)
+    forbidden_strings: list[str] = field(default_factory=list)
+    notes: str = ""
+
+
+@dataclass
 class AcceptanceManifest:
     """Top-level acceptance manifest."""
 
@@ -93,6 +104,7 @@ class AcceptanceManifest:
     review_cases: list[ReviewCase] = field(default_factory=list)
     ci_cases: list[CICase] = field(default_factory=list)
     backport_cases: list[BackportCase] = field(default_factory=list)
+    workflow_cases: list[WorkflowCase] = field(default_factory=list)
 
 
 @dataclass
@@ -102,12 +114,17 @@ class AcceptanceScorecard:
     review_cases: int
     review_passed: int
     review_failed: int
+    workflow_cases: int
+    workflow_passed: int
+    workflow_failed: int
     ci_replay_cases: int
     backport_replay_cases: int
 
     @property
     def readiness(self) -> str:
-        return "pass" if self.review_failed == 0 else "needs-follow-up"
+        if self.review_failed == 0 and self.workflow_failed == 0:
+            return "pass"
+        return "needs-follow-up"
 
 
 @dataclass
@@ -170,17 +187,47 @@ class ReviewCaseResult:
         )
 
 
+@dataclass
+class WorkflowCaseCheck:
+    """One workflow-contract assertion result."""
+
+    label: str
+    passed: bool
+    detail: str
+
+
+@dataclass
+class WorkflowCaseResult:
+    """Rendered result for one workflow contract case."""
+
+    name: str
+    workflow_path: str
+    checks: list[WorkflowCaseCheck] = field(default_factory=list)
+    notes: str = ""
+
+    @property
+    def passed(self) -> bool:
+        return bool(self.checks) and all(check.passed for check in self.checks)
+
+
 def _build_scorecard(
     manifest: AcceptanceManifest,
     results: list[ReviewCaseResult],
+    workflow_results: list[WorkflowCaseResult] | None = None,
 ) -> AcceptanceScorecard:
     """Build a rollout scorecard from acceptance results and replay cases."""
+    workflow_results = workflow_results or []
     review_passed = sum(1 for result in results if result.passed)
     review_failed = len(results) - review_passed
+    workflow_passed = sum(1 for result in workflow_results if result.passed)
+    workflow_failed = len(workflow_results) - workflow_passed
     return AcceptanceScorecard(
         review_cases=len(results),
         review_passed=review_passed,
         review_failed=review_failed,
+        workflow_cases=len(workflow_results),
+        workflow_passed=workflow_passed,
+        workflow_failed=workflow_failed,
         ci_replay_cases=len(manifest.ci_cases),
         backport_replay_cases=len(manifest.backport_cases),
     )
@@ -201,6 +248,13 @@ def _coerce_int(value: Any, default: int = 0) -> int:
     if isinstance(value, bool):
         return default
     return value if isinstance(value, int) else default
+
+
+def _coerce_str_list(value: Any) -> list[str]:
+    """Return a list of strings from a YAML sequence."""
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
 
 
 def _load_manifest(path: str | Path) -> AcceptanceManifest:
@@ -273,6 +327,20 @@ def _load_manifest(path: str | Path) -> AcceptanceManifest:
             )
         )
 
+    workflow_cases: list[WorkflowCase] = []
+    for item in raw.get("workflow_cases", []):
+        if not isinstance(item, dict):
+            raise ValueError("Each workflow case must be a mapping.")
+        workflow_cases.append(
+            WorkflowCase(
+                name=_coerce_str(item.get("name"), _coerce_str(item.get("workflow_path"))),
+                workflow_path=_coerce_str(item.get("workflow_path")),
+                required_strings=_coerce_str_list(item.get("required_strings")),
+                forbidden_strings=_coerce_str_list(item.get("forbidden_strings")),
+                notes=_coerce_str(item.get("notes")),
+            )
+        )
+
     manifest = AcceptanceManifest(
         target_repo=_coerce_str(raw.get("target_repo"), "valkey-io/valkey"),
         execution_repo=_coerce_str(raw.get("execution_repo")),
@@ -283,6 +351,7 @@ def _load_manifest(path: str | Path) -> AcceptanceManifest:
         review_cases=review_cases,
         ci_cases=ci_cases,
         backport_cases=backport_cases,
+        workflow_cases=workflow_cases,
     )
     _validate_manifest(manifest)
     return manifest
@@ -313,6 +382,11 @@ def _validate_manifest(manifest: AcceptanceManifest) -> None:
         if not backport_case.target_branch:
             raise ValueError(
                 f"Backport case {backport_case.name!r} is missing target_branch."
+            )
+    for workflow_case in manifest.workflow_cases:
+        if not workflow_case.workflow_path:
+            raise ValueError(
+                f"Workflow case {workflow_case.name!r} is missing workflow_path."
             )
 
 
@@ -506,6 +580,76 @@ def _run_review_case(
     return result
 
 
+def _run_workflow_case(case: WorkflowCase) -> WorkflowCaseResult:
+    """Evaluate one repo-local workflow contract case."""
+    path = Path(case.workflow_path)
+    checks: list[WorkflowCaseCheck] = []
+    if not path.exists():
+        checks.append(
+            WorkflowCaseCheck(
+                label="file-exists",
+                passed=False,
+                detail=f"{case.workflow_path} is missing.",
+            )
+        )
+        return WorkflowCaseResult(
+            name=case.name,
+            workflow_path=case.workflow_path,
+            checks=checks,
+            notes=case.notes,
+        )
+
+    text = path.read_text(encoding="utf-8")
+    try:
+        yaml.safe_load(text)
+        checks.append(
+            WorkflowCaseCheck(
+                label="yaml-parse",
+                passed=True,
+                detail="workflow parses as YAML",
+            )
+        )
+    except yaml.YAMLError as exc:  # type: ignore[attr-defined]
+        checks.append(
+            WorkflowCaseCheck(
+                label="yaml-parse",
+                passed=False,
+                detail=f"workflow YAML is invalid: {exc}",
+            )
+        )
+
+    for fragment in case.required_strings:
+        checks.append(
+            WorkflowCaseCheck(
+                label=f"contains:{fragment}",
+                passed=fragment in text,
+                detail=(
+                    f"required fragment present: {fragment}"
+                    if fragment in text
+                    else f"missing required fragment: {fragment}"
+                ),
+            )
+        )
+    for fragment in case.forbidden_strings:
+        checks.append(
+            WorkflowCaseCheck(
+                label=f"omits:{fragment}",
+                passed=fragment not in text,
+                detail=(
+                    f"forbidden fragment absent: {fragment}"
+                    if fragment not in text
+                    else f"found forbidden fragment: {fragment}"
+                ),
+            )
+        )
+    return WorkflowCaseResult(
+        name=case.name,
+        workflow_path=case.workflow_path,
+        checks=checks,
+        notes=case.notes,
+    )
+
+
 def _render_review_case(result: ReviewCaseResult) -> str:
     """Render one review case as markdown."""
     lines = [f"### {result.name} (PR #{result.pr_number})"]
@@ -614,10 +758,12 @@ def _render_backport_command(
 def _render_report(
     manifest: AcceptanceManifest,
     results: list[ReviewCaseResult],
+    workflow_results: list[WorkflowCaseResult] | None = None,
 ) -> str:
     """Render the full markdown report."""
     signer = load_signer_from_env()
-    scorecard = _build_scorecard(manifest, results)
+    workflow_results = workflow_results or []
+    scorecard = _build_scorecard(manifest, results, workflow_results)
     lines = [
         "# Valkey Acceptance Report",
         "",
@@ -638,6 +784,10 @@ def _render_report(
         "",
         f"- Verdict: `{scorecard.readiness}`",
         f"- Review cases: `{scorecard.review_passed}/{scorecard.review_cases}` passed",
+        (
+            "- Workflow cases: "
+            f"`{scorecard.workflow_passed}/{scorecard.workflow_cases}` passed"
+        ),
         f"- CI replay cases queued for manual execution: `{scorecard.ci_replay_cases}`",
         (
             "- Backport replay cases queued for manual execution: "
@@ -653,6 +803,27 @@ def _render_report(
             lines.append("")
     else:
         lines.append("No automated review cases configured.")
+        lines.append("")
+
+    lines.append("## Workflow Cases")
+    lines.append("")
+    if workflow_results:
+        for workflow_result in workflow_results:
+            lines.append(f"### {workflow_result.name}")
+            lines.append(
+                f"- Workflow: `{workflow_result.workflow_path}`"
+            )
+            lines.append(
+                f"- Acceptance verdict: {'pass' if workflow_result.passed else 'needs follow-up'}"
+            )
+            if workflow_result.notes:
+                lines.append(f"- Notes: {workflow_result.notes}")
+            for check in workflow_result.checks:
+                status = "pass" if check.passed else "mismatch"
+                lines.append(f"- {check.label}: {status} ({check.detail})")
+            lines.append("")
+    else:
+        lines.append("No workflow contract cases configured.")
         lines.append("")
 
     lines.append("## Manual CI Replays")
@@ -734,6 +905,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     manifest = _load_manifest(args.manifest)
     results: list[ReviewCaseResult] = []
+    workflow_results: list[WorkflowCaseResult] = []
 
     if manifest.review_cases:
         if not args.token:
@@ -752,14 +924,22 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
 
-    report = _render_report(manifest, results)
+    for workflow_case in manifest.workflow_cases:
+        logger.info(
+            "Evaluating workflow case %s (%s).",
+            workflow_case.name,
+            workflow_case.workflow_path,
+        )
+        workflow_results.append(_run_workflow_case(workflow_case))
+
+    report = _render_report(manifest, results, workflow_results)
     if args.output:
         Path(args.output).write_text(report, encoding="utf-8")
     else:
         print(report)
 
     if args.json_output:
-        scorecard = _build_scorecard(manifest, results)
+        scorecard = _build_scorecard(manifest, results, workflow_results)
         payload = {
             "manifest": asdict(manifest),
             "scorecard": {
@@ -779,6 +959,16 @@ def main(argv: list[str] | None = None) -> int:
                     "coverage": asdict(result.coverage) if result.coverage else None,
                 }
                 for result in results
+            ],
+            "workflow_results": [
+                {
+                    "name": result.name,
+                    "workflow_path": result.workflow_path,
+                    "passed": result.passed,
+                    "notes": result.notes,
+                    "checks": [asdict(check) for check in result.checks],
+                }
+                for result in workflow_results
             ],
         }
         Path(args.json_output).write_text(json.dumps(payload, indent=2), encoding="utf-8")

@@ -24,6 +24,7 @@ from scripts.bedrock_retriever import BedrockRetriever
 from scripts.code_reviewer import CodeReviewer, ReviewCoverage
 from scripts.comment_publisher import CommentPublisher
 from scripts.config import ReviewerConfig, load_reviewer_config, load_reviewer_config_text
+from scripts.event_ledger import EventLedger
 from scripts.models import PullRequestContext, ReviewState, SummaryResult
 from scripts.models import DiffScope as _DiffScope
 from scripts.path_filter import PathFilter
@@ -38,6 +39,11 @@ from scripts.review_state_store import ReviewStateStore
 from scripts.summary import ReviewWorkflowSummary
 
 logger = logging.getLogger(__name__)
+
+
+def _review_subject(repo_name: str, pr_number: int | None) -> str:
+    """Build a stable event subject for one reviewed pull request."""
+    return f"{repo_name}#{pr_number or 0}"
 
 
 def _load_runtime_reviewer_config(
@@ -200,6 +206,7 @@ def run(argv: list[str] | None = None) -> int:
     manual_pr_number = args.pr_number
     event = None
     repo_name = args.repo
+    event_ledger: EventLedger | None = None
     if manual_pr_number is not None:
         if args.mode not in {"auto", "review"}:
             logger.error("Manual PR review only supports --mode auto or --mode review.")
@@ -224,9 +231,36 @@ def run(argv: list[str] | None = None) -> int:
         summary.write()
         return 2
 
+    preflight_pr_number = manual_pr_number
+    if preflight_pr_number is None and event is not None:
+        preflight_pr_number = event.pr_number
+    review_subject = _review_subject(repo_name, preflight_pr_number)
+    event_ledger = EventLedger(
+        gh,
+        repo_name,
+        state_github_client=state_gh,
+        state_repo_full_name=args.state_repo or repo_name,
+    )
+    event_ledger.record(
+        "workflow.run_seen",
+        review_subject,
+        workflow="pr-review",
+        repo=repo_name,
+        pr_number=preflight_pr_number or 0,
+        mode=resolved_mode,
+        event_name=args.event_name or "manual",
+    )
+
     config = _load_runtime_reviewer_config(gh, repo_name, args.config)
     if not config.enabled:
         summary.add_result("preflight", "skipped", "disabled")
+        event_ledger.record(
+            "review.preflight_skipped",
+            review_subject,
+            reason="disabled",
+            mode=resolved_mode,
+        )
+        event_ledger.save()
         summary.write()
         return 0
     if event is not None:
@@ -234,6 +268,13 @@ def run(argv: list[str] | None = None) -> int:
         allowed, reason = gate.may_process(event, config)
         if not allowed:
             summary.add_result("preflight", "skipped", reason)
+            event_ledger.record(
+                "review.preflight_skipped",
+                review_subject,
+                reason=reason,
+                mode=resolved_mode,
+            )
+            event_ledger.save()
             summary.write()
             return 0
 
@@ -296,8 +337,15 @@ def run(argv: list[str] | None = None) -> int:
             assert event is not None
             pr_number = event.pr_number or 0
         pr_context = fetcher.fetch(repo_name, pr_number)
+        review_subject = _review_subject(repo_name, pr_context.number)
         if config.ignore_keyword and config.ignore_keyword in (pr_context.body or ""):
             summary.add_result("preflight", "skipped", "ignored-by-keyword")
+            event_ledger.record(
+                "review.preflight_skipped",
+                review_subject,
+                reason="ignored-by-keyword",
+                mode=resolved_mode,
+            )
             summary.write()
             return 0
 
@@ -315,6 +363,11 @@ def run(argv: list[str] | None = None) -> int:
             assert event is not None
             if event.comment_id is None:
                 summary.add_result("chat", "skipped", "missing-comment-id")
+                event_ledger.record(
+                    "review.chat_skipped",
+                    review_subject,
+                    reason="missing-comment-id",
+                )
                 summary.write()
                 return 0
 
@@ -326,6 +379,12 @@ def run(argv: list[str] | None = None) -> int:
             )
             if event.is_review_comment and not thread.reply_to_bot:
                 summary.add_result("chat", "skipped", "unsupported-comment-context")
+                event_ledger.record(
+                    "review.chat_skipped",
+                    review_subject,
+                    reason="unsupported-comment-context",
+                    comment_id=event.comment_id,
+                )
                 summary.write()
                 return 0
             relevant_paths = _select_chat_paths(
@@ -358,6 +417,13 @@ def run(argv: list[str] | None = None) -> int:
                 review_comment=event.is_review_comment,
             )
             summary.add_result("chat", "performed", "reply-posted")
+            event_ledger.record(
+                "review.chat_replied",
+                review_subject,
+                comment_id=event.comment_id,
+                review_comment=event.is_review_comment,
+                relevant_paths=sorted(relevant_paths),
+            )
             summary.write()
             return 0
 
@@ -385,10 +451,22 @@ def run(argv: list[str] | None = None) -> int:
                 _render_summary_comment(summary_result, policy_note=policy_note),
             )
             summary.add_result("summary", "performed", "comment-upserted")
+            event_ledger.record(
+                "review.summary_posted",
+                review_subject,
+                summary_comment_id=summary_comment_id or 0,
+                release_notes=bool(summary_result.release_notes),
+                has_short_summary=bool(summary_result.short_summary.strip()),
+            )
         except Exception as exc:
             had_failure = True
             logger.warning("PR summary failed for %s#%d: %s", repo_name, pr_context.number, exc)
             summary.add_result("summary", "failed", str(exc))
+            event_ledger.record(
+                "review.summary_failed",
+                review_subject,
+                error=str(exc),
+            )
 
         review_comment_ids: list[int] = (
             list(current_state.review_comment_ids) if current_state else []
@@ -396,6 +474,11 @@ def run(argv: list[str] | None = None) -> int:
 
         if config.disable_review:
             summary.add_result("review", "skipped", "disabled")
+            event_ledger.record(
+                "review.skipped",
+                review_subject,
+                reason="disabled",
+            )
         else:
             try:
                 diff_scope = fetcher.build_diff_scope(
@@ -411,6 +494,12 @@ def run(argv: list[str] | None = None) -> int:
                 if reviewer.classify_simple_change(diff_scope.files) and not config.review_simple_changes:
                     detail = "simple-change" if diff_scope.files else "no-new-files"
                     summary.add_result("review", "skipped", detail)
+                    event_ledger.record(
+                        "review.skipped",
+                        review_subject,
+                        reason=detail,
+                        file_count=len(diff_scope.files),
+                    )
                     review_completed_for_head = True
                 else:
                     # Per-file triage: use light model to skip trivial files
@@ -419,6 +508,12 @@ def run(argv: list[str] | None = None) -> int:
                     )
                     if not triaged_files:
                         summary.add_result("review", "skipped", "all-files-approved-by-triage")
+                        event_ledger.record(
+                            "review.skipped",
+                            review_subject,
+                            reason="all-files-approved-by-triage",
+                            file_count=len(diff_scope.files),
+                        )
                         review_completed_for_head = True
                     else:
                         triaged_scope = _DiffScope(
@@ -459,6 +554,18 @@ def run(argv: list[str] | None = None) -> int:
                                     "file(s) auto-approved"
                                 ),
                             )
+                            event_ledger.record(
+                                "review.comments_posted" if comments_published else "review.failed",
+                                review_subject,
+                                comments=len(published_ids),
+                                triaged_file_count=len(triaged_files),
+                                auto_approved_file_count=len(diff_scope.files) - len(triaged_files),
+                                reason=(
+                                    "publish-review-comments-returned-no-comment-ids"
+                                    if not comments_published
+                                    else ""
+                                ),
+                            )
                             if not comments_published:
                                 had_failure = True
                             if coverage_report is not None and not coverage_report.complete:
@@ -470,6 +577,13 @@ def run(argv: list[str] | None = None) -> int:
                                 )
                                 if review_id and review_id not in review_comment_ids:
                                     review_comment_ids.append(review_id)
+                                event_ledger.record(
+                                    "review.note_posted",
+                                    review_subject,
+                                    note_kind="coverage-incomplete",
+                                    review_id=review_id or 0,
+                                    unaccounted_files=len(coverage_report.unaccounted_files),
+                                )
                             review_completed_for_head = (
                                 comments_published
                                 and (
@@ -493,6 +607,13 @@ def run(argv: list[str] | None = None) -> int:
                                     "performed",
                                     "approval withheld (incomplete review coverage)",
                                 )
+                                event_ledger.record(
+                                    "review.note_posted",
+                                    review_subject,
+                                    note_kind="approval-withheld",
+                                    review_id=review_id or 0,
+                                    unaccounted_files=len(coverage_report.unaccounted_files),
+                                )
                             else:
                                 if config.approve_on_no_findings:
                                     publisher.approve_pr(
@@ -502,6 +623,12 @@ def run(argv: list[str] | None = None) -> int:
                                         commit_sha=pr_context.head_sha,
                                     )
                                     detail = "approved (no issues found)"
+                                    event_ledger.record(
+                                        "review.approved",
+                                        review_subject,
+                                        reason="no-issues-found",
+                                        reviewed_file_count=len(triaged_files),
+                                    )
                                 else:
                                     review_id = publisher.publish_review_note(
                                         repo_name,
@@ -516,6 +643,13 @@ def run(argv: list[str] | None = None) -> int:
                                     if review_id and review_id not in review_comment_ids:
                                         review_comment_ids.append(review_id)
                                     detail = "no actionable issues (approval disabled)"
+                                    event_ledger.record(
+                                        "review.note_posted",
+                                        review_subject,
+                                        note_kind="no-findings-approval-disabled",
+                                        review_id=review_id or 0,
+                                        reviewed_file_count=len(triaged_files),
+                                    )
                                 review_completed_for_head = True
                                 summary.add_result(
                                     "review",
@@ -526,6 +660,11 @@ def run(argv: list[str] | None = None) -> int:
                 had_failure = True
                 logger.warning("PR review failed for %s#%d: %s", repo_name, pr_context.number, exc)
                 summary.add_result("review", "failed", str(exc))
+                event_ledger.record(
+                    "review.failed",
+                    review_subject,
+                    error=str(exc),
+                )
 
         state_store.save(
             ReviewState(
@@ -542,15 +681,36 @@ def run(argv: list[str] | None = None) -> int:
             )
         )
         summary.add_result("state", "saved", None)
+        event_ledger.record(
+            "review.state_saved",
+            review_subject,
+            review_completed_for_head=review_completed_for_head,
+            last_reviewed_head_sha=(
+                pr_context.head_sha
+                if review_completed_for_head
+                else last_reviewed_head_sha or ""
+            ),
+            review_comment_count=len(review_comment_ids),
+            summary_comment_id=summary_comment_id or 0,
+        )
         summary.write()
         return 1 if had_failure else 0
     except Exception as exc:
         logger.exception("PR reviewer pipeline failed: %s", exc)
         summary.add_result("pipeline", "failed", str(exc))
+        if event_ledger is not None:
+            event_ledger.record(
+                "pipeline.failed",
+                review_subject,
+                workflow="pr-review",
+                error=str(exc),
+            )
         summary.write()
         return 1
     finally:
         rate_limiter.save()
+        if event_ledger is not None:
+            event_ledger.save()
 
 
 def main() -> None:

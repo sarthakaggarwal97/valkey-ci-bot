@@ -182,3 +182,41 @@ def test_ci_workflow_declares_checkout_permissions_and_current_action() -> None:
     assert checkout_step["uses"] == "actions/checkout@v6"
     assert checkout_step["with"]["persist-credentials"] is False
     assert setup_step["uses"] == "actions/setup-python@v6"
+
+    acceptance_job = workflow["jobs"]["acceptance"]
+    acceptance_run = next(
+        step
+        for step in acceptance_job["steps"]
+        if step["name"] == "Run workflow acceptance gate"
+    )
+    acceptance_upload = next(
+        step
+        for step in acceptance_job["steps"]
+        if step["name"] == "Upload acceptance report"
+    )
+    assert "-m scripts.valkey_acceptance" in acceptance_run["run"]
+    assert "--manifest examples/ci-agent-acceptance.yml" in acceptance_run["run"]
+    assert acceptance_upload["uses"] == "actions/upload-artifact@v4"
+
+
+def test_validate_fix_workflow_requires_explicit_build_only_opt_in() -> None:
+    workflow = _load_yaml(REPO_ROOT / ".github/workflows/validate-fix.yml")
+    on_block = _get_on_block(workflow)
+    inputs = on_block["workflow_call"]["inputs"]
+
+    assert inputs["allow_build_only"]["default"] is False
+    assert inputs["test_commands"]["default"] == "[]"
+
+    test_step = next(
+        step
+        for step in workflow["jobs"]["validate"]["steps"]
+        if step["name"] == "Run test commands"
+    )
+    result_step = next(
+        step
+        for step in workflow["jobs"]["validate"]["steps"]
+        if step["name"] == "Collect results"
+    )
+    assert "allow_build_only" in test_step["env"]["ALLOW_BUILD_ONLY"]
+    assert "Missing test commands. Provide at least one test command or set allow_build_only=true." in test_step["run"]
+    assert "Validation passed with explicit build-only checks." in result_step["run"]

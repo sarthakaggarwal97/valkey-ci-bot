@@ -20,6 +20,7 @@ from github import Auth, Github
 from scripts.bedrock_client import BedrockClient
 from scripts.bedrock_retriever import BedrockRetriever
 from scripts.config import BotConfig, load_config
+from scripts.event_ledger import EventLedger
 from scripts.fuzzer_issue_publisher import FuzzerIssuePublisher
 from scripts.fuzzer_run_analyzer import FuzzerRunAnalyzer
 from scripts.models import fuzzer_run_analysis_to_dict
@@ -28,6 +29,11 @@ from scripts.rate_limiter import RateLimiter
 from scripts.summary import FuzzerRunSummaryRow, FuzzerWorkflowSummary
 
 logger = logging.getLogger(__name__)
+
+
+def _fuzzer_subject(target_repo: str, run_id: int) -> str:
+    """Build a stable subject for one analyzed fuzzer run."""
+    return f"{target_repo}:fuzzer-run:{run_id}"
 
 
 @dataclass(frozen=True)
@@ -148,6 +154,12 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
     """Analyze newly completed Valkey fuzzer workflow runs."""
     target_gh = Github(auth=Auth.Token(args.target_token))
     state_gh = Github(auth=Auth.Token(args.state_token))
+    event_ledger = EventLedger(
+        target_gh,
+        args.target_repo,
+        state_github_client=state_gh,
+        state_repo_full_name=args.state_repo,
+    )
     config = _load_local_bot_config(args.config_path)
     rate_limiter = RateLimiter(
         config,
@@ -188,92 +200,141 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
         "has_anomalies": False,
     }
     new_last_seen = last_seen_run_id
-    for run in recent_runs:
-        run_result: dict[str, object] = {
-            "run_id": run.id,
-            "run_number": run.run_number,
-            "conclusion": run.conclusion or "",
-            "head_sha": run.head_sha,
-            "html_url": run.html_url,
-        }
-
-        if args.dry_run:
-            run_result["action"] = "would-analyze"
-            run_results.append(run_result)
-            continue
-
-        try:
-            analysis = analyzer.analyze_workflow_run(
-                args.target_repo,
-                run.id,
+    try:
+        for run in recent_runs:
+            subject = _fuzzer_subject(args.target_repo, run.id)
+            event_ledger.record(
+                "workflow.run_seen",
+                subject,
+                workflow="fuzzer-monitor",
+                repo=args.target_repo,
+                run_id=run.id,
                 workflow_file=args.workflow_file,
+                conclusion=run.conclusion or "",
+                head_sha=run.head_sha,
             )
-        except Exception as exc:
-            run_result["action"] = "analysis-error"
-            run_result["error"] = str(exc)
-            run_results.append(run_result)
-            break
+            run_result: dict[str, object] = {
+                "run_id": run.id,
+                "run_number": run.run_number,
+                "conclusion": run.conclusion or "",
+                "head_sha": run.head_sha,
+                "html_url": run.html_url,
+            }
 
-        run_result["action"] = "analyzed"
-        run_result["analysis"] = fuzzer_run_analysis_to_dict(analysis)
-        issue_action: str | None = None
-        issue_url: str | None = None
-        if analysis.overall_status == "anomalous":
+            if args.dry_run:
+                run_result["action"] = "would-analyze"
+                run_results.append(run_result)
+                event_ledger.record(
+                    "fuzzer.run_dry_run",
+                    subject,
+                    workflow_file=args.workflow_file,
+                )
+                continue
+
             try:
-                issue_action, issue_url = issue_publisher.upsert_issue(
+                analysis = analyzer.analyze_workflow_run(
                     args.target_repo,
-                    analysis,
-                )
-                run_result["issue_action"] = issue_action
-                run_result["issue_url"] = issue_url
-            except Exception as exc:
-                logger.warning(
-                    "Failed to create/update anomaly issue for run %s: %s",
                     run.id,
-                    exc,
+                    workflow_file=args.workflow_file,
                 )
-                run_result["issue_action"] = "issue-error"
-                run_result["issue_error"] = str(exc)
-        run_results.append(run_result)
-        result["has_anomalies"] = (
-            bool(result["has_anomalies"]) or analysis.overall_status != "normal"
-        )
-        summary.add_row(
-            FuzzerRunSummaryRow(
-                run_id=analysis.run_id,
-                run_url=analysis.run_url,
-                conclusion=analysis.conclusion,
+            except Exception as exc:
+                run_result["action"] = "analysis-error"
+                run_result["error"] = str(exc)
+                run_results.append(run_result)
+                event_ledger.record(
+                    "fuzzer.analysis_failed",
+                    subject,
+                    error=str(exc),
+                )
+                break
+
+            run_result["action"] = "analyzed"
+            run_result["analysis"] = fuzzer_run_analysis_to_dict(analysis)
+            event_ledger.record(
+                "fuzzer.run_analyzed",
+                subject,
                 overall_status=analysis.overall_status,
-                scenario_id=analysis.scenario_id,
-                seed=analysis.seed,
+                conclusion=analysis.conclusion,
                 anomaly_count=len(analysis.anomalies),
                 normal_signal_count=len(analysis.normal_signals),
-                summary=analysis.summary,
-                reproduction_hint=analysis.reproduction_hint,
-                issue_url=issue_url,
-                issue_action=issue_action,
-                anomaly_details=[
-                    f"[{a.severity}] {a.title}: {a.evidence}"
-                    for a in analysis.anomalies[:10]
-                ] if analysis.anomalies else None,
             )
-        )
-        new_last_seen = max(new_last_seen, run.id)
+            issue_action: str | None = None
+            issue_url: str | None = None
+            if analysis.overall_status == "anomalous":
+                try:
+                    issue_action, issue_url = issue_publisher.upsert_issue(
+                        args.target_repo,
+                        analysis,
+                    )
+                    run_result["issue_action"] = issue_action
+                    run_result["issue_url"] = issue_url
+                    event_ledger.record(
+                        "fuzzer.issue_upserted",
+                        subject,
+                        issue_action=issue_action or "",
+                        issue_url=issue_url or "",
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to create/update anomaly issue for run %s: %s",
+                        run.id,
+                        exc,
+                    )
+                    run_result["issue_action"] = "issue-error"
+                    run_result["issue_error"] = str(exc)
+                    event_ledger.record(
+                        "fuzzer.issue_error",
+                        subject,
+                        error=str(exc),
+                    )
+            run_results.append(run_result)
+            result["has_anomalies"] = (
+                bool(result["has_anomalies"]) or analysis.overall_status != "normal"
+            )
+            summary.add_row(
+                FuzzerRunSummaryRow(
+                    run_id=analysis.run_id,
+                    run_url=analysis.run_url,
+                    conclusion=analysis.conclusion,
+                    overall_status=analysis.overall_status,
+                    scenario_id=analysis.scenario_id,
+                    seed=analysis.seed,
+                    anomaly_count=len(analysis.anomalies),
+                    normal_signal_count=len(analysis.normal_signals),
+                    summary=analysis.summary,
+                    reproduction_hint=analysis.reproduction_hint,
+                    issue_url=issue_url,
+                    issue_action=issue_action,
+                    anomaly_details=[
+                        f"[{a.severity}] {a.title}: {a.evidence}"
+                        for a in analysis.anomalies[:10]
+                    ] if analysis.anomalies else None,
+                )
+            )
+            new_last_seen = max(new_last_seen, run.id)
 
-    if not args.dry_run and new_last_seen > last_seen_run_id:
-        state_store.mark_seen(
-            monitor_key,
-            last_seen_run_id=new_last_seen,
-            target_repo=args.target_repo,
-            workflow_file=args.workflow_file,
-            event=args.event,
-        )
-        state_store.save()
-        summary.write()
+        if not args.dry_run and new_last_seen > last_seen_run_id:
+            state_store.mark_seen(
+                monitor_key,
+                last_seen_run_id=new_last_seen,
+                target_repo=args.target_repo,
+                workflow_file=args.workflow_file,
+                event=args.event,
+            )
+            state_store.save()
+            summary.write()
+            event_ledger.record(
+                "fuzzer.state_saved",
+                f"{args.target_repo}:{args.workflow_file}:{args.event}",
+                last_seen_run_id=new_last_seen,
+                new_run_count=len(recent_runs),
+            )
 
-    if not args.dry_run:
-        rate_limiter.save()
-    return result
+        return result
+    finally:
+        if not args.dry_run:
+            rate_limiter.save()
+        event_ledger.save()
 
 
 def main(argv: list[str] | None = None) -> int:

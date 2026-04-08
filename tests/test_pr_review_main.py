@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from scripts.code_reviewer import ReviewCoverage
 from scripts.config import RetrievalConfig, ReviewerConfig
 from scripts.models import (
@@ -22,6 +24,12 @@ from scripts.pr_review_main import (
     _select_review_files,
     run,
 )
+
+
+@pytest.fixture(autouse=True)
+def _mock_event_ledger():
+    with patch("scripts.pr_review_main.EventLedger") as mock_cls:
+        yield mock_cls.return_value
 
 
 def _event_file(tmp_path: Path, payload: dict) -> Path:
@@ -198,6 +206,7 @@ def test_run_review_mode_posts_summary_and_review(
     mock_rate_limiter_cls,
     mock_github_cls,
     _mock_boto_client,
+    _mock_event_ledger,
     tmp_path,
 ) -> None:
     payload = {
@@ -245,6 +254,7 @@ def test_run_review_mode_posts_summary_and_review(
         )
         mock_reviewer = mock_reviewer_cls.return_value
         mock_reviewer.classify_simple_change.return_value = False
+        mock_reviewer.triage_files.return_value = _context().files
         mock_reviewer.review.return_value = [
             MagicMock(path="src/failover.c", line=12, body="Risk", severity="high")
         ]
@@ -268,6 +278,22 @@ def test_run_review_mode_posts_summary_and_review(
     publisher.upsert_summary.assert_called_once()
     publisher.publish_review_comments.assert_called_once()
     state_store.save.assert_called_once()
+    _mock_event_ledger.record.assert_any_call(
+        "review.summary_posted",
+        "owner/repo#11",
+        summary_comment_id=99,
+        release_notes=True,
+        has_short_summary=False,
+    )
+    _mock_event_ledger.record.assert_any_call(
+        "review.comments_posted",
+        "owner/repo#11",
+        comments=1,
+        triaged_file_count=1,
+        auto_approved_file_count=0,
+        reason="",
+    )
+    _mock_event_ledger.save.assert_called_once()
     saved_state = state_store.save.call_args.args[0]
     assert saved_state.last_reviewed_head_sha == "head456"
 
