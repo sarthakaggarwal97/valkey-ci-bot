@@ -467,6 +467,7 @@ def build_dashboard(
     events: list[JsonObject] | None = None,
     input_warnings: list[str] | None = None,
     generated_at: str | None = None,
+    daily_health_data: JsonObject | None = None,
 ) -> JsonObject:
     """Build a structured dashboard payload from state/artifact snapshots."""
     failure_store = failure_store or {}
@@ -517,6 +518,7 @@ def build_dashboard(
         "agent_outcomes": agent_outcomes,
         "ai_reliability": ai_reliability,
         "state_health": state_health,
+        "daily_health": daily_health_data or {},
     }
 
 
@@ -1034,6 +1036,18 @@ def render_html(dashboard: JsonObject) -> str:
         ),
     )
 
+    # Daily CI Health heatmap panel (from daily_health_report)
+    daily_health = _mapping(dashboard.get("daily_health"))
+    if daily_health and daily_health.get("heatmap"):
+        from scripts.daily_health_report import render_heatmap_panel
+        daily_health_panel = _panel(
+            "Daily CI Health Trends",
+            render_heatmap_panel(daily_health),
+            wide=True,
+        )
+    else:
+        daily_health_panel = ""
+
     outcome_panel = _panel(
         "Agent Outcome Ledger",
         _summary_grid([
@@ -1290,6 +1304,7 @@ td { color: #dce6f3; }
     <section class="metrics" aria-label="Executive snapshot">{metrics}</section>
     <div class="layout">
       {flaky_panel}
+      {daily_health_panel}
       {ci_panel}
       {outcome_panel}
       {review_panel}
@@ -1316,6 +1331,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-markdown", default="agent-dashboard.md")
     parser.add_argument("--output-json", default="agent-dashboard.json")
     parser.add_argument("--output-html", default="agent-dashboard.html")
+    parser.add_argument("--daily-health", default="", help="Path to daily health report JSON")
     return parser
 
 
@@ -1344,6 +1360,10 @@ def main(argv: list[str] | None = None) -> int:
     events, warnings = _load_event_logs(args.event_log)
     input_warnings.extend(warnings)
 
+    daily_health_data, warning = _load_json(args.daily_health)
+    if warning:
+        input_warnings.append(warning)
+
     dashboard = build_dashboard(
         failure_store=_mapping(failure_store),
         rate_state=_mapping(rate_state),
@@ -1356,6 +1376,7 @@ def main(argv: list[str] | None = None) -> int:
         ),
         events=events,
         input_warnings=input_warnings,
+        daily_health_data=_mapping(daily_health_data),
     )
     Path(args.output_json).write_text(
         json.dumps(dashboard, indent=2, sort_keys=True),

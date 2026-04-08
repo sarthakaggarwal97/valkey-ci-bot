@@ -219,6 +219,22 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
+      - name: Generate daily CI health report
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ steps.target-token.outputs.token || github.token }}
+        shell: bash
+        run: |
+          python3 -m scripts.daily_health_report \
+            --repo "valkey-io/valkey" \
+            --workflow "daily.yml" \
+            --branch "unstable" \
+            --days 14 \
+            --token "${GITHUB_TOKEN}" \
+            --output daily-health-report.html \
+            --output-json daily-health-report.json
+
       - name: Generate capability dashboard
         if: always()
         shell: bash
@@ -230,6 +246,7 @@ jobs:
             --review-state bot-data/review-state.json \
             --event-log bot-data/agent-events.jsonl \
             --daily-result monitor-result.json \
+            --daily-health daily-health-report.json \
             --output-markdown agent-dashboard.md \
             --output-json agent-dashboard.json \
             --output-html agent-dashboard.html
@@ -248,4 +265,6 @@ jobs:
             agent-dashboard.md
             agent-dashboard.json
             agent-dashboard.html
+            daily-health-report.html
+            daily-health-report.json
           retention-days: 30
