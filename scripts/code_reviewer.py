@@ -1449,7 +1449,48 @@ class ReviewToolHandler:
         tool_input: dict,
     ) -> tuple[bool, str]:
         """Reject premature review submission until required files are fetched."""
-        if tool_name != "submit_review" or not self._required_files:
+        if tool_name != "submit_review":
+            return True, "Review submitted."
+        if not isinstance(tool_input, dict):
+            return False, "submit_review input must be a JSON object."
+
+        reviews = tool_input.get("reviews")
+        if not isinstance(reviews, list):
+            return False, "submit_review.reviews must be an array."
+
+        invalid_review_paths: list[str] = []
+        malformed_reviews: list[int] = []
+        for index, raw_review in enumerate(reviews):
+            if not isinstance(raw_review, dict):
+                malformed_reviews.append(index)
+                continue
+            path = str(raw_review.get("path", "")).strip()
+            if self._required_files and path not in self._required_files:
+                invalid_review_paths.append(path or f"<missing path at index {index}>")
+            required_text_fields = ("title", "trigger", "impact", "body")
+            if any(not str(raw_review.get(field, "")).strip() for field in required_text_fields):
+                malformed_reviews.append(index)
+
+        lgtm = bool(tool_input.get("lgtm"))
+        payload_errors: list[str] = []
+        if lgtm and reviews:
+            payload_errors.append(
+                "Set lgtm to false when submit_review contains one or more findings."
+            )
+        if invalid_review_paths:
+            payload_errors.extend([
+                "Review findings must target files in the current review scope:",
+                *[f"- `{path}`" for path in invalid_review_paths],
+            ])
+        if malformed_reviews:
+            payload_errors.extend([
+                "Every review finding must include non-empty title, trigger, impact, and body fields:",
+                *[f"- finding index {index}" for index in malformed_reviews],
+            ])
+        if payload_errors:
+            return False, "\n".join(payload_errors)
+
+        if not self._required_files:
             return True, "Review submitted."
 
         ordered_paths = list(self._required_files)

@@ -23,6 +23,7 @@ def test_load_reviewer_config_defaults() -> None:
     assert config.post_policy_notes is True
     assert config.models.light_model_id
     assert config.models.heavy_model_id
+    assert config.models.temperature == 0.0
 
 
 def test_load_reviewer_config_nested_section() -> None:

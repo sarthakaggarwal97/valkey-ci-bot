@@ -112,4 +112,4 @@ reviewer:
   models:
     light_model_id: "us.anthropic.claude-opus-4-6-v1"
     heavy_model_id: "us.anthropic.claude-opus-4-6-v1"
-    temperature: 0.05
+    temperature: 0.0

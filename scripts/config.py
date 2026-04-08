@@ -83,7 +83,7 @@ class ReviewerModels:
 
     light_model_id: str = "us.anthropic.claude-sonnet-4-v1"
     heavy_model_id: str = "us.anthropic.claude-opus-4-6-v1"
-    temperature: float = 0.05
+    temperature: float = 0.0
 
 
 @dataclass
