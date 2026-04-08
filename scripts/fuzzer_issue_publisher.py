@@ -193,6 +193,81 @@ def _render_issue_body(
     return "\n".join(lines)
 
 
+def _render_occurrence_comment(analysis: FuzzerRunAnalysis, *, occurrences: int) -> str:
+    """Render a comment body for a new occurrence on an existing issue."""
+    lines = [
+        f"## Occurrence #{occurrences}",
+        "",
+        _issue_verdict(analysis),
+        "",
+        "### Metadata",
+        "",
+        "| Field | Value |",
+        "|---|---|",
+        f"| Run | [{analysis.run_id}]({analysis.run_url}) |",
+        f"| Conclusion | `{analysis.conclusion or 'unknown'}` |",
+        f"| Status | `{analysis.overall_status}` |",
+    ]
+    if analysis.root_cause_category:
+        lines.append(
+            f"| Root cause | `{_escape_table_cell(analysis.root_cause_category)}` |"
+        )
+    lines.extend([
+        f"| Scenario | `{_escape_table_cell(analysis.scenario_id or 'unknown')}` |",
+        f"| Seed | `{_escape_table_cell(analysis.seed or 'unknown')}` |",
+        f"| Evidence source | "
+        f"`{'raw job log fallback' if analysis.raw_log_fallback_used else 'artifacts and structured logs'}` |",
+        "",
+        "### Summary",
+        "",
+        analysis.summary,
+    ])
+
+    # Deduplicate anomalies the same way as the issue body.
+    specific = [a for a in analysis.anomalies if a.title not in _GENERIC_TITLES]
+    generic = [a for a in analysis.anomalies if a.title in _GENERIC_TITLES]
+    specific_evidence = {a.evidence.strip().lower() for a in specific}
+    deduped_generic = [
+        a for a in generic
+        if a.evidence.strip().lower() not in specific_evidence
+    ]
+    deduped = specific + deduped_generic
+
+    if deduped:
+        critical = [a for a in deduped if a.severity == "critical"]
+        warnings = [a for a in deduped if a.severity != "critical"]
+        lines.extend(["", "### Findings", ""])
+        for anomaly in critical:
+            lines.append(f"- Critical: **{anomaly.title}**. {anomaly.evidence}")
+        for anomaly in warnings:
+            lines.append(f"- Warning: **{anomaly.title}**. {anomaly.evidence}")
+
+    if analysis.reproduction_hint:
+        lines.extend([
+            "",
+            "**Reproduction**",
+            "```",
+            analysis.reproduction_hint,
+            "```",
+        ])
+
+    lines.extend([
+        "",
+        "---",
+        "*Automated by `valkey-ci-agent`*",
+        "",
+    ])
+    return "\n".join(lines)
+
+
+def _bump_occurrence_count(body: str, new_count: int) -> str:
+    """Replace the occurrence counter in an existing issue body."""
+    return _OCCURRENCES_MARKER_RE.sub(
+        f"<!-- valkey-ci-agent:occurrences:{new_count} -->",
+        body,
+    )
+
+
 class FuzzerIssuePublisher:
     """Creates or updates issues for anomalous fuzzer-run analyses."""
 
@@ -206,6 +281,11 @@ class FuzzerIssuePublisher:
         analysis: FuzzerRunAnalysis,
     ) -> tuple[str, str]:
         """Create or update an anomaly issue.
+
+        When a matching open issue already exists, a new comment is posted
+        with the latest run details and the occurrence counter in the issue
+        body is bumped.  The original issue body is preserved so the first
+        occurrence remains visible.
 
         Returns ``(action, issue_url)`` where action is ``created`` or ``updated``.
         """
@@ -245,22 +325,25 @@ class FuzzerIssuePublisher:
             )
             return "created", issue.html_url
 
+        # Bump occurrence counter in the original issue body.
         occurrences = _extract_occurrence_count(existing.body) + 1
-        body = _render_issue_body(
-            analysis,
-            fingerprint=fingerprint,
-            occurrences=occurrences,
-        )
+        updated_body = _bump_occurrence_count(existing.body, occurrences)
         retry_github_call(
-            lambda: existing.edit(
-                title=_issue_title(analysis),
-                body=body,
-            ),
+            lambda: existing.edit(body=updated_body),
             retries=self._retries,
-            description=f"update anomaly issue #{existing.number}",
+            description=f"bump occurrence count on issue #{existing.number}",
+        )
+
+        # Post a comment with the new run's full details.
+        comment_body = _render_occurrence_comment(analysis, occurrences=occurrences)
+        retry_github_call(
+            lambda: existing.create_comment(body=comment_body),
+            retries=self._retries,
+            description=f"post occurrence comment on issue #{existing.number}",
         )
         logger.info(
-            "Updated anomaly issue #%s for fuzzer run %s.",
+            "Posted occurrence #%d comment on issue #%s for fuzzer run %s.",
+            occurrences,
             existing.number,
             analysis.run_id,
         )
