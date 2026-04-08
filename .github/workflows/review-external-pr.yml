@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       config_path:
-        description: "Reviewer config path. Target repo is checked first, then this bot repo."
+        description: "Reviewer config path. Target repo is checked first, then this agent repo."
         required: false
         default: ".github/pr-review-bot.yml"
         type: string
@@ -44,7 +44,7 @@ jobs:
       TARGET_GITHUB_APP_ID: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
       TARGET_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
     steps:
-      - name: Check out bot repository
+      - name: Check out agent repository
         uses: actions/checkout@v6
         with:
           persist-credentials: false

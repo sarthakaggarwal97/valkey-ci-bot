@@ -39,7 +39,7 @@ def test_dashboard_workflow_generates_static_artifacts() -> None:
         "ci-agent-capability-dashboard"
     )
 
-    bot_data_checkout = _step(workflow, "Check out bot data snapshots")
+    bot_data_checkout = _step(workflow, "Check out agent data snapshots")
     generate_step = _step(workflow, "Generate capability dashboard")
     upload_step = _step(workflow, "Upload dashboard artifact")
 

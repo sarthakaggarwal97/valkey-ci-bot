@@ -38,7 +38,7 @@ def test_review_workflow_checks_out_bot_repository() -> None:
     checkout_step = next(
         step
         for step in workflow["jobs"]["review"]["steps"]
-        if step["name"] == "Checkout bot repository"
+        if step["name"] == "Checkout agent repository"
     )
     resolve_step = next(
         step

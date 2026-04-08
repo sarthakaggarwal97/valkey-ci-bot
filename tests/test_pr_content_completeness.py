@@ -192,7 +192,7 @@ def test_pr_body_contains_all_required_elements(report, root_cause):
 
     # AI disclaimer
     body_lower = body.lower()
-    assert "ai bot" in body_lower or "ai" in body_lower, "PR body must contain AI disclaimer"
+    assert "ai agent" in body_lower or "ai" in body_lower, "PR body must contain AI disclaimer"
     assert "human review" in body_lower, "PR body must mention human review"
 
 

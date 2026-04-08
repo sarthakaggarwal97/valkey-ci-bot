@@ -49,7 +49,7 @@ jobs:
       VALKEY_FORK_REPO: ${{ vars.VALKEY_FORK_REPO || 'sarthakaggarwal97/valkey' }}
       VALKEY_FORK_GITHUB_TOKEN: ${{ secrets.VALKEY_FORK_GITHUB_TOKEN }}
     steps:
-      - name: Check out bot repository
+      - name: Check out agent repository
         uses: actions/checkout@v6
         with:
           persist-credentials: false
@@ -209,7 +209,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Check out bot data snapshots
+      - name: Check out agent data snapshots
         if: always()
         continue-on-error: true
         uses: actions/checkout@v6

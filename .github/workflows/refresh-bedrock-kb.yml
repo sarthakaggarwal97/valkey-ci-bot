@@ -48,7 +48,7 @@ jobs:
       KB_REFRESH_SKIP_WEB_SYNC: ${{ github.event.inputs.skip_web_sync || 'false' }}
       KB_REFRESH_VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
     steps:
-      - name: Check out bot repository
+      - name: Check out agent repository
         uses: actions/checkout@v6
         with:
           persist-credentials: false

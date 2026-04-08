@@ -1,4 +1,4 @@
-"""Amazon Bedrock API wrapper for the CI Failure Bot.
+"""Amazon Bedrock API wrapper for the CI Failure Agent.
 
 Provides a client that calls the Bedrock Converse API with retry logic,
 token limit enforcement, and project context injection.
@@ -216,7 +216,7 @@ class BedrockClient:
         """Initialize the Bedrock client.
 
         Args:
-            config: Bot configuration containing model ID, token limits, and
+            config: Agent configuration containing model ID, token limits, and
                 project context.
             client: Optional pre-configured boto3 bedrock-runtime client.
                 If not provided, one is created using default credentials

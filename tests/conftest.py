@@ -1,4 +1,4 @@
-"""Shared fixtures for CI failure bot tests."""
+"""Shared fixtures for CI failure agent tests."""
 
 import pytest
 

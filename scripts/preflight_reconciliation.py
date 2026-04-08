@@ -109,8 +109,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", required=True, help="Repository full name (owner/repo)")
     parser.add_argument("--token", required=True, help="GitHub token for the target repo")
-    parser.add_argument("--state-token", default=None, help="GitHub token for bot-state persistence")
-    parser.add_argument("--state-repo", default=None, help="Repository full name used for bot-state persistence")
+    parser.add_argument("--state-token", default=None, help="GitHub token for agent-state persistence")
+    parser.add_argument("--state-repo", default=None, help="Repository full name used for agent-state persistence")
     return parser
 
 

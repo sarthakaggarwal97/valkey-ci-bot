@@ -1,1 +1,1 @@
-# CI Failure Bot scripts package
+# CI Failure Agent scripts package

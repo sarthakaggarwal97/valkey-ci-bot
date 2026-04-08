@@ -113,7 +113,7 @@ def _fetch_recent_completed_runs(args: MonitorArgs, last_seen_run_id: int) -> li
 
 
 def _load_local_bot_config(config_path: str) -> BotConfig:
-    """Load local bot config when present, else fall back to defaults."""
+    """Load local agent config when present, else fall back to defaults."""
     path = Path(config_path)
     if not path.exists():
         return BotConfig()

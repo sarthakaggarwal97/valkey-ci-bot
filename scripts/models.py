@@ -1,4 +1,4 @@
-"""Data models for the CI Failure Bot and PR reviewer pipelines."""
+"""Data models for the CI Failure Agent and PR reviewer pipelines."""
 
 from __future__ import annotations
 

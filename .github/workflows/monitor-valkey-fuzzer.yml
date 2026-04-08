@@ -44,7 +44,7 @@ jobs:
       VALKEY_GITHUB_APP_ID: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
       VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
     steps:
-      - name: Check out bot repository
+      - name: Check out agent repository
         uses: actions/checkout@v6
         with:
           persist-credentials: false
@@ -130,7 +130,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Check out bot data snapshots
+      - name: Check out agent data snapshots
         if: always()
         continue-on-error: true
         uses: actions/checkout@v6

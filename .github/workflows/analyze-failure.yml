@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       config_path:
-        description: "Path to the bot configuration file in the consumer repo"
+        description: "Path to the agent configuration file in the consumer repo"
         required: false
         type: string
         default: ".github/ci-failure-bot.yml"
@@ -56,7 +56,7 @@ jobs:
             core.setOutput('repository', workflowRef.slice(0, markerIndex));
             core.setOutput('ref', workflowRef.slice(refIndex + 1));
 
-      - name: Checkout bot repository
+      - name: Checkout agent repository
         uses: actions/checkout@v6
         with:
           repository: ${{ steps.called-workflow.outputs.repository }}

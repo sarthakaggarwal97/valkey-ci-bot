@@ -38,7 +38,7 @@ _MAX_ERROR_SIGNATURE_CHARS = 10_000
 
 @dataclass
 class PRStateTransition:
-    """One observed transition for a bot-created PR."""
+    """One observed transition for an agent-created PR."""
 
     fingerprint: str
     pr_url: str

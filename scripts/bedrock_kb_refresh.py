@@ -1,4 +1,4 @@
-"""Refresh the Valkey retrieval knowledge bases used by the bot."""
+"""Refresh the Valkey retrieval knowledge bases used by the agent."""
 
 from __future__ import annotations
 

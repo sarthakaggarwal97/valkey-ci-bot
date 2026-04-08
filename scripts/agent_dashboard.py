@@ -3,7 +3,7 @@
 The agent already writes durable JSON state for failure handling, flaky-test
 campaigns, PR review state, rate limiting, and monitor watermarks. This module
 pulls those snapshots into one Markdown/JSON report so maintainers can see
-what the bot is doing instead of inferring it from scattered artifacts.
+what the agent is doing instead of inferring it from scattered artifacts.
 """
 
 from __future__ import annotations

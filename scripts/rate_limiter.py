@@ -1,6 +1,6 @@
-"""Rate limiting and safety limits for the CI Failure Bot.
+"""Rate limiting and safety limits for the CI Failure Agent.
 
-Tracks daily PR creation count, open bot PR count, and daily token
+Tracks daily PR creation count, open agent PR count, and daily token
 budget to prevent repository flooding and excessive LLM resource usage.
 """
 
@@ -44,7 +44,7 @@ def _is_missing_state_error(exc: Exception) -> bool:
 
 
 class RateLimiter:
-    """Enforces daily PR limits, open bot PR caps, and token budgets.
+    """Enforces daily PR limits, open agent PR caps, and token budgets.
 
     State is persisted as a JSON file on the bot-data branch so it
     survives across workflow runs.
@@ -100,7 +100,7 @@ class RateLimiter:
     def can_create_pr(self) -> bool:
         """Check if a new PR can be created within the daily limit.
 
-        Also checks the open bot PR limit via GitHub API if available.
+        Also checks the open agent PR limit via GitHub API if available.
         """
         self._prune_old_timestamps()
         if len(self._pr_timestamps) >= self._config.max_prs_per_day:
@@ -116,7 +116,7 @@ class RateLimiter:
         return True
 
     def _exceeds_open_pr_limit(self) -> bool:
-        """Check if the number of open bot PRs meets or exceeds the cap."""
+        """Check if the number of open agent PRs meets or exceeds the cap."""
         if not self._gh or not self._repo_name:
             return False
 
@@ -129,12 +129,12 @@ class RateLimiter:
             )
             if bot_pr_count >= self._config.max_open_bot_prs:
                 logger.info(
-                    "Open bot PR limit reached (%d/%d).",
+                    "Open agent PR limit reached (%d/%d).",
                     bot_pr_count, self._config.max_open_bot_prs,
                 )
                 return True
         except Exception as exc:
-            logger.warning("Failed to check open bot PRs: %s", exc)
+            logger.warning("Failed to check open agent PRs: %s", exc)
 
         return False
 

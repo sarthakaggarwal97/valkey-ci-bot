@@ -1,4 +1,4 @@
-"""Pipeline orchestrator — CLI entry point for the CI Failure Bot."""
+"""Pipeline orchestrator — CLI entry point for the CI Failure Agent."""
 
 from __future__ import annotations
 
@@ -1567,13 +1567,13 @@ def run_reconciliation(
 
 def main() -> None:
     """CLI entry point."""
-    parser = argparse.ArgumentParser(description="CI Failure Bot Pipeline")
+    parser = argparse.ArgumentParser(description="CI Failure Agent Pipeline")
     parser.add_argument("--repo", required=True, help="Repository full name (owner/repo)")
     parser.add_argument("--run-id", type=int, default=None, help="Workflow run ID (required for analyze mode)")
     parser.add_argument("--config", default=".github/ci-failure-bot.yml", help="Config file path")
     parser.add_argument("--token", required=True, help="GitHub token")
-    parser.add_argument("--state-token", default=None, help="GitHub token for bot-state storage")
-    parser.add_argument("--state-repo", default=None, help="Repository full name used for bot-state persistence")
+    parser.add_argument("--state-token", default=None, help="GitHub token for agent-state storage")
+    parser.add_argument("--state-repo", default=None, help="Repository full name used for agent-state persistence")
     parser.add_argument("--aws-region", default=None, help="AWS region for Bedrock client")
     parser.add_argument("--mode", default="analyze", choices=["analyze", "reconcile"],
                         help="Pipeline mode: 'analyze' for normal failure processing, 'reconcile' for draining queued failures")

@@ -192,7 +192,7 @@ def _validate_patch_applies(diff: str, source_files: dict[str, str]) -> tuple[bo
     Returns (success, error_output).
     """
     try:
-        with tempfile.TemporaryDirectory(prefix="ci-bot-patch-check-") as tmpdir:
+        with tempfile.TemporaryDirectory(prefix="ci-agent-patch-check-") as tmpdir:
             work_dir = Path(tmpdir)
             subprocess.run(
                 ["git", "init", "-q"],

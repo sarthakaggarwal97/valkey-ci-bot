@@ -334,7 +334,7 @@ class PRContextFetcher:
         )
 
     def _is_bot_authored(self, comment) -> bool:
-        """Return whether the comment was authored by the authenticated bot."""
+        """Return whether the comment was authored by the authenticated agent."""
         bot_login = self._get_bot_login()
         if not bot_login:
             return False

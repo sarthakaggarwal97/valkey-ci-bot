@@ -1,4 +1,4 @@
-"""GitHub Actions workflow summary and PR summary comments for CI Failure Bot.
+"""GitHub Actions workflow summary and PR summary comments for CI Failure Agent.
 
 Collects processing results during a pipeline run and emits a
 markdown summary to ``$GITHUB_STEP_SUMMARY`` (or returns the
@@ -76,7 +76,7 @@ class WorkflowSummary:
     def render(self) -> str:
         """Return the full markdown summary string."""
         lines: list[str] = []
-        lines.append(f"## CI Failure Bot - {self.mode} run\n")
+        lines.append(f"## CI Failure Agent - {self.mode} run\n")
 
         if not self.results:
             lines.append("No failures processed.\n")
@@ -339,7 +339,7 @@ class ReviewWorkflowSummary:
 
     def render(self) -> str:
         """Render the reviewer workflow summary."""
-        lines = [f"## PR Review Bot - {self.mode} run\n"]
+        lines = [f"## PR Review Agent - {self.mode} run\n"]
         if not self.results:
             lines.append("No review stages executed.\n")
             return "\n".join(lines)

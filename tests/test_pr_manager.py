@@ -254,7 +254,7 @@ class TestBuildPRBody:
         # Req 6.4: confidence level
         assert "high" in body
         # Req 6.4: AI disclaimer
-        assert "AI bot" in body
+        assert "AI agent" in body
         assert "human review" in body
 
     def test_unparseable_failure_body(self):
@@ -438,7 +438,7 @@ class TestCreatePR:
         assert "TestSuite.TestCase" in body
         assert "Off-by-one" in body
         assert "high" in body
-        assert "AI bot" in body
+        assert "AI agent" in body
 
     def test_commit_message_content(self):
         """Req 6.2: commit message includes identifier, job name, root cause."""

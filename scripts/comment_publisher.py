@@ -48,7 +48,7 @@ class CommentPublisher:
                 )
                 if not self._is_bot_authored_comment(comment):
                     logger.info(
-                        "Cached summary comment %s is not bot-authored; creating a new summary comment.",
+                        "Cached summary comment %s is not agent-authored; creating a new summary comment.",
                         comment_id,
                     )
                 else:
@@ -364,7 +364,7 @@ class CommentPublisher:
         )
 
     def _is_bot_authored_comment(self, comment) -> bool:
-        """Return True only for comments authored by the authenticated bot."""
+        """Return True only for comments authored by the authenticated agent."""
         bot_login = self._get_bot_login()
         if not bot_login:
             return False

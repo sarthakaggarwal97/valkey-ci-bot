@@ -1,4 +1,4 @@
-"""Configuration loader for the CI Failure Bot."""
+"""Configuration loader for the CI Failure Agent."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ class RetrievalConfig:
 
 @dataclass
 class BotConfig:
-    """Top-level bot configuration with sensible defaults."""
+    """Top-level agent configuration with sensible defaults."""
     bedrock_model_id: str = "us.anthropic.claude-opus-4-6-v1"
     max_input_tokens: int = 100_000
     max_output_tokens: int = 4096
@@ -406,7 +406,7 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
 
 
 def load_config_text(text: str, *, source: str = "<memory>") -> BotConfig:
-    """Load bot configuration from YAML text."""
+    """Load agent configuration from YAML text."""
     try:
         raw = yaml.safe_load(text)
     except yaml.YAMLError as exc:
@@ -417,7 +417,7 @@ def load_config_text(text: str, *, source: str = "<memory>") -> BotConfig:
 
 
 def load_config(path: str | Path) -> BotConfig:
-    """Load bot configuration from a YAML file.
+    """Load agent configuration from a YAML file.
 
     Returns default config if the file is missing or contains invalid YAML.
     Valid fields are merged; invalid/unrecognized fields are ignored with a warning.

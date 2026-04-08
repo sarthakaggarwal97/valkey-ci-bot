@@ -26,7 +26,7 @@ def _is_missing_state_error(exc: Exception) -> bool:
 
 
 class MonitorStateStore:
-    """Persists workflow-run monitoring watermarks on the bot-data branch."""
+    """Persists workflow-run monitoring watermarks on the data branch."""
 
     def __init__(
         self,
@@ -97,7 +97,7 @@ class MonitorStateStore:
         )
 
     def load(self) -> None:
-        """Load monitor state from the bot-data branch."""
+        """Load monitor state from the data branch."""
         if not self._gh or not self._repo_name:
             logger.info("No GitHub client; starting with empty monitor state.")
             return
@@ -117,7 +117,7 @@ class MonitorStateStore:
             self._entries.clear()
 
     def save(self) -> None:
-        """Save monitor state to the bot-data branch."""
+        """Save monitor state to the data branch."""
         if not self._gh or not self._repo_name:
             logger.warning("Cannot save monitor state: no GitHub client or repo.")
             return

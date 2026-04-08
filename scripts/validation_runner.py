@@ -1,8 +1,8 @@
-"""Validation runner for the CI Failure Bot.
+"""Validation runner for the CI Failure Agent.
 
 Checks out the consumer repo at the target commit SHA, applies the
 generated patch, builds with the matching CI configuration, and runs
-the specific failing test(s) — all within the bot's own workflow
+the specific failing test(s) — all within the agent's own workflow
 environment.
 """
 
@@ -144,7 +144,7 @@ def _substitute_test_commands(
 class ValidationRunner:
     """Orchestrates build + test validation of a proposed fix.
 
-    The validation runs within the bot's own workflow environment:
+    The validation runs within the agent's own workflow environment:
     1. Checks out the consumer repo at the target commit SHA
     2. Applies the generated patch via ``git apply``
     3. Selects a ValidationProfile from config using job name and matrix params
@@ -260,7 +260,7 @@ class ValidationRunner:
             profile.job_name_pattern, failure_report.job_name,
         )
 
-        with tempfile.TemporaryDirectory(prefix="ci-bot-validate-") as tmpdir:
+        with tempfile.TemporaryDirectory(prefix="ci-agent-validate-") as tmpdir:
             work_dir = Path(tmpdir) / "repo"
 
             clone_ok, clone_output = self._checkout_repo(
