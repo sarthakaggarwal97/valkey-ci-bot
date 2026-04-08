@@ -208,3 +208,41 @@ jobs:
           path: monitor-result.json
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Check out bot data snapshots
+        if: always()
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          ref: bot-data
+          path: bot-data
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Generate capability dashboard
+        if: always()
+        shell: bash
+        run: |
+          python3 -m scripts.agent_dashboard \
+            --failure-store bot-data/failure-store.json \
+            --rate-state bot-data/rate-state.json \
+            --monitor-state bot-data/monitor-state.json \
+            --review-state bot-data/review-state.json \
+            --daily-result monitor-result.json \
+            --output-markdown agent-dashboard.md \
+            --output-json agent-dashboard.json
+
+      - name: Publish capability dashboard to summary
+        if: always()
+        shell: bash
+        run: cat agent-dashboard.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload capability dashboard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: valkey-daily-agent-dashboard-${{ github.run_id }}
+          path: |
+            agent-dashboard.md
+            agent-dashboard.json
+          retention-days: 30

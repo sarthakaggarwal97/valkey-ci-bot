@@ -209,6 +209,8 @@ class TestSerialization:
         limiter.record_pr_created()
         limiter.record_pr_created()
         limiter.record_token_usage(5000)
+        limiter.record_ai_metric("bedrock.invoke_schema.calls")
+        limiter.record_ai_metric("bedrock.invoke_schema.success", 2)
         limiter.queue_failure("fp-abc123")
         limiter.queue_failure("fp-def456")
 
@@ -219,6 +221,10 @@ class TestSerialization:
 
         assert limiter2.get_daily_pr_count() == 2
         assert limiter2.get_token_usage() == 5000
+        assert limiter2.get_ai_metrics() == {
+            "bedrock.invoke_schema.calls": 1,
+            "bedrock.invoke_schema.success": 2,
+        }
         assert limiter2.get_queued_failures() == ["fp-abc123", "fp-def456"]
 
     def test_from_dict_with_empty_data(self, config: BotConfig) -> None:
@@ -227,6 +233,7 @@ class TestSerialization:
         limiter.from_dict({})
         assert limiter.get_daily_pr_count() == 0
         assert limiter.get_token_usage() == 0
+        assert limiter.get_ai_metrics() == {}
         assert limiter.get_queued_failures() == []
 
     def test_to_dict_structure(self, limiter: RateLimiter) -> None:
@@ -236,6 +243,7 @@ class TestSerialization:
         assert "token_usage" in data
         assert "token_window_start" in data
         assert "queued_failures" in data
+        assert "ai_metrics" in data
 
     def test_save_creates_bot_data_branch_when_missing(self, config: BotConfig) -> None:
         repo = MagicMock()
@@ -323,6 +331,7 @@ class TestSerialization:
             "token_usage": 5,
             "token_window_start": window_start,
             "queued_failures": ["fp-a"],
+            "ai_metrics": {"bedrock.invoke.calls": 3},
         }
         concurrent_payload = {
             "pr_timestamps": [
@@ -332,6 +341,10 @@ class TestSerialization:
             "token_usage": 9,
             "token_window_start": window_start,
             "queued_failures": ["fp-a", "fp-c"],
+            "ai_metrics": {
+                "bedrock.invoke.calls": 5,
+                "bedrock.invoke_schema.calls": 1,
+            },
         }
         initial_contents = MagicMock(
             decoded_content=json.dumps(initial_payload).encode(),
@@ -358,6 +371,8 @@ class TestSerialization:
         limiter.record_pr_created()
         local_timestamp = limiter.get_daily_pr_count()
         limiter.record_token_usage(7)
+        limiter.record_ai_metric("bedrock.invoke.calls", 1)
+        limiter.record_ai_metric("bedrock.retries", 2)
         limiter.queue_failure("fp-b")
         limiter.save()
 
@@ -366,5 +381,10 @@ class TestSerialization:
         merged_payload = json.loads(repo.update_file.call_args_list[-1].args[2])
         assert len(merged_payload["pr_timestamps"]) == 3
         assert merged_payload["token_usage"] == 16
+        assert merged_payload["ai_metrics"] == {
+            "bedrock.invoke.calls": 6,
+            "bedrock.invoke_schema.calls": 1,
+            "bedrock.retries": 2,
+        }
         assert set(merged_payload["queued_failures"]) == {"fp-a", "fp-b", "fp-c"}
         assert repo.update_file.call_args_list[-1].args[3] == "sha-2"

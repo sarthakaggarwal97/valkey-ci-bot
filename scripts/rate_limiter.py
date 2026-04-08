@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import Counter
 from datetime import datetime, timezone, timedelta
 from typing import TYPE_CHECKING
 
@@ -73,11 +74,13 @@ class RateLimiter:
 
         # Queued failures (fingerprints waiting for rate limit reset)
         self._queued_failures: list[str] = []
+        self._ai_metrics: dict[str, int] = {}
         self._pending_pr_timestamps: list[str] = []
         self._pending_token_delta: int = 0
         self._pending_token_window_start: str | None = None
         self._pending_queue_additions: set[str] = set()
         self._pending_queue_removals: set[str] = set()
+        self._pending_ai_metrics: Counter[str] = Counter()
 
     # --- Daily PR limit ---
 
@@ -198,6 +201,25 @@ class RateLimiter:
             else:
                 self._pending_queue_removals.add(fingerprint)
 
+    # --- AI execution metrics ---
+
+    def record_ai_metric(self, name: str, amount: int = 1) -> None:
+        """Accumulate a named AI execution counter in the durable state."""
+        metric_name = str(name).strip()
+        if not metric_name:
+            return
+        metric_amount = int(amount)
+        if metric_amount == 0:
+            return
+        self._ai_metrics[metric_name] = (
+            self._ai_metrics.get(metric_name, 0) + metric_amount
+        )
+        self._pending_ai_metrics[metric_name] += metric_amount
+
+    def get_ai_metrics(self) -> dict[str, int]:
+        """Return a copy of accumulated AI execution counters."""
+        return dict(self._ai_metrics)
+
     # --- Persistence ---
 
     def to_dict(self) -> dict:
@@ -207,6 +229,7 @@ class RateLimiter:
             "token_usage": self._token_usage,
             "token_window_start": self._token_window_start,
             "queued_failures": self._queued_failures,
+            "ai_metrics": self._ai_metrics,
         }
 
     def from_dict(self, data: dict) -> None:
@@ -217,11 +240,17 @@ class RateLimiter:
             "token_window_start", datetime.now(timezone.utc).isoformat()
         )
         self._queued_failures = data.get("queued_failures", [])
+        raw_ai_metrics = data.get("ai_metrics", {})
+        self._ai_metrics = {}
+        if isinstance(raw_ai_metrics, dict):
+            for key, value in raw_ai_metrics.items():
+                self._ai_metrics[str(key)] = int(value)
         self._pending_pr_timestamps = []
         self._pending_token_delta = 0
         self._pending_token_window_start = self._token_window_start
         self._pending_queue_additions = set()
         self._pending_queue_removals = set()
+        self._pending_ai_metrics = Counter()
 
     def _ensure_state_branch(self, repo) -> None:
         """Create the data branch from the default branch when missing."""
@@ -364,4 +393,13 @@ class RateLimiter:
             if fingerprint not in self._pending_queue_removals
         ]
         merged["queued_failures"] = queue
+
+        raw_ai_metrics = merged.get("ai_metrics", {})
+        ai_metrics: dict[str, int] = {}
+        if isinstance(raw_ai_metrics, dict):
+            for key, value in raw_ai_metrics.items():
+                ai_metrics[str(key)] = int(value)
+        for key, amount in self._pending_ai_metrics.items():
+            ai_metrics[key] = ai_metrics.get(key, 0) + int(amount)
+        merged["ai_metrics"] = ai_metrics
         return merged

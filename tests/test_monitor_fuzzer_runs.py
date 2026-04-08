@@ -36,6 +36,7 @@ def _run(run_id: int, conclusion: str) -> MagicMock:
     return run
 
 
+@patch("scripts.monitor_fuzzer_runs.RateLimiter")
 @patch("scripts.monitor_fuzzer_runs._make_bedrock_client")
 @patch("scripts.monitor_fuzzer_runs.FuzzerIssuePublisher")
 @patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
@@ -47,6 +48,7 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
     mock_analyzer_cls,
     mock_issue_publisher_cls,
     mock_make_bedrock_client,
+    mock_rate_limiter_cls,
 ) -> None:
     state_store = mock_state_store_cls.return_value
     state_store.get_last_seen_run_id.return_value = 100
@@ -99,6 +101,10 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
     assert result["runs"][1]["issue_action"] == "created"
     assert result["has_anomalies"] is True
     mock_issue_publisher_cls.return_value.upsert_issue.assert_called_once()
+    mock_rate_limiter_cls.return_value.load.assert_called_once()
+    mock_rate_limiter_cls.return_value.save.assert_called_once()
+    _, make_kwargs = mock_make_bedrock_client.call_args
+    assert make_kwargs["rate_limiter"] is mock_rate_limiter_cls.return_value
     state_store.mark_seen.assert_called_once_with(
         "valkey-io/valkey-fuzzer:fuzzer-run.yml:schedule",
         last_seen_run_id=102,
@@ -109,6 +115,7 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
     state_store.save.assert_called_once()
 
 
+@patch("scripts.monitor_fuzzer_runs.RateLimiter")
 @patch("scripts.monitor_fuzzer_runs._make_bedrock_client")
 @patch("scripts.monitor_fuzzer_runs.FuzzerIssuePublisher")
 @patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
@@ -120,6 +127,7 @@ def test_monitor_dry_run_does_not_analyze_or_advance_state(
     mock_analyzer_cls,
     mock_issue_publisher_cls,
     mock_make_bedrock_client,
+    mock_rate_limiter_cls,
 ) -> None:
     state_store = mock_state_store_cls.return_value
     state_store.get_last_seen_run_id.return_value = 100
@@ -136,5 +144,7 @@ def test_monitor_dry_run_does_not_analyze_or_advance_state(
     assert result["runs"][0]["action"] == "would-analyze"
     mock_analyzer_cls.return_value.analyze_workflow_run.assert_not_called()
     mock_issue_publisher_cls.return_value.upsert_issue.assert_not_called()
+    mock_rate_limiter_cls.return_value.load.assert_called_once()
+    mock_rate_limiter_cls.return_value.save.assert_not_called()
     state_store.mark_seen.assert_not_called()
     state_store.save.assert_not_called()

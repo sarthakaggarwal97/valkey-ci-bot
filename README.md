@@ -10,6 +10,7 @@ An AI agent for Valkey CI failure remediation, PR review, and automated backport
 - **Backport Agent** — cherry-picks merged PRs onto release branches with LLM-based conflict resolution
 - **Fuzzer Monitor** — watches fuzzer runs, detects anomalies, creates GitHub issues
 - **Central Valkey Monitor** — watches scheduled CI runs, tracks failure history, queues validated fixes
+- **Capability Dashboard** — publishes a static report for flaky campaigns, CI outcomes, PR review coverage, fuzzer anomalies, AI reliability, and state health
 
 ## Setup
 
@@ -30,6 +31,43 @@ Local development:
 - fill in your own `GITHUB_TOKEN`, `AWS_REGION`, and `AWS_PROFILE`
 - when targeting repositories that require DCO, also set `CI_BOT_COMMIT_NAME`, `CI_BOT_COMMIT_EMAIL`, and `CI_BOT_REQUIRE_DCO_SIGNOFF=true`
 - source `.env.local` manually before running scripts
+
+## Capability Dashboard
+
+Workflow at `.github/workflows/agent-dashboard.yml`.
+
+The dashboard generator turns the bot's durable state and monitor artifacts
+into `agent-dashboard.md` and `agent-dashboard.json`. It is intentionally static:
+no service to deploy, no database to operate, and no extra UI to secure. The
+report covers:
+
+- flaky campaign status, validation pass counts, attempts, failed hypotheses, and queued PR payloads
+- CI failure incidents, pass/fail history, queued failures, and Daily monitor outcomes
+- PR review state, summary/review comment counts, acceptance follow-ups, and coverage gaps
+- fuzzer run status, anomaly issues, root-cause categories, scenarios, seeds, and raw-log fallback usage
+- AI reliability signals such as token usage, schema tool-use calls/successes, toolChoice fallback success, tool-loop terminal validation rejections, retry pressure, and explicit remaining instrumentation gaps
+- monitor watermarks and missing input warnings
+
+The standalone workflow runs on a schedule and manual dispatch, checks out the
+`bot-data` branch snapshots when present, writes the report into the workflow
+summary, and uploads the Markdown/JSON pair as an artifact. The Daily and
+Fuzzer monitor workflows also generate dashboard artifacts for each run,
+including their current `monitor-result.json` or `fuzzer-monitor-result.json`
+payloads.
+
+Local usage:
+
+```bash
+python3 -m scripts.agent_dashboard \
+  --failure-store bot-data/failure-store.json \
+  --rate-state bot-data/rate-state.json \
+  --monitor-state bot-data/monitor-state.json \
+  --review-state bot-data/review-state.json \
+  --daily-result monitor-result.json \
+  --fuzzer-result fuzzer-monitor-result.json \
+  --output-markdown agent-dashboard.md \
+  --output-json agent-dashboard.json
+```
 
 ## CI Failure Agent
 
