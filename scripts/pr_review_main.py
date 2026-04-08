@@ -281,6 +281,7 @@ def run(argv: list[str] | None = None) -> int:
                 region_name=args.aws_region or None,
                 config=bedrock_client_config,
             ),
+            metric_recorder=rate_limiter.record_ai_metric,
         )
     fetcher = PRContextFetcher(gh, github_retries=config.github_retries)
     publisher = CommentPublisher(gh, github_retries=config.github_retries)

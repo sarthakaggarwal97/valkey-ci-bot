@@ -8,10 +8,12 @@ from scripts.commit_signoff import CommitSigner
 from scripts.code_reviewer import ReviewCoverage
 from scripts.models import SummaryResult
 from scripts.valkey_acceptance import (
+    AcceptanceManifest,
     CICase,
     BackportCase,
     ReviewCaseResult,
     ReviewPolicySignals,
+    _build_scorecard,
     _has_signed_off_by,
     _load_manifest,
     _needs_core_team,
@@ -127,3 +129,55 @@ def test_review_case_result_blocks_on_incomplete_model_coverage() -> None:
 
     assert result.passed is False
     assert result.model_followups == ["review-coverage-incomplete"]
+
+
+def test_acceptance_scorecard_counts_review_and_replay_cases() -> None:
+    passing = ReviewCaseResult(
+        name="policy-case",
+        pr_number=1,
+        policy=ReviewPolicySignals(
+            missing_dco_commits=[],
+            needs_core_team=False,
+            needs_docs=False,
+            security_sensitive=False,
+            governance_changed=False,
+            changed_files=["src/server.c"],
+        ),
+    )
+    failing = ReviewCaseResult(
+        name="model-case",
+        pr_number=2,
+        policy=ReviewPolicySignals(
+            missing_dco_commits=[],
+            needs_core_team=False,
+            needs_docs=False,
+            security_sensitive=False,
+            governance_changed=False,
+            changed_files=["src/server.c"],
+        ),
+        summary=SummaryResult(
+            walkthrough="Adds a guarded server path.",
+            file_groups_markdown="",
+            release_notes=None,
+            short_summary="",
+        ),
+        coverage=ReviewCoverage(
+            requested_lgtm=True,
+            unaccounted_files=["src/server.c"],
+        ),
+    )
+    manifest = AcceptanceManifest(
+        ci_cases=[CICase(name="daily", workflow_run_id=1)],
+        backport_cases=[
+            BackportCase(name="bp", source_pr_number=2, target_branch="8.1")
+        ],
+    )
+
+    scorecard = _build_scorecard(manifest, [passing, failing])
+
+    assert scorecard.review_cases == 2
+    assert scorecard.review_passed == 1
+    assert scorecard.review_failed == 1
+    assert scorecard.ci_replay_cases == 1
+    assert scorecard.backport_replay_cases == 1
+    assert scorecard.readiness == "needs-follow-up"

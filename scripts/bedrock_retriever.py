@@ -81,9 +81,15 @@ def _extract_source(result: dict[str, Any]) -> str:
 class BedrockRetriever:
     """Small wrapper around Bedrock KB retrieval with prompt-friendly output."""
 
-    def __init__(self, client: BedrockAgentRuntimeClient):
+    def __init__(self, client: BedrockAgentRuntimeClient, metric_recorder: Any | None = None):
         self._client = client
         self._cache: dict[tuple[str, str, int], list[RetrievedSnippet]] = {}
+        self._metric_recorder = metric_recorder
+
+    def _record_metric(self, name: str, amount: int = 1) -> None:
+        recorder = self._metric_recorder
+        if callable(recorder):
+            recorder(name, amount)
 
     def retrieve(
         self,
@@ -100,6 +106,7 @@ class BedrockRetriever:
 
         snippets: list[RetrievedSnippet] = []
         for label, knowledge_base_id in _configured_knowledge_bases(config):
+            self._record_metric("bedrock.retrieval.calls")
             cache_key = (
                 knowledge_base_id,
                 normalized_query,
@@ -120,6 +127,7 @@ class BedrockRetriever:
                         },
                     )
                 except (BotoCoreError, ClientError) as exc:
+                    self._record_metric("bedrock.retrieval.errors")
                     logger.warning(
                         "Bedrock retrieval failed for KB %s: %s",
                         knowledge_base_id,
@@ -129,6 +137,9 @@ class BedrockRetriever:
                     continue
                 cached = self._parse_results(label, knowledge_base_id, response, config)
                 self._cache[cache_key] = cached
+                self._record_metric("bedrock.retrieval.snippets", len(cached))
+            else:
+                self._record_metric("bedrock.retrieval.cache_hits")
             snippets.extend(cached)
 
         snippets.sort(key=lambda item: item.score, reverse=True)
@@ -141,6 +152,10 @@ class BedrockRetriever:
                 continue
             seen.add(key)
             deduped.append(snippet)
+        if deduped:
+            self._record_metric("bedrock.retrieval.hits")
+        else:
+            self._record_metric("bedrock.retrieval.empty")
         return deduped
 
     def render_for_prompt(

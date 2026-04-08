@@ -109,7 +109,7 @@ def _make_mock_repo():
     repo.create_git_ref.return_value = MagicMock()
 
     contents = MagicMock()
-    contents.decoded_content = b"placeholder\n"
+    contents.decoded_content = b"a\n"
     contents.sha = "file_sha_000"
     repo.get_contents.return_value = contents
     repo.update_file.return_value = {"commit": MagicMock()}

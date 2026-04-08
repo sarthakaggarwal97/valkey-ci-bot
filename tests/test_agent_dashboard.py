@@ -110,6 +110,9 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
                 "bedrock.schema_tool_choice_fallback_success": 1,
                 "bedrock.tool_loop.terminal_validation_rejections": 2,
                 "bedrock.retries": 5,
+                "bedrock.prompt_safety_guard.checked": 10,
+                "bedrock.prompt_safety_guard.present": 9,
+                "bedrock.prompt_safety_guard.missing": 1,
             },
         },
         monitor_state={
@@ -144,6 +147,29 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
             }
         ],
         fuzzer_results=[_fuzzer_result()],
+        events=[
+            {
+                "event_id": "evt-1",
+                "event_type": "validation.passed",
+                "created_at": "2026-04-08T02:30:00+00:00",
+                "subject": "fp-queued",
+                "attributes": {"job_name": "daily / linux"},
+            },
+            {
+                "event_id": "evt-2",
+                "event_type": "pr.created",
+                "created_at": "2026-04-08T02:31:00+00:00",
+                "subject": "fp-queued",
+                "attributes": {"pr_url": "https://github.com/o/r/pull/1"},
+            },
+            {
+                "event_id": "evt-3",
+                "event_type": "pr.merged",
+                "created_at": "2026-04-08T02:40:00+00:00",
+                "subject": "fp-queued",
+                "attributes": {"pr_url": "https://github.com/o/r/pull/1"},
+            },
+        ],
         acceptance_results=[
             {
                 "passed": False,
@@ -165,6 +191,7 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
     assert dashboard["snapshot"]["tracked_review_prs"] == 1
     assert dashboard["snapshot"]["fuzzer_runs_analyzed"] == 2
     assert dashboard["snapshot"]["fuzzer_anomalous_runs"] == 1
+    assert dashboard["snapshot"]["agent_events"] == 3
     assert dashboard["ci_failures"]["history_failures"] == 2
     assert dashboard["ci_failures"]["daily_job_outcome_counts"] == {"pr-created": 1}
     assert dashboard["flaky_tests"]["failed_hypotheses"] == 1
@@ -174,7 +201,10 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
     assert dashboard["ai_reliability"]["schema_successes"] == 3
     assert dashboard["ai_reliability"]["terminal_validation_rejections"] == 2
     assert dashboard["ai_reliability"]["bedrock_retries"] == 5
+    assert dashboard["ai_reliability"]["prompt_safety_coverage"] == 0.9
     assert dashboard["fuzzer"]["raw_log_fallbacks"] == 1
+    assert dashboard["agent_outcomes"]["prs_created"] == 1
+    assert dashboard["agent_outcomes"]["prs_merged"] == 1
 
 
 def test_render_markdown_includes_all_dashboards() -> None:
@@ -188,6 +218,7 @@ def test_render_markdown_includes_all_dashboards() -> None:
 
     assert "## Flaky Test Dashboard" in markdown
     assert "## CI Failure Outcomes" in markdown
+    assert "## Agent Outcome Ledger" in markdown
     assert "## PR Review Dashboard" in markdown
     assert "## Fuzzer Dashboard" in markdown
     assert "## AI Reliability Dashboard" in markdown
@@ -199,10 +230,21 @@ def test_render_markdown_includes_all_dashboards() -> None:
 def test_cli_writes_markdown_and_json(tmp_path: Path) -> None:
     failure_store_path = tmp_path / "failure-store.json"
     fuzzer_result_path = tmp_path / "fuzzer-monitor-result.json"
+    event_log_path = tmp_path / "agent-events.jsonl"
     output_markdown_path = tmp_path / "agent-dashboard.md"
     output_json_path = tmp_path / "agent-dashboard.json"
     failure_store_path.write_text(json.dumps(_failure_store()), encoding="utf-8")
     fuzzer_result_path.write_text(json.dumps(_fuzzer_result()), encoding="utf-8")
+    event_log_path.write_text(
+        json.dumps({
+            "event_id": "evt-1",
+            "event_type": "fix.dead_lettered",
+            "created_at": "2026-04-08T02:30:00+00:00",
+            "subject": "fp-queued",
+            "attributes": {"attempts": 5},
+        }) + "\n",
+        encoding="utf-8",
+    )
 
     exit_code = main(
         [
@@ -210,6 +252,8 @@ def test_cli_writes_markdown_and_json(tmp_path: Path) -> None:
             str(failure_store_path),
             "--fuzzer-result",
             str(fuzzer_result_path),
+            "--event-log",
+            str(event_log_path),
             "--output-markdown",
             str(output_markdown_path),
             "--output-json",
@@ -224,3 +268,4 @@ def test_cli_writes_markdown_and_json(tmp_path: Path) -> None:
     payload = json.loads(output_json_path.read_text(encoding="utf-8"))
     assert payload["snapshot"]["failure_incidents"] == 2
     assert payload["snapshot"]["fuzzer_anomalous_runs"] == 1
+    assert payload["agent_outcomes"]["dead_lettered"] == 1

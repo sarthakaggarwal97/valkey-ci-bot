@@ -954,6 +954,40 @@ def test_code_reviewer_logs_verifier_drop_reason(caplog: pytest.LogCaptureFixtur
     assert "not well supported" in caplog.text
 
 
+def test_code_reviewer_withholds_findings_when_verifier_fails() -> None:
+    bedrock = MagicMock()
+    bedrock.invoke.side_effect = [
+        """
+    {
+      "findings": [
+        {
+          "path": "src/failover.c",
+          "line": 14,
+          "severity": "high",
+          "confidence": "high",
+          "title": "Potential stale state",
+          "trigger": "a timeout fires before cleanup",
+          "impact": "leave stale failover state behind",
+          "body": "The timeout path updates the timer but not the state field."
+        }
+      ]
+    }
+    """,
+        RuntimeError("verifier unavailable"),
+    ]
+    reviewer = CodeReviewer(bedrock)
+    scope = DiffScope(
+        base_sha="base123",
+        head_sha="head456",
+        files=_context().files,
+        incremental=False,
+    )
+
+    findings = reviewer.review(_context(), scope, ReviewerConfig(max_review_comments=5))
+
+    assert findings == []
+
+
 def test_code_reviewer_ranks_by_severity_and_confidence_before_capping() -> None:
     bedrock = MagicMock()
     bedrock.invoke.side_effect = [
@@ -1159,7 +1193,7 @@ def test_code_reviewer_groups_related_files_into_single_agentic_pass() -> None:
     assert "Suggested related changed files/tests to inspect early" not in prompt
 
 
-def test_agentic_review_budgets_allow_100_fetches_and_turns() -> None:
+def test_agentic_review_budgets_scale_with_scope() -> None:
     scope = DiffScope(
         base_sha="base123",
         head_sha="head456",
@@ -1167,7 +1201,16 @@ def test_agentic_review_budgets_allow_100_fetches_and_turns() -> None:
         incremental=False,
     )
 
-    assert _agentic_review_budgets(scope) == (100, 100)
+    assert _agentic_review_budgets(scope) == (20, 20)
+
+    large_scope = DiffScope(
+        base_sha="base123",
+        head_sha="head456",
+        files=_context().files * 20,
+        incremental=False,
+    )
+
+    assert _agentic_review_budgets(large_scope) == (100, 80)
 
 
 def test_code_reviewer_reuses_shared_tool_state_across_focused_agentic_passes() -> None:

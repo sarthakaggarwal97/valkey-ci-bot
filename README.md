@@ -45,7 +45,8 @@ report covers:
 - CI failure incidents, pass/fail history, queued failures, and Daily monitor outcomes
 - PR review state, summary/review comment counts, acceptance follow-ups, and coverage gaps
 - fuzzer run status, anomaly issues, root-cause categories, scenarios, seeds, and raw-log fallback usage
-- AI reliability signals such as token usage, schema tool-use calls/successes, toolChoice fallback success, tool-loop terminal validation rejections, retry pressure, and explicit remaining instrumentation gaps
+- an append-only agent outcome ledger covering validation, queueing, PR creation, merge/abandonment outcomes, and dead-letter events
+- AI reliability signals such as token usage, schema tool-use calls/successes, toolChoice fallback success, prompt-safety guard coverage, tool-loop terminal validation rejections, retry pressure, and explicit remaining instrumentation gaps
 - monitor watermarks and missing input warnings
 
 The standalone workflow runs on a schedule and manual dispatch, checks out the
@@ -63,6 +64,7 @@ python3 -m scripts.agent_dashboard \
   --rate-state bot-data/rate-state.json \
   --monitor-state bot-data/monitor-state.json \
   --review-state bot-data/review-state.json \
+  --event-log bot-data/agent-events.jsonl \
   --daily-result monitor-result.json \
   --fuzzer-result fuzzer-monitor-result.json \
   --output-markdown agent-dashboard.md \
@@ -79,13 +81,18 @@ When a CI workflow fails in `valkey-io/valkey`, the agent:
 2. retrieves and parses logs using format-specific parsers (gtest, tcl, build errors, sentinel/cluster)
 3. analyzes root cause using Amazon Bedrock
 4. generates a candidate fix
-5. validates the fix by rebuilding and re-running the failing job locally
+5. validates the fix with a configured CI-exact validation profile
 6. queues the validated fix for human approval before opening a PR
 
 For flaky failures, the agent now switches to a campaign mode: it stores prior
 failed ideas in the failure store, repeats validation multiple times before
 trusting a fix, and reuses that backlog on later attempts so it does not keep
 trying the same weak patch.
+
+Validation fails closed when no validation profile matches. Set
+`validation.require_profile: false` only when you intentionally want the legacy
+build-only fallback; otherwise unmatched jobs are routed away from automatic
+PR creation rather than being treated as CI-validated.
 
 Required GitHub configuration:
 
@@ -241,7 +248,10 @@ The harness:
 
 - runs deterministic policy checks such as DCO, docs follow-up, security handling, and `@core-team` escalation
 - can execute report-only PR summary and review passes against real Valkey PRs
+- emits a readiness scorecard for review cases plus CI/backport replay coverage
 - renders exact replay commands for CI failure and backport cases to run against a fork
+
+Manual replay workflow: `.github/workflows/agent-replay-lab.yml`.
 
 See `docs/valkey-acceptance.md` for usage.
 

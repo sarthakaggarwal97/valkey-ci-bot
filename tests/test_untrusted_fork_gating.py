@@ -293,7 +293,7 @@ def test_trusted_failure_pr_creation_proceeds(report):
     repo_mock.create_git_ref.return_value = MagicMock()
 
     contents = MagicMock()
-    contents.decoded_content = b"placeholder\n"
+    contents.decoded_content = b"a\n"
     contents.sha = "file_sha_000"
     repo_mock.get_contents.return_value = contents
     repo_mock.update_file.return_value = {"commit": MagicMock()}

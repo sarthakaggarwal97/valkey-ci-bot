@@ -55,6 +55,7 @@ def test_render_for_prompt_includes_code_and_docs_results() -> None:
 
 def test_retrieve_uses_cache_for_repeat_query() -> None:
     client = MagicMock()
+    record_metric = MagicMock()
     client.retrieve.return_value = {
         "retrievalResults": [
             {
@@ -64,7 +65,7 @@ def test_retrieve_uses_cache_for_repeat_query() -> None:
             }
         ]
     }
-    retriever = BedrockRetriever(client)
+    retriever = BedrockRetriever(client, metric_recorder=record_metric)
     config = RetrievalConfig(
         enabled=True,
         code_knowledge_base_id="CODEKB",
@@ -75,6 +76,9 @@ def test_retrieve_uses_cache_for_repeat_query() -> None:
 
     assert first == second
     client.retrieve.assert_called_once()
+    record_metric.assert_any_call("bedrock.retrieval.snippets", 1)
+    record_metric.assert_any_call("bedrock.retrieval.cache_hits", 1)
+    record_metric.assert_any_call("bedrock.retrieval.hits", 1)
 
 
 def test_disabled_retrieval_returns_empty_output() -> None:

@@ -53,9 +53,21 @@ limits:
   # the bot pauses new PR creation until existing PRs are resolved.
   max_open_bot_prs: 3
 
+  # Maximum queued-PR reconciliation attempts before the fix moves to the
+  # dead-letter dashboard instead of retrying forever.
+  queued_pr_max_attempts: 5
+
   # Cumulative Bedrock token budget per 24-hour period. The bot stops
   # making Bedrock calls once this budget is exhausted.
   daily_token_budget: 1000000
+
+# ---------------------------------------------------------------------------
+# Validation safety
+# ---------------------------------------------------------------------------
+validation:
+  # Fail closed when no validation profile matches. Set false only if you
+  # intentionally want the legacy build-only fallback profile.
+  require_profile: true
 
 # ---------------------------------------------------------------------------
 # Fix generation settings

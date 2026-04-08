@@ -519,6 +519,7 @@ class TestRunReconciliation:
         mock_load_config.return_value = BotConfig()
         rate_limiter = MagicMock()
         rate_limiter.get_queued_failures.return_value = []
+        mock_store.return_value.reconcile_pr_states.return_value = []
 
         count = run_reconciliation(
             "owner/repo", "config.yml", "token",
@@ -526,6 +527,8 @@ class TestRunReconciliation:
         )
 
         assert count == 0
+        mock_store.return_value.reconcile_pr_states.assert_called_once()
+        mock_store.return_value.save.assert_called_once()
 
     @patch("scripts.main._load_runtime_config")
     @patch("scripts.main.FailureStore")
@@ -547,6 +550,7 @@ class TestRunReconciliation:
         entry.queued_pr_payload = self._queued_payload()
         store_instance.get_entry.return_value = entry
         store_instance.has_open_pr.return_value = False
+        store_instance.record_queued_pr_failure.return_value = 1
         mock_store.return_value = store_instance
 
         pr_manager = MagicMock()
@@ -582,6 +586,7 @@ class TestRunReconciliation:
         entry.queued_pr_payload = self._queued_payload()
         store_instance.get_entry.return_value = entry
         store_instance.has_open_pr.return_value = False
+        store_instance.record_queued_pr_failure.return_value = 1
         mock_store.return_value = store_instance
 
         pr_manager = MagicMock()
@@ -660,6 +665,42 @@ class TestRunReconciliation:
         assert count == 1
         rate_limiter.dequeue_failure.assert_called_once_with("fp1")
         mock_pr_mgr.return_value.create_pr.assert_not_called()
+
+    @patch("scripts.main._load_runtime_config")
+    @patch("scripts.main.FailureStore")
+    @patch("scripts.main.PRManager")
+    @patch("scripts.main.Github")
+    def test_pr_creation_failure_keeps_queued_payload_for_retry(
+        self, mock_gh, mock_pr_mgr, mock_store, mock_load_config,
+    ):
+        """Transient queued PR failures stay queued for a future attempt."""
+        mock_load_config.return_value = BotConfig()
+
+        rate_limiter = MagicMock()
+        rate_limiter.get_queued_failures.return_value = ["fp1"]
+        rate_limiter.can_create_pr.return_value = True
+
+        store_instance = MagicMock()
+        entry = MagicMock(failure_identifier="TestSuite.TestCase")
+        entry.queued_pr_payload = self._queued_payload()
+        store_instance.get_entry.return_value = entry
+        store_instance.has_open_pr.return_value = False
+        store_instance.record_queued_pr_failure.return_value = 1
+        mock_store.return_value = store_instance
+
+        pr_manager = MagicMock()
+        pr_manager.create_pr.side_effect = RuntimeError("pr-creation-failed: 500")
+        mock_pr_mgr.return_value = pr_manager
+
+        count = run_reconciliation(
+            "owner/repo", "config.yml", "token",
+            rate_limiter=rate_limiter,
+        )
+
+        assert count == 0
+        rate_limiter.dequeue_failure.assert_not_called()
+        store_instance.clear_queued_pr.assert_not_called()
+        pr_manager.create_pr.assert_called_once()
 
 
 class TestRunPipeline:

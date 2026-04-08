@@ -136,7 +136,10 @@ def _make_bedrock_client(
     retriever: BedrockRetriever | None = None
     if config.retrieval.enabled:
         retriever = BedrockRetriever(
-            boto3.client("bedrock-agent-runtime", **client_kwargs)
+            boto3.client("bedrock-agent-runtime", **client_kwargs),
+            metric_recorder=(
+                rate_limiter.record_ai_metric if rate_limiter is not None else None
+            ),
         )
     return bedrock_client, retriever
 

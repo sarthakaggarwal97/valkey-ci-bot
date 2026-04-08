@@ -201,14 +201,14 @@ class ValidationRunner:
                 return ValidationResult(
                     passed=False,
                     output="\n\n".join(outputs),
-                    strategy="local",
+                    strategy=result.strategy,
                     passed_runs=run_number - 1,
                     attempted_runs=run_number,
                 )
         return ValidationResult(
             passed=True,
             output="\n\n".join(outputs),
-            strategy="local",
+            strategy=result.strategy if outputs else "local",
             passed_runs=requested_runs,
             attempted_runs=requested_runs,
         )
@@ -230,6 +230,22 @@ class ValidationRunner:
             self._config.validation_profiles,
         )
         if profile is None:
+            if self._config.require_validation_profile:
+                output = (
+                    "missing-validation-profile: no validation profile matches "
+                    f"job '{failure_report.job_name}' with params "
+                    f"{failure_report.matrix_params}. Configure a CI-exact "
+                    "validation profile or explicitly set "
+                    "validation.require_profile=false to allow build-only "
+                    "fallback validation."
+                )
+                logger.warning(output)
+                return ValidationResult(
+                    passed=False,
+                    output=output,
+                    strategy="missing-validation-profile",
+                    attempted_runs=1,
+                )
             logger.warning(
                 "No validation profile matches job '%s' with params %s. "
                 "Using default fallback profile. Consider configuring a "

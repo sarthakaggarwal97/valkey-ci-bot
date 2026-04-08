@@ -18,6 +18,7 @@ from github import Auth, Github
 from scripts.bedrock_client import BedrockClient, BedrockError
 from scripts.bedrock_retriever import BedrockRetriever
 from scripts.config import BotConfig, ProjectContext, load_config, load_config_text
+from scripts.event_ledger import EventLedger
 from scripts.failure_detector import FailureDetector
 from scripts.failure_store import FailureStore
 from scripts.fix_generator import FixGenerator
@@ -883,6 +884,21 @@ def run_pipeline(
             state_repo_full_name=state_repo,
         )
     rate_limiter.load()
+    event_ledger = EventLedger(
+        gh,
+        repo_name,
+        state_github_client=state_gh,
+        state_repo_full_name=state_repo,
+    )
+    event_ledger.record(
+        "workflow.run_seen",
+        str(run_id),
+        repo=repo_name,
+        workflow_name=workflow_run.name,
+        workflow_file=workflow_run.workflow_file,
+        head_sha=workflow_run.head_sha,
+        head_branch=workflow_run.head_branch,
+    )
 
     # Build Bedrock-backed components
     bedrock_kwargs: dict = {}
@@ -897,6 +913,7 @@ def run_pipeline(
     if retrieval_enabled:
         retriever = BedrockRetriever(
             boto3.client("bedrock-agent-runtime", region_name=aws_region),
+            metric_recorder=rate_limiter.record_ai_metric,
         )
     root_cause_analyzer = RootCauseAnalyzer(bedrock_client, gh)
     root_cause_analyzer.with_retriever(retriever, config.retrieval)
@@ -925,6 +942,13 @@ def run_pipeline(
     failure_source = FailureDetector.classify_trust(workflow_run, repo_name)
     if failure_source == "untrusted-fork":
         logger.info("Untrusted fork failure for run %d, skipping privileged stages.", run_id)
+        event_ledger.record(
+            "workflow.skipped",
+            str(run_id),
+            reason="untrusted-fork",
+            repo=repo_name,
+        )
+        event_ledger.save()
         return PipelineResult.empty()
 
     # Detect failed jobs
@@ -933,11 +957,24 @@ def run_pipeline(
         failed_jobs = detector.detect(workflow_run)
     except Exception as exc:
         logger.error("Failure detection failed for run %d: %s", run_id, exc)
+        event_ledger.record(
+            "workflow.detection_failed",
+            str(run_id),
+            repo=repo_name,
+            error=str(exc),
+        )
+        event_ledger.save()
         return PipelineResult.empty()
     detect_duration = time.perf_counter() - detect_start
 
     if not failed_jobs:
         logger.info("No actionable failures in run %d.", run_id)
+        event_ledger.record(
+            "workflow.no_failures",
+            str(run_id),
+            repo=repo_name,
+        )
+        event_ledger.save()
         return PipelineResult.empty()
 
     # Workflow summary collector
@@ -982,6 +1019,16 @@ def run_pipeline(
                 fingerprint=fingerprint,
                 max_entries=max_history_entries,
             )
+        event_ledger.record(
+            "failure.observed",
+            fingerprint or job.name,
+            repo=report.repo_full_name or repo_name,
+            workflow_run_id=report.workflow_run_id,
+            workflow_file=report.workflow_file,
+            job_name=report.job_name,
+            parsed=bool(report.parsed_failures),
+            unparseable=report.is_unparseable,
+        )
 
         if report.is_unparseable or not report.parsed_failures:
             logger.info(
@@ -1058,8 +1105,25 @@ def run_pipeline(
 
             if not diff or not root_cause:
                 outcome = "analysis-failed" if not root_cause else "no-fix-generated"
+                event_ledger.record(
+                    "fix.skipped",
+                    fingerprint or job.name,
+                    job_name=job.name,
+                    failure_identifier=failure_id,
+                    outcome=outcome,
+                )
                 summary.add_result(job.name, failure_id, outcome)
                 continue
+
+            event_ledger.record(
+                "root_cause.analyzed",
+                fingerprint or job.name,
+                job_name=job.name,
+                failure_identifier=failure_id,
+                confidence=root_cause.confidence,
+                is_flaky=root_cause.is_flaky,
+                files_to_change=root_cause.files_to_change,
+            )
 
             # Validate → PR (only if we have a diff)
             validated_diff = _validate_fix(
@@ -1076,8 +1140,25 @@ def run_pipeline(
                 metrics=metrics,
             )
             if validated_diff is None:
+                event_ledger.record(
+                    "validation.failed",
+                    fingerprint or job.name,
+                    job_name=job.name,
+                    failure_identifier=failure_id,
+                    confidence=root_cause.confidence,
+                    is_flaky=root_cause.is_flaky,
+                )
                 summary.add_result(job.name, failure_id, "validation-failed")
                 continue
+
+            event_ledger.record(
+                "validation.passed",
+                fingerprint or job.name,
+                job_name=job.name,
+                failure_identifier=failure_id,
+                confidence=root_cause.confidence,
+                is_flaky=root_cause.is_flaky,
+            )
 
             history_summary = None
             if report.parsed_failures:
@@ -1137,6 +1218,14 @@ def run_pipeline(
                             rationale=root_cause.rationale,
                         )
                     )
+                    event_ledger.record(
+                        "fix.queued",
+                        fingerprint,
+                        job_name=job.name,
+                        failure_identifier=failure_id,
+                        reason="manual-approval",
+                        target_branch=report.target_branch or "unstable",
+                    )
                 summary.add_result(job.name, failure_id, "queued-manual-approval")
             elif rate_limiter.can_create_pr():
                 pr_creation_start = time.perf_counter()
@@ -1149,6 +1238,13 @@ def run_pipeline(
                 )
                 pr_creation_duration = time.perf_counter() - pr_creation_start
                 if pr_url:
+                    event_ledger.record(
+                        "pr.created",
+                        fingerprint or job.name,
+                        job_name=job.name,
+                        failure_identifier=failure_id,
+                        pr_url=pr_url,
+                    )
                     if fingerprint:
                         failure_store.mark_flaky_campaign_status(
                             fingerprint,
@@ -1169,6 +1265,12 @@ def run_pipeline(
                     )
                     summary.add_result(job.name, failure_id, "pr-created")
                 else:
+                    event_ledger.record(
+                        "pr.creation_failed",
+                        fingerprint or job.name,
+                        job_name=job.name,
+                        failure_identifier=failure_id,
+                    )
                     summary.add_result(job.name, failure_id, "pr-creation-failed")
             else:
                 if fingerprint:
@@ -1185,15 +1287,30 @@ def run_pipeline(
                         "daily-rate-limit, fingerprint=%s queued.",
                         job.name, fingerprint[:12],
                     )
+                    event_ledger.record(
+                        "fix.queued",
+                        fingerprint,
+                        job_name=job.name,
+                        failure_identifier=failure_id,
+                        reason="rate-limit",
+                        target_branch=report.target_branch or "unstable",
+                    )
                 summary.add_result(job.name, failure_id, "queued-rate-limit")
         except Exception as exc:
             logger.error("Error processing job %s: %s", job.name, exc)
+            event_ledger.record(
+                "job.error",
+                job.name,
+                workflow_run_id=run_id,
+                error=str(exc),
+            )
             summary.add_result(job.name, "", "error", error=str(exc))
             continue
 
     # Save failure store and rate limiter state
     failure_store.save()
     rate_limiter.save()
+    event_ledger.save()
 
     # Emit workflow summary
     summary.write()
@@ -1263,14 +1380,6 @@ def run_reconciliation(
         )
     rate_limiter.load()
 
-    queued = rate_limiter.get_queued_failures()
-    if not queued:
-        logger.info("No queued failures to drain.")
-        return 0
-
-    logger.info("Reconciliation: %d queued failure(s) to process.", len(queued))
-
-    # Build components needed for the pipeline
     failure_store = FailureStore(
         gh,
         repo_name,
@@ -1278,9 +1387,42 @@ def run_reconciliation(
         state_repo_full_name=state_repo,
     )
     failure_store.load()
-    failure_store.reconcile_pr_states()
+    pr_state_transitions = failure_store.reconcile_pr_states()
     pr_manager = PRManager(gh, repo_name, failure_store)
+    event_ledger = EventLedger(
+        gh,
+        repo_name,
+        state_github_client=state_gh,
+        state_repo_full_name=state_repo,
+    )
+    for transition in pr_state_transitions:
+        event_type = (
+            "pr.merged"
+            if transition.new_status == "merged"
+            else "pr.closed_without_merge"
+        )
+        event_ledger.record(
+            event_type,
+            transition.fingerprint,
+            pr_url=transition.pr_url,
+            pr_number=transition.pr_number,
+            previous_status=transition.previous_status,
+            new_status=transition.new_status,
+            github_state=transition.github_state,
+            merged=transition.merged,
+            source="reconciliation",
+        )
 
+    queued = rate_limiter.get_queued_failures()
+    if not queued:
+        failure_store.save()
+        event_ledger.save()
+        logger.info("No queued failures to drain.")
+        return 0
+
+    logger.info("Reconciliation: %d queued failure(s) to process.", len(queued))
+
+    # Build components needed for queued PR creation.
     # Workflow summary collector
     summary = WorkflowSummary(mode="reconcile")
 
@@ -1353,6 +1495,14 @@ def run_reconciliation(
             failure_store.mark_flaky_campaign_status(fingerprint, "pr-created")
             failure_store.clear_queued_pr(fingerprint)
             rate_limiter.dequeue_failure(fingerprint)
+            event_ledger.record(
+                "pr.created",
+                fingerprint,
+                job_name=report.job_name,
+                failure_identifier=entry.failure_identifier,
+                pr_url=pr_url,
+                source="reconciliation",
+            )
             summary.add_result(
                 report.job_name, entry.failure_identifier, "pr-created",
             )
@@ -1361,17 +1511,52 @@ def run_reconciliation(
                 fingerprint[:12], pr_url,
             )
         except (RuntimeError, ValueError) as exc:
-            failure_store.clear_queued_pr(fingerprint)
-            rate_limiter.dequeue_failure(fingerprint)
+            attempts = failure_store.record_queued_pr_failure(fingerprint, str(exc))
+            event_ledger.record(
+                "pr.creation_failed",
+                fingerprint,
+                job_name=report.job_name,
+                failure_identifier=entry.failure_identifier,
+                source="reconciliation",
+                attempts=attempts,
+                error=str(exc),
+            )
+            if attempts >= max(1, config.queued_pr_max_attempts):
+                failure_store.mark_queued_pr_dead_letter(fingerprint, str(exc))
+                rate_limiter.dequeue_failure(fingerprint)
+                event_ledger.record(
+                    "fix.dead_lettered",
+                    fingerprint,
+                    job_name=report.job_name,
+                    failure_identifier=entry.failure_identifier,
+                    attempts=attempts,
+                    error=str(exc),
+                )
+                summary.add_result(
+                    report.job_name,
+                    entry.failure_identifier,
+                    "queued-pr-dead-letter",
+                    error=str(exc),
+                )
+                processed += 1
+                continue
             summary.add_result(
                 report.job_name, entry.failure_identifier, "pr-creation-failed",
                 error=str(exc),
             )
+            logger.warning(
+                "Queued PR creation failed for fingerprint %s; keeping payload "
+                "queued for a future reconciliation attempt: %s",
+                fingerprint[:12],
+                exc,
+            )
+            continue
         processed += 1
 
     # Save state
     failure_store.save()
     rate_limiter.save()
+    event_ledger.save()
 
     # Emit workflow summary
     summary.write()

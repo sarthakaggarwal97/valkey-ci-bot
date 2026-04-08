@@ -147,6 +147,106 @@ def test_record_queued_pr_persists_payload() -> None:
     assert entry.incident_key == "fp1"
 
 
+def test_record_queued_pr_failure_keeps_payload_for_retry() -> None:
+    store = FailureStore()
+    report = FailureReport(
+        workflow_name="CI",
+        job_name="job",
+        matrix_params={},
+        commit_sha="abc123",
+        failure_source="trusted",
+        repo_full_name="owner/repo",
+        workflow_run_id=7,
+        target_branch="unstable",
+    )
+    root_cause = RootCauseReport(
+        description="root cause",
+        files_to_change=["src/foo.c"],
+        confidence="high",
+        rationale="because",
+        is_flaky=False,
+        flakiness_indicators=None,
+    )
+    store.record_queued_pr("fp1", report, root_cause, "diff", "unstable")
+
+    attempts = store.record_queued_pr_failure("fp1", "GitHub 500")
+
+    entry = store.entries["fp1"]
+    assert attempts == 1
+    assert entry.status == "queued-pr-retry"
+    assert entry.queued_pr_payload is not None
+    assert entry.queued_pr_payload["patch"] == "diff"
+    assert entry.queued_pr_payload["reconciliation"]["last_error"] == "GitHub 500"
+
+
+def test_mark_queued_pr_dead_letter_preserves_payload_for_debugging() -> None:
+    store = FailureStore()
+    report = FailureReport(
+        workflow_name="CI",
+        job_name="job",
+        matrix_params={},
+        commit_sha="abc123",
+        failure_source="trusted",
+        repo_full_name="owner/repo",
+        workflow_run_id=7,
+        target_branch="unstable",
+    )
+    root_cause = RootCauseReport(
+        description="root cause",
+        files_to_change=["src/foo.c"],
+        confidence="high",
+        rationale="because",
+        is_flaky=False,
+        flakiness_indicators=None,
+    )
+    store.record_queued_pr("fp1", report, root_cause, "diff", "unstable")
+    store.record_queued_pr_failure("fp1", "GitHub 500")
+
+    store.mark_queued_pr_dead_letter("fp1", "GitHub 500")
+
+    entry = store.entries["fp1"]
+    assert entry.status == "queued-pr-dead-letter"
+    assert entry.queued_pr_payload is not None
+    assert entry.queued_pr_payload["patch"] == "diff"
+    assert (
+        entry.queued_pr_payload["reconciliation"]["dead_letter_reason"]
+        == "GitHub 500"
+    )
+
+
+def test_reconcile_pr_states_returns_maintainer_outcome_transitions() -> None:
+    repo = MagicMock()
+    pr = MagicMock()
+    pr.merged = True
+    pr.state = "closed"
+    repo.get_pull.return_value = pr
+    gh = MagicMock()
+    gh.get_repo.return_value = repo
+    store = FailureStore(gh, "owner/repo")
+    store.entries["fp1"] = FailureStoreEntry(
+        fingerprint="fp1",
+        failure_identifier="test-cache-flush",
+        test_name="test-cache-flush",
+        incident_key="fp1",
+        error_signature="boom",
+        file_path="tests/unit/cache.tcl",
+        pr_url="https://github.com/owner/repo/pull/42",
+        status="open",
+        created_at="2026-04-08T00:00:00+00:00",
+        updated_at="2026-04-08T00:00:00+00:00",
+    )
+
+    transitions = store.reconcile_pr_states()
+
+    assert store.entries["fp1"].status == "merged"
+    assert len(transitions) == 1
+    assert transitions[0].fingerprint == "fp1"
+    assert transitions[0].pr_number == 42
+    assert transitions[0].previous_status == "open"
+    assert transitions[0].new_status == "merged"
+    assert transitions[0].merged is True
+
+
 def test_load_raises_on_non_missing_remote_error() -> None:
     repo = MagicMock()
     repo.get_contents.side_effect = GithubException(500, {"message": "boom"})

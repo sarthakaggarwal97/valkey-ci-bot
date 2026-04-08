@@ -218,10 +218,24 @@ class TestUntrustedForkSkip:
 # ---------------------------------------------------------------------------
 
 class TestNoMatchingProfile:
-    def test_uses_fallback_when_no_profile_matches(self):
+    def test_missing_profile_fails_closed_by_default(self):
         config = _make_config(profiles=[
             _make_profile(job_name_pattern="^completely-different$"),
         ])
+        runner = ValidationRunner(config, repo_clone_url="https://github.com/owner/repo.git")
+        report = _make_failure_report(job_name="test-sanitizer-address")
+
+        result = runner.validate("some patch", report)
+
+        assert result.passed is False
+        assert result.strategy == "missing-validation-profile"
+        assert "missing-validation-profile" in result.output
+
+    def test_uses_fallback_when_explicitly_allowed(self):
+        config = _make_config(profiles=[
+            _make_profile(job_name_pattern="^completely-different$"),
+        ])
+        config.require_validation_profile = False
         runner = ValidationRunner(config, repo_clone_url="https://github.com/owner/repo.git")
         report = _make_failure_report(job_name="test-sanitizer-address")
 
@@ -233,7 +247,6 @@ class TestNoMatchingProfile:
              ):
             result = runner.validate("some patch", report)
 
-        # Fallback profile is used instead of returning failure
         assert result.passed is True
 
 

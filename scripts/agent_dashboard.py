@@ -15,6 +15,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from scripts.event_ledger import parse_events
+
 
 JsonObject = dict[str, Any]
 
@@ -29,6 +31,7 @@ _SNAPSHOT_LABELS = {
     "fuzzer_anomalous_runs": "Fuzzer anomalous runs",
     "daily_runs_seen": "Daily runs seen",
     "ai_token_usage": "AI token usage",
+    "agent_events": "Agent events",
     "instrumentation_gaps": "Instrumentation gaps",
 }
 
@@ -87,6 +90,23 @@ def _load_many(paths: list[str]) -> tuple[list[Any], list[str]]:
         if payload is not None:
             payloads.append(payload)
     return payloads, warnings
+
+
+def _load_event_logs(paths: list[str]) -> tuple[list[JsonObject], list[str]]:
+    events: list[JsonObject] = []
+    warnings: list[str] = []
+    for path in paths:
+        if not path:
+            continue
+        file_path = Path(path)
+        if not file_path.exists():
+            warnings.append(f"{path} was not present")
+            continue
+        try:
+            events.extend(parse_events(file_path.read_text(encoding="utf-8")))
+        except OSError as exc:
+            warnings.append(f"{path} could not be read: {exc}")
+    return events, warnings
 
 
 def _failure_entries(failure_store: JsonObject) -> list[JsonObject]:
@@ -336,6 +356,37 @@ def _build_fuzzer_metrics(fuzzer_results: list[JsonObject]) -> JsonObject:
     }
 
 
+def _build_agent_outcome_metrics(events: list[JsonObject]) -> JsonObject:
+    """Build outcome-oriented metrics from the append-only event ledger."""
+    event_type_counts = Counter(
+        _str(event.get("event_type"), "unknown")
+        for event in events
+    )
+    subject_counts = Counter(
+        _str(event.get("subject"), "unknown")
+        for event in events
+    )
+    pr_created = event_type_counts.get("pr.created", 0)
+    pr_merged = event_type_counts.get("pr.merged", 0)
+    pr_closed_without_merge = event_type_counts.get("pr.closed_without_merge", 0)
+    validation_passed = event_type_counts.get("validation.passed", 0)
+    validation_failed = event_type_counts.get("validation.failed", 0)
+    dead_lettered = event_type_counts.get("fix.dead_lettered", 0)
+    recent_events = _recent(events, "created_at", limit=15)
+    return {
+        "events": len(events),
+        "event_type_counts": _counter_dict(event_type_counts),
+        "subjects": len(subject_counts),
+        "validation_passed": validation_passed,
+        "validation_failed": validation_failed,
+        "prs_created": pr_created,
+        "prs_merged": pr_merged,
+        "prs_closed_without_merge": pr_closed_without_merge,
+        "dead_lettered": dead_lettered,
+        "recent_events": recent_events,
+    }
+
+
 def _build_ai_reliability_metrics(
     rate_state: JsonObject,
     review_metrics: JsonObject,
@@ -346,6 +397,14 @@ def _build_ai_reliability_metrics(
         str(key): _int(value)
         for key, value in raw_ai_metrics.items()
     }
+    prompt_safety_checked = ai_metrics.get("bedrock.prompt_safety_guard.checked", 0)
+    prompt_safety_present = ai_metrics.get("bedrock.prompt_safety_guard.present", 0)
+    prompt_safety_missing = ai_metrics.get("bedrock.prompt_safety_guard.missing", 0)
+    prompt_safety_coverage = (
+        round(prompt_safety_present / prompt_safety_checked, 4)
+        if prompt_safety_checked
+        else 0.0
+    )
     return {
         "token_usage": _int(rate_state.get("token_usage")),
         "token_window_start": _str(rate_state.get("token_window_start"), "unknown"),
@@ -369,13 +428,13 @@ def _build_ai_reliability_metrics(
         "bedrock_retries": ai_metrics.get("bedrock.retries", 0),
         "retry_exhaustions": ai_metrics.get("bedrock.errors.retry_exhausted", 0),
         "non_retryable_errors": ai_metrics.get("bedrock.errors.non_retryable", 0),
+        "prompt_safety_checked": prompt_safety_checked,
+        "prompt_safety_present": prompt_safety_present,
+        "prompt_safety_missing": prompt_safety_missing,
+        "prompt_safety_coverage": prompt_safety_coverage,
         "review_model_followups": review_metrics["model_followup_counts"],
         "fuzzer_raw_log_fallbacks": fuzzer_metrics["raw_log_fallbacks"],
-        "instrumentation_gaps": [
-            "Retrieval hit counts and source coverage are not persisted yet.",
-            "Prompt-safety guard coverage is not persisted yet.",
-            "Reviewer verifier dropped-finding counts are not persisted yet.",
-        ],
+        "instrumentation_gaps": [],
     }
 
 
@@ -404,6 +463,7 @@ def build_dashboard(
     daily_results: list[JsonObject] | None = None,
     fuzzer_results: list[JsonObject] | None = None,
     acceptance_results: list[JsonObject] | None = None,
+    events: list[JsonObject] | None = None,
     input_warnings: list[str] | None = None,
     generated_at: str | None = None,
 ) -> JsonObject:
@@ -415,6 +475,7 @@ def build_dashboard(
     daily_results = daily_results or []
     fuzzer_results = fuzzer_results or []
     acceptance_results = acceptance_results or []
+    events = events or []
     input_warnings = input_warnings or []
 
     ci_failures = _build_ci_failure_metrics(
@@ -425,6 +486,7 @@ def build_dashboard(
     flaky_tests = _build_flaky_metrics(failure_store)
     review_metrics = _build_review_metrics(review_state, acceptance_results)
     fuzzer_metrics = _build_fuzzer_metrics(fuzzer_results)
+    agent_outcomes = _build_agent_outcome_metrics(events)
     ai_reliability = _build_ai_reliability_metrics(
         rate_state,
         review_metrics,
@@ -441,6 +503,7 @@ def build_dashboard(
         "fuzzer_anomalous_runs": fuzzer_metrics["status_counts"].get("anomalous", 0),
         "daily_runs_seen": ci_failures["daily_runs_seen"],
         "ai_token_usage": ai_reliability["token_usage"],
+        "agent_events": agent_outcomes["events"],
         "instrumentation_gaps": len(ai_reliability["instrumentation_gaps"]),
     }
     return {
@@ -450,6 +513,7 @@ def build_dashboard(
         "flaky_tests": flaky_tests,
         "pr_reviews": review_metrics,
         "fuzzer": fuzzer_metrics,
+        "agent_outcomes": agent_outcomes,
         "ai_reliability": ai_reliability,
         "state_health": state_health,
     }
@@ -495,6 +559,7 @@ def render_markdown(dashboard: JsonObject) -> str:
     flaky_tests = _mapping(dashboard.get("flaky_tests"))
     pr_reviews = _mapping(dashboard.get("pr_reviews"))
     fuzzer = _mapping(dashboard.get("fuzzer"))
+    agent_outcomes = _mapping(dashboard.get("agent_outcomes"))
     ai_reliability = _mapping(dashboard.get("ai_reliability"))
     state_health = _mapping(dashboard.get("state_health"))
 
@@ -569,6 +634,42 @@ def render_markdown(dashboard: JsonObject) -> str:
                 ["Daily job outcomes", _status_counts_text(_mapping(ci_failures.get("daily_job_outcome_counts")))],
             ],
             empty="No CI failure data was available.",
+        ),
+        "",
+        "## Agent Outcome Ledger",
+        "",
+        _table(
+            ["Signal", "Value"],
+            [
+                ["Events", agent_outcomes.get("events", 0)],
+                ["Subjects", agent_outcomes.get("subjects", 0)],
+                ["Validation passed", agent_outcomes.get("validation_passed", 0)],
+                ["Validation failed", agent_outcomes.get("validation_failed", 0)],
+                ["PRs created", agent_outcomes.get("prs_created", 0)],
+                ["PRs merged", agent_outcomes.get("prs_merged", 0)],
+                [
+                    "PRs closed without merge",
+                    agent_outcomes.get("prs_closed_without_merge", 0),
+                ],
+                ["Dead-lettered fixes", agent_outcomes.get("dead_lettered", 0)],
+                ["Event types", _status_counts_text(_mapping(agent_outcomes.get("event_type_counts")))],
+            ],
+            empty="No event ledger data was available.",
+        ),
+        "",
+        _table(
+            ["Time", "Type", "Subject", "Attributes"],
+            [
+                [
+                    event.get("created_at", ""),
+                    event.get("event_type", ""),
+                    event.get("subject", ""),
+                    json.dumps(_mapping(event.get("attributes")), sort_keys=True)[:240],
+                ]
+                for event in _list(agent_outcomes.get("recent_events"))
+                if isinstance(event, dict)
+            ],
+            empty="No recent agent events were present.",
         ),
         "",
         "## PR Review Dashboard",
@@ -656,6 +757,10 @@ def render_markdown(dashboard: JsonObject) -> str:
                 ["Bedrock retries", ai_reliability.get("bedrock_retries", 0)],
                 ["Retry exhaustions", ai_reliability.get("retry_exhaustions", 0)],
                 ["Non-retryable errors", ai_reliability.get("non_retryable_errors", 0)],
+                ["Prompt-safety guard checks", ai_reliability.get("prompt_safety_checked", 0)],
+                ["Prompt-safety guard present", ai_reliability.get("prompt_safety_present", 0)],
+                ["Prompt-safety guard missing", ai_reliability.get("prompt_safety_missing", 0)],
+                ["Prompt-safety guard coverage", ai_reliability.get("prompt_safety_coverage", 0.0)],
                 ["Review model followups", _status_counts_text(_mapping(ai_reliability.get("review_model_followups")))],
                 ["Fuzzer raw log fallbacks", ai_reliability.get("fuzzer_raw_log_fallbacks", 0)],
             ],
@@ -726,6 +831,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--daily-result", action="append", default=[])
     parser.add_argument("--fuzzer-result", action="append", default=[])
     parser.add_argument("--acceptance-result", action="append", default=[])
+    parser.add_argument("--event-log", action="append", default=[])
     parser.add_argument("--output-markdown", default="agent-dashboard.md")
     parser.add_argument("--output-json", default="agent-dashboard.json")
     return parser
@@ -753,6 +859,8 @@ def main(argv: list[str] | None = None) -> int:
     input_warnings.extend(warnings)
     acceptance_payloads, warnings = _load_many(args.acceptance_result)
     input_warnings.extend(warnings)
+    events, warnings = _load_event_logs(args.event_log)
+    input_warnings.extend(warnings)
 
     dashboard = build_dashboard(
         failure_store=_mapping(failure_store),
@@ -764,6 +872,7 @@ def main(argv: list[str] | None = None) -> int:
         acceptance_results=_acceptance_results(
             [_mapping(result) for result in acceptance_payloads]
         ),
+        events=events,
         input_warnings=input_warnings,
     )
     Path(args.output_json).write_text(

@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 from datetime import datetime, timezone
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING
 
 from github.GithubException import GithubException
@@ -34,6 +34,19 @@ logger = logging.getLogger(__name__)
 _STORE_BRANCH = "bot-data"
 _STORE_FILE = "failure-store.json"
 _MAX_ERROR_SIGNATURE_CHARS = 10_000
+
+
+@dataclass
+class PRStateTransition:
+    """One observed transition for a bot-created PR."""
+
+    fingerprint: str
+    pr_url: str
+    pr_number: int
+    previous_status: str
+    new_status: str
+    github_state: str
+    merged: bool
 
 
 def _is_missing_store_error(exc: Exception) -> bool:
@@ -432,6 +445,59 @@ class FailureStore:
                 entry.campaign_status = campaign.status
                 entry.updated_at = campaign.updated_at
 
+    def record_queued_pr_failure(self, fingerprint: str, error: str) -> int:
+        """Record a failed reconciliation attempt while keeping the fix queued."""
+        now = datetime.now(timezone.utc).isoformat()
+        entry = self.get_entry(fingerprint)
+        if entry is None:
+            return 0
+        payload = dict(entry.queued_pr_payload or {})
+        reconciliation = payload.get("reconciliation", {})
+        if not isinstance(reconciliation, dict):
+            reconciliation = {}
+        attempts = int(reconciliation.get("attempts", 0)) + 1
+        reconciliation.update({
+            "attempts": attempts,
+            "last_error": str(error),
+            "last_attempt_at": now,
+        })
+        payload["reconciliation"] = reconciliation
+        entry.queued_pr_payload = payload
+        entry.status = "queued-pr-retry"
+        entry.updated_at = now
+        campaign = self._campaigns.get(fingerprint)
+        if campaign is not None:
+            campaign.queued_pr_payload = payload
+            campaign.status = "queued-pr-retry"
+            campaign.updated_at = now
+            entry.campaign_status = campaign.status
+        return attempts
+
+    def mark_queued_pr_dead_letter(self, fingerprint: str, error: str) -> None:
+        """Move a queued PR payload out of the active retry queue."""
+        now = datetime.now(timezone.utc).isoformat()
+        entry = self.get_entry(fingerprint)
+        if entry is not None:
+            payload = dict(entry.queued_pr_payload or {})
+            reconciliation = payload.get("reconciliation", {})
+            if not isinstance(reconciliation, dict):
+                reconciliation = {}
+            reconciliation.update({
+                "dead_lettered_at": now,
+                "dead_letter_reason": str(error),
+            })
+            payload["reconciliation"] = reconciliation
+            entry.queued_pr_payload = payload
+            entry.status = "queued-pr-dead-letter"
+            entry.updated_at = now
+        campaign = self._campaigns.get(fingerprint)
+        if campaign is not None:
+            campaign.status = "queued-pr-dead-letter"
+            campaign.updated_at = now
+            if entry is not None:
+                campaign.queued_pr_payload = entry.queued_pr_payload
+                entry.campaign_status = campaign.status
+
     def record_failure_observation(
         self,
         report: FailureReport,
@@ -661,13 +727,14 @@ class FailureStore:
             campaign.status = "abandoned"
             campaign.updated_at = datetime.now(timezone.utc).isoformat()
 
-    def reconcile_pr_states(self) -> None:
+    def reconcile_pr_states(self) -> list[PRStateTransition]:
         """Reconcile store entries against actual PR states via GitHub API."""
         if not self._gh or not self._repo_name:
             logger.warning("Cannot reconcile: no GitHub client or repo configured.")
-            return
+            return []
 
         repo = self._gh.get_repo(self._repo_name)
+        transitions: list[PRStateTransition] = []
         for fingerprint, entry in self._entries.items():
             if entry.status not in ("open", "processing"):
                 continue
@@ -677,6 +744,7 @@ class FailureStore:
                 # Extract PR number from URL
                 pr_number = int(entry.pr_url.rstrip("/").split("/")[-1])
                 pr = repo.get_pull(pr_number)
+                previous_status = entry.status
                 if pr.merged:
                     entry.status = "merged"
                     if entry.campaign_status:
@@ -694,8 +762,21 @@ class FailureStore:
                         campaign.status = "abandoned"
                         campaign.updated_at = datetime.now(timezone.utc).isoformat()
                 entry.updated_at = datetime.now(timezone.utc).isoformat()
+                if entry.status != previous_status:
+                    transitions.append(
+                        PRStateTransition(
+                            fingerprint=fingerprint,
+                            pr_url=entry.pr_url,
+                            pr_number=pr_number,
+                            previous_status=previous_status,
+                            new_status=entry.status,
+                            github_state=str(pr.state),
+                            merged=bool(pr.merged),
+                        )
+                    )
             except Exception as exc:
                 logger.warning("Failed to reconcile PR for %s: %s", fingerprint, exc)
+        return transitions
 
     def to_dict(self) -> dict:
         """Serialize the store to a JSON-compatible dict."""

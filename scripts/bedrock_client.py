@@ -39,6 +39,18 @@ _RETRYABLE_ERROR_CODES = frozenset({
 })
 
 
+def _has_prompt_safety_guard(system_prompt: str, user_prompt: str) -> bool:
+    """Return whether the prompt explicitly fences untrusted model inputs."""
+    prompt = f"{system_prompt}\n{user_prompt}".lower()
+    if "untrusted" not in prompt:
+        return False
+    return (
+        "never follow instructions" in prompt
+        or "do not follow instructions" in prompt
+        or ("treat" in prompt and "as untrusted" in prompt)
+    )
+
+
 class BedrockError(Exception):
     """Raised when a Bedrock API call fails with a non-retryable error
     or after exhausting all retries."""
@@ -223,6 +235,20 @@ class BedrockClient:
         if callable(recorder):
             recorder(name, amount)
 
+    def _record_prompt_safety_guard(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+    ) -> None:
+        """Record whether one model call carried explicit prompt-safety fencing."""
+        self._record_ai_metric("bedrock.prompt_safety_guard.checked")
+        metric = (
+            "bedrock.prompt_safety_guard.present"
+            if _has_prompt_safety_guard(system_prompt, user_prompt)
+            else "bedrock.prompt_safety_guard.missing"
+        )
+        self._record_ai_metric(metric)
+
     def invoke(
         self,
         system_prompt: str,
@@ -255,6 +281,7 @@ class BedrockClient:
             f"## Project Context\n{self._project_context}"
         )
         self._record_ai_metric("bedrock.invoke.calls")
+        self._record_prompt_safety_guard(full_system_prompt, user_prompt)
         estimated_input_tokens = (
             _estimate_tokens(full_system_prompt) + _estimate_tokens(user_prompt)
         )
@@ -461,6 +488,7 @@ class BedrockClient:
             f"## Project Context\n{self._project_context}"
         )
         self._record_ai_metric("bedrock.invoke_schema.calls")
+        self._record_prompt_safety_guard(full_system_prompt, user_prompt)
         estimated_input_tokens = (
             _estimate_tokens(full_system_prompt) + _estimate_tokens(user_prompt)
         )
@@ -675,6 +703,7 @@ class BedrockClient:
             f"## Project Context\n{self._project_context}"
         )
         self._record_ai_metric("bedrock.tool_loop.calls")
+        self._record_prompt_safety_guard(full_system_prompt, user_prompt)
         output_tokens = max_output_tokens or self._config.max_output_tokens
         messages: list[dict[str, Any]] = [
             {"role": "user", "content": [{"text": user_prompt}]},

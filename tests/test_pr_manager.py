@@ -74,7 +74,7 @@ def _make_root_cause(**overrides) -> RootCauseReport:
 SAMPLE_PATCH = """\
 --- a/src/foo.c
 +++ b/src/foo.c
-@@ -40,3 +40,3 @@
+@@ -1,3 +1,3 @@
  void foo() {
 -    for (int i = 0; i <= n; i++) {
 +    for (int i = 0; i < n; i++) {
@@ -84,7 +84,7 @@ SAMPLE_PATCH = """\
 MULTI_FILE_PATCH = """\
 --- a/src/foo.c
 +++ b/src/foo.c
-@@ -40,3 +40,3 @@
+@@ -1,3 +1,3 @@
  void foo() {
 -    for (int i = 0; i <= n; i++) {
 +    for (int i = 0; i < n; i++) {
@@ -277,7 +277,7 @@ class TestParseUnifiedDiff:
         assert "src/foo.c" in result
         hunks = result["src/foo.c"]
         assert len(hunks) == 1
-        assert hunks[0]["old_start"] == 40
+        assert hunks[0]["old_start"] == 1
 
     def test_parses_multiple_files(self):
         multi_patch = (
@@ -333,6 +333,32 @@ class TestApplyHunks:
         result = _apply_hunks("", hunks)
         assert "line1" in result
         assert "line2" in result
+
+    def test_context_mismatch_fails_closed(self):
+        original = "line1\nactual\nline3\n"
+        hunks = [{
+            "old_start": 2,
+            "old_count": 1,
+            "new_start": 2,
+            "new_count": 1,
+            "lines": [" expected"],
+        }]
+
+        with pytest.raises(ValueError, match="Patch context mismatch"):
+            _apply_hunks(original, hunks)
+
+    def test_deletion_mismatch_fails_closed(self):
+        original = "line1\nactual\nline3\n"
+        hunks = [{
+            "old_start": 2,
+            "old_count": 1,
+            "new_start": 2,
+            "new_count": 0,
+            "lines": ["-expected"],
+        }]
+
+        with pytest.raises(ValueError, match="Patch deletion mismatch"):
+            _apply_hunks(original, hunks)
 
 
 # ---------------------------------------------------------------------------
@@ -481,6 +507,21 @@ class TestCreatePR:
         repo.create_pull.assert_not_called()
         fp = _compute_fingerprint(report)
         assert store.entries[fp].pr_url == existing_pr.html_url
+
+    def test_existing_branch_is_reset_before_patch_application(self):
+        repo = _make_mock_repo()
+        repo.create_git_ref.side_effect = GithubException(
+            422,
+            {"message": "Reference already exists"},
+        )
+        mgr, _, _ = _make_pr_manager(repo=repo)
+        report = _make_failure_report()
+        root_cause = _make_root_cause()
+
+        mgr.create_pr(SAMPLE_PATCH, report, root_cause, "unstable")
+
+        repo.branch_ref.edit.assert_any_call(report.commit_sha, force=True)
+        repo.branch_ref.edit.assert_any_call(repo.new_commit.sha)
 
 
 class TestForkPRSkip:

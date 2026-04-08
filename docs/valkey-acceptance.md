@@ -18,6 +18,12 @@ It does that in two layers:
 - review coverage accounting
 - readiness follow-up flags for empty summaries or incomplete model coverage
 
+3. Replay scorecard
+- review pass/fail counts
+- CI replay cases queued for manual execution
+- backport replay cases queued for manual execution
+- overall readiness verdict
+
 The harness does not post comments or open PRs. It is safe to run against
 real Valkey pull requests as long as you provide read-capable GitHub access
 and Bedrock credentials only when you want to execute the model passes.
@@ -67,3 +73,11 @@ export CI_BOT_REQUIRE_DCO_SIGNOFF=true
 
 The acceptance report will include the exact replay commands for CI-failure
 and backport cases, using those environment variables.
+
+## Replay Lab Workflow
+
+The manual `.github/workflows/agent-replay-lab.yml` workflow runs the same
+acceptance harness, publishes the Markdown report to the workflow summary, and
+uploads the Markdown/JSON scorecard as artifacts. Use it before public rollout
+and after prompt/model changes so capability changes are measured against the
+same replay manifest.

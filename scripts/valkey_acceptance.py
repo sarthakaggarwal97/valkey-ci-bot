@@ -96,6 +96,21 @@ class AcceptanceManifest:
 
 
 @dataclass
+class AcceptanceScorecard:
+    """High-level replay/eval scorecard for rollout readiness."""
+
+    review_cases: int
+    review_passed: int
+    review_failed: int
+    ci_replay_cases: int
+    backport_replay_cases: int
+
+    @property
+    def readiness(self) -> str:
+        return "pass" if self.review_failed == 0 else "needs-follow-up"
+
+
+@dataclass
 class ReviewPolicySignals:
     """Deterministic policy checks derived from PR metadata."""
 
@@ -153,6 +168,22 @@ class ReviewCaseResult:
             all(check.passed for check in self.expectation_checks)
             and not self.model_followups
         )
+
+
+def _build_scorecard(
+    manifest: AcceptanceManifest,
+    results: list[ReviewCaseResult],
+) -> AcceptanceScorecard:
+    """Build a rollout scorecard from acceptance results and replay cases."""
+    review_passed = sum(1 for result in results if result.passed)
+    review_failed = len(results) - review_passed
+    return AcceptanceScorecard(
+        review_cases=len(results),
+        review_passed=review_passed,
+        review_failed=review_failed,
+        ci_replay_cases=len(manifest.ci_cases),
+        backport_replay_cases=len(manifest.backport_cases),
+    )
 
 
 def _coerce_bool_or_none(value: Any) -> bool | None:
@@ -586,6 +617,7 @@ def _render_report(
 ) -> str:
     """Render the full markdown report."""
     signer = load_signer_from_env()
+    scorecard = _build_scorecard(manifest, results)
     lines = [
         "# Valkey Acceptance Report",
         "",
@@ -600,6 +632,16 @@ def _render_report(
         ),
         (
             f"- Require DCO signoff: `{require_dco_signoff_from_env()}`"
+        ),
+        "",
+        "## Readiness Scorecard",
+        "",
+        f"- Verdict: `{scorecard.readiness}`",
+        f"- Review cases: `{scorecard.review_passed}/{scorecard.review_cases}` passed",
+        f"- CI replay cases queued for manual execution: `{scorecard.ci_replay_cases}`",
+        (
+            "- Backport replay cases queued for manual execution: "
+            f"`{scorecard.backport_replay_cases}`"
         ),
         "",
         "## Review Cases",
@@ -717,8 +759,13 @@ def main(argv: list[str] | None = None) -> int:
         print(report)
 
     if args.json_output:
+        scorecard = _build_scorecard(manifest, results)
         payload = {
             "manifest": asdict(manifest),
+            "scorecard": {
+                **asdict(scorecard),
+                "readiness": scorecard.readiness,
+            },
             "results": [
                 {
                     "name": result.name,

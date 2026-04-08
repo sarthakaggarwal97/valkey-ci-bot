@@ -101,10 +101,10 @@ _GROUPING_TOKEN_BLACKLIST = frozenset({
 })
 
 _FOCUSED_AGENTIC_FILE_LIMIT = 25
-_MIN_AGENTIC_FETCHES = 100
+_MIN_AGENTIC_FETCHES = 20
 _MAX_AGENTIC_FETCHES = 100
-_MIN_AGENTIC_TURNS = 100
-_MAX_AGENTIC_TURNS = 100
+_MIN_AGENTIC_TURNS = 20
+_MAX_AGENTIC_TURNS = 80
 
 _SPECULATIVE_SUBSTRINGS = (
     "not shown in the diff",
@@ -548,8 +548,8 @@ def _chunk_diff_scope(scope: DiffScope, *, max_chars_per_chunk: int = 180_000) -
 def _agentic_review_budgets(scope: DiffScope) -> tuple[int, int]:
     """Return fetch and turn budgets for one agentic review pass."""
     file_count = max(1, len(scope.files))
-    max_fetches = min(_MAX_AGENTIC_FETCHES, max(_MIN_AGENTIC_FETCHES, file_count * 4))
-    max_turns = min(_MAX_AGENTIC_TURNS, max(_MIN_AGENTIC_TURNS, file_count * 3))
+    max_fetches = min(_MAX_AGENTIC_FETCHES, max(_MIN_AGENTIC_FETCHES, 10 + file_count * 6))
+    max_turns = min(_MAX_AGENTIC_TURNS, max(_MIN_AGENTIC_TURNS, 8 + file_count * 4))
     return max_fetches, max_turns
 
 
@@ -2162,6 +2162,17 @@ class CodeReviewer:
         """Return metadata from the most recent review pass."""
         return self._last_review_coverage
 
+    def _record_review_metric(self, name: str, amount: int = 1) -> None:
+        """Best-effort reviewer metric recording through the shared Bedrock client."""
+        recorder = getattr(self._bedrock, "_record_ai_metric", None)
+        if callable(recorder):
+            recorder(name, amount)
+            return
+        limiter = getattr(self._bedrock, "_rate_limiter", None)
+        limiter_recorder = getattr(limiter, "record_ai_metric", None)
+        if callable(limiter_recorder):
+            limiter_recorder(name, amount)
+
     def classify_simple_change(self, files: list[ChangedFile]) -> bool:
         """Return ``True`` for changes that are likely trivial."""
         if not files:
@@ -3055,6 +3066,13 @@ CRITICAL rules:
             filtered_speculative,
             len(drafts),
         )
+        self._record_review_metric("reviewer.findings.filtered_path", filtered_path)
+        self._record_review_metric("reviewer.findings.filtered_lgtm", filtered_lgtm)
+        self._record_review_metric(
+            "reviewer.findings.filtered_speculative",
+            filtered_speculative,
+        )
+        self._record_review_metric("reviewer.findings.normalized_kept", len(drafts))
         return drafts
 
     def _verify_candidates(
@@ -3172,12 +3190,17 @@ Return JSON only:
                 temperature=0.0,
             )
         except Exception as exc:
-            logger.warning("Reviewer verification failed: %s. Keeping generated findings.", exc)
-            return drafts
+            logger.warning("Reviewer verification failed: %s. Withholding generated findings.", exc)
+            self._record_review_metric("reviewer.verifier.errors")
+            return []
 
         if not isinstance(payload, dict) or not isinstance(payload.get("results"), list):
-            logger.warning("Reviewer verification returned an unexpected payload. Keeping generated findings.")
-            return drafts
+            logger.warning(
+                "Reviewer verification returned an unexpected payload. "
+                "Withholding generated findings."
+            )
+            self._record_review_metric("reviewer.verifier.invalid_payload")
+            return []
 
         result_map: dict[int, dict[str, Any]] = {}
         for raw_result in payload["results"]:
@@ -3222,6 +3245,11 @@ Return JSON only:
             "Verification kept %d of %d candidate finding(s).",
             len(verified),
             len(drafts),
+        )
+        self._record_review_metric("reviewer.verifier.kept", len(verified))
+        self._record_review_metric(
+            "reviewer.verifier.dropped",
+            max(0, len(drafts) - len(verified)),
         )
         return verified
 

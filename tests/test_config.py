@@ -75,6 +75,7 @@ full_config_strategy = st.fixed_dictionaries({
         "max_prs_per_day": positive_int,
         "max_failures_per_run": positive_int,
         "max_open_bot_prs": positive_int,
+        "queued_pr_max_attempts": positive_int,
         "daily_token_budget": positive_int,
     }),
     "fix_generation": st.fixed_dictionaries({
@@ -87,6 +88,9 @@ full_config_strategy = st.fixed_dictionaries({
         "max_attempts_per_run": st.integers(min_value=1, max_value=10),
         "validation_passes": st.integers(min_value=1, max_value=10),
         "max_failed_hypotheses": st.integers(min_value=1, max_value=100),
+    }),
+    "validation": st.fixed_dictionaries({
+        "require_profile": st.booleans(),
     }),
     "monitored_workflows": st.lists(workflow_file, min_size=1, max_size=6),
     "retrieval": st.fixed_dictionaries({
@@ -130,6 +134,7 @@ def test_config_round_trip_all_fields(config_data: dict) -> None:
         assert cfg.max_prs_per_day == config_data["limits"]["max_prs_per_day"]
         assert cfg.max_failures_per_run == config_data["limits"]["max_failures_per_run"]
         assert cfg.max_open_bot_prs == config_data["limits"]["max_open_bot_prs"]
+        assert cfg.queued_pr_max_attempts == config_data["limits"]["queued_pr_max_attempts"]
         assert cfg.daily_token_budget == config_data["limits"]["daily_token_budget"]
 
         # Fix generation section
@@ -142,6 +147,9 @@ def test_config_round_trip_all_fields(config_data: dict) -> None:
         assert cfg.flaky_max_attempts_per_run == config_data["flaky_campaign"]["max_attempts_per_run"]
         assert cfg.flaky_validation_passes == config_data["flaky_campaign"]["validation_passes"]
         assert cfg.flaky_max_failed_hypotheses == config_data["flaky_campaign"]["max_failed_hypotheses"]
+
+        # Validation section
+        assert cfg.require_validation_profile == config_data["validation"]["require_profile"]
 
         # Monitored workflows
         assert cfg.monitored_workflows == config_data["monitored_workflows"]
@@ -195,11 +203,13 @@ def test_missing_config_returns_defaults() -> None:
     assert cfg.max_prs_per_day == defaults.max_prs_per_day
     assert cfg.max_failures_per_run == defaults.max_failures_per_run
     assert cfg.max_open_bot_prs == defaults.max_open_bot_prs
+    assert cfg.queued_pr_max_attempts == defaults.queued_pr_max_attempts
     assert cfg.daily_token_budget == defaults.daily_token_budget
     assert cfg.flaky_campaign_enabled == defaults.flaky_campaign_enabled
     assert cfg.flaky_max_attempts_per_run == defaults.flaky_max_attempts_per_run
     assert cfg.flaky_validation_passes == defaults.flaky_validation_passes
     assert cfg.flaky_max_failed_hypotheses == defaults.flaky_max_failed_hypotheses
+    assert cfg.require_validation_profile == defaults.require_validation_profile
     assert cfg.retrieval == defaults.retrieval
 
     # Project defaults

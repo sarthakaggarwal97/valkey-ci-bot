@@ -414,7 +414,7 @@ class PRManager:
         branch_name: str,
         base_sha: str,
     ) -> None:
-        """Create the working branch when it does not already exist."""
+        """Create the working branch or reset an existing bot branch to base."""
         try:
             repo.create_git_ref(
                 ref=f"refs/heads/{branch_name}",
@@ -422,6 +422,13 @@ class PRManager:
             )
         except GithubException as exc:
             if exc.status == 422:
+                logger.info(
+                    "Branch %s already exists; resetting it to %s before patching.",
+                    branch_name,
+                    base_sha[:12],
+                )
+                branch_ref = repo.get_git_ref(f"heads/{branch_name}")
+                branch_ref.edit(base_sha, force=True)
                 return
             raise
 
@@ -552,6 +559,12 @@ def _parse_unified_diff(patch: str) -> dict[str, list[dict]]:
     current_hunk: dict | None = None
 
     for line in patch.split("\n"):
+        # File headers are not hunk content. In multi-file patches, the
+        # ``--- a/path`` header would otherwise look like a removed line.
+        if re.match(r"^--- a/(.+)$", line):
+            current_hunk = None
+            continue
+
         # Detect target file
         m = re.match(r"^\+\+\+ b/(.+)$", line)
         if m:
@@ -601,6 +614,12 @@ def _apply_hunks(original: str, hunks: list[dict]) -> str:
         # old_start is 1-based; for new files (@@ -0,0 +1,N @@) it is 0.
         hunk_start = hunk["old_start"] - 1 if hunk["old_start"] > 0 else 0
 
+        if hunk_start > len(original_lines):
+            raise ValueError(
+                f"Patch hunk starts at line {hunk_start + 1}, "
+                f"past end of file with {len(original_lines)} line(s)."
+            )
+
         # Copy lines before this hunk
         while orig_idx < hunk_start and orig_idx < len(original_lines):
             result_lines.append(original_lines[orig_idx])
@@ -611,16 +630,31 @@ def _apply_hunks(original: str, hunks: list[dict]) -> str:
             if diff_line.startswith("+"):
                 result_lines.append(diff_line[1:])
             elif diff_line.startswith("-"):
-                orig_idx += 1  # skip removed line
-            elif diff_line.startswith(" "):
-                # Validate context line matches the original when possible.
                 expected = diff_line[1:]
-                if orig_idx < len(original_lines) and original_lines[orig_idx] != expected:
-                    logger.warning(
-                        "Context line mismatch at line %d: expected %r, got %r",
-                        orig_idx + 1,
-                        expected,
-                        original_lines[orig_idx],
+                if orig_idx >= len(original_lines):
+                    raise ValueError(
+                        "Patch deletion exceeded original file length: "
+                        f"expected {expected!r}."
+                    )
+                if original_lines[orig_idx] != expected:
+                    raise ValueError(
+                        "Patch deletion mismatch at line "
+                        f"{orig_idx + 1}: expected {expected!r}, "
+                        f"got {original_lines[orig_idx]!r}."
+                    )
+                orig_idx += 1
+            elif diff_line.startswith(" "):
+                expected = diff_line[1:]
+                if orig_idx >= len(original_lines):
+                    raise ValueError(
+                        "Patch context exceeded original file length: "
+                        f"expected {expected!r}."
+                    )
+                if original_lines[orig_idx] != expected:
+                    raise ValueError(
+                        "Patch context mismatch at line "
+                        f"{orig_idx + 1}: expected {expected!r}, "
+                        f"got {original_lines[orig_idx]!r}."
                     )
                 result_lines.append(expected)
                 orig_idx += 1
