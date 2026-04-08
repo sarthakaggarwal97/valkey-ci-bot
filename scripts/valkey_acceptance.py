@@ -133,8 +133,26 @@ class ReviewCaseResult:
     coverage: ReviewCoverage | None = None
 
     @property
+    def model_followups(self) -> list[str]:
+        """Return model-execution issues that should block acceptance."""
+        if self.summary is None:
+            return []
+
+        followups: list[str] = []
+        if not self.summary.walkthrough.strip():
+            followups.append("summary-empty")
+        if self.coverage is None:
+            followups.append("review-coverage-missing")
+        elif not self.coverage.complete:
+            followups.append("review-coverage-incomplete")
+        return followups
+
+    @property
     def passed(self) -> bool:
-        return all(check.passed for check in self.expectation_checks)
+        return (
+            all(check.passed for check in self.expectation_checks)
+            and not self.model_followups
+        )
 
 
 def _coerce_bool_or_none(value: Any) -> bool | None:
@@ -427,6 +445,16 @@ def _run_review_case(
         incremental=False,
     )
     triaged_files = reviewer.triage_files(diff_scope.files, review_context, config)
+    if not triaged_files:
+        result.coverage = ReviewCoverage(
+            requested_lgtm=True,
+            skipped_files=[
+                (changed_file.path, "approved by triage")
+                for changed_file in diff_scope.files
+            ],
+        )
+        return result
+
     triaged_scope = DiffScope(
         base_sha=diff_scope.base_sha,
         head_sha=diff_scope.head_sha,
@@ -451,7 +479,7 @@ def _render_review_case(result: ReviewCaseResult) -> str:
     """Render one review case as markdown."""
     lines = [f"### {result.name} (PR #{result.pr_number})"]
     lines.append(
-        f"- Acceptance policy checks: {'pass' if result.passed else 'needs follow-up'}"
+        f"- Acceptance verdict: {'pass' if result.passed else 'needs follow-up'}"
     )
     lines.append(
         "- Deterministic signals: "
@@ -472,6 +500,11 @@ def _render_review_case(result: ReviewCaseResult) -> str:
                 f"- Expectation `{check.label}`: {status} "
                 f"(expected `{check.expected}`, actual `{check.actual}`)"
             )
+    if result.model_followups:
+        lines.append(
+            "- Model follow-up: "
+            + ", ".join(f"`{item}`" for item in result.model_followups)
+        )
     if result.summary is not None:
         lines.append(f"- Summary: {result.summary.walkthrough or '(empty)'}")
     if result.coverage is not None:
@@ -693,6 +726,7 @@ def main(argv: list[str] | None = None) -> int:
                     "passed": result.passed,
                     "policy": asdict(result.policy),
                     "expectation_checks": [asdict(check) for check in result.expectation_checks],
+                    "model_followups": result.model_followups,
                     "summary": asdict(result.summary) if result.summary else None,
                     "findings": [asdict(finding) for finding in result.findings],
                     "coverage": asdict(result.coverage) if result.coverage else None,

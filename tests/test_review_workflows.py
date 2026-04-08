@@ -25,8 +25,9 @@ def test_review_workflow_checks_out_bot_repository() -> None:
     inputs = on_block["workflow_call"]["inputs"]
     secrets = on_block["workflow_call"]["secrets"]
 
-    # bot_repository/bot_ref removed for security — workflow always
-    # checks out its own repository at the called ref.
+    # The called workflow resolves its own repository/ref from the OIDC
+    # job_workflow_ref claim so actions/checkout does not default to the
+    # caller repository.
     assert "bot_repository" not in inputs
     assert "bot_ref" not in inputs
     assert "aws_region" in inputs
@@ -39,9 +40,15 @@ def test_review_workflow_checks_out_bot_repository() -> None:
         for step in workflow["jobs"]["review"]["steps"]
         if step["name"] == "Checkout bot repository"
     )
-    # No repository/ref override — uses the called workflow's own repo
-    assert "repository" not in checkout_step.get("with", {})
-    assert "ref" not in checkout_step.get("with", {})
+    resolve_step = next(
+        step
+        for step in workflow["jobs"]["review"]["steps"]
+        if step["name"] == "Resolve called workflow ref"
+    )
+    assert resolve_step["uses"] == "actions/github-script@v7"
+    assert "job_workflow_ref" in resolve_step["with"]["script"]
+    assert checkout_step["with"]["repository"] == "${{ steps.called-workflow.outputs.repository }}"
+    assert checkout_step["with"]["ref"] == "${{ steps.called-workflow.outputs.ref }}"
     assert checkout_step["uses"] == "actions/checkout@v6"
 
     assert workflow["jobs"]["review"]["permissions"]["id-token"] == "write"
@@ -64,7 +71,7 @@ def test_review_workflow_checks_out_bot_repository() -> None:
     )
     assert setup_step["uses"] == "actions/setup-python@v6"
     assert role_step["uses"] == "aws-actions/configure-aws-credentials@v5"
-    assert role_step["with"]["role-to-assume"] == "${{ secrets.AWS_ROLE_ARN || secrets.CI_BOT_AWS_ROLE_ARN }}"
+    assert role_step["with"]["role-to-assume"] == "${{ secrets.AWS_ROLE_ARN }}"
     assert role_step["with"]["aws-region"] == "${{ inputs.aws_region }}"
 
     review_step = next(
@@ -77,6 +84,8 @@ def test_review_workflow_checks_out_bot_repository() -> None:
 
 def test_example_pr_review_caller_passes_bot_checkout_inputs() -> None:
     workflow = _load_yaml(REPO_ROOT / "examples/pr-review-caller-workflow.yml")
+
+    assert workflow["permissions"]["id-token"] == "write"
 
     review_with = workflow["jobs"]["review"]["with"]
     assert "bot_repository" not in review_with

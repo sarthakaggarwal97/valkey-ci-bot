@@ -35,6 +35,13 @@ def _is_write_conflict(exc: Exception) -> bool:
     return "sha" in message or "already exists" in message or "conflict" in message
 
 
+def _is_missing_state_error(exc: Exception) -> bool:
+    """Return True when the remote state branch or file is absent."""
+    if isinstance(exc, GithubException):
+        return exc.status == 404
+    return isinstance(exc, FileNotFoundError)
+
+
 class RateLimiter:
     """Enforces daily PR limits, open bot PR caps, and token budgets.
 
@@ -244,6 +251,8 @@ class RateLimiter:
             self.from_dict(data)
             logger.info("Loaded rate limiter state.")
         except Exception as exc:
+            if not _is_missing_state_error(exc):
+                raise RuntimeError(f"failed to load rate limiter state: {exc}") from exc
             logger.info("Could not load rate limiter state (may not exist yet): %s", exc)
 
     def save(self) -> None:

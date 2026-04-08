@@ -808,7 +808,7 @@ def test_run_chat_mode_replies_to_review_comment(
 
     with patch(
         "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=ReviewerConfig(),
+        return_value=ReviewerConfig(chat_collaborator_only=False),
     ), patch(
         "scripts.pr_review_main.ReviewChat"
     ) as mock_chat_cls:
@@ -880,7 +880,7 @@ def test_run_chat_mode_skips_non_bot_review_thread(
 
     with patch(
         "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=ReviewerConfig(),
+        return_value=ReviewerConfig(chat_collaborator_only=False),
     ), patch(
         "scripts.pr_review_main.ReviewChat"
     ) as mock_chat_cls:
@@ -952,7 +952,7 @@ def test_run_chat_mode_does_not_use_unrelated_file_context_for_filtered_thread(
 
     with patch(
         "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=ReviewerConfig(path_filters=["src/**"]),
+        return_value=ReviewerConfig(path_filters=["src/**"], chat_collaborator_only=False),
     ), patch(
         "scripts.pr_review_main.ReviewChat"
     ) as mock_chat_cls:
@@ -1023,7 +1023,7 @@ def test_run_issue_comment_chat_mode_prefers_mentioned_file_context(
 
     with patch(
         "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=ReviewerConfig(),
+        return_value=ReviewerConfig(chat_collaborator_only=False),
     ), patch(
         "scripts.pr_review_main.ReviewChat"
     ) as mock_chat_cls:

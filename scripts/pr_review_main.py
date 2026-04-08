@@ -342,12 +342,13 @@ def run(argv: list[str] | None = None) -> int:
                 retriever=retriever,
                 retrieval_config=config.retrieval,
                 github_client=gh,
-            ).reply(
-                chat_context,
-                thread,
-                event.body or "",
-                config,
-            )
+                ).reply(
+                    chat_context,
+                    thread,
+                    event.body or "",
+                    config,
+                    requester=event.actor,
+                )
             publisher.publish_chat_reply(
                 repo_name,
                 pr_context.number,

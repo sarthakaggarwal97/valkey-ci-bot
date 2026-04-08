@@ -297,6 +297,17 @@ class TestSerialization:
         state_gh.get_repo.assert_called_once_with("owner/valkey-ci-agent")
         target_gh.get_repo.assert_not_called()
 
+    def test_load_raises_on_non_missing_remote_error(self, config: BotConfig) -> None:
+        repo = MagicMock()
+        repo.get_contents.side_effect = GithubException(500, {"message": "boom"})
+        gh = MagicMock()
+        gh.get_repo.return_value = repo
+
+        limiter = RateLimiter(config, github_client=gh, repo_full_name="owner/repo")
+
+        with pytest.raises(RuntimeError, match="failed to load rate limiter state"):
+            limiter.load()
+
     def test_save_retries_on_write_conflict_and_merges_remote_updates(
         self,
         config: BotConfig,

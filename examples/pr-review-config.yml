@@ -6,6 +6,10 @@
 reviewer:
   enabled: true
   collaborator_only: false
+  # Keep interactive /reviewbot chat restricted to collaborator-equivalent
+  # actors by default. This avoids letting arbitrary public comments drive
+  # repository-context tool use and Bedrock spend.
+  chat_collaborator_only: true
   disable_review: false
   disable_release_notes: false
   review_simple_changes: true
@@ -108,4 +112,4 @@ reviewer:
   models:
     light_model_id: "us.anthropic.claude-opus-4-6-v1"
     heavy_model_id: "us.anthropic.claude-opus-4-6-v1"
-    temperature: 0.05
+    temperature: 0.0

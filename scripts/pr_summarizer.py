@@ -20,6 +20,17 @@ global data structures and variables, and any changes that might affect
 the external interface or behavior of the code.
 Return valid JSON only."""
 
+_SUMMARY_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "walkthrough": {"type": "string"},
+        "short_summary": {"type": "string"},
+        "file_groups_markdown": {"type": "string"},
+        "release_notes": {"type": ["string", "null"]},
+    },
+    "required": ["walkthrough", "short_summary", "file_groups_markdown"],
+}
+
 
 def _extract_json_payload(text: str) -> Any:
     candidate = text.strip()
@@ -62,6 +73,101 @@ def _build_retrieval_query(pr: PullRequestContext) -> str:
     lines = [pr.title, pr.body]
     lines.extend(changed_file.path for changed_file in pr.files)
     return "\n".join(filter(None, lines))
+
+
+def _summarize_changed_paths(pr: PullRequestContext, *, max_paths: int = 8) -> str:
+    """Render a compact path list for deterministic summary fallback."""
+    if not pr.files:
+        return "no changed files"
+    paths = [changed_file.path for changed_file in pr.files[:max_paths]]
+    rendered = ", ".join(f"`{path}`" for path in paths)
+    remaining = len(pr.files) - len(paths)
+    if remaining > 0:
+        rendered += f", and {remaining} more"
+    return rendered
+
+
+def _fallback_file_groups(pr: PullRequestContext, *, max_rows: int = 12) -> str:
+    """Build a conservative file-groups table without model output."""
+    if not pr.files:
+        return "| Files | Summary |\n|---|---|\n| _None_ | No files changed. |"
+    rows = ["| Files | Summary |", "|---|---|"]
+    for changed_file in pr.files[:max_rows]:
+        rows.append(
+            "| "
+            f"`{changed_file.path}`"
+            " | "
+            f"{changed_file.status}, +{changed_file.additions}/-{changed_file.deletions}"
+            " |"
+        )
+    remaining = len(pr.files) - max_rows
+    if remaining > 0:
+        rows.append(f"| _{remaining} more file(s)_ | Not listed in fallback summary. |")
+    return "\n".join(rows)
+
+
+def _fallback_summary(pr: PullRequestContext) -> SummaryResult:
+    """Return a useful summary when model output is incomplete."""
+    path_summary = _summarize_changed_paths(pr)
+    if pr.title:
+        short_summary = f"{pr.title}. Changed files include {path_summary}."
+    else:
+        short_summary = f"Changed files include {path_summary}."
+    return SummaryResult(
+        walkthrough=(
+            f"Changed paths include {path_summary}. Review the file groups below "
+            "for per-file status and churn."
+        ),
+        file_groups_markdown=_fallback_file_groups(pr),
+        release_notes=None,
+        short_summary=short_summary,
+    )
+
+
+def _coerce_summary_result(
+    payload: Any,
+    pr: PullRequestContext,
+    config: ReviewerConfig,
+) -> SummaryResult:
+    """Normalize model summary output and fill safe fallbacks for gaps."""
+    fallback = _fallback_summary(pr)
+    if not isinstance(payload, dict):
+        logger.warning("PR summary model output was not a JSON object; using fallback.")
+        return fallback
+
+    walkthrough = str(payload.get("walkthrough") or "").strip()
+    short_summary = str(payload.get("short_summary") or "").strip()
+    file_groups_markdown = str(payload.get("file_groups_markdown") or "").strip()
+    release_notes = (
+        str(payload["release_notes"]).strip()
+        if payload.get("release_notes") is not None
+        else None
+    )
+
+    missing: list[str] = []
+    if not walkthrough:
+        walkthrough = fallback.walkthrough
+        missing.append("walkthrough")
+    if not short_summary:
+        short_summary = fallback.short_summary
+        missing.append("short_summary")
+    if not file_groups_markdown:
+        file_groups_markdown = fallback.file_groups_markdown
+        missing.append("file_groups_markdown")
+    if config.disable_release_notes:
+        release_notes = None
+    if missing:
+        logger.warning(
+            "PR summary model output omitted %s; filled deterministic fallback fields.",
+            ", ".join(missing),
+        )
+
+    return SummaryResult(
+        walkthrough=walkthrough,
+        file_groups_markdown=file_groups_markdown,
+        release_notes=release_notes,
+        short_summary=short_summary,
+    )
 
 
 class PRSummarizer:
@@ -126,18 +232,6 @@ Return JSON with this schema:
 
 {release_notes_instruction}
 """
-        # Define the JSON schema for structured tool-use output
-        _summary_schema: dict = {
-            "type": "object",
-            "properties": {
-                "walkthrough": {"type": "string"},
-                "short_summary": {"type": "string"},
-                "file_groups_markdown": {"type": "string"},
-                "release_notes": {"type": ["string", "null"]},
-            },
-            "required": ["walkthrough", "short_summary", "file_groups_markdown"],
-        }
-
         # Try structured tool-use first, fall back to plain invoke + JSON parsing
         payload: dict | None = None
         _has_schema_method = (
@@ -155,7 +249,7 @@ Return JSON with this schema:
                     user_prompt,
                     tool_name="generate_pr_summary",
                     tool_description="Generate a structured PR summary with walkthrough, short summary, file groups, and release notes",
-                    json_schema=_summary_schema,
+                    json_schema=_SUMMARY_SCHEMA,
                     model_id=config.models.light_model_id,
                     max_output_tokens=config.max_output_tokens,
                     temperature=config.models.temperature,
@@ -180,22 +274,12 @@ Return JSON with this schema:
             try:
                 payload = _extract_json_payload(response)
             except Exception:
+                fallback = _fallback_summary(pr)
                 return SummaryResult(
-                    walkthrough=response.strip(),
-                    file_groups_markdown="",
+                    walkthrough=response.strip() or fallback.walkthrough,
+                    file_groups_markdown=fallback.file_groups_markdown,
                     release_notes=None,
-                    short_summary="",
+                    short_summary=fallback.short_summary,
                 )
 
-        return SummaryResult(
-            walkthrough=str(payload.get("walkthrough", "")).strip(),
-            file_groups_markdown=str(
-                payload.get("file_groups_markdown", "")
-            ).strip(),
-            release_notes=(
-                str(payload["release_notes"]).strip()
-                if payload.get("release_notes") is not None
-                else None
-            ),
-            short_summary=str(payload.get("short_summary", "")).strip(),
-        )
+        return _coerce_summary_result(payload, pr, config)

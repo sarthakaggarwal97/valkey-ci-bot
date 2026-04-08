@@ -11,6 +11,7 @@ def test_reviewer_config_invalid_types_fall_back_to_defaults() -> None:
             "reviewer": {
                 "enabled": "false",
                 "collaborator_only": "true",
+                "chat_collaborator_only": "false",
                 "approve_on_no_findings": "true",
                 "model_file_triage": "true",
                 "post_policy_notes": "false",
@@ -40,6 +41,7 @@ def test_reviewer_config_invalid_types_fall_back_to_defaults() -> None:
     defaults = ReviewerConfig()
     assert config.enabled == defaults.enabled
     assert config.collaborator_only == defaults.collaborator_only
+    assert config.chat_collaborator_only == defaults.chat_collaborator_only
     assert config.approve_on_no_findings == defaults.approve_on_no_findings
     assert config.model_file_triage == defaults.model_file_triage
     assert config.post_policy_notes == defaults.post_policy_notes

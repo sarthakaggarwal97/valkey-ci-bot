@@ -40,6 +40,34 @@ def _context() -> PullRequestContext:
     )
 
 
+def test_fetch_marks_patchless_source_files_as_reviewable() -> None:
+    raw_file = MagicMock(
+        filename="src/huge_change.c",
+        status="modified",
+        additions=2500,
+        deletions=1800,
+        patch=None,
+    )
+    pr = MagicMock()
+    pr.body = ""
+    pr.user.login = "alice"
+    pr.base.sha = "base123"
+    pr.head.sha = "head456"
+    pr.get_files.return_value = [raw_file]
+    pr.get_review_comments.return_value = []
+    pr.get_commits.return_value = []
+    repo = MagicMock()
+    repo.get_pull.return_value = pr
+    gh = MagicMock()
+    gh.get_repo.return_value = repo
+
+    context = PRContextFetcher(gh).fetch("owner/repo", 1)
+
+    assert context.files[0].path == "src/huge_change.c"
+    assert context.files[0].patch is None
+    assert context.files[0].is_binary is False
+
+
 def test_build_diff_scope_limits_to_changed_files_since_last_review() -> None:
     compare = MagicMock()
     compare.status = "ahead"
@@ -55,6 +83,24 @@ def test_build_diff_scope_limits_to_changed_files_since_last_review() -> None:
     assert scope.incremental is True
     assert [changed_file.path for changed_file in scope.files] == ["src/b.c"]
     assert scope.files[0].patch == "incremental-patch"
+
+
+def test_build_diff_scope_keeps_patchless_source_files_reviewable() -> None:
+    compare = MagicMock()
+    compare.status = "ahead"
+    compare.files = [MagicMock(filename="src/b.c", patch=None)]
+
+    repo = MagicMock()
+    repo.compare.return_value = compare
+    gh = MagicMock()
+    gh.get_repo.return_value = repo
+
+    scope = PRContextFetcher(gh).build_diff_scope(_context(), "oldsha")
+
+    assert scope.incremental is True
+    assert [changed_file.path for changed_file in scope.files] == ["src/b.c"]
+    assert scope.files[0].patch is None
+    assert scope.files[0].is_binary is False
 
 
 def test_build_diff_scope_falls_back_to_full_review_when_compare_is_untrusted() -> None:

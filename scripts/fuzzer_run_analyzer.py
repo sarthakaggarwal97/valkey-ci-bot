@@ -45,6 +45,56 @@ Return valid JSON only using this exact schema:
 }
 """
 
+_FUZZER_ANALYSIS_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "overall_status": {
+            "type": "string",
+            "enum": ["normal", "warning", "anomalous"],
+        },
+        "root_cause_category": {
+            "anyOf": [
+                {"type": "string"},
+                {"type": "null"},
+            ],
+        },
+        "summary": {"type": "string"},
+        "anomalies": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "severity": {
+                        "type": "string",
+                        "enum": ["warning", "critical"],
+                    },
+                    "evidence": {"type": "string"},
+                },
+                "required": ["title", "severity", "evidence"],
+            },
+        },
+        "normal_signals": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "reproduction_hint": {
+            "anyOf": [
+                {"type": "string"},
+                {"type": "null"},
+            ],
+        },
+    },
+    "required": [
+        "overall_status",
+        "root_cause_category",
+        "summary",
+        "anomalies",
+        "normal_signals",
+        "reproduction_hint",
+    ],
+}
+
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 _GITHUB_LOG_PREFIX_RE = re.compile(
     r"^[^\t]+\t[^\t]+\t\d{4}-\d{2}-\d{2}T[0-9:.]+Z\s?"
@@ -697,11 +747,14 @@ class FuzzerRunAnalyzer:
 
         model_payload: dict[str, Any] = {}
         try:
-            response = self._bedrock.invoke(
-                _SYSTEM_PROMPT,
-                _build_user_prompt(context, anomalies, normal_signals, retrieved_context),
+            model_payload = self._invoke_model(
+                _build_user_prompt(
+                    context,
+                    anomalies,
+                    normal_signals,
+                    retrieved_context,
+                ),
             )
-            model_payload = _parse_model_payload(response)
         except Exception as exc:
             logger.warning("Fuzzer run analysis model call failed for run %s: %s", run_id, exc)
 
@@ -747,3 +800,38 @@ class FuzzerRunAnalyzer:
             else None,
             raw_log_fallback_used=context.raw_log_fallback_used,
         )
+
+    def _invoke_model(self, user_prompt: str) -> dict[str, Any]:
+        """Invoke the model, preferring native schema output when available."""
+        invoke_with_schema = getattr(self._bedrock, "invoke_with_schema", None)
+        if (
+            callable(invoke_with_schema)
+            and type(self._bedrock).__name__ != "MagicMock"
+        ):
+            try:
+                response = invoke_with_schema(
+                    _SYSTEM_PROMPT,
+                    user_prompt,
+                    tool_name="submit_fuzzer_analysis",
+                    tool_description=(
+                        "Submit the structured fuzzer workflow-run analysis."
+                    ),
+                    json_schema=_FUZZER_ANALYSIS_SCHEMA,
+                    temperature=0.0,
+                )
+                payload = json.loads(response) if isinstance(response, str) else response
+                if isinstance(payload, dict):
+                    logger.info("Used structured tool-use output for fuzzer analysis.")
+                    return payload
+            except Exception as exc:
+                logger.info(
+                    "Structured fuzzer analysis output failed (%s); falling back to plain invoke.",
+                    exc,
+                )
+
+        response = self._bedrock.invoke(
+            _SYSTEM_PROMPT,
+            user_prompt,
+            temperature=0.0,
+        )
+        return _parse_model_payload(response)

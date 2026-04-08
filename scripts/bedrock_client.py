@@ -475,6 +475,11 @@ class BedrockClient:
                         }
                     }
                 ],
+                "toolChoice": {
+                    "tool": {
+                        "name": tool_name,
+                    },
+                },
             },
         }
         if temperature is not None:
@@ -769,12 +774,19 @@ class BedrockClient:
         # Only offer the terminal tool so the model is forced to use it
         forced_kwargs = {**converse_kwargs}
         forced_kwargs["messages"] = messages
+        forced_tools = [
+            t for t in tools
+            if t.get("toolSpec", {}).get("name") == terminal_tool
+        ]
         forced_kwargs["toolConfig"] = {
-            "tools": [
-                t for t in tools
-                if t.get("toolSpec", {}).get("name") == terminal_tool
-            ],
+            "tools": forced_tools,
         }
+        if forced_tools:
+            forced_kwargs["toolConfig"]["toolChoice"] = {
+                "tool": {
+                    "name": terminal_tool,
+                },
+            }
 
         try:
             estimated = _estimate_tokens(full_system_prompt) + sum(
@@ -789,16 +801,45 @@ class BedrockClient:
                     )
                 self._rate_limiter.record_token_usage(estimated)
 
-            response = self._converse_with_retry(forced_kwargs)
+            try:
+                response = self._converse_with_retry(forced_kwargs)
+            except ClientError as exc:
+                error_message = exc.response.get("Error", {}).get("Message", "")
+                if "toolchoice" not in error_message.lower().replace(" ", ""):
+                    raise
+                logger.info(
+                    "Forced terminal toolChoice was rejected; retrying forced "
+                    "submission with only the terminal tool exposed."
+                )
+                fallback_forced_kwargs = {**forced_kwargs}
+                fallback_forced_kwargs["toolConfig"] = {
+                    "tools": forced_tools,
+                }
+                response = self._converse_with_retry(fallback_forced_kwargs)
             self._adjust_token_usage(response, estimated)
             assistant_content = response["output"]["message"]["content"]
 
             for block in assistant_content:
                 if "toolUse" in block and block["toolUse"]["name"] == terminal_tool:
+                    tool_input = block["toolUse"].get("input", {})
+                    validator = getattr(tool_handler, "validate_terminal_tool", None)
+                    if callable(validator):
+                        validation = validator(terminal_tool, tool_input)
+                        if (
+                            isinstance(validation, tuple)
+                            and len(validation) == 2
+                            and not bool(validation[0])
+                        ):
+                            reason = str(validation[1] or "terminal tool rejected")
+                            raise BedrockError(
+                                f"Forced terminal tool rejected: {reason}",
+                                error_code="TerminalToolRejected",
+                                retryable=False,
+                            )
                     logger.info(
                         "Terminal tool %s called on forced turn.", terminal_tool,
                     )
-                    return _json.dumps(block["toolUse"].get("input", {}))
+                    return _json.dumps(tool_input)
 
             # If still no terminal tool, extract any text
             text_parts = [

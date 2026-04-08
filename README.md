@@ -51,6 +51,7 @@ trying the same weak patch.
 
 Required GitHub configuration:
 
+- caller workflow permission: `id-token: write`
 - secret: `AWS_ROLE_ARN`
 - either secret: `VALKEY_GITHUB_TOKEN`
 - or variable: `VALKEY_GITHUB_APP_ID` plus secret: `VALKEY_GITHUB_APP_PRIVATE_KEY`
@@ -106,6 +107,7 @@ Useful reviewer config fields:
 
 - `reviewer.custom_instructions` for project-specific invariants and review guidance
 - `reviewer.approve_on_no_findings` to opt into automated approvals after no findings
+- `reviewer.chat_collaborator_only` to restrict `/reviewbot` follow-up chat to collaborator-equivalent actors
 - `reviewer.model_file_triage` to opt into light-model file skipping before heavy review
 - `reviewer.post_policy_notes` to include deterministic maintainer-policy notes in the summary
 - `reviewer.project.source_dirs` and `reviewer.project.test_dirs` for source/test discovery
@@ -114,6 +116,7 @@ Useful reviewer config fields:
 
 Required GitHub configuration:
 
+- caller workflow permission: `id-token: write`
 - secret: `AWS_ROLE_ARN`
 - either secret: `VALKEY_GITHUB_TOKEN`
 - or variable: `VALKEY_GITHUB_APP_ID` plus secret: `VALKEY_GITHUB_APP_PRIVATE_KEY`
@@ -151,6 +154,7 @@ Example consumer-repo files:
 
 Required GitHub configuration in the consumer repo:
 
+- caller workflow permission: `id-token: write`
 - secret: `CI_BOT_AWS_ROLE_ARN` — IAM role assumable via GitHub OIDC for Bedrock access
 - variable: `CI_BOT_AWS_REGION` (optional, defaults to `us-east-1`)
 - optional variable: `CI_BOT_COMMIT_NAME`

@@ -72,6 +72,11 @@ def _unsupported(path: str) -> bool:
     return any(lowered.endswith(suffix) for suffix in _UNSUPPORTED_SUFFIXES)
 
 
+def is_unsupported_review_path(path: str) -> bool:
+    """Return True when a path is not useful for automated code review."""
+    return _unsupported(path)
+
+
 class PathFilter:
     """Applies default exclusions and ordered include/exclude patterns."""
 
@@ -88,7 +93,6 @@ class PathFilter:
         path = changed_file.path
         return (
             changed_file.is_binary
-            or changed_file.patch is None
             or _looks_generated(path)
             or _unsupported(path)
         )

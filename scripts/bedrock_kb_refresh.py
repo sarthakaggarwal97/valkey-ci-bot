@@ -13,7 +13,7 @@ import tempfile
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
@@ -267,7 +267,7 @@ def run_command(args: list[str], cwd: Path | None = None) -> str:
 
 def make_client_token(prefix: str) -> str:
     """Generate a Bedrock-compatible idempotency token."""
-    return f"{prefix}-{int(datetime.now(UTC).timestamp())}-{uuid.uuid4().hex}"
+    return f"{prefix}-{int(datetime.now(timezone.utc).timestamp())}-{uuid.uuid4().hex}"
 
 
 def is_probably_text(path: Path) -> bool:
@@ -328,7 +328,7 @@ def stage_curated_corpus(
         "source": repo_url,
         "branch": branch,
         "head_sha": head_sha,
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "file_count": file_count,
         "total_bytes": total_bytes,
     }
@@ -863,7 +863,7 @@ def refresh(args: RefreshArgs) -> dict[str, object]:
             agent_client,
             args.web_kb_id,
             web_data_source_id,
-            f"Refresh Valkey docs crawl at {datetime.now(UTC).isoformat()}",
+            f"Refresh Valkey docs crawl at {datetime.now(timezone.utc).isoformat()}",
         )
         result["web_data_source_id"] = web_data_source_id
         result["web_ingestion_job_id"] = web_ingestion_job_id

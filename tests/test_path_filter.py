@@ -6,7 +6,12 @@ from scripts.models import ChangedFile
 from scripts.path_filter import PathFilter
 
 
-def _file(path: str, *, patch: str | None = "@@ -1 +1 @@\n-old\n+new") -> ChangedFile:
+def _file(
+    path: str,
+    *,
+    patch: str | None = "@@ -1 +1 @@\n-old\n+new",
+    is_binary: bool | None = None,
+) -> ChangedFile:
     return ChangedFile(
         path=path,
         status="modified",
@@ -14,7 +19,7 @@ def _file(path: str, *, patch: str | None = "@@ -1 +1 @@\n-old\n+new") -> Change
         deletions=1,
         patch=patch,
         contents=None,
-        is_binary=patch is None,
+        is_binary=patch is None if is_binary is None else is_binary,
     )
 
 
@@ -48,3 +53,14 @@ def test_path_filter_applies_ordered_patterns() -> None:
         "src/main.c",
         "tests/test_api.py",
     ]
+
+
+def test_path_filter_keeps_patchless_source_files_for_full_content_review() -> None:
+    files = [
+        _file("src/huge_change.c", patch=None, is_binary=False),
+        _file("docs/logo.png", patch=None, is_binary=True),
+    ]
+
+    selected = PathFilter().select(files, [])
+
+    assert [changed_file.path for changed_file in selected] == ["src/huge_change.c"]

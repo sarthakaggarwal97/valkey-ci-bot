@@ -378,6 +378,33 @@ class TestBedrockClientInvoke:
         assert messages[0]["role"] == "user"
         assert messages[0]["content"][0]["text"] == "my user message"
 
+    def test_invoke_with_schema_forces_named_tool(self):
+        mock_client = MagicMock()
+        payload = {"answer": "structured"}
+        mock_client.converse.return_value = _make_tool_use_response(
+            "submit_schema",
+            payload,
+        )
+        client = _make_bedrock_client(mock_client=mock_client)
+
+        result = client.invoke_with_schema(
+            "sys",
+            "user",
+            tool_name="submit_schema",
+            tool_description="Submit structured output.",
+            json_schema={
+                "type": "object",
+                "properties": {"answer": {"type": "string"}},
+                "required": ["answer"],
+            },
+        )
+
+        assert json.loads(result) == payload
+        call_kwargs = mock_client.converse.call_args.kwargs
+        assert call_kwargs["toolConfig"]["toolChoice"] == {
+            "tool": {"name": "submit_schema"},
+        }
+
     def test_converse_with_tools_retries_after_terminal_validation_rejection(self):
         mock_client = MagicMock()
         submit_input = {
@@ -501,6 +528,9 @@ class TestBedrockClientInvoke:
         assert forced_call["toolConfig"]["tools"] == [
             {"toolSpec": {"name": "submit_review", "inputSchema": {"json": {}}}},
         ]
+        assert forced_call["toolConfig"]["toolChoice"] == {
+            "tool": {"name": "submit_review"},
+        }
         final_message = forced_call["messages"][-1]
         assert final_message["role"] == "user"
         assert "MUST call submit_review now" in final_message["content"][0]["text"]

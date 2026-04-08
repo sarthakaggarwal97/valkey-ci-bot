@@ -415,7 +415,7 @@ def _is_comment_or_whitespace_only_patch(path: str, patch: str) -> bool:
 def _is_deterministically_trivial_review_change(changed_file: ChangedFile) -> bool:
     """Return True when a file can be safely skipped without model triage."""
     if not changed_file.patch:
-        return True
+        return not _looks_like_code(changed_file.path)
 
     delta = changed_file.additions + changed_file.deletions
     if delta <= 3 and not _looks_like_code(changed_file.path):
@@ -1449,7 +1449,48 @@ class ReviewToolHandler:
         tool_input: dict,
     ) -> tuple[bool, str]:
         """Reject premature review submission until required files are fetched."""
-        if tool_name != "submit_review" or not self._required_files:
+        if tool_name != "submit_review":
+            return True, "Review submitted."
+        if not isinstance(tool_input, dict):
+            return False, "submit_review input must be a JSON object."
+
+        reviews = tool_input.get("reviews")
+        if not isinstance(reviews, list):
+            return False, "submit_review.reviews must be an array."
+
+        invalid_review_paths: list[str] = []
+        malformed_reviews: list[int] = []
+        for index, raw_review in enumerate(reviews):
+            if not isinstance(raw_review, dict):
+                malformed_reviews.append(index)
+                continue
+            path = str(raw_review.get("path", "")).strip()
+            if self._required_files and path not in self._required_files:
+                invalid_review_paths.append(path or f"<missing path at index {index}>")
+            required_text_fields = ("title", "trigger", "impact", "body")
+            if any(not str(raw_review.get(field, "")).strip() for field in required_text_fields):
+                malformed_reviews.append(index)
+
+        lgtm = bool(tool_input.get("lgtm"))
+        payload_errors: list[str] = []
+        if lgtm and reviews:
+            payload_errors.append(
+                "Set lgtm to false when submit_review contains one or more findings."
+            )
+        if invalid_review_paths:
+            payload_errors.extend([
+                "Review findings must target files in the current review scope:",
+                *[f"- `{path}`" for path in invalid_review_paths],
+            ])
+        if malformed_reviews:
+            payload_errors.extend([
+                "Every review finding must include non-empty title, trigger, impact, and body fields:",
+                *[f"- finding index {index}" for index in malformed_reviews],
+            ])
+        if payload_errors:
+            return False, "\n".join(payload_errors)
+
+        if not self._required_files:
             return True, "Review submitted."
 
         ordered_paths = list(self._required_files)
@@ -2140,6 +2181,12 @@ class CodeReviewer:
         """
         if _is_deterministically_trivial_review_change(changed_file):
             return "APPROVED"
+        if changed_file.patch is None:
+            logger.info(
+                "Triage: %s -> NEEDS_REVIEW (patch unavailable)",
+                changed_file.path,
+            )
+            return "NEEDS_REVIEW"
         if not config.model_file_triage:
             logger.info(
                 "Triage: %s -> NEEDS_REVIEW (model_file_triage disabled)",
@@ -2147,6 +2194,10 @@ class CodeReviewer:
             )
             return "NEEDS_REVIEW"
 
+        patch_excerpt = (
+            changed_file.patch
+            or "[patch unavailable; use hydrated file contents if review is needed]"
+        )[:4000]
         triage_prompt = f"""Triage this file diff as NEEDS_REVIEW or APPROVED.
 
 Rules:
@@ -2160,7 +2211,7 @@ File: {changed_file.path}
 Status: {changed_file.status}
 
 Diff:
-{changed_file.patch[:4000]}
+{patch_excerpt}
 
 Respond with ONLY one line:
 [TRIAGE]: NEEDS_REVIEW
@@ -2929,17 +2980,24 @@ CRITICAL rules:
             changed_file = reviewable_files[path]
             raw_line = raw_finding.get("line")
             normalized_line = int(raw_line) if isinstance(raw_line, int) and raw_line > 0 else None
-            if normalized_line is not None and changed_file.patch:
-                added_lines, context_lines = _parse_diff_lines(changed_file.patch)
-                snapped = _snap_line_to_diff(normalized_line, added_lines, context_lines)
-                if snapped != normalized_line:
-                    logger.info(
-                        "Line %d for %s snapped to %s",
+            if normalized_line is not None:
+                if changed_file.patch:
+                    added_lines, context_lines = _parse_diff_lines(changed_file.patch)
+                    snapped = _snap_line_to_diff(
                         normalized_line,
-                        path,
-                        snapped,
+                        added_lines,
+                        context_lines,
                     )
-                normalized_line = snapped
+                    if snapped != normalized_line:
+                        logger.info(
+                            "Line %d for %s snapped to %s",
+                            normalized_line,
+                            path,
+                            snapped,
+                        )
+                    normalized_line = snapped
+                else:
+                    normalized_line = None
 
             if _is_false_indentation_finding(
                 combined_text, path, normalized_line, changed_file.contents,

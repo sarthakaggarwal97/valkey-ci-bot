@@ -16,6 +16,7 @@ It does that in two layers:
 - PR summary generation
 - PR review findings
 - review coverage accounting
+- readiness follow-up flags for empty summaries or incomplete model coverage
 
 The harness does not post comments or open PRs. It is safe to run against
 real Valkey pull requests as long as you provide read-capable GitHub access

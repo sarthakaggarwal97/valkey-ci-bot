@@ -64,9 +64,10 @@ class PermissionGate:
         if mode == "skip":
             return False, "unsupported-comment-context"
 
-        if config.collaborator_only and not self.actor_is_collaborator(
-            event.repo, event.actor
-        ):
+        collaborator_required = config.collaborator_only or (
+            mode == "chat" and config.chat_collaborator_only
+        )
+        if collaborator_required and not self.actor_is_collaborator(event.repo, event.actor):
             return False, "non-collaborator"
 
         return True, None

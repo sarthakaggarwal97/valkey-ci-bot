@@ -15,6 +15,7 @@ from scripts.models import (
     PullRequestCommit,
     ReviewThread,
 )
+from scripts.path_filter import is_unsupported_review_path
 
 if TYPE_CHECKING:
     from github import Github
@@ -64,7 +65,8 @@ class PRContextFetcher:
                     deletions=int(raw_file.deletions or 0),
                     patch=patch,
                     contents=None,
-                    is_binary=patch is None,
+                    is_binary=patch is None
+                    and is_unsupported_review_path(raw_file.filename),
                 )
             )
         review_comments: list[ExistingReviewComment] = []
@@ -255,11 +257,13 @@ class PRContextFetcher:
             raw_file = comparison_files.get(changed_file.path)
             if raw_file is None:
                 continue
+            patch = getattr(raw_file, "patch", None)
             files.append(
                 replace(
                     changed_file,
-                    patch=getattr(raw_file, "patch", None),
-                    is_binary=getattr(raw_file, "patch", None) is None,
+                    patch=patch,
+                    is_binary=patch is None
+                    and is_unsupported_review_path(changed_file.path),
                 )
             )
         return DiffScope(

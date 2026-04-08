@@ -64,6 +64,7 @@ def test_pr_summarizer_uses_light_model() -> None:
     result = summarizer.summarize(_context(), config)
 
     assert result.walkthrough == "Updates failover handling."
+    assert result.short_summary.startswith("Improve failover logic.")
     kwargs = bedrock.invoke.call_args.kwargs
     assert kwargs["model_id"] == config.models.light_model_id
 
@@ -170,7 +171,7 @@ def test_code_reviewer_triage_skips_comment_only_code_changes() -> None:
     verdict = CodeReviewer(bedrock).triage_file(
         changed_file,
         _context(),
-        ReviewerConfig(),
+        ReviewerConfig(model_file_triage=True),
     )
 
     assert verdict == "APPROVED"
@@ -196,6 +197,63 @@ def test_code_reviewer_triage_reviews_c_preprocessor_changes() -> None:
     )
 
     assert verdict == "NEEDS_REVIEW"
+
+
+def test_code_reviewer_triage_reviews_patchless_code_changes() -> None:
+    bedrock = MagicMock()
+    changed_file = ChangedFile(
+        path="src/large_change.c",
+        status="modified",
+        additions=2500,
+        deletions=1800,
+        patch=None,
+        contents="int changed(void) { return 1; }",
+        is_binary=False,
+    )
+
+    verdict = CodeReviewer(bedrock).triage_file(
+        changed_file,
+        _context(),
+        ReviewerConfig(model_file_triage=True),
+    )
+
+    assert verdict == "NEEDS_REVIEW"
+    bedrock.invoke.assert_not_called()
+
+
+def test_code_reviewer_uses_file_level_findings_when_patch_unavailable() -> None:
+    changed_file = ChangedFile(
+        path="src/large_change.c",
+        status="modified",
+        additions=2500,
+        deletions=1800,
+        patch=None,
+        contents="int changed(void) { return 1; }",
+        is_binary=False,
+    )
+    scope = DiffScope(
+        base_sha="base123",
+        head_sha="head456",
+        files=[changed_file],
+        incremental=False,
+    )
+
+    drafts = CodeReviewer(MagicMock())._normalize_raw_findings(
+        [
+            {
+                "path": "src/large_change.c",
+                "line": 42,
+                "severity": "high",
+                "confidence": "high",
+                "body": "This visible control-flow change can skip cleanup.",
+            }
+        ],
+        scope,
+        ReviewerConfig(),
+    )
+
+    assert len(drafts) == 1
+    assert drafts[0].line is None
 
 
 def test_code_reviewer_filters_speculative_and_file_level_findings() -> None:
@@ -274,11 +332,37 @@ def test_review_chat_uses_heavy_model() -> None:
         ),
         "/reviewbot can you suggest a test?",
         config,
+        requester="alice",
     )
 
     assert "targeted failover timeout regression test" in reply
+    assert reply.startswith("@alice ")
     kwargs = bedrock.invoke.call_args.kwargs
     assert kwargs["model_id"] == config.models.heavy_model_id
+    user_prompt = bedrock.invoke.call_args[0][1]
+    assert "Requester: @alice" in user_prompt
+
+
+def test_review_chat_uses_safe_fallback_for_empty_reply() -> None:
+    bedrock = MagicMock()
+    bedrock.invoke.return_value = "   "
+    chat = ReviewChat(bedrock)
+
+    reply = chat.reply(
+        _context(),
+        ReviewThread(
+            comment_id=1,
+            path="src/failover.c",
+            line=14,
+            conversation=["Can you suggest a test?"],
+        ),
+        "/reviewbot can you suggest a test?",
+        ReviewerConfig(),
+        requester="alice",
+    )
+
+    assert reply.startswith("@alice ")
+    assert "not have enough verified PR context" in reply
 
 
 def test_review_tool_handler_search_code_verifies_hits_at_head_sha() -> None:
@@ -636,6 +720,57 @@ def test_review_tool_handler_requires_explicit_file_fetch_before_submit() -> Non
 
     assert accepted is True
     assert message == "Review submitted."
+
+
+def test_review_tool_handler_rejects_inconsistent_submit_review_payload() -> None:
+    gh = MagicMock()
+    repo = MagicMock()
+    gh.get_repo.return_value = repo
+    repo.get_contents.return_value = MagicMock(
+        decoded_content=b"int failover(void) { return 0; }\n",
+    )
+    required_files = [
+        ChangedFile(
+            path="src/failover.c",
+            status="modified",
+            additions=3,
+            deletions=1,
+            patch="@@ -1 +1 @@\n-old\n+new",
+            contents="int failover(void) { return 0; }",
+            is_binary=False,
+        ),
+    ]
+    handler = ReviewToolHandler(
+        gh,
+        "owner/repo",
+        "head456",
+        required_files=required_files,
+    )
+    handler.execute("get_file", {"path": "src/failover.c"})
+
+    accepted, message = handler.validate_terminal_tool(
+        "submit_review",
+        {
+            "reviews": [
+                {
+                    "path": "src/other.c",
+                    "severity": "high",
+                    "confidence": "high",
+                    "title": "Wrong file",
+                    "trigger": "a timeout fires",
+                    "impact": "skip cleanup",
+                    "body": "The target path is outside this review scope.",
+                }
+            ],
+            "lgtm": True,
+            "checked_files": ["src/failover.c"],
+            "skipped_files": [],
+        },
+    )
+
+    assert accepted is False
+    assert "Set lgtm to false" in message
+    assert "src/other.c" in message
 
 
 def test_review_tool_handler_prioritizes_related_file_fetches_over_search_misses() -> None:

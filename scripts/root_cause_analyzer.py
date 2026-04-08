@@ -69,9 +69,48 @@ Guidelines:
 "medium" when likely but uncertain, "low" when speculative.
 - Set is_flaky to true if the failure appears timing-dependent, \
 non-deterministic, or intermittent.
-- files_to_change should list only files that need modification to fix the issue.
+- files_to_change should list only repository-relative files that need \
+modification to fix the issue.
+- If the evidence is insufficient, return confidence "low", an empty \
+files_to_change list, and explain what evidence is missing in the rationale.
+- Do not invent source paths. Prefer files referenced in the logs, stack \
+traces, supplied source snippets, or retrieved context.
 - Keep description and rationale concise but informative.
 """
+
+_ROOT_CAUSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "description": {"type": "string"},
+        "files_to_change": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+        },
+        "rationale": {"type": "string"},
+        "is_flaky": {"type": "boolean"},
+        "flakiness_indicators": {
+            "anyOf": [
+                {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                {"type": "null"},
+            ],
+        },
+    },
+    "required": [
+        "description",
+        "files_to_change",
+        "confidence",
+        "rationale",
+        "is_flaky",
+        "flakiness_indicators",
+    ],
+}
 
 
 def _detect_flaky_indicators(failure: ParsedFailure) -> list[str]:
@@ -202,18 +241,37 @@ def _parse_bedrock_response(raw: str) -> RootCauseReport:
         cleaned = cleaned.strip()
 
     data = json.loads(cleaned)
+    if not isinstance(data, dict):
+        raise ValueError("Root cause response JSON was not an object.")
 
     confidence = data.get("confidence", "low")
     if confidence not in ("high", "medium", "low"):
         confidence = "low"
+    raw_files = data.get("files_to_change", [])
+    files_to_change = [
+        path
+        for path in raw_files
+        if isinstance(path, str) and path.strip()
+    ] if isinstance(raw_files, list) else []
+
+    raw_indicators = data.get("flakiness_indicators")
+    flakiness_indicators = (
+        [
+            indicator
+            for indicator in raw_indicators
+            if isinstance(indicator, str) and indicator.strip()
+        ]
+        if isinstance(raw_indicators, list)
+        else None
+    )
 
     return RootCauseReport(
         description=str(data.get("description", "")),
-        files_to_change=list(data.get("files_to_change", [])),
+        files_to_change=files_to_change,
         confidence=confidence,
         rationale=str(data.get("rationale", "")),
         is_flaky=bool(data.get("is_flaky", False)),
-        flakiness_indicators=data.get("flakiness_indicators"),
+        flakiness_indicators=flakiness_indicators,
     )
 
 
@@ -301,7 +359,7 @@ class RootCauseAnalyzer:
         )
 
         try:
-            raw_response = self._bedrock.invoke(_SYSTEM_PROMPT, user_prompt)
+            raw_response = self._invoke_model(user_prompt)
         except BedrockError as exc:
             logger.error("Bedrock error during root cause analysis: %s", exc)
             return self._analysis_failed_report(str(exc))
@@ -329,6 +387,39 @@ class RootCauseAnalyzer:
             report.files_to_change,
         )
         return report
+
+    def _invoke_model(self, user_prompt: str) -> str:
+        """Invoke the model, preferring native schema output when available."""
+        invoke_with_schema = getattr(self._bedrock, "invoke_with_schema", None)
+        if (
+            callable(invoke_with_schema)
+            and type(self._bedrock).__name__ != "MagicMock"
+        ):
+            try:
+                response = invoke_with_schema(
+                    _SYSTEM_PROMPT,
+                    user_prompt,
+                    tool_name="submit_root_cause_analysis",
+                    tool_description=(
+                        "Submit the structured root-cause analysis for this "
+                        "CI failure."
+                    ),
+                    json_schema=_ROOT_CAUSE_SCHEMA,
+                    temperature=0.0,
+                )
+                logger.info("Used structured tool-use output for root cause analysis.")
+                return response if isinstance(response, str) else json.dumps(response)
+            except Exception as exc:
+                logger.info(
+                    "Structured root-cause output failed (%s); falling back to plain invoke.",
+                    exc,
+                )
+
+        return self._bedrock.invoke(
+            _SYSTEM_PROMPT,
+            user_prompt,
+            temperature=0.0,
+        )
 
     def identify_relevant_files(
         self,

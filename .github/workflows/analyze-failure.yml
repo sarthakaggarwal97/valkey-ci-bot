@@ -38,9 +38,29 @@ jobs:
       CI_BOT_COMMIT_EMAIL: ${{ vars.CI_BOT_COMMIT_EMAIL || '' }}
       CI_BOT_REQUIRE_DCO_SIGNOFF: ${{ vars.CI_BOT_REQUIRE_DCO_SIGNOFF || 'false' }}
     steps:
+      - name: Resolve called workflow ref
+        id: called-workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken('valkey-ci-agent');
+            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+            const workflowRef = payload.job_workflow_ref || '';
+            const marker = '/.github/workflows/';
+            const markerIndex = workflowRef.indexOf(marker);
+            const refIndex = workflowRef.lastIndexOf('@');
+            if (markerIndex <= 0 || refIndex <= markerIndex) {
+              core.setFailed(`Could not resolve called workflow repository/ref from job_workflow_ref: ${workflowRef}`);
+              return;
+            }
+            core.setOutput('repository', workflowRef.slice(0, markerIndex));
+            core.setOutput('ref', workflowRef.slice(refIndex + 1));
+
       - name: Checkout bot repository
         uses: actions/checkout@v6
         with:
+          repository: ${{ steps.called-workflow.outputs.repository }}
+          ref: ${{ steps.called-workflow.outputs.ref }}
           persist-credentials: false
           fetch-depth: 1
 

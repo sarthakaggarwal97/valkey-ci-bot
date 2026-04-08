@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
+from github.GithubException import GithubException
 
 from scripts.config import BotConfig, ProjectContext
 from scripts.models import (
@@ -1146,6 +1147,9 @@ class TestRunPipeline:
         )
         mock_load_config.return_value = BotConfig(monitored_workflows=["ci.yml"])
         mock_detector.return_value.detect.return_value = []
+        mock_gh.return_value.get_repo.return_value.get_contents.side_effect = (
+            GithubException(404, {"message": "missing state"})
+        )
 
         run_pipeline(
             "owner/repo",
@@ -1506,6 +1510,9 @@ class TestRunPipeline:
 
         mock_detector.return_value.detect.return_value = []
         mock_boto_client.side_effect = [MagicMock(), MagicMock()]
+        mock_gh.return_value.get_repo.return_value.get_contents.side_effect = (
+            GithubException(404, {"message": "missing state"})
+        )
 
         run_pipeline(
             "owner/repo",
@@ -1565,6 +1572,9 @@ class TestRunPipeline:
 
         mock_detector.return_value.detect.return_value = []
         mock_boto_client.return_value = MagicMock()
+        mock_gh.return_value.get_repo.return_value.get_contents.side_effect = (
+            GithubException(404, {"message": "missing state"})
+        )
 
         run_pipeline(
             "owner/repo",
