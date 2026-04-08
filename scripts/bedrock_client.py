@@ -165,6 +165,13 @@ def _is_retryable_error(error: ClientError) -> bool:
     return error_code in _RETRYABLE_ERROR_CODES
 
 
+def _is_tool_choice_rejected(error: ClientError) -> bool:
+    """Return True when Bedrock rejects forced toolChoice support."""
+    error_message = error.response.get("Error", {}).get("Message", "")
+    normalized_message = error_message.lower().replace(" ", "")
+    return "toolchoice" in normalized_message
+
+
 def _estimate_tokens(text: str) -> int:
     """Estimate token count conservatively from text length."""
     if not text:
@@ -510,6 +517,38 @@ class BedrockClient:
                 error_code = exc.response.get("Error", {}).get("Code", "")
                 error_message = exc.response.get("Error", {}).get("Message", str(exc))
 
+                if _is_tool_choice_rejected(exc):
+                    logger.info(
+                        "Structured toolChoice was rejected; retrying schema "
+                        "tool-use without forced toolChoice."
+                    )
+                    fallback_kwargs = {**converse_kwargs}
+                    fallback_tool_config = dict(fallback_kwargs["toolConfig"])
+                    fallback_tool_config.pop("toolChoice", None)
+                    fallback_kwargs["toolConfig"] = fallback_tool_config
+                    try:
+                        response = self._converse_with_retry(fallback_kwargs)
+                        self._adjust_token_usage(response, reserved_tokens)
+                        return self._extract_tool_use_json(response)
+                    except ClientError as fallback_exc:
+                        last_error = fallback_exc
+                        error_code = fallback_exc.response.get("Error", {}).get("Code", "")
+                        error_message = fallback_exc.response.get("Error", {}).get(
+                            "Message", str(fallback_exc)
+                        )
+                        if not _is_retryable_error(fallback_exc):
+                            raise BedrockError(
+                                f"Bedrock API error: {error_message}",
+                                error_code=error_code,
+                                retryable=False,
+                            ) from fallback_exc
+                        raise BedrockError(
+                            f"Bedrock API error after fallback schema tool-use "
+                            f"attempts: {error_message}",
+                            error_code=error_code,
+                            retryable=True,
+                        ) from fallback_exc
+
                 if not _is_retryable_error(exc):
                     raise BedrockError(
                         f"Bedrock API error: {error_message}",
@@ -804,8 +843,7 @@ class BedrockClient:
             try:
                 response = self._converse_with_retry(forced_kwargs)
             except ClientError as exc:
-                error_message = exc.response.get("Error", {}).get("Message", "")
-                if "toolchoice" not in error_message.lower().replace(" ", ""):
+                if not _is_tool_choice_rejected(exc):
                     raise
                 logger.info(
                     "Forced terminal toolChoice was rejected; retrying forced "
