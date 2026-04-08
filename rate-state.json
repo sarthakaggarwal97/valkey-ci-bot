@@ -1,18 +1,21 @@
 {
   "pr_timestamps": [],
-  "token_usage": 483805,
+  "token_usage": 891748,
   "token_window_start": "2026-04-08T07:55:42.346172+00:00",
   "queued_failures": [],
   "ai_metrics": {
-    "bedrock.invoke_schema.calls": 4,
-    "bedrock.invoke_schema.success": 4,
-    "bedrock.retrieval.calls": 6,
-    "bedrock.retrieval.snippets": 18,
-    "bedrock.retrieval.hits": 3,
-    "bedrock.prompt_safety_guard.checked": 3,
-    "bedrock.prompt_safety_guard.present": 3,
-    "bedrock.tool_loop.calls": 1,
-    "bedrock.tool_loop.turns": 10,
-    "bedrock.tool_loop.success": 1
+    "bedrock.invoke_schema.calls": 7,
+    "bedrock.invoke_schema.success": 7,
+    "bedrock.retrieval.calls": 12,
+    "bedrock.retrieval.snippets": 36,
+    "bedrock.retrieval.hits": 6,
+    "bedrock.prompt_safety_guard.checked": 8,
+    "bedrock.prompt_safety_guard.present": 8,
+    "bedrock.tool_loop.calls": 3,
+    "bedrock.tool_loop.turns": 24,
+    "bedrock.tool_loop.success": 3,
+    "reviewer.findings.normalized_kept": 2,
+    "reviewer.verifier.kept": 2,
+    "bedrock.tool_loop.terminal_validation_rejections": 1
   }
 }
