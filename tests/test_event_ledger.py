@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import builtins
+import importlib
 import json
+import sys
 from unittest.mock import MagicMock
 
 from scripts.event_ledger import EventLedger, make_event, parse_events
@@ -70,3 +73,20 @@ def test_event_ledger_appends_pending_events_to_remote_file() -> None:
         "validation.passed",
     ]
     assert ledger.pending == []
+
+
+def test_parse_events_can_import_without_pygithub(monkeypatch) -> None:
+    original_import = builtins.__import__
+
+    def _guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "github.GithubException":
+            raise ModuleNotFoundError("No module named 'github'")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.delitem(sys.modules, "scripts.event_ledger", raising=False)
+    monkeypatch.setattr(builtins, "__import__", _guarded_import)
+    module = importlib.import_module("scripts.event_ledger")
+
+    events = module.parse_events('{"event_id":"evt","event_type":"review.summary_posted"}\n')
+
+    assert events == [{"event_id": "evt", "event_type": "review.summary_posted"}]

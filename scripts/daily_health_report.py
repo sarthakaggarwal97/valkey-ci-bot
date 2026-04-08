@@ -70,10 +70,13 @@ def fetch_daily_runs(
         description=f"get repo {repo_full_name}",
     )
 
-    # Fetch workflow runs
+    workflow = retry_github_call(
+        lambda: repo.get_workflow(workflow_file),
+        retries=3,
+        description=f"get workflow {workflow_file}",
+    )
     runs = retry_github_call(
-        lambda: repo.get_workflow_runs(
-            workflow_file_name=workflow_file,
+        lambda: workflow.get_runs(
             branch=branch,
             status="completed",
         ),
@@ -98,8 +101,11 @@ def fetch_daily_runs(
 
         # Fetch jobs for this run
         try:
+            def _list_jobs() -> list[Any]:
+                return list(run.jobs())
+
             jobs = retry_github_call(
-                lambda r=run: list(r.jobs()),
+                _list_jobs,
                 retries=2,
                 description=f"get jobs for run {run.id}",
             )

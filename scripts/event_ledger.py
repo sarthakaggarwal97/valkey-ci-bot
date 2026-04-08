@@ -10,8 +10,6 @@ import logging
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
-from github.GithubException import GithubException
-
 if TYPE_CHECKING:
     from github import Github
 
@@ -25,10 +23,14 @@ _MAX_PERSIST_ATTEMPTS = 3
 JsonObject = dict[str, Any]
 
 
+def _github_status(exc: Exception) -> int | None:
+    status = getattr(exc, "status", None)
+    return status if isinstance(status, int) else None
+
+
 def _is_write_conflict(exc: Exception) -> bool:
-    if not isinstance(exc, GithubException):
-        return False
-    if exc.status in {409, 422}:
+    status = _github_status(exc)
+    if status in {409, 422}:
         return True
     message = str(exc).lower()
     return "sha" in message or "already exists" in message or "conflict" in message
@@ -144,8 +146,8 @@ class EventLedger:
         try:
             repo.get_git_ref(f"heads/{_LEDGER_BRANCH}")
             return
-        except GithubException as exc:
-            if exc.status != 404:
+        except Exception as exc:
+            if _github_status(exc) != 404:
                 raise
         except FileNotFoundError:
             pass
@@ -204,8 +206,8 @@ class EventLedger:
     def _read_remote_ledger(self, repo: Any) -> tuple[str, Any | None]:
         try:
             contents = repo.get_contents(_LEDGER_FILE, ref=_LEDGER_BRANCH)
-        except GithubException as exc:
-            if exc.status == 404:
+        except Exception as exc:
+            if _github_status(exc) == 404:
                 return "", None
             raise
         except FileNotFoundError:
