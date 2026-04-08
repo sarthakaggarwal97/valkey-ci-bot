@@ -131,12 +131,14 @@ def test_render_summary_comment_uses_short_summary_when_present() -> None:
             file_groups_markdown="- Core",
             release_notes="Release note",
             short_summary="Short summary first.",
-        )
+        ),
+        policy_note="### Maintainer Checklist\n\nNo signals.",
     )
 
     assert "Short summary first." in rendered
     assert "### Walkthrough" in rendered
     assert "Longer walkthrough" in rendered
+    assert "### Maintainer Checklist" in rendered
 
 
 def test_select_chat_paths_falls_back_to_first_five_when_no_file_is_mentioned() -> None:
@@ -266,6 +268,8 @@ def test_run_review_mode_posts_summary_and_review(
     publisher.upsert_summary.assert_called_once()
     publisher.publish_review_comments.assert_called_once()
     state_store.save.assert_called_once()
+    saved_state = state_store.save.call_args.args[0]
+    assert saved_state.last_reviewed_head_sha == "head456"
 
 
 @patch("scripts.pr_review_main.boto3.client")
@@ -346,7 +350,10 @@ def test_run_manual_review_mode_uses_bot_repo_state(
     assert rate_kwargs["state_github_client"] is state_gh
     assert rate_kwargs["state_repo_full_name"] == "sarthakaggarwal97/valkey-ci-agent"
     publisher.upsert_summary.assert_called_once()
-    publisher.approve_pr.assert_called_once()
+    publisher.approve_pr.assert_not_called()
+    publisher.publish_review_note.assert_called_once()
+    saved_state = mock_state_store_cls.return_value.save.call_args.args[0]
+    assert saved_state.last_reviewed_head_sha == "head456"
 
 
 @patch("scripts.pr_review_main.boto3.client")
@@ -426,6 +433,98 @@ def test_run_review_mode_withholds_approval_when_coverage_is_incomplete(
     assert exit_code == 0
     publisher.approve_pr.assert_not_called()
     publisher.publish_review_note.assert_called_once()
+    saved_state = mock_state_store_cls.return_value.save.call_args.args[0]
+    assert saved_state.last_reviewed_head_sha is None
+
+
+@patch("scripts.pr_review_main.boto3.client")
+@patch("scripts.pr_review_main.Github")
+@patch("scripts.pr_review_main.RateLimiter")
+@patch("scripts.pr_review_main.ReviewStateStore")
+@patch("scripts.pr_review_main.CommentPublisher")
+@patch("scripts.pr_review_main.PRContextFetcher")
+def test_run_review_mode_does_not_advance_state_when_findings_have_incomplete_coverage(
+    mock_fetcher_cls,
+    mock_publisher_cls,
+    mock_state_store_cls,
+    mock_rate_limiter_cls,
+    mock_github_cls,
+    _mock_boto_client,
+    tmp_path,
+) -> None:
+    payload = {
+        "repository": {"full_name": "owner/repo"},
+        "sender": {"login": "alice"},
+        "pull_request": {"number": 11, "body": "Details"},
+    }
+    event_path = _event_file(tmp_path, payload)
+
+    fetcher = mock_fetcher_cls.return_value
+    fetcher.fetch.return_value = _context()
+    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
+    fetcher.build_diff_scope.return_value = MagicMock(files=_context().files)
+
+    publisher = mock_publisher_cls.return_value
+    publisher.upsert_summary.return_value = 99
+    publisher.publish_review_comments.return_value = [1001]
+    publisher.publish_review_note.return_value = 1002
+    mock_state_store_cls.return_value.load.return_value = ReviewState(
+        repo="owner/repo",
+        pr_number=11,
+        last_reviewed_head_sha="oldsha",
+        summary_comment_id=55,
+        review_comment_ids=[],
+        updated_at="2026-03-12T00:00:00+00:00",
+    )
+    mock_rate_limiter_cls.return_value.load.return_value = None
+    mock_rate_limiter_cls.return_value.save.return_value = None
+    mock_github_cls.return_value = MagicMock()
+
+    with patch(
+        "scripts.pr_review_main._load_runtime_reviewer_config",
+        return_value=ReviewerConfig(),
+    ), patch(
+        "scripts.pr_review_main.PRSummarizer"
+    ) as mock_summarizer_cls, patch(
+        "scripts.pr_review_main.CodeReviewer"
+    ) as mock_reviewer_cls:
+        mock_summarizer_cls.return_value.summarize.return_value = SummaryResult(
+            walkthrough="Summary",
+            file_groups_markdown="- Core",
+            release_notes="Release note",
+        )
+        mock_reviewer = mock_reviewer_cls.return_value
+        mock_reviewer.classify_simple_change.return_value = False
+        mock_reviewer.review.return_value = [
+            MagicMock(path="src/failover.c", line=12, body="Risk", severity="high")
+        ]
+        mock_reviewer.get_last_review_coverage.return_value = ReviewCoverage(
+            requested_lgtm=False,
+            checked_files=[],
+            skipped_files=[],
+            unaccounted_files=["src/failover.c"],
+        )
+
+        exit_code = run(
+            [
+                "--repo",
+                "owner/repo",
+                "--mode",
+                "review",
+                "--token",
+                "token",
+                "--event-name",
+                "pull_request_target",
+                "--event-path",
+                str(event_path),
+            ]
+        )
+
+    assert exit_code == 0
+    publisher.publish_review_comments.assert_called_once()
+    publisher.publish_review_note.assert_called_once()
+    saved_state = mock_state_store_cls.return_value.save.call_args.args[0]
+    assert saved_state.last_reviewed_head_sha == "oldsha"
 
 
 @patch("scripts.pr_review_main.boto3.client")
@@ -657,6 +756,8 @@ def test_run_review_mode_returns_nonzero_when_review_generation_is_unparseable(
 
     assert exit_code == 1
     mock_publisher_cls.return_value.publish_review_comments.assert_not_called()
+    saved_state = mock_state_store_cls.return_value.save.call_args.args[0]
+    assert saved_state.last_reviewed_head_sha is None
 
 
 @patch("scripts.pr_review_main.boto3.client")

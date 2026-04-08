@@ -33,6 +33,7 @@ from scripts.pr_event_router import PREventRouter, load_event_from_path
 from scripts.pr_summarizer import PRSummarizer
 from scripts.rate_limiter import RateLimiter
 from scripts.review_chat import ReviewChat
+from scripts.review_policy import collect_review_policy_note, render_review_policy_note
 from scripts.review_state_store import ReviewStateStore
 from scripts.summary import ReviewWorkflowSummary
 
@@ -88,7 +89,11 @@ def _select_review_files(
     return [changed_file.path for changed_file in selected[: config.max_files]]
 
 
-def _render_summary_comment(summary: SummaryResult) -> str:
+def _render_summary_comment(
+    summary: SummaryResult,
+    *,
+    policy_note: str = "",
+) -> str:
     """Render the summary comment body posted to the pull request."""
     sections = ["## PR Summary"]
     if summary.short_summary:
@@ -98,6 +103,8 @@ def _render_summary_comment(summary: SummaryResult) -> str:
         sections.extend(["", "### File Groups", "", summary.file_groups_markdown])
     if summary.release_notes:
         sections.extend(["", "### Release Notes", "", summary.release_notes])
+    if policy_note:
+        sections.extend(["", policy_note])
     return "\n".join(sections).strip()
 
 
@@ -298,6 +305,10 @@ def run(argv: list[str] | None = None) -> int:
         pr_context = fetcher.hydrate_contents(pr_context, selected_path_set)
         review_context = _filtered_context(pr_context, selected_path_set)
         current_state = state_store.load(repo_name, pr_context.number)
+        last_reviewed_head_sha = (
+            current_state.last_reviewed_head_sha if current_state else None
+        )
+        review_completed_for_head = False
 
         if resolved_mode == "chat":
             assert event is not None
@@ -351,6 +362,11 @@ def run(argv: list[str] | None = None) -> int:
         summary_comment_id = current_state.summary_comment_id if current_state else None
         short_summary = ""
         try:
+            policy_note = ""
+            if config.post_policy_notes:
+                policy_note = render_review_policy_note(
+                    collect_review_policy_note(pr_context)
+                )
             summary_result = PRSummarizer(
                 bedrock_client,
                 retriever=retriever,
@@ -364,7 +380,7 @@ def run(argv: list[str] | None = None) -> int:
                 repo_name,
                 pr_context.number,
                 summary_comment_id,
-                _render_summary_comment(summary_result),
+                _render_summary_comment(summary_result, policy_note=policy_note),
             )
             summary.add_result("summary", "performed", "comment-upserted")
         except Exception as exc:
@@ -382,7 +398,7 @@ def run(argv: list[str] | None = None) -> int:
             try:
                 diff_scope = fetcher.build_diff_scope(
                     review_context,
-                    current_state.last_reviewed_head_sha if current_state else None,
+                    last_reviewed_head_sha,
                 )
                 reviewer = CodeReviewer(
                     bedrock_client,
@@ -393,6 +409,7 @@ def run(argv: list[str] | None = None) -> int:
                 if reviewer.classify_simple_change(diff_scope.files) and not config.review_simple_changes:
                     detail = "simple-change" if diff_scope.files else "no-new-files"
                     summary.add_result("review", "skipped", detail)
+                    review_completed_for_head = True
                 else:
                     # Per-file triage: use light model to skip trivial files
                     triaged_files = reviewer.triage_files(
@@ -400,6 +417,7 @@ def run(argv: list[str] | None = None) -> int:
                     )
                     if not triaged_files:
                         summary.add_result("review", "skipped", "all-files-approved-by-triage")
+                        review_completed_for_head = True
                     else:
                         triaged_scope = _DiffScope(
                             base_sha=diff_scope.base_sha,
@@ -429,10 +447,34 @@ def run(argv: list[str] | None = None) -> int:
                                 for comment_id in published_ids
                                 if comment_id not in review_comment_ids
                             )
+                            comments_published = bool(published_ids)
                             summary.add_result(
                                 "review",
-                                "performed",
-                                f"{len(published_ids)} comment(s), {len(diff_scope.files) - len(triaged_files)} file(s) auto-approved",
+                                "performed" if comments_published else "failed",
+                                (
+                                    f"{len(published_ids)} comment(s), "
+                                    f"{len(diff_scope.files) - len(triaged_files)} "
+                                    "file(s) auto-approved"
+                                ),
+                            )
+                            if not comments_published:
+                                had_failure = True
+                            if coverage_report is not None and not coverage_report.complete:
+                                review_id = publisher.publish_review_note(
+                                    repo_name,
+                                    pr_context.number,
+                                    coverage_report.render_review_note(),
+                                    commit_sha=pr_context.head_sha,
+                                )
+                                if review_id and review_id not in review_comment_ids:
+                                    review_comment_ids.append(review_id)
+                            review_completed_for_head = (
+                                comments_published
+                                and (
+                                    coverage_report.complete
+                                    if coverage_report is not None
+                                    else True
+                                )
                             )
                         else:
                             if coverage_report is not None and not coverage_report.approvable:
@@ -450,16 +492,33 @@ def run(argv: list[str] | None = None) -> int:
                                     "approval withheld (incomplete review coverage)",
                                 )
                             else:
-                                publisher.approve_pr(
-                                    repo_name,
-                                    pr_context.number,
-                                    body="LGTM",
-                                    commit_sha=pr_context.head_sha,
-                                )
+                                if config.approve_on_no_findings:
+                                    publisher.approve_pr(
+                                        repo_name,
+                                        pr_context.number,
+                                        body="LGTM",
+                                        commit_sha=pr_context.head_sha,
+                                    )
+                                    detail = "approved (no issues found)"
+                                else:
+                                    review_id = publisher.publish_review_note(
+                                        repo_name,
+                                        pr_context.number,
+                                        (
+                                            "Automated review found no actionable "
+                                            "issues in this pass. It is not approving "
+                                            "automatically."
+                                        ),
+                                        commit_sha=pr_context.head_sha,
+                                    )
+                                    if review_id and review_id not in review_comment_ids:
+                                        review_comment_ids.append(review_id)
+                                    detail = "no actionable issues (approval disabled)"
+                                review_completed_for_head = True
                                 summary.add_result(
                                     "review",
                                     "performed",
-                                    "approved (no issues found)",
+                                    detail,
                                 )
             except Exception as exc:
                 had_failure = True
@@ -470,7 +529,11 @@ def run(argv: list[str] | None = None) -> int:
             ReviewState(
                 repo=repo_name,
                 pr_number=pr_context.number,
-                last_reviewed_head_sha=pr_context.head_sha,
+                last_reviewed_head_sha=(
+                    pr_context.head_sha
+                    if review_completed_for_head
+                    else last_reviewed_head_sha
+                ),
                 summary_comment_id=summary_comment_id,
                 review_comment_ids=review_comment_ids,
                 updated_at=datetime.now(timezone.utc).isoformat(),

@@ -173,8 +173,16 @@ class ReviewCoverage:
         """Return True when the reviewer explicitly approved with full coverage."""
         return (
             self.requested_lgtm
-            and not self.claimed_without_tool
+            and self.complete
+        )
+
+    @property
+    def complete(self) -> bool:
+        """Return True when every required file was accounted for."""
+        return (
+            not self.claimed_without_tool
             and not self.unaccounted_files
+            and not self.fetch_limit_hit
         )
 
     def render_review_note(self) -> str:
@@ -363,6 +371,60 @@ def _looks_like_code(path: str) -> bool:
         ".sol",
         ".vue", ".svelte",
     }
+
+
+def _changed_patch_lines(patch: str) -> list[str]:
+    """Return added/removed content lines from a unified diff patch."""
+    changed_lines: list[str] = []
+    for line in patch.splitlines():
+        if line.startswith(("+++", "---")):
+            continue
+        if line.startswith(("+", "-")):
+            changed_lines.append(line[1:])
+    return changed_lines
+
+
+def _is_comment_or_whitespace_only_patch(path: str, patch: str) -> bool:
+    """Return True for patches that only change comments or blank lines."""
+    suffix = PurePosixPath(path).suffix.lower()
+    comment_prefixes = ["//", "/*", "*", "*/"]
+    if suffix in {
+        ".py", ".pyi",
+        ".sh", ".bash", ".zsh",
+        ".rb",
+        ".pl", ".pm",
+        ".r",
+        ".tcl",
+        ".yaml", ".yml",
+    }:
+        comment_prefixes.append("#")
+
+    changed_lines = _changed_patch_lines(patch)
+    if not changed_lines:
+        return True
+    for line in changed_lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if any(stripped.startswith(prefix) for prefix in comment_prefixes):
+            continue
+        return False
+    return True
+
+
+def _is_deterministically_trivial_review_change(changed_file: ChangedFile) -> bool:
+    """Return True when a file can be safely skipped without model triage."""
+    if not changed_file.patch:
+        return True
+
+    delta = changed_file.additions + changed_file.deletions
+    if delta <= 3 and not _looks_like_code(changed_file.path):
+        return True
+
+    return _looks_like_code(changed_file.path) and _is_comment_or_whitespace_only_patch(
+        changed_file.path,
+        changed_file.patch,
+    )
 
 
 def _serialize_scope(scope: DiffScope, *, max_chars: int = 500_000) -> str:
@@ -2076,13 +2138,14 @@ class CodeReviewer:
 
         Returns "NEEDS_REVIEW" or "APPROVED".
         """
-        if not changed_file.patch:
+        if _is_deterministically_trivial_review_change(changed_file):
             return "APPROVED"
-
-        # Very small changes to non-code files are auto-approved
-        delta = changed_file.additions + changed_file.deletions
-        if delta <= 3 and not _looks_like_code(changed_file.path):
-            return "APPROVED"
+        if not config.model_file_triage:
+            logger.info(
+                "Triage: %s -> NEEDS_REVIEW (model_file_triage disabled)",
+                changed_file.path,
+            )
+            return "NEEDS_REVIEW"
 
         triage_prompt = f"""Triage this file diff as NEEDS_REVIEW or APPROVED.
 
@@ -2307,6 +2370,11 @@ Summary of all changes in this PR (for cross-file context):
             custom_instructions_section = f"""
 ## Project-Specific Review Guidelines
 {config.custom_instructions}
+
+Note: deterministic maintainer-policy reminders such as DCO, docs follow-up,
+security process, governance, and core-team routing are handled separately in
+the PR summary checklist. Do not emit those as inline defect findings unless
+the diff also contains a concrete code defect.
 """
         existing_review_context = _render_existing_review_context(pr, diff_scope)
         existing_review_section = ""
@@ -2438,6 +2506,13 @@ CRITICAL rules:
         custom_instructions_section = ""
         if config.custom_instructions:
             custom_instructions_section = f"\n## Project-Specific Review Guidelines\n{config.custom_instructions}\n"
+            custom_instructions_section += (
+                "\nNote: deterministic maintainer-policy reminders such as DCO, "
+                "docs follow-up, security process, governance, and core-team "
+                "routing are handled separately in the PR summary checklist. "
+                "Do not emit those as inline defect findings unless the diff "
+                "also contains a concrete code defect.\n"
+            )
         review_paths = "\n".join(
             f"- {changed_file.path}" for changed_file in diff_scope.files
         )

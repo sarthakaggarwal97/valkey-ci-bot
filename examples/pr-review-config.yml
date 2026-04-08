@@ -10,6 +10,14 @@ reviewer:
   disable_release_notes: false
   review_simple_changes: true
   review_comment_lgtm: false
+  # Keep automated GitHub approvals disabled until your review eval set shows
+  # the bot is reliable enough for your repository.
+  approve_on_no_findings: false
+  # When false, only deterministic trivial file changes are skipped before the
+  # heavy review pass. Set true to let the light model skip files.
+  model_file_triage: false
+  # Add deterministic DCO/docs/core-team/security notes to the summary comment.
+  post_policy_notes: true
   ignore_keyword: "/reviewbot: ignore"
   max_files: 150
   max_review_comments: 20

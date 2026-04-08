@@ -167,6 +167,10 @@ def test_fetch_includes_existing_review_comments() -> None:
     pr.user.login = "alice"
     pr.get_files.return_value = [raw_file]
     pr.get_review_comments.return_value = [review_comment]
+    commit = MagicMock()
+    commit.sha = "abc123"
+    commit.commit.message = "Fix timeout\n\nSigned-off-by: Alice <alice@example.com>"
+    pr.get_commits.return_value = [commit]
 
     context = PRContextFetcher(gh).fetch("owner/repo", 1)
 
@@ -174,3 +178,6 @@ def test_fetch_includes_existing_review_comments() -> None:
     assert context.review_comments[0].path == "src/a.c"
     assert context.review_comments[0].line == 12
     assert context.review_comments[0].author == "bob"
+    assert len(context.commits) == 1
+    assert context.commits[0].sha == "abc123"
+    assert "Signed-off-by" in context.commits[0].message

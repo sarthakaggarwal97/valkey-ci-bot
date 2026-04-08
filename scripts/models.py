@@ -233,6 +233,14 @@ class ExistingReviewComment:
 
 
 @dataclass
+class PullRequestCommit:
+    """A commit in a pull request."""
+
+    sha: str
+    message: str
+
+
+@dataclass
 class PullRequestContext:
     """Context fetched for a pull request review."""
 
@@ -245,6 +253,7 @@ class PullRequestContext:
     author: str
     files: list[ChangedFile]
     review_comments: list[ExistingReviewComment] = field(default_factory=list)
+    commits: list[PullRequestCommit] = field(default_factory=list)
 
 
 @dataclass

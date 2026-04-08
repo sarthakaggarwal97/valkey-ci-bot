@@ -73,13 +73,25 @@ The reviewer is intentionally defect-oriented and conservative. It prefers a
 small number of high-confidence findings, generates structured candidate
 findings, runs a skeptic verification pass before publishing, ranks surviving
 findings by severity and confidence, and submits them as a single batched
-review with a short top-level summary.
+review with a short top-level summary. By default, a no-findings pass posts a
+neutral review note instead of approving the PR; set
+`reviewer.approve_on_no_findings: true` only after the bot is passing your
+review eval set.
+
+Maintainer-policy reminders are kept separate from inline defect findings. The
+summary comment can include a deterministic checklist for DCO, docs follow-up,
+security-sensitive PRs, governance changes, and likely `@core-team` review
+routing. This is controlled by `reviewer.post_policy_notes`.
 
 When deeper context is needed, the reviewer can fetch changed files at the PR
 head SHA, inspect the full pre-change file at the base SHA, search code at the
 pinned revision, and locate likely related tests. Test discovery uses the
 project metadata in the reviewer config, including optional
 `project.test_to_source_patterns` mappings.
+
+Detailed review skips only deterministic trivial file changes by default. Set
+`reviewer.model_file_triage: true` if you want the light model to skip files
+before the heavy review pass.
 
 Example consumer-repo files:
 
@@ -93,6 +105,9 @@ Config loading checks the target repo first (`.github/pr-review-bot.yml`), then 
 Useful reviewer config fields:
 
 - `reviewer.custom_instructions` for project-specific invariants and review guidance
+- `reviewer.approve_on_no_findings` to opt into automated approvals after no findings
+- `reviewer.model_file_triage` to opt into light-model file skipping before heavy review
+- `reviewer.post_policy_notes` to include deterministic maintainer-policy notes in the summary
 - `reviewer.project.source_dirs` and `reviewer.project.test_dirs` for source/test discovery
 - `reviewer.project.test_to_source_patterns` to map changed source files to likely regression tests
 - `reviewer.retrieval.*` to enable optional Bedrock Knowledge Base context

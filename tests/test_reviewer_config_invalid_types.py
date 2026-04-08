@@ -11,6 +11,9 @@ def test_reviewer_config_invalid_types_fall_back_to_defaults() -> None:
             "reviewer": {
                 "enabled": "false",
                 "collaborator_only": "true",
+                "approve_on_no_findings": "true",
+                "model_file_triage": "true",
+                "post_policy_notes": "false",
                 "max_files": "150",
                 "max_review_comments": "20",
                 "path_filters": "src/**",
@@ -37,6 +40,9 @@ def test_reviewer_config_invalid_types_fall_back_to_defaults() -> None:
     defaults = ReviewerConfig()
     assert config.enabled == defaults.enabled
     assert config.collaborator_only == defaults.collaborator_only
+    assert config.approve_on_no_findings == defaults.approve_on_no_findings
+    assert config.model_file_triage == defaults.model_file_triage
+    assert config.post_policy_notes == defaults.post_policy_notes
     assert config.max_files == defaults.max_files
     assert config.max_review_comments == defaults.max_review_comments
     assert config.path_filters == defaults.path_filters

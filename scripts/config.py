@@ -96,6 +96,9 @@ class ReviewerConfig:
     disable_release_notes: bool = False
     review_simple_changes: bool = True
     review_comment_lgtm: bool = False
+    approve_on_no_findings: bool = False
+    model_file_triage: bool = False
+    post_policy_notes: bool = True
     ignore_keyword: str = "/reviewbot: ignore"
     max_files: int = 150
     max_review_comments: int = 5
@@ -466,6 +469,21 @@ def load_reviewer_config_data(raw: Any, *, source: str = "<memory>") -> Reviewer
             root.get("review_comment_lgtm", defaults.review_comment_lgtm)
             if "review_comment_lgtm" in root else defaults.review_comment_lgtm,
             defaults.review_comment_lgtm,
+        ),
+        approve_on_no_findings=_coerce_bool(
+            root.get("approve_on_no_findings", defaults.approve_on_no_findings)
+            if "approve_on_no_findings" in root else defaults.approve_on_no_findings,
+            defaults.approve_on_no_findings,
+        ),
+        model_file_triage=_coerce_bool(
+            root.get("model_file_triage", defaults.model_file_triage)
+            if "model_file_triage" in root else defaults.model_file_triage,
+            defaults.model_file_triage,
+        ),
+        post_policy_notes=_coerce_bool(
+            root.get("post_policy_notes", defaults.post_policy_notes)
+            if "post_policy_notes" in root else defaults.post_policy_notes,
+            defaults.post_policy_notes,
         ),
         ignore_keyword=_coerce_str(
             root.get("ignore_keyword"),

@@ -1,4 +1,7 @@
 reviewer:
+  approve_on_no_findings: false
+  model_file_triage: false
+  post_policy_notes: true
   custom_instructions: |
     This project is Valkey, a high-performance in-memory key-value store
     forked from Redis 7.2. It is written in C and uses an event-driven,
@@ -47,6 +50,11 @@ reviewer:
       clustering, Lua scripting, pub/sub, and persistence via RDB and AOF.
     source_dirs: ["src/"]
     test_dirs: ["tests/"]
+    test_to_source_patterns:
+      - test_path: "tests/unit/{name}.tcl"
+        source_path: "src/{name}.c"
+      - test_path: "tests/integration/{name}.tcl"
+        source_path: "src/{name}.c"
   retrieval:
     enabled: true
     code_knowledge_base_id: "OHQMPN9RCG"

@@ -12,6 +12,7 @@ from scripts.models import (
     DiffScope,
     ExistingReviewComment,
     PullRequestContext,
+    PullRequestCommit,
     ReviewThread,
 )
 
@@ -99,6 +100,27 @@ class PRContextFetcher:
                 pr_number,
                 exc,
             )
+        commits: list[PullRequestCommit] = []
+        try:
+            for raw_commit in retry_github_call(
+                lambda: list(pr.get_commits()),
+                retries=self._github_retries,
+                description=f"list commits for {repo_name}#{pr_number}",
+            ):
+                commit = getattr(raw_commit, "commit", None)
+                commits.append(
+                    PullRequestCommit(
+                        sha=str(getattr(raw_commit, "sha", "") or ""),
+                        message=str(getattr(commit, "message", "") or ""),
+                    )
+                )
+        except Exception as exc:
+            logger.warning(
+                "Failed to load commits for %s#%d: %s",
+                repo_name,
+                pr_number,
+                exc,
+            )
         return PullRequestContext(
             repo=repo_name,
             number=pr_number,
@@ -109,6 +131,7 @@ class PRContextFetcher:
             author=pr.user.login if pr.user else "",
             files=files,
             review_comments=review_comments,
+            commits=commits,
         )
 
     def hydrate_contents(

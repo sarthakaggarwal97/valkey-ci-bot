@@ -17,6 +17,9 @@ def test_load_reviewer_config_defaults() -> None:
     assert config.collaborator_only is False
     assert config.ignore_keyword == "/reviewbot: ignore"
     assert config.daily_token_budget == 1_000_000_000
+    assert config.approve_on_no_findings is False
+    assert config.model_file_triage is False
+    assert config.post_policy_notes is True
     assert config.models.light_model_id
     assert config.models.heavy_model_id
 
@@ -27,6 +30,9 @@ def test_load_reviewer_config_nested_section() -> None:
             "reviewer": {
                 "collaborator_only": True,
                 "disable_release_notes": True,
+                "approve_on_no_findings": True,
+                "model_file_triage": True,
+                "post_policy_notes": False,
                 "max_review_comments": 7,
                 "path_filters": ["src/**", "!src/generated/**"],
                 "retrieval": {
@@ -47,6 +53,9 @@ def test_load_reviewer_config_nested_section() -> None:
 
     assert config.collaborator_only is True
     assert config.disable_release_notes is True
+    assert config.approve_on_no_findings is True
+    assert config.model_file_triage is True
+    assert config.post_policy_notes is False
     assert config.max_review_comments == 7
     assert config.path_filters == ["src/**", "!src/generated/**"]
     assert config.retrieval.enabled is True

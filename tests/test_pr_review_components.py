@@ -109,6 +109,95 @@ def test_code_reviewer_uses_heavy_model_and_filters_findings() -> None:
     assert kwargs["model_id"] == config.models.heavy_model_id
 
 
+def test_code_reviewer_triage_keeps_code_changes_by_default() -> None:
+    bedrock = MagicMock()
+    bedrock.invoke.return_value = "[TRIAGE]: APPROVED"
+    changed_file = ChangedFile(
+        path="src/failover.c",
+        status="modified",
+        additions=1,
+        deletions=1,
+        patch="@@ -1 +1 @@\n-int x = 0;\n+int x = 1;",
+        contents="int x = 1;",
+        is_binary=False,
+    )
+
+    verdict = CodeReviewer(bedrock).triage_file(
+        changed_file,
+        _context(),
+        ReviewerConfig(),
+    )
+
+    assert verdict == "NEEDS_REVIEW"
+    bedrock.invoke.assert_not_called()
+
+
+def test_code_reviewer_triage_can_use_model_when_enabled() -> None:
+    bedrock = MagicMock()
+    bedrock.invoke.return_value = "[TRIAGE]: APPROVED"
+    changed_file = ChangedFile(
+        path="src/failover.c",
+        status="modified",
+        additions=1,
+        deletions=1,
+        patch="@@ -1 +1 @@\n-int x = 0;\n+int x = 1;",
+        contents="int x = 1;",
+        is_binary=False,
+    )
+
+    verdict = CodeReviewer(bedrock).triage_file(
+        changed_file,
+        _context(),
+        ReviewerConfig(model_file_triage=True),
+    )
+
+    assert verdict == "APPROVED"
+    bedrock.invoke.assert_called_once()
+
+
+def test_code_reviewer_triage_skips_comment_only_code_changes() -> None:
+    bedrock = MagicMock()
+    changed_file = ChangedFile(
+        path="src/failover.c",
+        status="modified",
+        additions=1,
+        deletions=1,
+        patch="@@ -1 +1 @@\n-// old comment\n+// new comment",
+        contents="// new comment",
+        is_binary=False,
+    )
+
+    verdict = CodeReviewer(bedrock).triage_file(
+        changed_file,
+        _context(),
+        ReviewerConfig(),
+    )
+
+    assert verdict == "APPROVED"
+    bedrock.invoke.assert_not_called()
+
+
+def test_code_reviewer_triage_reviews_c_preprocessor_changes() -> None:
+    bedrock = MagicMock()
+    changed_file = ChangedFile(
+        path="src/failover.c",
+        status="modified",
+        additions=1,
+        deletions=1,
+        patch='@@ -1 +1 @@\n-#include "old.h"\n+#include "new.h"',
+        contents='#include "new.h"',
+        is_binary=False,
+    )
+
+    verdict = CodeReviewer(bedrock).triage_file(
+        changed_file,
+        _context(),
+        ReviewerConfig(),
+    )
+
+    assert verdict == "NEEDS_REVIEW"
+
+
 def test_code_reviewer_filters_speculative_and_file_level_findings() -> None:
     bedrock = MagicMock()
     # First call: review pass returns findings (some speculative).
@@ -639,6 +728,8 @@ def test_review_coverage_note_lists_gaps() -> None:
     assert "`src/socket.c`" in note
     assert "`tests/failover_timeout.tcl`" in note
     assert "fetch budget" in note
+    assert coverage.complete is False
+    assert coverage.approvable is False
 
 
 def test_code_reviewer_raises_on_unparseable_response() -> None:

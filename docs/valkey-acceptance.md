@@ -23,7 +23,7 @@ and Bedrock credentials only when you want to execute the model passes.
 
 ## Manifest
 
-Start from [examples/valkey-acceptance.yml](/Users/sarthagg/IdeaProjects/valkey-ci-bot/examples/valkey-acceptance.yml).
+Start from `examples/valkey-acceptance.yml`.
 
 Use:
 - `target_repo` for the upstream repo you want to inspect
