@@ -68,8 +68,11 @@ experience. The single-page HTML stays useful for quick inspection, the
 Markdown file stays optimized for GitHub step summaries, and the JSON file
 stays optimized for automation.
 
-If you want a stable public URL, run `.github/workflows/publish-dashboard-site.yml`.
-It builds the same site and deploys it to GitHub Pages.
+The GitHub Pages publisher at `.github/workflows/publish-dashboard-site.yml`
+now republishes the site automatically after successful `main`-branch runs of
+CI, dashboard refreshes, replay lab, Daily monitoring, Fuzzer monitoring,
+review workflows, and backport automation. It also keeps a 6-hour scheduled
+refresh and still supports manual dispatch if you want to force a republish.
 
 Local usage:
 

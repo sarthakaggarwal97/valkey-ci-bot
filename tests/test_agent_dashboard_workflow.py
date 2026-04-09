@@ -114,6 +114,20 @@ def test_publish_workflow_builds_pages_site() -> None:
     build_job = workflow["jobs"]["build"]
     deploy_job = workflow["jobs"]["deploy"]
 
+    assert "workflow_run" in on_block
+    assert on_block["workflow_run"]["types"] == ["completed"]
+    assert on_block["workflow_run"]["workflows"] == [
+        "CI",
+        "CI Agent Capability Dashboard",
+        "CI Agent Replay Lab",
+        "Monitor Valkey Daily Failures",
+        "Monitor Valkey Fuzzer Runs",
+        "Review Pull Request",
+        "Review External Pull Request",
+        "Backport PR",
+        "Analyze CI Failure",
+    ]
+    assert "schedule" in on_block
     assert "workflow_dispatch" in on_block
     assert workflow["permissions"] == {
         "contents": "read",
@@ -121,6 +135,8 @@ def test_publish_workflow_builds_pages_site() -> None:
         "id-token": "write",
     }
     assert build_job["concurrency"]["group"] == "publish-dashboard-site"
+    assert "workflow_run.conclusion == 'success'" in build_job["if"]
+    assert "workflow_run.head_branch == github.event.repository.default_branch" in build_job["if"]
 
     build_steps = build_job["steps"]
     generate_dashboard = next(

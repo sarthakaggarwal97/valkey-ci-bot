@@ -1,6 +1,21 @@
 name: Publish Dashboard Site
 
 on:
+  workflow_run:
+    workflows:
+      - CI
+      - CI Agent Capability Dashboard
+      - CI Agent Replay Lab
+      - Monitor Valkey Daily Failures
+      - Monitor Valkey Fuzzer Runs
+      - Review Pull Request
+      - Review External Pull Request
+      - Backport PR
+      - Analyze CI Failure
+    types:
+      - completed
+  schedule:
+    - cron: "43 */6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -13,6 +28,12 @@ env:
 
 jobs:
   build:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == github.event.repository.default_branch
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
