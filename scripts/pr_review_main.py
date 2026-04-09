@@ -37,6 +37,10 @@ from scripts.review_chat import ReviewChat
 from scripts.review_policy import collect_review_policy_note, render_review_policy_note
 from scripts.review_state_store import ReviewStateStore
 from scripts.summary import ReviewWorkflowSummary
+from scripts.valkey_repo_context import (
+    augment_reviewer_config_for_valkey,
+    load_valkey_repo_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -337,6 +341,8 @@ def run(argv: list[str] | None = None) -> int:
             assert event is not None
             pr_number = event.pr_number or 0
         pr_context = fetcher.fetch(repo_name, pr_number)
+        valkey_context = load_valkey_repo_context(gh, repo_name, ref=pr_context.head_sha)
+        config = augment_reviewer_config_for_valkey(config, pr_context, valkey_context)
         review_subject = _review_subject(repo_name, pr_context.number)
         if config.ignore_keyword and config.ignore_keyword in (pr_context.body or ""):
             summary.add_result("preflight", "skipped", "ignored-by-keyword")

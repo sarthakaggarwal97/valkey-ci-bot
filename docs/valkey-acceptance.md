@@ -32,6 +32,21 @@ and Bedrock credentials only when you want to execute the model passes.
 
 Start from `examples/valkey-acceptance.yml`.
 
+That file can be regenerated from current Valkey repository state with:
+
+```bash
+python3 -m scripts.build_valkey_acceptance_manifest \
+  --token "$GITHUB_TOKEN" \
+  --output examples/valkey-acceptance.yml
+```
+
+The builder selects:
+
+- recent PRs that cover missing DCO, docs follow-up, `@core-team`, `run-extra-tests`, and clean-review scenarios
+- latest failed runs from key Valkey workflows when present
+- a recent merged default-branch PR plus the newest release branch for backport replay
+- local workflow contract cases from `examples/ci-agent-acceptance.yml`
+
 Use:
 - `target_repo` for the upstream repo you want to inspect
 - `execution_repo` for your fork when replaying CI or backport flows

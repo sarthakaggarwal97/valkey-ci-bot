@@ -76,6 +76,45 @@ python3 -m scripts.agent_dashboard \
   --output-html agent-dashboard.html
 ```
 
+## Valkey-Native Context
+
+For Valkey repositories, the agent now loads live upstream context instead of
+depending only on static local prompts.
+
+At runtime it fetches:
+
+- repository-wide `.github/copilot-instructions.md`
+- path-targeted `.github/instructions/*.md`
+- the current `.github/workflows/*.yml` inventory
+- important maintainer labels such as `run-extra-tests`, `needs-doc-pr`, and `pending-missing-dco`
+
+That context is injected into:
+
+- PR review prompts, including release-branch guidance and label-aware policy notes
+- failure analysis and fix generation, including workflow-sensitive remediation hints
+- runtime validation defaults, so new Valkey jobs can inherit CI-exact build and test commands directly from live workflow YAML
+
+This keeps the bot aligned with current Valkey maintainer practice as the
+upstream repository evolves.
+
+## Valkey Acceptance Harness
+
+The checked-in `examples/valkey-acceptance.yml` manifest is generated from live
+Valkey state instead of being a static placeholder. It includes:
+
+- recent PRs chosen to exercise DCO, docs, `@core-team`, `run-extra-tests`, and clean-review paths
+- latest failed runs from key Valkey workflows such as `Daily`, `CI`, `External`, and `Weekly` when available
+- a recent merged PR plus the newest release branch for backport replay
+- workflow contract checks for this repo's own automation surface
+
+Refresh it with:
+
+```bash
+python3 -m scripts.build_valkey_acceptance_manifest \
+  --token "$GITHUB_TOKEN" \
+  --output examples/valkey-acceptance.yml
+```
+
 ## CI Failure Agent
 
 The core feature. Reusable workflow at `.github/workflows/analyze-failure.yml`.

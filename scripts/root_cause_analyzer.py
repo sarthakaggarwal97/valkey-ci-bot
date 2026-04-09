@@ -173,6 +173,7 @@ def _build_user_prompt(
     failure_report: FailureReport,
     source_contents: dict[str, str],
     retrieved_context: str = "",
+    domain_context: str = "",
 ) -> str:
     """Build the user prompt sent to Bedrock for root cause analysis."""
     parts: list[str] = []
@@ -208,6 +209,9 @@ def _build_user_prompt(
 
     if retrieved_context:
         parts.append(f"\n{retrieved_context}")
+
+    if domain_context:
+        parts.append(f"\n## Valkey Maintainer Context\n{domain_context}")
 
     return "\n".join(parts)
 
@@ -291,6 +295,7 @@ class RootCauseAnalyzer:
         self._github = github_client
         self._retriever: BedrockRetriever | None = None
         self._retrieval_config = RetrievalConfig()
+        self._domain_context = ""
 
     def with_retriever(
         self,
@@ -300,6 +305,11 @@ class RootCauseAnalyzer:
         """Attach optional retrieval support to the analyzer."""
         self._retriever = retriever
         self._retrieval_config = retrieval_config or RetrievalConfig()
+        return self
+
+    def with_domain_context(self, domain_context: str | None) -> RootCauseAnalyzer:
+        """Attach repo-specific runtime guidance to the next analysis prompt."""
+        self._domain_context = (domain_context or "").strip()
         return self
 
     # ------------------------------------------------------------------
@@ -360,6 +370,7 @@ class RootCauseAnalyzer:
             failure_report,
             source_contents,
             retrieved_context,
+            self._domain_context,
         )
 
         try:

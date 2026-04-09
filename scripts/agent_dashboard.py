@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.event_ledger import parse_events
+from scripts.valkey_repo_context import infer_valkey_subsystem
 
 
 JsonObject = dict[str, Any]
@@ -247,14 +248,29 @@ def _build_flaky_metrics(failure_store: JsonObject) -> JsonObject:
     validation_passes = sum(
         _int(campaign.get("consecutive_full_passes")) for campaign in campaigns
     )
+    subsystem_counts: Counter[str] = Counter()
+    recent_campaigns = _recent(campaigns, "updated_at", limit=12)
+    for campaign in recent_campaigns:
+        subsystem = infer_valkey_subsystem(
+            [],
+            [
+                _str(campaign.get("failure_identifier")),
+                _str(campaign.get("job_name")),
+                _str(campaign.get("branch")),
+            ],
+        )
+        if subsystem:
+            campaign["subsystem"] = subsystem
+            subsystem_counts[subsystem] += 1
     return {
         "campaigns": len(campaigns),
         "active_campaigns": len(active),
         "status_counts": _counter_dict(status_counts),
+        "subsystem_counts": _counter_dict(subsystem_counts),
         "total_attempts": attempts,
         "failed_hypotheses": failed_hypotheses,
         "consecutive_full_passes": validation_passes,
-        "recent_campaigns": _recent(campaigns, "updated_at", limit=12),
+        "recent_campaigns": recent_campaigns,
     }
 
 
@@ -587,12 +603,14 @@ def render_markdown(dashboard: JsonObject) -> str:
         (
             f"Campaigns: **{flaky_tests.get('campaigns', 0)}** total, "
             f"**{flaky_tests.get('active_campaigns', 0)}** active. "
-            f"Status counts: {_status_counts_text(_mapping(flaky_tests.get('status_counts')))}."
+            f"Status counts: {_status_counts_text(_mapping(flaky_tests.get('status_counts')))}. "
+            f"Subsystems: {_status_counts_text(_mapping(flaky_tests.get('subsystem_counts')))}."
         ),
         "",
         _table(
             [
                 "Failure",
+                "Subsystem",
                 "Status",
                 "Job",
                 "Branch",
@@ -605,6 +623,7 @@ def render_markdown(dashboard: JsonObject) -> str:
             [
                 [
                     campaign.get("failure_identifier", ""),
+                    campaign.get("subsystem", ""),
                     campaign.get("status", ""),
                     campaign.get("job_name", ""),
                     campaign.get("branch", ""),
@@ -981,10 +1000,12 @@ def render_html(dashboard: JsonObject) -> str:
             ("Failed Hypotheses", flaky_tests.get("failed_hypotheses", 0)),
             ("Full Passes", flaky_tests.get("consecutive_full_passes", 0)),
             ("Status", _html_status_counts(_mapping(flaky_tests.get("status_counts")))),
+            ("Subsystems", _html_status_counts(_mapping(flaky_tests.get("subsystem_counts")))),
         ])
         + _html_table(
             [
                 "Failure",
+                "Subsystem",
                 "Status",
                 "Job",
                 "Branch",
@@ -997,6 +1018,7 @@ def render_html(dashboard: JsonObject) -> str:
             [
                 [
                     campaign.get("failure_identifier", ""),
+                    campaign.get("subsystem", ""),
                     _chip(campaign.get("status", "")),
                     campaign.get("job_name", ""),
                     campaign.get("branch", ""),

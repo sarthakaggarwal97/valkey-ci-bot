@@ -122,6 +122,7 @@ def _build_user_prompt(
     root_cause: RootCauseReport,
     source_files: dict[str, str],
     retrieved_context: str = "",
+    domain_context: str = "",
     apply_error: str | None = None,
     validation_error: str | None = None,
     failed_hypotheses: list[str] | None = None,
@@ -143,6 +144,9 @@ def _build_user_prompt(
 
     if retrieved_context:
         parts.append(f"\n{retrieved_context}")
+
+    if domain_context:
+        parts.append(f"\n## Valkey Maintainer Context\n{domain_context}")
 
     if failed_hypotheses:
         parts.append("\n## Previous Failed Approaches")
@@ -246,6 +250,7 @@ class FixGenerator:
         self._retrieval_config = RetrievalConfig()
         self._github_client = github_client
         self._repo_full_name = repo_full_name
+        self._domain_context = ""
 
     def with_retriever(
         self,
@@ -255,6 +260,11 @@ class FixGenerator:
         """Attach optional retrieval support to fix generation."""
         self._retriever = retriever
         self._retrieval_config = retrieval_config or RetrievalConfig()
+        return self
+
+    def with_domain_context(self, domain_context: str | None) -> FixGenerator:
+        """Attach repo-specific runtime guidance to the next fix prompt."""
+        self._domain_context = (domain_context or "").strip()
         return self
 
     def generate(
@@ -322,7 +332,7 @@ class FixGenerator:
             self.last_attempt_count = attempt + 1
             # Build prompt (include apply error feedback on retries)
             user_prompt = _build_user_prompt(
-                root_cause, source_files, retrieved_context, apply_error,
+                root_cause, source_files, retrieved_context, self._domain_context, apply_error,
                 validation_error=validation_error if attempt == 0 else None,
                 failed_hypotheses=failed_hypotheses,
             )
@@ -432,7 +442,11 @@ class FixGenerator:
             )
 
         user_prompt = _build_user_prompt(
-            root_cause, source_files, retrieved_context, None,
+            root_cause,
+            source_files,
+            retrieved_context,
+            self._domain_context,
+            None,
             validation_error=validation_error,
             failed_hypotheses=failed_hypotheses,
         )

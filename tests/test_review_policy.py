@@ -42,6 +42,7 @@ def test_collect_review_policy_note_flags_maintainer_signals() -> None:
                 message="Add test\n\nSigned-off-by: Alice <alice@example.com>",
             ),
         ],
+        base_ref="unstable",
     )
 
     note = collect_review_policy_note(context)
@@ -51,9 +52,16 @@ def test_collect_review_policy_note_flags_maintainer_signals() -> None:
     assert note.needs_core_team is True
     assert note.needs_docs is True
     assert note.security_sensitive is True
+    assert note.needs_extra_tests is True
+    assert note.suggested_labels == [
+        "pending-missing-dco",
+        "needs-doc-pr",
+        "run-extra-tests",
+    ]
     assert "abc123def456"[:12] in rendered
     assert "valkey-doc" in rendered
     assert "security-sensitive" in rendered
+    assert "run-extra-tests" in rendered
 
 
 def test_render_review_policy_note_all_clear() -> None:

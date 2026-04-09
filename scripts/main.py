@@ -43,6 +43,10 @@ from scripts.rate_limiter import RateLimiter
 from scripts.root_cause_analyzer import RootCauseAnalyzer
 from scripts.summary import ApprovalCandidate, ApprovalSummary, PRSummaryComment, WorkflowSummary
 from scripts.validation_runner import ValidationRunner
+from scripts.valkey_repo_context import (
+    apply_valkey_runtime_defaults,
+    load_valkey_repo_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -849,9 +853,11 @@ def run_pipeline(
         logger.error("Failed to fetch workflow run %d: %s", run_id, exc)
         return PipelineResult.empty()
 
+    valkey_context = load_valkey_repo_context(gh, repo_name, ref=workflow_run.head_sha)
     config = _load_runtime_config(
         gh, repo_name, config_path, ref=workflow_run.head_sha,
     )
+    config = apply_valkey_runtime_defaults(config, valkey_context)
     if (
         config.monitored_workflows
         and workflow_run.workflow_file
@@ -1088,6 +1094,13 @@ def run_pipeline(
             )
 
             failure_id = report.parsed_failures[0].failure_identifier if report.parsed_failures else ""
+            domain_context = (
+                valkey_context.render_failure_guidance(report)
+                if valkey_context is not None
+                else ""
+            )
+            root_cause_analyzer.with_domain_context(domain_context)
+            fix_generator.with_domain_context(domain_context)
 
             # Analyze → Fix
             root_cause, diff = _analyze_and_fix(

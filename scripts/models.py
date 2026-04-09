@@ -254,6 +254,9 @@ class PullRequestContext:
     files: list[ChangedFile]
     review_comments: list[ExistingReviewComment] = field(default_factory=list)
     commits: list[PullRequestCommit] = field(default_factory=list)
+    base_ref: str = ""
+    head_ref: str = ""
+    labels: list[str] = field(default_factory=list)
 
 
 @dataclass

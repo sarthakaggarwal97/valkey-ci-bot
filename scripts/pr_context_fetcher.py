@@ -134,6 +134,13 @@ class PRContextFetcher:
             files=files,
             review_comments=review_comments,
             commits=commits,
+            base_ref=getattr(pr.base, "ref", "") or "",
+            head_ref=getattr(pr.head, "ref", "") or "",
+            labels=[
+                str(getattr(label, "name", "") or "")
+                for label in getattr(pr, "labels", [])
+                if getattr(label, "name", None)
+            ],
         )
 
     def hydrate_contents(

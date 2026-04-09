@@ -38,7 +38,7 @@ def _failure_store() -> dict:
         "campaigns": {
             "campaign-active": {
                 "fingerprint": "campaign-active",
-                "failure_identifier": "test-cache-flush",
+                "failure_identifier": "maxmemory-eviction",
                 "job_name": "daily / linux",
                 "branch": "unstable",
                 "status": "active",
@@ -195,6 +195,7 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
     assert dashboard["ci_failures"]["history_failures"] == 2
     assert dashboard["ci_failures"]["daily_job_outcome_counts"] == {"pr-created": 1}
     assert dashboard["flaky_tests"]["failed_hypotheses"] == 1
+    assert dashboard["flaky_tests"]["subsystem_counts"] == {"memory": 1}
     assert dashboard["pr_reviews"]["coverage_incomplete_cases"] == 1
     assert dashboard["ai_reliability"]["token_usage"] == 42_000
     assert dashboard["ai_reliability"]["schema_calls"] == 4
@@ -224,6 +225,7 @@ def test_render_markdown_includes_all_dashboards() -> None:
     assert "## AI Reliability Dashboard" in markdown
     assert "Schema toolChoice rejections" in markdown
     assert "Instrumentation gaps:" in markdown
+    assert "Subsystems:" in markdown
     assert "slot-coverage-drop" in markdown
 
 
@@ -242,6 +244,7 @@ def test_render_html_is_polished_static_dashboard() -> None:
     assert "Flaky Test Lab" in html
     assert "Fuzzer Watch" in html
     assert "AI Reliability" in html
+    assert "memory" in html
     assert "slot-coverage-drop" in html
     assert "border-radius: 8px" in html
 

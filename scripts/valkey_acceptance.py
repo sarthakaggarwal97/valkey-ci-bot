@@ -31,6 +31,10 @@ from scripts.pr_review_main import (
     _select_review_files,
 )
 from scripts.pr_summarizer import PRSummarizer
+from scripts.valkey_repo_context import (
+    augment_reviewer_config_for_valkey,
+    load_valkey_repo_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -523,6 +527,8 @@ def _run_review_case(
     config = _load_runtime_reviewer_config(gh, repo_name, reviewer_config_path)
     fetcher = PRContextFetcher(gh, github_retries=config.github_retries)
     context = fetcher.fetch(repo_name, case.pr_number)
+    valkey_context = load_valkey_repo_context(gh, repo_name, ref=context.head_sha)
+    config = augment_reviewer_config_for_valkey(config, context, valkey_context)
     selected_paths = set(_select_review_files(context, config))
     review_context: PullRequestContext = _filtered_context(
         fetcher.hydrate_contents(context, selected_paths),
