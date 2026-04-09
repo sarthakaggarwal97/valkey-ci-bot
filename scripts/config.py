@@ -74,6 +74,8 @@ class BotConfig:
     flaky_validation_passes: int = 3
     flaky_max_failed_hypotheses: int = 20
     require_validation_profile: bool = True
+    soak_validation_workflows: list[str] = field(default_factory=list)
+    soak_validation_passes: int = 1
     project: ProjectContext = field(default_factory=ProjectContext)
     validation_profiles: list[ValidationProfile] = field(default_factory=list)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
@@ -398,6 +400,14 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
         require_validation_profile=_coerce_bool(
             validation.get("require_profile"),
             defaults.require_validation_profile,
+        ),
+        soak_validation_workflows=_coerce_str_list(
+            validation.get("soak_workflows"),
+            defaults.soak_validation_workflows,
+        ),
+        soak_validation_passes=_coerce_int(
+            validation.get("soak_passes"),
+            defaults.soak_validation_passes,
         ),
         project=_merge_project(raw.get("project", {})) if isinstance(raw.get("project"), dict) else defaults.project,
         validation_profiles=_merge_validation_profiles(raw.get("validation_profiles", [])) if isinstance(raw.get("validation_profiles"), list) else defaults.validation_profiles,

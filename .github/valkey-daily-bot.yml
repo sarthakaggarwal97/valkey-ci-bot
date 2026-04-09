@@ -18,6 +18,12 @@ limits:
   min_failure_streak_before_queue: 2
   max_history_entries_per_test: 30
 
+validation:
+  require_profile: true
+  soak_workflows:
+    - daily.yml
+  soak_passes: 100
+
 monitored_workflows:
   - daily.yml
 

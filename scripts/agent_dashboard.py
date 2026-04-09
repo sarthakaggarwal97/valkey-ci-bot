@@ -557,6 +557,8 @@ def _build_fuzzer_metrics(fuzzer_results: list[JsonObject]) -> JsonObject:
                         "run_id": run.get("run_id"),
                         "run_url": analysis.get("run_url") or run.get("html_url"),
                         "status": status,
+                        "triage_verdict": analysis.get("triage_verdict"),
+                        "suggested_labels": analysis.get("suggested_labels"),
                         "scenario_id": analysis.get("scenario_id"),
                         "seed": analysis.get("seed"),
                         "root_cause_category": analysis.get("root_cause_category"),
@@ -1010,11 +1012,12 @@ def render_markdown(dashboard: JsonObject) -> str:
         ),
         "",
         _table(
-            ["Run", "Status", "Scenario", "Seed", "Root Cause", "Issue", "Summary"],
+            ["Run", "Status", "Triage", "Scenario", "Seed", "Root Cause", "Issue", "Summary"],
             [
                 [
                     _link(anomaly.get("run_id", ""), anomaly.get("run_url", "")),
                     anomaly.get("status", ""),
+                    anomaly.get("triage_verdict", ""),
                     anomaly.get("scenario_id", ""),
                     anomaly.get("seed", ""),
                     anomaly.get("root_cause_category", ""),
@@ -1511,11 +1514,12 @@ def render_html(dashboard: JsonObject) -> str:
             ("Root Causes", _html_status_counts(_mapping(fuzzer.get("root_cause_counts")))),
         ])
         + _html_table(
-            ["Run", "Status", "Scenario", "Seed", "Root Cause", "Issue", "Summary"],
+            ["Run", "Status", "Triage", "Scenario", "Seed", "Root Cause", "Issue", "Summary"],
             [
                 [
                     _html_link(anomaly.get("run_id", ""), anomaly.get("run_url", "")),
                     _chip(anomaly.get("status", "")),
+                    _chip(anomaly.get("triage_verdict", "")),
                     anomaly.get("scenario_id", ""),
                     anomaly.get("seed", ""),
                     anomaly.get("root_cause_category", ""),

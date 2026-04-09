@@ -504,3 +504,22 @@ class TestValidationPipeline:
         assert result.attempted_runs == 2
         assert validate_once.call_count == 2
         assert "boom" in result.output
+
+    def test_large_repeat_count_compacts_success_output(self):
+        config = _make_config()
+        runner = ValidationRunner(config, repo_clone_url="https://github.com/owner/repo.git")
+        report = _make_failure_report()
+
+        with patch.object(
+            runner,
+            "_validate_once",
+            side_effect=[ValidationResult(passed=True, output="ok") for _ in range(12)],
+        ) as validate_once:
+            result = runner.validate("diff content", report, repeat_count=12)
+
+        assert result.passed is True
+        assert result.passed_runs == 12
+        assert result.attempted_runs == 12
+        assert validate_once.call_count == 12
+        assert "Validation passed across 12/12 consecutive runs." in result.output
+        assert "[representative run 1/12]" in result.output

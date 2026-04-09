@@ -249,6 +249,7 @@ class TestFuzzerWorkflowSummary:
                 anomaly_count=2,
                 normal_signal_count=1,
                 summary="Slot coverage failed after chaos.",
+                triage_verdict="possible-core-valkey-bug",
                 reproduction_hint="valkey-fuzzer cluster --seed 839534793",
                 issue_url="https://github.com/valkey-io/valkey-fuzzer/issues/7",
                 issue_action="created",
@@ -259,6 +260,7 @@ class TestFuzzerWorkflowSummary:
 
         assert "Run 123" in md
         assert "anomalous" in md
+        assert "possible-core-valkey-bug" in md
         assert "Analyzed **1** run(s)" in md
         assert "839534793" in md
         assert "Slot coverage failed after chaos." in md

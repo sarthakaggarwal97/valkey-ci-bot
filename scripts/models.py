@@ -368,6 +368,8 @@ class FuzzerRunAnalysis:
     reproduction_hint: str | None = None
     root_cause_category: str | None = None
     raw_log_fallback_used: bool = False
+    triage_verdict: str = "needs-human-triage"
+    suggested_labels: list[str] = field(default_factory=list)
 
 
 def failure_report_to_dict(report: FailureReport) -> dict:
@@ -499,5 +501,9 @@ def fuzzer_run_analysis_to_dict(analysis: FuzzerRunAnalysis) -> dict:
             "raw_log_fallback_used": bool(
                 getattr(analysis, "raw_log_fallback_used", False)
             ),
+            "triage_verdict": getattr(
+                analysis, "triage_verdict", "needs-human-triage"
+            ),
+            "suggested_labels": list(getattr(analysis, "suggested_labels", [])),
         }
     return asdict(analysis)

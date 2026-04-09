@@ -74,6 +74,8 @@ def _fuzzer_result() -> dict:
                 "analysis": {
                     "run_url": "https://github.com/valkey-io/valkey-fuzzer/actions/runs/101",
                     "overall_status": "anomalous",
+                    "triage_verdict": "possible-core-valkey-bug",
+                    "suggested_labels": ["possible-valkey-bug"],
                     "scenario_id": "reshard",
                     "seed": "123",
                     "root_cause_category": "slot-coverage-drop",
@@ -86,6 +88,7 @@ def _fuzzer_result() -> dict:
                 "conclusion": "success",
                 "analysis": {
                     "overall_status": "normal",
+                    "triage_verdict": "expected-chaos-noise",
                     "scenario_id": "reshard",
                     "seed": "124",
                     "root_cause_category": None,
@@ -334,6 +337,7 @@ def test_render_markdown_includes_all_dashboards() -> None:
     assert "Instrumentation gaps:" in markdown
     assert "Subsystems:" in markdown
     assert "slot-coverage-drop" in markdown
+    assert "possible-core-valkey-bug" in markdown
 
 
 def test_render_html_is_polished_static_dashboard() -> None:
@@ -358,6 +362,7 @@ def test_render_html_is_polished_static_dashboard() -> None:
     assert "AI Reliability" in html
     assert "memory" in html
     assert "slot-coverage-drop" in html
+    assert "possible-core-valkey-bug" in html
     assert "border-radius: 8px" in html
 
 

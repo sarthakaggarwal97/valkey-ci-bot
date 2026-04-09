@@ -80,6 +80,8 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
             run_url="https://example.com/101",
             conclusion="success",
             overall_status="normal",
+            triage_verdict="expected-chaos-noise",
+            suggested_labels=[],
             scenario_id="seed-101",
             seed="101",
             anomalies=[],
@@ -92,6 +94,8 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
             run_url="https://example.com/102",
             conclusion="failure",
             overall_status="anomalous",
+            triage_verdict="likely-core-valkey-bug",
+            suggested_labels=["possible-valkey-bug"],
             scenario_id="seed-102",
             seed="102",
             anomalies=[FuzzerSignal(title="Slot coverage drop", severity="high", evidence="coverage fell below threshold")],
@@ -126,6 +130,7 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
         "fuzzer.run_analyzed",
         "valkey-io/valkey-fuzzer:fuzzer-run:102",
         overall_status="anomalous",
+        triage_verdict="likely-core-valkey-bug",
         conclusion="failure",
         anomaly_count=1,
         normal_signal_count=0,
@@ -135,6 +140,7 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
         "valkey-io/valkey-fuzzer:fuzzer-run:102",
         issue_action="created",
         issue_url="https://github.com/valkey-io/valkey-fuzzer/issues/1",
+        suggested_labels="possible-valkey-bug",
     )
     _mock_event_ledger.save.assert_called_once()
 

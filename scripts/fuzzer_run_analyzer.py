@@ -33,6 +33,7 @@ that was NOT part of the chaos plan crashed or failed, which is likely a real bu
 Return valid JSON only using this exact schema:
 {
   "overall_status": "normal|warning|anomalous",
+  "triage_verdict": "likely-core-valkey-bug|possible-core-valkey-bug|expected-chaos-noise|environmental-or-infra|needs-human-triage",
   "root_cause_category": "short stable label for the class of failure, e.g. 'complete-shard-loss', 'split-brain', 'failover-timeout', 'replication-divergence'. Use the same label for the same kind of failure regardless of which specific nodes or shards are involved. Use null for normal runs.",
   "summary": "short maintainer-facing analysis of the run",
   "anomalies": [
@@ -55,6 +56,16 @@ _FUZZER_ANALYSIS_SCHEMA: dict[str, Any] = {
         "overall_status": {
             "type": "string",
             "enum": ["normal", "warning", "anomalous"],
+        },
+        "triage_verdict": {
+            "type": "string",
+            "enum": [
+                "likely-core-valkey-bug",
+                "possible-core-valkey-bug",
+                "expected-chaos-noise",
+                "environmental-or-infra",
+                "needs-human-triage",
+            ],
         },
         "root_cause_category": {
             "anyOf": [
@@ -91,6 +102,7 @@ _FUZZER_ANALYSIS_SCHEMA: dict[str, Any] = {
     },
     "required": [
         "overall_status",
+        "triage_verdict",
         "root_cause_category",
         "summary",
         "anomalies",
@@ -153,6 +165,81 @@ _NORMAL_PATTERNS: tuple[tuple[str, str], ...] = (
     ("Replica sync completed", r"MASTER <-> REPLICA sync: Finished|Successfully replicated"),
 )
 _SEVERITY_RANK = {"normal": 0, "warning": 1, "anomalous": 2}
+_TRIAGE_RANK = {
+    "expected-chaos-noise": 0,
+    "environmental-or-infra": 1,
+    "needs-human-triage": 2,
+    "possible-core-valkey-bug": 3,
+    "likely-core-valkey-bug": 4,
+}
+_CORE_BUG_CATEGORIES = {
+    "complete-shard-loss",
+    "split-brain",
+    "failover-timeout",
+    "replication-divergence",
+    "slot-coverage-drop",
+}
+_INFRA_NOISE_TITLES = {
+    "RDB save failure",
+    "AOF error",
+    "Config rewrite failure",
+    "Rejected client connection",
+}
+_LIKELY_CORE_BUG_TITLES = {
+    "Node crash or assertion",
+    "Memory or sanitizer failure",
+    "Segmentation fault",
+    "Out of memory",
+    "Failover timeout",
+    "Split-brain or slot loss",
+}
+_ROOT_CAUSE_INFERENCE_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "slot-coverage-drop",
+        (
+            "slot coverage",
+            "slots still assigned",
+            "slot loss",
+            "slot migration",
+        ),
+    ),
+    (
+        "split-brain",
+        (
+            "split-brain",
+            "split brain",
+            "multiple primaries",
+            "dual primary",
+        ),
+    ),
+    (
+        "failover-timeout",
+        (
+            "failover timeout",
+            "timeout waiting for failover",
+            "failover did not complete",
+        ),
+    ),
+    (
+        "replication-divergence",
+        (
+            "replication divergence",
+            "data consistency",
+            "view consistency",
+            "partial resync",
+            "replica sync",
+        ),
+    ),
+    (
+        "complete-shard-loss",
+        (
+            "complete shard loss",
+            "all primaries lost",
+            "no reachable master",
+            "no reachable primary",
+        ),
+    ),
+)
 
 def _decode_text(payload: bytes) -> str:
     return payload.decode("utf-8", errors="replace")
@@ -222,6 +309,59 @@ def _dedupe_normal_signals(signals: list[str]) -> list[str]:
         seen.add(normalized)
         deduped.append(normalized)
     return deduped
+
+
+def _merge_triage_verdicts(deterministic: str, model_value: object) -> str:
+    model_verdict = str(model_value or "").strip()
+    if model_verdict not in _TRIAGE_RANK:
+        return deterministic
+    return (
+        model_verdict
+        if _TRIAGE_RANK[model_verdict] > _TRIAGE_RANK[deterministic]
+        else deterministic
+    )
+
+
+def _infer_root_cause_category(anomalies: list[FuzzerSignal]) -> str | None:
+    haystack = " \n".join(
+        f"{signal.title} {signal.evidence}".lower().strip()
+        for signal in anomalies
+        if signal.title.strip() or signal.evidence.strip()
+    )
+    if not haystack:
+        return None
+    for category, patterns in _ROOT_CAUSE_INFERENCE_PATTERNS:
+        if any(pattern in haystack for pattern in patterns):
+            return category
+    return None
+
+
+def _deterministic_triage_verdict(
+    overall_status: str,
+    anomalies: list[FuzzerSignal],
+    root_cause_category: str | None,
+) -> str:
+    if overall_status == "normal":
+        return "expected-chaos-noise"
+
+    category = (root_cause_category or "").strip().lower()
+    if category in _CORE_BUG_CATEGORIES:
+        return "likely-core-valkey-bug"
+
+    titles = {signal.title.strip() for signal in anomalies if signal.title.strip()}
+    if titles & _LIKELY_CORE_BUG_TITLES:
+        return "likely-core-valkey-bug"
+    if titles and titles.issubset(_INFRA_NOISE_TITLES):
+        return "environmental-or-infra"
+    if overall_status == "anomalous":
+        return "possible-core-valkey-bug"
+    return "needs-human-triage"
+
+
+def _suggested_labels_for_triage(triage_verdict: str) -> list[str]:
+    if triage_verdict in {"likely-core-valkey-bug", "possible-core-valkey-bug"}:
+        return ["possible-valkey-bug"]
+    return []
 
 
 def _dedupe_signals(signals: list[FuzzerSignal]) -> list[FuzzerSignal]:
@@ -778,6 +918,23 @@ class FuzzerRunAnalyzer:
             else "normal"
         )
         overall_status = _merge_statuses(deterministic_status, str(model_status))
+        model_root_cause_category = (
+            str(model_payload["root_cause_category"]).strip()
+            if model_payload.get("root_cause_category")
+            else None
+        )
+        root_cause_category = model_root_cause_category or _infer_root_cause_category(
+            merged_anomalies
+        )
+        deterministic_triage = _deterministic_triage_verdict(
+            overall_status,
+            merged_anomalies,
+            root_cause_category,
+        )
+        triage_verdict = _merge_triage_verdicts(
+            deterministic_triage,
+            model_payload.get("triage_verdict"),
+        )
         summary = str(model_payload.get("summary") or "").strip()
         if not summary:
             summary = _fallback_summary(context, merged_anomalies, merged_normal_signals)
@@ -799,10 +956,10 @@ class FuzzerRunAnalyzer:
                 context,
                 model_payload.get("reproduction_hint"),
             ),
-            root_cause_category=str(model_payload["root_cause_category"]).strip()
-            if model_payload.get("root_cause_category")
-            else None,
+            root_cause_category=root_cause_category,
             raw_log_fallback_used=context.raw_log_fallback_used,
+            triage_verdict=triage_verdict,
+            suggested_labels=_suggested_labels_for_triage(triage_verdict),
         )
 
     def _invoke_model(self, user_prompt: str) -> dict[str, Any]:

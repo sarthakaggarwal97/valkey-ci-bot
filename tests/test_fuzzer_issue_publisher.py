@@ -42,13 +42,17 @@ def _analysis() -> FuzzerRunAnalysis:
         normal_signals=["Failover election won."],
         reproduction_hint="valkey-fuzzer cluster --seed 839534793",
         raw_log_fallback_used=True,
+        triage_verdict="possible-core-valkey-bug",
+        suggested_labels=["possible-valkey-bug"],
     )
 
 
 def test_upsert_issue_creates_new_issue_when_no_match_exists() -> None:
     github_client = MagicMock()
     repo = github_client.get_repo.return_value
+    repo.full_name = "valkey-io/valkey-fuzzer"
     repo.get_issues.return_value = []
+    repo.get_label.return_value = MagicMock(name="possible-valkey-bug")
     issue = MagicMock()
     issue.number = 7
     issue.html_url = "https://github.com/valkey-io/valkey-fuzzer/issues/7"
@@ -60,19 +64,24 @@ def test_upsert_issue_creates_new_issue_when_no_match_exists() -> None:
     assert action == "created"
     assert url.endswith("/7")
     repo.create_issue.assert_called_once()
+    repo.get_label.assert_called_once_with("possible-valkey-bug")
+    issue.add_to_labels.assert_called_once_with("possible-valkey-bug")
     body = repo.create_issue.call_args.kwargs["body"]
     assert "839534793" in body
     assert "Split-brain or slot loss" in body
+    assert "possible-core-valkey-bug" in body
     assert "valkey-ci-agent:fuzzer-issue:" in body
 
 
 def test_upsert_issue_updates_existing_open_issue() -> None:
     github_client = MagicMock()
     repo = github_client.get_repo.return_value
+    repo.full_name = "valkey-io/valkey-fuzzer"
     existing = MagicMock()
     existing.pull_request = None
     existing.number = 8
     existing.html_url = "https://github.com/valkey-io/valkey-fuzzer/issues/8"
+    existing.get_labels.return_value = []
     analysis = _analysis()
     existing.body = (
         f"{_issue_marker(_fingerprint_for_analysis(analysis))}\n"
@@ -95,10 +104,12 @@ def test_upsert_issue_updates_existing_open_issue() -> None:
 
     # A comment should be posted with the new run's details.
     existing.create_comment.assert_called_once()
+    existing.add_to_labels.assert_called_once_with("possible-valkey-bug")
     comment_body = existing.create_comment.call_args.kwargs["body"]
     assert "## Occurrence #3" in comment_body
     assert "839534793" in comment_body
     assert "Split-brain or slot loss" in comment_body
+    assert "possible-core-valkey-bug" in comment_body
 
 
 def test_render_issue_body_uses_verdict_and_plain_severity_labels() -> None:
@@ -107,6 +118,7 @@ def test_render_issue_body_uses_verdict_and_plain_severity_labels() -> None:
     assert "## Fuzzer Run Summary" in body
     assert "Action Needed" in body
     assert "raw job log fallback" in body
+    assert "Triage verdict" in body
     assert "Critical:" in body
     assert "Warning:" not in body
     assert "🔴" not in body

@@ -254,6 +254,7 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                 "fuzzer.run_analyzed",
                 subject,
                 overall_status=analysis.overall_status,
+                triage_verdict=getattr(analysis, "triage_verdict", ""),
                 conclusion=analysis.conclusion,
                 anomaly_count=len(analysis.anomalies),
                 normal_signal_count=len(analysis.normal_signals),
@@ -273,6 +274,9 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                         subject,
                         issue_action=issue_action or "",
                         issue_url=issue_url or "",
+                        suggested_labels=",".join(
+                            getattr(analysis, "suggested_labels", []) or []
+                        ),
                     )
                 except Exception as exc:
                     logger.warning(
@@ -302,6 +306,7 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                     anomaly_count=len(analysis.anomalies),
                     normal_signal_count=len(analysis.normal_signals),
                     summary=analysis.summary,
+                    triage_verdict=getattr(analysis, "triage_verdict", None),
                     reproduction_hint=analysis.reproduction_hint,
                     issue_url=issue_url,
                     issue_action=issue_action,

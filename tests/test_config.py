@@ -91,6 +91,8 @@ full_config_strategy = st.fixed_dictionaries({
     }),
     "validation": st.fixed_dictionaries({
         "require_profile": st.booleans(),
+        "soak_workflows": st.lists(workflow_file, min_size=0, max_size=3),
+        "soak_passes": st.integers(min_value=1, max_value=200),
     }),
     "monitored_workflows": st.lists(workflow_file, min_size=1, max_size=6),
     "retrieval": st.fixed_dictionaries({
@@ -150,6 +152,8 @@ def test_config_round_trip_all_fields(config_data: dict) -> None:
 
         # Validation section
         assert cfg.require_validation_profile == config_data["validation"]["require_profile"]
+        assert cfg.soak_validation_workflows == config_data["validation"]["soak_workflows"]
+        assert cfg.soak_validation_passes == config_data["validation"]["soak_passes"]
 
         # Monitored workflows
         assert cfg.monitored_workflows == config_data["monitored_workflows"]
@@ -210,6 +214,8 @@ def test_missing_config_returns_defaults() -> None:
     assert cfg.flaky_validation_passes == defaults.flaky_validation_passes
     assert cfg.flaky_max_failed_hypotheses == defaults.flaky_max_failed_hypotheses
     assert cfg.require_validation_profile == defaults.require_validation_profile
+    assert cfg.soak_validation_workflows == defaults.soak_validation_workflows
+    assert cfg.soak_validation_passes == defaults.soak_validation_passes
     assert cfg.retrieval == defaults.retrieval
 
     # Project defaults
@@ -323,6 +329,8 @@ def test_invalid_yaml_returns_full_defaults(invalid_content: str) -> None:
         assert cfg.flaky_max_attempts_per_run == defaults.flaky_max_attempts_per_run
         assert cfg.flaky_validation_passes == defaults.flaky_validation_passes
         assert cfg.flaky_max_failed_hypotheses == defaults.flaky_max_failed_hypotheses
+        assert cfg.soak_validation_workflows == defaults.soak_validation_workflows
+        assert cfg.soak_validation_passes == defaults.soak_validation_passes
         assert cfg.retrieval == defaults.retrieval
         assert cfg.project.language == ProjectContext().language
         assert cfg.project.build_system == ProjectContext().build_system
@@ -367,6 +375,8 @@ def test_unrecognized_fields_ignored_with_defaults(extra_fields: dict) -> None:
         assert cfg.flaky_max_attempts_per_run == defaults.flaky_max_attempts_per_run
         assert cfg.flaky_validation_passes == defaults.flaky_validation_passes
         assert cfg.flaky_max_failed_hypotheses == defaults.flaky_max_failed_hypotheses
+        assert cfg.soak_validation_workflows == defaults.soak_validation_workflows
+        assert cfg.soak_validation_passes == defaults.soak_validation_passes
         assert cfg.retrieval == defaults.retrieval
         assert cfg.project.language == ProjectContext().language
         assert cfg.validation_profiles == []

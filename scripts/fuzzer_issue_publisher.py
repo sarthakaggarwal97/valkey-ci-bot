@@ -32,6 +32,20 @@ def _escape_table_cell(value: object) -> str:
 
 def _issue_verdict(analysis: FuzzerRunAnalysis) -> str:
     """Return a concise maintainer-facing status line."""
+    if analysis.triage_verdict == "likely-core-valkey-bug":
+        return (
+            "This run looks like a likely core Valkey bug and should get maintainer triage."
+        )
+    if analysis.triage_verdict == "possible-core-valkey-bug":
+        return (
+            "This run looks like a possible core Valkey bug and should be triaged as such."
+        )
+    if analysis.triage_verdict == "environmental-or-infra":
+        return (
+            "This run looks more like environmental or infrastructure noise than a product bug."
+        )
+    if analysis.triage_verdict == "expected-chaos-noise":
+        return "This run looks consistent with expected chaos noise."
     if analysis.overall_status == "anomalous":
         return "This run looks anomalous and likely needs maintainer attention."
     if analysis.overall_status == "warning":
@@ -115,6 +129,7 @@ def _render_issue_body(
         f"| Run | [{analysis.run_id}]({analysis.run_url}) |",
         f"| Conclusion | `{analysis.conclusion or 'unknown'}` |",
         f"| Status | `{analysis.overall_status}` |",
+        f"| Triage verdict | `{_escape_table_cell(analysis.triage_verdict)}` |",
     ]
     if analysis.root_cause_category:
         lines.append(
@@ -207,6 +222,7 @@ def _render_occurrence_comment(analysis: FuzzerRunAnalysis, *, occurrences: int)
         f"| Run | [{analysis.run_id}]({analysis.run_url}) |",
         f"| Conclusion | `{analysis.conclusion or 'unknown'}` |",
         f"| Status | `{analysis.overall_status}` |",
+        f"| Triage verdict | `{_escape_table_cell(analysis.triage_verdict)}` |",
     ]
     if analysis.root_cause_category:
         lines.append(
@@ -294,6 +310,7 @@ class FuzzerIssuePublisher:
             retries=self._retries,
             description=f"load repository {repo_full_name}",
         )
+        labels_to_apply = self._resolve_labels(repo, analysis.suggested_labels)
         fingerprint = _fingerprint_for_analysis(analysis)
         marker = _issue_marker(fingerprint)
         existing = None
@@ -318,6 +335,7 @@ class FuzzerIssuePublisher:
                 retries=self._retries,
                 description=f"create anomaly issue for {repo_full_name}",
             )
+            self._apply_labels(issue, labels_to_apply)
             logger.info(
                 "Created anomaly issue #%s for fuzzer run %s.",
                 issue.number,
@@ -333,6 +351,7 @@ class FuzzerIssuePublisher:
             retries=self._retries,
             description=f"bump occurrence count on issue #{existing.number}",
         )
+        self._apply_labels(existing, labels_to_apply)
 
         # Post a comment with the new run's full details.
         comment_body = _render_occurrence_comment(analysis, occurrences=occurrences)
@@ -348,3 +367,56 @@ class FuzzerIssuePublisher:
             analysis.run_id,
         )
         return "updated", existing.html_url
+
+    def _resolve_labels(
+        self,
+        repo,
+        requested_labels: list[str],
+    ) -> list[str]:
+        """Return only labels that exist in the target repository."""
+        resolved: list[str] = []
+        repo_name = str(getattr(repo, "full_name", "<repo>"))
+        for label in requested_labels:
+            if not label:
+                continue
+            def load_label(label_name: str = label):
+                return repo.get_label(label_name)
+            try:
+                retry_github_call(
+                    load_label,
+                    retries=self._retries,
+                    description=f"load label {label} for {repo_name}",
+                )
+            except Exception:
+                logger.info("Skipping missing label %s on %s.", label, repo_name)
+                continue
+            resolved.append(label)
+        return resolved
+
+    def _apply_labels(self, issue, labels_to_apply: list[str]) -> None:
+        """Add missing labels to an issue without removing existing labels."""
+        if not labels_to_apply:
+            return
+        try:
+            def list_labels():
+                return list(issue.get_labels())
+            existing_labels = {
+                str(getattr(label, "name", "")).strip()
+                for label in retry_github_call(
+                    list_labels,
+                    retries=self._retries,
+                    description=f"list labels for issue #{issue.number}",
+                )
+            }
+        except Exception:
+            existing_labels = set()
+        missing = [label for label in labels_to_apply if label not in existing_labels]
+        if not missing:
+            return
+        def add_labels() -> None:
+            issue.add_to_labels(*missing)
+        retry_github_call(
+            add_labels,
+            retries=self._retries,
+            description=f"add labels to issue #{issue.number}",
+        )

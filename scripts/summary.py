@@ -395,6 +395,7 @@ class FuzzerRunSummaryRow:
     anomaly_count: int
     normal_signal_count: int
     summary: str
+    triage_verdict: str | None = None
     reproduction_hint: str | None = None
     issue_url: str | None = None
     issue_action: str | None = None
@@ -431,10 +432,10 @@ class FuzzerWorkflowSummary:
         if issue_count:
             lines.append(f"Issues updated or created for **{issue_count}** run(s).\n")
         lines.append(
-            "| Run | Conclusion | Status | Scenario | Seed | Anomalies | Normal Signals | Issue |"
+            "| Run | Conclusion | Status | Triage | Scenario | Seed | Anomalies | Normal Signals | Issue |"
         )
         lines.append(
-            "|-----|------------|--------|----------|------|-----------|----------------|-------|"
+            "|-----|------------|--------|--------|----------|------|-----------|----------------|-------|"
         )
         for row in self.rows:
             issue_cell = ""
@@ -446,6 +447,7 @@ class FuzzerWorkflowSummary:
                 f"[{row.run_id}]({row.run_url}) | "
                 f"{_escape_table_cell(row.conclusion or 'unknown')} | "
                 f"{_escape_table_cell(row.overall_status)} | "
+                f"{_escape_table_cell(row.triage_verdict or 'unknown')} | "
                 f"{_escape_table_cell(row.scenario_id or 'unknown')} | "
                 f"{_escape_table_cell(row.seed or 'unknown')} | "
                 f"{row.anomaly_count} | "
@@ -459,6 +461,8 @@ class FuzzerWorkflowSummary:
             lines.append(f"- Conclusion: `{row.conclusion or 'unknown'}`")
             lines.append(f"- Scenario: `{row.scenario_id or 'unknown'}`")
             lines.append(f"- Seed: `{row.seed or 'unknown'}`")
+            if row.triage_verdict:
+                lines.append(f"- Triage: `{row.triage_verdict}`")
             lines.append(f"- Summary: {row.summary}")
             if row.anomaly_details:
                 for detail in row.anomaly_details:

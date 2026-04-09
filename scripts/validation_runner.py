@@ -194,9 +194,15 @@ class ValidationRunner:
             )
         requested_runs = max(1, repeat_count)
         outputs: list[str] = []
+        representative_output = ""
+        final_strategy = "local"
         for run_number in range(1, requested_runs + 1):
             result = self._validate_once(patch, failure_report)
-            outputs.append(f"[run {run_number}/{requested_runs}]\n{result.output}")
+            final_strategy = result.strategy
+            if run_number == 1:
+                representative_output = result.output
+            if not result.passed or requested_runs <= 10:
+                outputs.append(f"[run {run_number}/{requested_runs}]\n{result.output}")
             if not result.passed:
                 return ValidationResult(
                     passed=False,
@@ -207,8 +213,16 @@ class ValidationRunner:
                 )
         return ValidationResult(
             passed=True,
-            output="\n\n".join(outputs),
-            strategy=result.strategy if outputs else "local",
+            output=(
+                "\n\n".join(outputs)
+                if outputs
+                else (
+                    f"Validation passed across {requested_runs}/{requested_runs} "
+                    "consecutive runs.\n\n"
+                    f"[representative run 1/{requested_runs}]\n{representative_output}"
+                )
+            ),
+            strategy=final_strategy,
             passed_runs=requested_runs,
             attempted_runs=requested_runs,
         )

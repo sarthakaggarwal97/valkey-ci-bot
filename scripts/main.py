@@ -319,6 +319,28 @@ def _summarize_flaky_attempt(
     return " | ".join(part for part in parts if part)
 
 
+def _required_validation_runs(
+    report: FailureReport,
+    root_cause: RootCauseReport,
+    config: BotConfig,
+) -> int:
+    """Return the consecutive validation pass target for one failure."""
+    repeat_count = max(
+        1,
+        config.flaky_validation_passes
+        if root_cause.is_flaky and config.flaky_campaign_enabled
+        else 1,
+    )
+    workflow_file = (report.workflow_file or "").strip()
+    if (
+        workflow_file
+        and workflow_file in config.soak_validation_workflows
+        and config.soak_validation_passes > 1
+    ):
+        repeat_count = max(repeat_count, config.soak_validation_passes)
+    return repeat_count
+
+
 def _retrieve_failure_report(
     job: FailedJob,
     workflow_run: WorkflowRun,
@@ -627,10 +649,7 @@ def _validate_fix(
             max_validation_attempts,
             max(1, config.flaky_max_attempts_per_run),
         )
-    repeat_count = max(
-        1,
-        config.flaky_validation_passes if use_flaky_campaign else 1,
-    )
+    repeat_count = _required_validation_runs(report, root_cause, config)
     current_diff = diff
     failed_hypotheses: list[str] = []
     if use_flaky_campaign and failure_store is not None and fingerprint:

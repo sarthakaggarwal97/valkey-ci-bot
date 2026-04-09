@@ -933,11 +933,12 @@ def _render_fuzzer(dashboard: JsonObject) -> str:
         + _panel(
             "Recent anomalies",
             _table(
-                ["Run", "Status", "Scenario", "Seed", "Root Cause", "Issue", "Summary"],
+                ["Run", "Status", "Triage", "Scenario", "Seed", "Root Cause", "Issue", "Summary"],
                 [
                     [
                         _link(anomaly.get("run_id", ""), anomaly.get("run_url", "")),
                         _chip(anomaly.get("status", "")),
+                        _chip(anomaly.get("triage_verdict", "")),
                         anomaly.get("scenario_id", ""),
                         anomaly.get("seed", ""),
                         anomaly.get("root_cause_category", ""),

@@ -69,6 +69,13 @@ validation:
   # intentionally want the legacy build-only fallback profile.
   require_profile: true
 
+  # Optional workflow-specific soak loop. When a failure comes from one of
+  # these workflow filenames, the bot requires this many consecutive clean
+  # validation passes before it queues or opens a draft PR.
+  soak_workflows:
+    - daily.yml
+  soak_passes: 100
+
 # ---------------------------------------------------------------------------
 # Fix generation settings
 # ---------------------------------------------------------------------------

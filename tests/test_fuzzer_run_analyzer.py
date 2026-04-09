@@ -100,6 +100,8 @@ def test_analyzer_prefers_artifacts_and_keeps_deterministic_findings() -> None:
     assert analysis.scenario_id == "839534793"
     assert analysis.seed == "839534793"
     assert analysis.overall_status == "anomalous"
+    assert analysis.triage_verdict == "likely-core-valkey-bug"
+    assert analysis.suggested_labels == ["possible-valkey-bug"]
     assert any("Slot Coverage" in signal.evidence for signal in analysis.anomalies)
     assert "Replication validation passed." in analysis.normal_signals
     assert any("Chaos event process_kill" in signal for signal in analysis.normal_signals)
@@ -147,6 +149,7 @@ def test_analyzer_falls_back_to_job_log_when_artifacts_are_missing() -> None:
     assert analysis.scenario_id == "12345"
     assert analysis.seed == "12345"
     assert analysis.overall_status == "normal"
+    assert analysis.triage_verdict == "expected-chaos-noise"
     assert analysis.raw_log_fallback_used is True
     assert analysis.summary.startswith("Run 11")
 
@@ -181,4 +184,5 @@ def test_analyzer_does_not_treat_serverassert_object_name_as_crash() -> None:
     )
 
     assert analysis.overall_status == "normal"
+    assert analysis.triage_verdict == "expected-chaos-noise"
     assert analysis.anomalies == []

@@ -1517,6 +1517,111 @@ class TestRunPipeline:
     @patch("scripts.main.FixGenerator")
     @patch("scripts.main.ValidationRunner")
     @patch("scripts.main.PRManager")
+    def test_daily_failures_require_soak_validation_before_queue(
+        self,
+        mock_pr_manager,
+        mock_validation_runner,
+        mock_fix_generator,
+        mock_root_cause_analyzer,
+        mock_bedrock_client,
+        mock_failure_store,
+        mock_log_retriever,
+        mock_detector,
+        mock_gh,
+        mock_load_config,
+        mock_build_workflow_run,
+        mock_boto_client,
+    ):
+        workflow_run = WorkflowRun(
+            id=1,
+            name="Daily",
+            event="schedule",
+            head_sha="abc123",
+            head_branch="unstable",
+            head_repository="owner/repo",
+            is_fork=False,
+            conclusion="failure",
+            workflow_file="daily.yml",
+        )
+        mock_build_workflow_run.return_value = workflow_run
+        config = BotConfig(monitored_workflows=["daily.yml"])
+        config.soak_validation_workflows = ["daily.yml"]
+        config.soak_validation_passes = 100
+        mock_load_config.return_value = config
+
+        mock_detector.return_value.detect.return_value = [
+            FailedJob(
+                id=10,
+                name="test-unit",
+                conclusion="failure",
+                step_name="Run tests",
+                matrix_params={},
+            )
+        ]
+        mock_log_retriever.return_value.get_job_log.return_value = (
+            "src/foo.c:42: Failure\n"
+            "Expected: 1\n"
+            "  Actual: 0\n"
+            "[  FAILED  ] TestSuite.TestCase\n"
+        )
+
+        failure_store = mock_failure_store.return_value
+        failure_store.compute_incident_key.return_value = "fp-daily"
+        failure_store.has_open_pr.return_value = False
+        failure_store.get_entry.return_value = None
+        failure_store.summarize_history.return_value = MagicMock(
+            consecutive_failures=2,
+            failure_count=2,
+            last_known_good_sha="goodsha",
+            first_bad_sha="badsha",
+        )
+
+        mock_root_cause_analyzer.return_value.analyze.return_value = _make_root_cause(
+            confidence="high",
+            is_flaky=False,
+        )
+        mock_root_cause_analyzer.return_value.identify_relevant_files.return_value = []
+        mock_root_cause_analyzer.return_value._retrieve_file_contents.return_value = {}
+        mock_fix_generator.return_value.generate.return_value = "diff"
+        mock_validation_runner.return_value.validate.return_value = ValidationResult(
+            passed=True,
+            output="stable",
+            passed_runs=100,
+            attempted_runs=100,
+        )
+
+        rate_limiter = MagicMock()
+        rate_limiter.can_use_tokens.return_value = True
+        rate_limiter.can_create_pr.return_value = True
+
+        run_pipeline(
+            "owner/repo",
+            1,
+            ".github/ci-failure-bot.yml",
+            "token",
+            allow_pr_creation=False,
+            rate_limiter=rate_limiter,
+        )
+
+        mock_validation_runner.return_value.validate.assert_called_once_with(
+            "diff",
+            ANY,
+            repeat_count=100,
+        )
+        failure_store.record_queued_pr.assert_called_once()
+
+    @patch("scripts.main.boto3.client")
+    @patch("scripts.main._build_workflow_run")
+    @patch("scripts.main._load_runtime_config")
+    @patch("scripts.main.Github")
+    @patch("scripts.main.FailureDetector")
+    @patch("scripts.main.LogRetriever")
+    @patch("scripts.main.FailureStore")
+    @patch("scripts.main.BedrockClient")
+    @patch("scripts.main.RootCauseAnalyzer")
+    @patch("scripts.main.FixGenerator")
+    @patch("scripts.main.ValidationRunner")
+    @patch("scripts.main.PRManager")
     def test_wires_retriever_when_retrieval_is_enabled(
         self,
         mock_pr_manager,
