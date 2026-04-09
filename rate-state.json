@@ -1,21 +1,22 @@
 {
   "pr_timestamps": [],
-  "token_usage": 947958,
+  "token_usage": 1188808,
   "token_window_start": "2026-04-08T07:55:42.346172+00:00",
   "queued_failures": [],
   "ai_metrics": {
-    "bedrock.invoke_schema.calls": 8,
-    "bedrock.invoke_schema.success": 8,
-    "bedrock.retrieval.calls": 14,
-    "bedrock.retrieval.snippets": 42,
-    "bedrock.retrieval.hits": 7,
-    "bedrock.prompt_safety_guard.checked": 9,
-    "bedrock.prompt_safety_guard.present": 9,
-    "bedrock.tool_loop.calls": 3,
-    "bedrock.tool_loop.turns": 24,
-    "bedrock.tool_loop.success": 3,
+    "bedrock.invoke_schema.calls": 9,
+    "bedrock.invoke_schema.success": 9,
+    "bedrock.retrieval.calls": 18,
+    "bedrock.retrieval.snippets": 48,
+    "bedrock.retrieval.hits": 9,
+    "bedrock.prompt_safety_guard.checked": 11,
+    "bedrock.prompt_safety_guard.present": 11,
+    "bedrock.tool_loop.calls": 4,
+    "bedrock.tool_loop.turns": 29,
+    "bedrock.tool_loop.success": 4,
     "reviewer.findings.normalized_kept": 2,
     "reviewer.verifier.kept": 2,
-    "bedrock.tool_loop.terminal_validation_rejections": 1
+    "bedrock.tool_loop.terminal_validation_rejections": 1,
+    "bedrock.retrieval.cache_hits": 2
   }
 }
