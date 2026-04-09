@@ -96,6 +96,53 @@ def _fuzzer_result() -> dict:
     }
 
 
+def _trend_events() -> list[dict]:
+    return [
+        {
+            "event_id": "run-1",
+            "event_type": "workflow.run_seen",
+            "created_at": "2026-04-06T02:00:00+00:00",
+            "subject": "valkey-io/valkey:daily.yml:101",
+            "attributes": {"conclusion": "failure"},
+        },
+        {
+            "event_id": "run-2",
+            "event_type": "workflow.run_seen",
+            "created_at": "2026-04-07T02:00:00+00:00",
+            "subject": "valkey-io/valkey:daily.yml:102",
+            "attributes": {"conclusion": "success"},
+        },
+        {
+            "event_id": "run-3",
+            "event_type": "workflow.run_seen",
+            "created_at": "2026-04-08T02:00:00+00:00",
+            "subject": "valkey-io/valkey:daily.yml:103",
+            "attributes": {"conclusion": "failure"},
+        },
+        {
+            "event_id": "review-1",
+            "event_type": "review.comments_posted",
+            "created_at": "2026-04-07T03:00:00+00:00",
+            "subject": "valkey-io/valkey#1",
+            "attributes": {"comments": 2},
+        },
+        {
+            "event_id": "review-2",
+            "event_type": "review.note_posted",
+            "created_at": "2026-04-08T03:00:00+00:00",
+            "subject": "valkey-io/valkey#2",
+            "attributes": {"note_kind": "coverage-incomplete"},
+        },
+        {
+            "event_id": "review-3",
+            "event_type": "review.state_saved",
+            "created_at": "2026-04-08T03:10:00+00:00",
+            "subject": "valkey-io/valkey#2",
+            "attributes": {"review_completed_for_head": False},
+        },
+    ]
+
+
 def test_build_dashboard_summarizes_agent_capabilities() -> None:
     dashboard = build_dashboard(
         failure_store=_failure_store(),
@@ -169,6 +216,7 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
                 "subject": "fp-queued",
                 "attributes": {"pr_url": "https://github.com/o/r/pull/1"},
             },
+            *_trend_events(),
         ],
         acceptance_results=[
             {
@@ -191,7 +239,7 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
     assert dashboard["snapshot"]["tracked_review_prs"] == 1
     assert dashboard["snapshot"]["fuzzer_runs_analyzed"] == 2
     assert dashboard["snapshot"]["fuzzer_anomalous_runs"] == 1
-    assert dashboard["snapshot"]["agent_events"] == 3
+    assert dashboard["snapshot"]["agent_events"] == 9
     assert dashboard["ci_failures"]["history_failures"] == 2
     assert dashboard["ci_failures"]["daily_job_outcome_counts"] == {"pr-created": 1}
     assert dashboard["flaky_tests"]["failed_hypotheses"] == 1
@@ -206,17 +254,23 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
     assert dashboard["fuzzer"]["raw_log_fallbacks"] == 1
     assert dashboard["agent_outcomes"]["prs_created"] == 1
     assert dashboard["agent_outcomes"]["prs_merged"] == 1
+    assert dashboard["trends"]["failure_rate"]["totals"][-3:] == [1, 1, 1]
+    assert dashboard["trends"]["failure_rate"]["rates"][-3:] == [1.0, 0.0, 1.0]
+    assert dashboard["trends"]["review_health"]["degraded_reviews"][-1] == 1
+    assert dashboard["trends"]["flaky_subsystems"]["top_subsystems"] == ["memory"]
 
 
 def test_render_markdown_includes_all_dashboards() -> None:
     dashboard = build_dashboard(
         failure_store=_failure_store(),
         fuzzer_results=[_fuzzer_result()],
+        events=_trend_events(),
         generated_at="2026-04-08T03:00:00+00:00",
     )
 
     markdown = render_markdown(dashboard)
 
+    assert "## Trend Watch" in markdown
     assert "## Flaky Test Dashboard" in markdown
     assert "## CI Failure Outcomes" in markdown
     assert "## Agent Outcome Ledger" in markdown
@@ -233,6 +287,7 @@ def test_render_html_is_polished_static_dashboard() -> None:
     dashboard = build_dashboard(
         failure_store=_failure_store(),
         fuzzer_results=[_fuzzer_result()],
+        events=_trend_events(),
         generated_at="2026-04-08T03:00:00+00:00",
     )
 
@@ -241,6 +296,10 @@ def test_render_html_is_polished_static_dashboard() -> None:
     assert "<!doctype html>" in html
     assert "<title>CI Agent Capability Dashboard</title>" in html
     assert 'class="metrics"' in html
+    assert "Trend Watch" in html
+    assert "Failure Rate" in html
+    assert "Review Health" in html
+    assert 'class="sparkline"' in html
     assert "Flaky Test Lab" in html
     assert "Fuzzer Watch" in html
     assert "AI Reliability" in html

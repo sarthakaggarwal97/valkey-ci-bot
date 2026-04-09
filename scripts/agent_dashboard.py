@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import html as html_lib
 import json
 from pathlib import Path
@@ -171,6 +171,170 @@ def _acceptance_results(acceptance_payloads: list[JsonObject]) -> list[JsonObjec
             if isinstance(result, dict)
         )
     return results
+
+
+def _parse_datetime(value: object) -> datetime | None:
+    text = _str(value).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _trend_window(
+    generated_at: str | None,
+    *,
+    days: int = 7,
+) -> tuple[list[str], dict[str, int]]:
+    end_dt = _parse_datetime(generated_at) or datetime.now(timezone.utc)
+    end_day = end_dt.date()
+    day_values = [
+        end_day - timedelta(days=offset)
+        for offset in reversed(range(max(1, days)))
+    ]
+    labels = [day.strftime("%m-%d") for day in day_values]
+    index = {day.isoformat(): position for position, day in enumerate(day_values)}
+    return labels, index
+
+
+def _index_day(timestamp: object, day_index: dict[str, int]) -> int | None:
+    parsed = _parse_datetime(timestamp)
+    if parsed is None:
+        return None
+    return day_index.get(parsed.date().isoformat())
+
+
+def _empty_series(length: int) -> list[int]:
+    return [0 for _ in range(length)]
+
+
+def _rate_series(numerators: list[int], denominators: list[int]) -> list[float]:
+    return [
+        round((num / den), 4) if den else 0.0
+        for num, den in zip(numerators, denominators)
+    ]
+
+
+def _average(values: list[float]) -> float:
+    return round(sum(values) / len(values), 4) if values else 0.0
+
+
+def _build_trend_metrics(
+    failure_store: JsonObject,
+    events: list[JsonObject],
+    *,
+    generated_at: str | None,
+) -> JsonObject:
+    labels, day_index = _trend_window(generated_at)
+    failure_counts = _empty_series(len(labels))
+    total_counts = _empty_series(len(labels))
+    for event in events:
+        if _str(event.get("event_type")) != "workflow.run_seen":
+            continue
+        attributes = _mapping(event.get("attributes"))
+        conclusion = _str(attributes.get("conclusion")).lower()
+        if conclusion not in {"success", "failure"}:
+            continue
+        position = _index_day(event.get("created_at"), day_index)
+        if position is None:
+            continue
+        total_counts[position] += 1
+        if conclusion == "failure":
+            failure_counts[position] += 1
+    failure_rates = _rate_series(failure_counts, total_counts)
+
+    subsystem_series: dict[str, list[int]] = {}
+    for campaign in _flaky_campaigns(failure_store):
+        subsystem = infer_valkey_subsystem(
+            [],
+            [
+                _str(campaign.get("failure_identifier")),
+                _str(campaign.get("job_name")),
+                _str(campaign.get("branch")),
+            ],
+        )
+        if not subsystem:
+            continue
+        series = subsystem_series.setdefault(subsystem, _empty_series(len(labels)))
+        timestamps = [
+            attempt.get("created_at")
+            for attempt in _list(campaign.get("attempts"))
+            if isinstance(attempt, dict) and attempt.get("created_at")
+        ]
+        if not timestamps:
+            fallback = campaign.get("updated_at") or campaign.get("created_at")
+            if fallback:
+                timestamps = [fallback]
+        for timestamp in timestamps:
+            position = _index_day(timestamp, day_index)
+            if position is not None:
+                series[position] += 1
+    top_subsystems = sorted(
+        subsystem_series,
+        key=lambda name: (sum(subsystem_series[name]), name),
+        reverse=True,
+    )[:3]
+
+    review_runs = _empty_series(len(labels))
+    healthy_reviews = _empty_series(len(labels))
+    degraded_reviews = _empty_series(len(labels))
+    for event in events:
+        position = _index_day(event.get("created_at"), day_index)
+        if position is None:
+            continue
+        event_type = _str(event.get("event_type"))
+        attributes = _mapping(event.get("attributes"))
+        if event_type == "review.state_saved":
+            review_runs[position] += 1
+        elif event_type in {"review.comments_posted", "review.approved"}:
+            healthy_reviews[position] += 1
+        elif event_type in {"review.failed", "review.summary_failed"}:
+            degraded_reviews[position] += 1
+        elif event_type == "review.note_posted" and _str(attributes.get("note_kind")) in {
+            "coverage-incomplete",
+            "approval-withheld",
+        }:
+            degraded_reviews[position] += 1
+    review_health = _rate_series(
+        healthy_reviews,
+        [healthy + degraded for healthy, degraded in zip(healthy_reviews, degraded_reviews)],
+    )
+
+    return {
+        "labels": labels,
+        "window_days": len(labels),
+        "failure_rate": {
+            "failures": failure_counts,
+            "totals": total_counts,
+            "rates": failure_rates,
+            "average_rate": (
+                round(sum(failure_counts) / sum(total_counts), 4)
+                if sum(total_counts)
+                else 0.0
+            ),
+        },
+        "flaky_subsystems": {
+            "top_subsystems": top_subsystems,
+            "series": {
+                name: subsystem_series[name]
+                for name in top_subsystems
+            },
+        },
+        "review_health": {
+            "review_runs": review_runs,
+            "healthy_reviews": healthy_reviews,
+            "degraded_reviews": degraded_reviews,
+            "scores": review_health,
+            "average_score": _average(review_health),
+        },
+    }
 
 
 def _build_ci_failure_metrics(
@@ -495,6 +659,7 @@ def build_dashboard(
     acceptance_results = acceptance_results or []
     events = events or []
     input_warnings = input_warnings or []
+    resolved_generated_at = generated_at or datetime.now(timezone.utc).isoformat()
 
     ci_failures = _build_ci_failure_metrics(
         failure_store,
@@ -511,6 +676,11 @@ def build_dashboard(
         fuzzer_metrics,
     )
     state_health = _build_state_health(monitor_state, input_warnings)
+    trend_metrics = _build_trend_metrics(
+        failure_store,
+        events,
+        generated_at=resolved_generated_at,
+    )
     snapshot = {
         "failure_incidents": ci_failures["failure_incidents"],
         "queued_failures": ci_failures["queued_failures"],
@@ -525,7 +695,7 @@ def build_dashboard(
         "instrumentation_gaps": len(ai_reliability["instrumentation_gaps"]),
     }
     return {
-        "generated_at": generated_at or datetime.now(timezone.utc).isoformat(),
+        "generated_at": resolved_generated_at,
         "snapshot": snapshot,
         "ci_failures": ci_failures,
         "flaky_tests": flaky_tests,
@@ -534,6 +704,7 @@ def build_dashboard(
         "agent_outcomes": agent_outcomes,
         "ai_reliability": ai_reliability,
         "state_health": state_health,
+        "trends": trend_metrics,
         "daily_health": daily_health_data or {},
     }
 
@@ -571,16 +742,26 @@ def _status_counts_text(counts: JsonObject) -> str:
     return ", ".join(f"`{key}`: {value}" for key, value in sorted(counts.items()))
 
 
+def _format_series(values: list[object], *, percent: bool = False) -> str:
+    if not values:
+        return "n/a"
+    if percent:
+        return " | ".join(f"{float(_str(value, '0')) * 100:.0f}%" for value in values)
+    return " | ".join(str(value) for value in values)
+
+
 def render_markdown(dashboard: JsonObject) -> str:
     """Render the dashboard payload as GitHub-flavored Markdown."""
     snapshot = _mapping(dashboard.get("snapshot"))
     ci_failures = _mapping(dashboard.get("ci_failures"))
     flaky_tests = _mapping(dashboard.get("flaky_tests"))
+    trends = _mapping(dashboard.get("trends"))
     pr_reviews = _mapping(dashboard.get("pr_reviews"))
     fuzzer = _mapping(dashboard.get("fuzzer"))
     agent_outcomes = _mapping(dashboard.get("agent_outcomes"))
     ai_reliability = _mapping(dashboard.get("ai_reliability"))
     state_health = _mapping(dashboard.get("state_health"))
+    trend_labels = _list(trends.get("labels"))
 
     lines: list[str] = [
         "# CI Agent Capability Dashboard",
@@ -596,6 +777,41 @@ def render_markdown(dashboard: JsonObject) -> str:
                 for key, value in snapshot.items()
             ],
             empty="No snapshot metrics were available.",
+        ),
+        "",
+        "## Trend Watch",
+        "",
+        _table(
+            ["Trend", "Window", "Values"],
+            [
+                [
+                    "Failure rate",
+                    " | ".join(_str(label) for label in trend_labels),
+                    _format_series(
+                        _list(_mapping(trends.get("failure_rate")).get("rates")),
+                        percent=True,
+                    ),
+                ],
+                [
+                    "Review health",
+                    " | ".join(_str(label) for label in trend_labels),
+                    _format_series(
+                        _list(_mapping(trends.get("review_health")).get("scores")),
+                        percent=True,
+                    ),
+                ],
+                [
+                    "Flaky subsystems",
+                    ", ".join(_list(_mapping(trends.get("flaky_subsystems")).get("top_subsystems"))) or "none",
+                    "<br>".join(
+                        f"{name}: {_format_series(_list(series))}"
+                        for name, series in _mapping(
+                            _mapping(trends.get("flaky_subsystems")).get("series")
+                        ).items()
+                    ) or "n/a",
+                ],
+            ],
+            empty="No trend data was available.",
         ),
         "",
         "## Flaky Test Dashboard",
@@ -964,11 +1180,60 @@ def _panel(title: str, body: str, *, wide: bool = False) -> str:
     )
 
 
+def _sparkline_svg(
+    values: list[float],
+    *,
+    color: str,
+    width: int = 220,
+    height: int = 54,
+) -> _Html:
+    if not values:
+        return _safe_html('<p class="empty">Not enough history.</p>')
+    if len(values) == 1:
+        values = [values[0], values[0]]
+    max_value = max(values) if values else 0.0
+    min_value = min(values) if values else 0.0
+    spread = max(max_value - min_value, 0.0001)
+    x_step = width / max(len(values) - 1, 1)
+    points = []
+    for index, value in enumerate(values):
+        x = round(index * x_step, 2)
+        y = round(height - (((value - min_value) / spread) * (height - 10)) - 5, 2)
+        points.append((x, y))
+    point_text = " ".join(f"{x},{y}" for x, y in points)
+    area_points = f"0,{height} " + point_text + f" {width},{height}"
+    circles = "".join(
+        f'<circle cx="{x}" cy="{y}" r="2.5" fill="{_html_attr(color)}"></circle>'
+        for x, y in points
+    )
+    return _safe_html(
+        '<svg class="sparkline" viewBox="0 0 '
+        + f'{width} {height}" preserveAspectRatio="none" aria-hidden="true">'
+        + f'<polygon points="{area_points}" fill="{_html_attr(color)}" opacity="0.12"></polygon>'
+        + f'<polyline points="{point_text}" fill="none" stroke="{_html_attr(color)}" '
+        + 'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>'
+        + circles
+        + "</svg>"
+    )
+
+
+def _trend_block(title: str, subtitle: str, chart: _Html, footer: str) -> str:
+    return (
+        '<div class="trend-block">'
+        f'<h3>{_html(title)}</h3>'
+        f'<p class="muted">{_html(subtitle)}</p>'
+        f"{chart}"
+        f'<p class="trend-footer">{_html(footer)}</p>'
+        "</div>"
+    )
+
+
 def render_html(dashboard: JsonObject) -> str:
     """Render a polished self-contained HTML dashboard artifact."""
     snapshot = _mapping(dashboard.get("snapshot"))
     ci_failures = _mapping(dashboard.get("ci_failures"))
     flaky_tests = _mapping(dashboard.get("flaky_tests"))
+    trends = _mapping(dashboard.get("trends"))
     pr_reviews = _mapping(dashboard.get("pr_reviews"))
     fuzzer = _mapping(dashboard.get("fuzzer"))
     agent_outcomes = _mapping(dashboard.get("agent_outcomes"))
@@ -989,6 +1254,64 @@ def render_html(dashboard: JsonObject) -> str:
     metrics = "".join(
         _metric_card(label, snapshot.get(key, 0), accent=accent)
         for key, label, accent in metric_keys
+    )
+
+    trend_labels = _list(trends.get("labels"))
+    failure_trend = _mapping(trends.get("failure_rate"))
+    review_trend = _mapping(trends.get("review_health"))
+    subsystem_trend = _mapping(trends.get("flaky_subsystems"))
+    subsystem_series = _mapping(subsystem_trend.get("series"))
+    subsystem_palette = ["#38bdf8", "#34d399", "#f59e0b"]
+    subsystem_rows = []
+    for index, name in enumerate(_list(subsystem_trend.get("top_subsystems"))):
+        series = _list(subsystem_series.get(name))
+        subsystem_rows.append(
+            '<div class="trend-series">'
+            f'<span class="legend-dot" style="background:{subsystem_palette[index % len(subsystem_palette)]}"></span>'
+            f'<strong>{_html(name)}</strong>'
+            f'<span>{_format_number(sum(_int(value) for value in series))} attempts</span>'
+            f'{_sparkline_svg([float(_int(value)) for value in series], color=subsystem_palette[index % len(subsystem_palette)])}'
+            "</div>"
+        )
+    trend_panel = _panel(
+        "Trend Watch",
+        '<div class="trend-grid">'
+        + _trend_block(
+            "Failure Rate",
+            f"Last {len(trend_labels)} days",
+            _sparkline_svg(
+                [float(value) for value in _list(failure_trend.get("rates"))],
+                color="#f87171",
+            ),
+            (
+                f"Average {float(failure_trend.get('average_rate', 0.0)) * 100:.0f}% "
+                f"across {sum(_int(value) for value in _list(failure_trend.get('totals')))} observed runs."
+            ),
+        )
+        + _trend_block(
+            "Flaky Subsystems",
+            ", ".join(_list(subsystem_trend.get("top_subsystems"))) or "No subsystem history yet",
+            _safe_html(
+                '<div class="trend-series-list">'
+                + ("".join(subsystem_rows) if subsystem_rows else '<p class="empty">Not enough history.</p>')
+                + "</div>"
+            ),
+            f"Window labels: {' | '.join(_str(label) for label in trend_labels)}",
+        )
+        + _trend_block(
+            "Review Health",
+            "Healthy review outcomes vs degraded ones",
+            _sparkline_svg(
+                [float(value) for value in _list(review_trend.get("scores"))],
+                color="#34d399",
+            ),
+            (
+                f"Average {float(review_trend.get('average_score', 0.0)) * 100:.0f}% healthy "
+                f"from {sum(_int(value) for value in _list(review_trend.get('review_runs')))} saved review states."
+            ),
+        )
+        + "</div>",
+        wide=True,
     )
 
     flaky_panel = _panel(
@@ -1281,6 +1604,50 @@ h2 { font-size: 20px; margin-bottom: 16px; }
 }
 .summary-grid span { display: block; color: var(--muted); font-size: 12px; }
 .summary-grid strong { display: block; margin-top: 5px; font-size: 18px; overflow-wrap: anywhere; }
+.trend-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.trend-block {
+  min-width: 0;
+}
+.trend-block h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+.trend-footer {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.sparkline {
+  width: 100%;
+  height: 64px;
+  margin-top: 8px;
+  display: block;
+}
+.trend-series-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+.trend-series {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.trend-series strong,
+.trend-series span {
+  font-size: 12px;
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+}
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
 table { width: 100%; border-collapse: collapse; min-width: 680px; }
 th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
@@ -1303,7 +1670,7 @@ td { color: #dce6f3; }
 .chip-bad { color: #fecaca; border-color: #991b1b; background: #450a0a; }
 .count { color: var(--muted); margin-right: 8px; }
 @media (max-width: 900px) {
-  .metrics, .layout, .summary-grid { grid-template-columns: 1fr; }
+  .metrics, .layout, .summary-grid, .trend-grid { grid-template-columns: 1fr; }
   .panel-wide { grid-column: auto; }
   h1 { font-size: 30px; }
 }
@@ -1325,6 +1692,7 @@ td { color: #dce6f3; }
     </header>
     <section class="metrics" aria-label="Executive snapshot">{metrics}</section>
     <div class="layout">
+      {trend_panel}
       {flaky_panel}
       {daily_health_panel}
       {ci_panel}

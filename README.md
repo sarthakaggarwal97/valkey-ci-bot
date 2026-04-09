@@ -42,6 +42,7 @@ It is intentionally static: no service to deploy, no database to operate, and
 no extra UI to secure. The report covers:
 
 - flaky campaign status, validation pass counts, attempts, failed hypotheses, and queued PR payloads
+- 7-day trend watch for failure-rate movement, flaky subsystem activity, and review health drift
 - CI failure incidents, pass/fail history, queued failures, and Daily monitor outcomes
 - PR review state, summary/review comment counts, acceptance follow-ups, and coverage gaps
 - fuzzer run status, anomaly issues, root-cause categories, scenarios, seeds, and raw-log fallback usage
