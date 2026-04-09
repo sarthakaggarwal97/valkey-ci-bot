@@ -251,6 +251,14 @@ jobs:
             --output-json agent-dashboard.json \
             --output-html agent-dashboard.html
 
+      - name: Generate observability site
+        if: always()
+        shell: bash
+        run: |
+          python3 -m scripts.agent_dashboard_site \
+            --dashboard-json agent-dashboard.json \
+            --site-dir dashboard-site
+
       - name: Publish capability dashboard to summary
         if: always()
         shell: bash
@@ -267,4 +275,5 @@ jobs:
             agent-dashboard.html
             daily-health-report.html
             daily-health-report.json
+            dashboard-site
           retention-days: 30

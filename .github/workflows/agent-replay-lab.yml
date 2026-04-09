@@ -42,6 +42,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Check out agent data snapshots
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          ref: bot-data
+          path: bot-data
+          persist-credentials: false
+          fetch-depth: 1
+
       - name: Configure AWS credentials from OIDC role
         if: ${{ github.event.inputs.run_models == 'true' }}
         uses: aws-actions/configure-aws-credentials@v5
@@ -73,6 +82,24 @@ jobs:
         shell: bash
         run: cat acceptance-report.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Generate observability site
+        shell: bash
+        run: |
+          python3 -m scripts.agent_dashboard \
+            --failure-store bot-data/failure-store.json \
+            --rate-state bot-data/rate-state.json \
+            --monitor-state bot-data/monitor-state.json \
+            --review-state bot-data/review-state.json \
+            --event-log bot-data/agent-events.jsonl \
+            --acceptance-result acceptance-report.json \
+            --output-markdown agent-dashboard.md \
+            --output-json agent-dashboard.json \
+            --output-html agent-dashboard.html
+
+          python3 -m scripts.agent_dashboard_site \
+            --dashboard-json agent-dashboard.json \
+            --site-dir dashboard-site
+
       - name: Upload replay lab artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -80,4 +107,8 @@ jobs:
           path: |
             acceptance-report.md
             acceptance-report.json
+            agent-dashboard.md
+            agent-dashboard.json
+            agent-dashboard.html
+            dashboard-site
           retention-days: 30

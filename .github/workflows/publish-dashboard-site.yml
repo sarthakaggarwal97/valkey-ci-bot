@@ -1,22 +1,22 @@
-name: CI Agent Capability Dashboard
+name: Publish Dashboard Site
 
 on:
-  schedule:
-    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  dashboard:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
-      group: ci-agent-capability-dashboard
+      group: publish-dashboard-site
       cancel-in-progress: true
     steps:
       - name: Check out agent repository
@@ -93,15 +93,12 @@ jobs:
             --dashboard-json agent-dashboard.json \
             --site-dir dashboard-site
 
-      - name: Publish dashboard to workflow summary
-        shell: bash
-        run: cat agent-dashboard.md >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload dashboard artifact
+      - name: Upload dashboard site artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ci-agent-capability-dashboard-${{ github.run_id }}
+          name: dashboard-site-${{ github.run_id }}
           path: |
+            dashboard-site
             agent-dashboard.md
             agent-dashboard.json
             agent-dashboard.html
@@ -109,5 +106,20 @@ jobs:
             acceptance-report.json
             daily-health-report.html
             daily-health-report.json
-            dashboard-site
           retention-days: 30
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dashboard-site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages site
+        id: deployment
+        uses: actions/deploy-pages@v4

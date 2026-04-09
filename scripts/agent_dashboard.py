@@ -486,6 +486,51 @@ def _build_review_metrics(review_state: JsonObject, acceptance_results: list[Jso
     }
 
 
+def _build_acceptance_metrics(acceptance_payloads: list[JsonObject]) -> JsonObject:
+    """Build replay-lab and workflow-acceptance metrics from payload snapshots."""
+    latest_payload = _mapping(acceptance_payloads[-1]) if acceptance_payloads else {}
+    scorecard = _mapping(latest_payload.get("scorecard"))
+    manifest = _mapping(latest_payload.get("manifest"))
+    workflow_results = [
+        _mapping(result)
+        for result in _list(latest_payload.get("workflow_results"))
+        if isinstance(result, dict)
+    ]
+    review_results = [
+        _mapping(result)
+        for result in _list(latest_payload.get("results"))
+        if isinstance(result, dict)
+    ]
+    readiness = _str(scorecard.get("readiness"), "unknown")
+    followup_counts: Counter[str] = Counter()
+    finding_count = 0
+    for result in review_results:
+        finding_count += len(_list(result.get("findings")))
+        for followup in _list(result.get("model_followups")):
+            followup_counts[_str(followup, "unknown")] += 1
+
+    return {
+        "payloads_seen": len(acceptance_payloads),
+        "readiness": readiness,
+        "review_cases": _int(scorecard.get("review_cases")),
+        "review_passed": _int(scorecard.get("review_passed")),
+        "review_failed": _int(scorecard.get("review_failed")),
+        "workflow_cases": _int(scorecard.get("workflow_cases")),
+        "workflow_passed": _int(scorecard.get("workflow_passed")),
+        "workflow_failed": _int(scorecard.get("workflow_failed")),
+        "ci_replay_cases": _int(scorecard.get("ci_replay_cases")),
+        "backport_replay_cases": _int(scorecard.get("backport_replay_cases")),
+        "manifest_review_cases": len(_list(manifest.get("review_cases"))),
+        "manifest_workflow_cases": len(_list(manifest.get("workflow_cases"))),
+        "manifest_ci_cases": len(_list(manifest.get("ci_cases"))),
+        "manifest_backport_cases": len(_list(manifest.get("backport_cases"))),
+        "finding_count": finding_count,
+        "model_followup_counts": _counter_dict(followup_counts),
+        "recent_review_results": review_results[:12],
+        "recent_workflow_results": workflow_results[:12],
+    }
+
+
 def _build_fuzzer_metrics(fuzzer_results: list[JsonObject]) -> JsonObject:
     runs = _fuzzer_runs(fuzzer_results)
     status_counts: Counter[str] = Counter()
@@ -644,6 +689,7 @@ def build_dashboard(
     daily_results: list[JsonObject] | None = None,
     fuzzer_results: list[JsonObject] | None = None,
     acceptance_results: list[JsonObject] | None = None,
+    acceptance_payloads: list[JsonObject] | None = None,
     events: list[JsonObject] | None = None,
     input_warnings: list[str] | None = None,
     generated_at: str | None = None,
@@ -657,6 +703,7 @@ def build_dashboard(
     daily_results = daily_results or []
     fuzzer_results = fuzzer_results or []
     acceptance_results = acceptance_results or []
+    acceptance_payloads = acceptance_payloads or []
     events = events or []
     input_warnings = input_warnings or []
     resolved_generated_at = generated_at or datetime.now(timezone.utc).isoformat()
@@ -668,6 +715,7 @@ def build_dashboard(
     )
     flaky_tests = _build_flaky_metrics(failure_store)
     review_metrics = _build_review_metrics(review_state, acceptance_results)
+    acceptance_metrics = _build_acceptance_metrics(acceptance_payloads)
     fuzzer_metrics = _build_fuzzer_metrics(fuzzer_results)
     agent_outcomes = _build_agent_outcome_metrics(events)
     ai_reliability = _build_ai_reliability_metrics(
@@ -700,6 +748,7 @@ def build_dashboard(
         "ci_failures": ci_failures,
         "flaky_tests": flaky_tests,
         "pr_reviews": review_metrics,
+        "acceptance": acceptance_metrics,
         "fuzzer": fuzzer_metrics,
         "agent_outcomes": agent_outcomes,
         "ai_reliability": ai_reliability,
@@ -1761,6 +1810,7 @@ def main(argv: list[str] | None = None) -> int:
         review_state=_mapping(review_state),
         daily_results=[_mapping(result) for result in daily_results],
         fuzzer_results=[_mapping(result) for result in fuzzer_results],
+        acceptance_payloads=[_mapping(result) for result in acceptance_payloads],
         acceptance_results=_acceptance_results(
             [_mapping(result) for result in acceptance_payloads]
         ),

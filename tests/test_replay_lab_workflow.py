@@ -29,6 +29,12 @@ def test_replay_lab_runs_acceptance_harness_and_uploads_scorecard() -> None:
     assert workflow["env"]["FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"] is True
 
     run_step = next(step for step in job["steps"] if step["name"] == "Run replay lab")
+    bot_data_checkout = next(
+        step for step in job["steps"] if step["name"] == "Check out agent data snapshots"
+    )
+    site_step = next(
+        step for step in job["steps"] if step["name"] == "Generate observability site"
+    )
     upload_step = next(
         step for step in job["steps"] if step["name"] == "Upload replay lab artifacts"
     )
@@ -36,4 +42,8 @@ def test_replay_lab_runs_acceptance_harness_and_uploads_scorecard() -> None:
     assert "-m scripts.valkey_acceptance" in run_step["run"]
     assert "--json-output acceptance-report.json" in run_step["run"]
     assert "--run-models" in run_step["run"]
+    assert bot_data_checkout["with"]["ref"] == "bot-data"
+    assert "-m scripts.agent_dashboard" in site_step["run"]
+    assert "-m scripts.agent_dashboard_site" in site_step["run"]
     assert upload_step["uses"] == "actions/upload-artifact@v4"
+    assert "dashboard-site" in upload_step["with"]["path"]

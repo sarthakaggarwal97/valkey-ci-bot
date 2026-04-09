@@ -143,6 +143,55 @@ def _trend_events() -> list[dict]:
     ]
 
 
+def _acceptance_payload() -> dict:
+    return {
+        "scorecard": {
+            "review_cases": 2,
+            "review_passed": 1,
+            "review_failed": 1,
+            "workflow_cases": 1,
+            "workflow_passed": 1,
+            "workflow_failed": 0,
+            "ci_replay_cases": 2,
+            "backport_replay_cases": 1,
+            "readiness": "pilot-ready",
+        },
+        "results": [
+            {
+                "name": "docs follow-up PR",
+                "pr_number": 101,
+                "passed": False,
+                "model_followups": ["review-coverage-incomplete"],
+                "findings": [{"title": "bug"}],
+                "coverage": {
+                    "claimed_without_tool": [],
+                    "unaccounted_files": ["src/server.c"],
+                    "fetch_limit_hit": False,
+                },
+                "expectation_checks": [
+                    {"label": "docs", "expected": True, "actual": True, "passed": True},
+                    {"label": "dco", "expected": True, "actual": False, "passed": False},
+                ],
+            }
+        ],
+        "workflow_results": [
+            {
+                "name": "dashboard workflow contract",
+                "workflow_path": ".github/workflows/agent-dashboard.yml",
+                "passed": True,
+                "notes": "all good",
+                "checks": [{"label": "artifact", "passed": True, "detail": "present"}],
+            }
+        ],
+        "manifest": {
+            "review_cases": [1, 2],
+            "workflow_cases": [1],
+            "ci_cases": [1, 2],
+            "backport_cases": [1],
+        },
+    }
+
+
 def test_build_dashboard_summarizes_agent_capabilities() -> None:
     dashboard = build_dashboard(
         failure_store=_failure_store(),
@@ -194,6 +243,7 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
             }
         ],
         fuzzer_results=[_fuzzer_result()],
+        acceptance_payloads=[_acceptance_payload()],
         events=[
             {
                 "event_id": "evt-1",
@@ -245,6 +295,9 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
     assert dashboard["flaky_tests"]["failed_hypotheses"] == 1
     assert dashboard["flaky_tests"]["subsystem_counts"] == {"memory": 1}
     assert dashboard["pr_reviews"]["coverage_incomplete_cases"] == 1
+    assert dashboard["acceptance"]["readiness"] == "pilot-ready"
+    assert dashboard["acceptance"]["review_failed"] == 1
+    assert dashboard["acceptance"]["workflow_passed"] == 1
     assert dashboard["ai_reliability"]["token_usage"] == 42_000
     assert dashboard["ai_reliability"]["schema_calls"] == 4
     assert dashboard["ai_reliability"]["schema_successes"] == 3

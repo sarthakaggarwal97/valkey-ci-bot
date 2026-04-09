@@ -37,9 +37,15 @@ Local development:
 Workflow at `.github/workflows/agent-dashboard.yml`.
 
 The dashboard generator turns the bot's durable state and monitor artifacts
-into `agent-dashboard.html`, `agent-dashboard.md`, and `agent-dashboard.json`.
-It is intentionally static: no service to deploy, no database to operate, and
-no extra UI to secure. The report covers:
+into:
+
+- `agent-dashboard.html` — the single-page executive dashboard artifact
+- `agent-dashboard.md` — a GitHub-summary-friendly report
+- `agent-dashboard.json` — the structured payload for automation
+- `dashboard-site/` — a multi-page observability site with workflow-specific views
+
+The site is intentionally static: no database to operate, no app server to
+deploy, and no extra runtime surface to secure. It covers:
 
 - flaky campaign status, validation pass counts, attempts, failed hypotheses, and queued PR payloads
 - 7-day trend watch for failure-rate movement, flaky subsystem activity, and review health drift
@@ -51,15 +57,19 @@ no extra UI to secure. The report covers:
 - monitor watermarks and missing input warnings
 
 The standalone workflow runs on a schedule and manual dispatch, checks out the
-`bot-data` branch snapshots when present, writes the report into the workflow
-summary, and uploads the Markdown/JSON pair as an artifact. The Daily and
-Fuzzer monitor workflows also generate dashboard artifacts for each run,
-including their current `monitor-result.json` or `fuzzer-monitor-result.json`
-payloads.
+`bot-data` branch snapshots when present, refreshes the Daily health report,
+runs the replay acceptance scorecard, writes the Markdown summary into the
+workflow summary, and uploads the full site plus supporting JSON artifacts.
+The Daily, Fuzzer, and Replay Lab workflows also generate the site artifact for
+their own richer workflow-specific payloads.
 
-Open `agent-dashboard.html` from the workflow artifact for the polished UI.
-The Markdown file stays optimized for GitHub step summaries, and the JSON file
+Open `dashboard-site/index.html` from the workflow artifact for the prettiest
+experience. The single-page HTML stays useful for quick inspection, the
+Markdown file stays optimized for GitHub step summaries, and the JSON file
 stays optimized for automation.
+
+If you want a stable public URL, run `.github/workflows/publish-dashboard-site.yml`.
+It builds the same site and deploys it to GitHub Pages.
 
 Local usage:
 
@@ -70,11 +80,17 @@ python3 -m scripts.agent_dashboard \
   --monitor-state bot-data/monitor-state.json \
   --review-state bot-data/review-state.json \
   --event-log bot-data/agent-events.jsonl \
+  --acceptance-result acceptance-report.json \
+  --daily-health daily-health-report.json \
   --daily-result monitor-result.json \
   --fuzzer-result fuzzer-monitor-result.json \
   --output-markdown agent-dashboard.md \
   --output-json agent-dashboard.json \
   --output-html agent-dashboard.html
+
+python3 -m scripts.agent_dashboard_site \
+  --dashboard-json agent-dashboard.json \
+  --site-dir dashboard-site
 ```
 
 ## Valkey-Native Context
