@@ -25,7 +25,11 @@ def test_monitor_workflow_uses_oidc_and_app_token_support() -> None:
     monitor_job = workflow["jobs"]["monitor"]
     job_env = monitor_job["env"]
 
-    assert workflow["permissions"] == {"contents": "write", "id-token": "write"}
+    assert workflow["permissions"] == {
+        "actions": "write",
+        "contents": "write",
+        "id-token": "write",
+    }
     assert on_block["workflow_dispatch"]["inputs"]["dry_run"]["default"] is True
     assert workflow["env"]["FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"] is True
     assert "concurrency" not in workflow

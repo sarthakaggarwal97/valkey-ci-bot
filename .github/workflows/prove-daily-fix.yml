@@ -1,0 +1,132 @@
+name: Prove Daily Fix
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: "Full name of the fork repository that owns the draft PR"
+        required: true
+        type: string
+      pr_number:
+        description: "Draft PR number to prove"
+        required: true
+        type: string
+      fingerprint:
+        description: "Failure fingerprint for the draft fix"
+        required: true
+        type: string
+      config_path:
+        description: "CI agent config path"
+        required: true
+        default: ".github/valkey-daily-bot.yml"
+        type: string
+      repeat_count:
+        description: "Required consecutive GitHub-native proof runs"
+        required: true
+        type: string
+      failure_report_json:
+        description: "Serialized FailureReport payload for the fix"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    concurrency:
+      group: prove-daily-fix-${{ inputs.target_repo }}-${{ inputs.pr_number }}
+      cancel-in-progress: false
+    env:
+      VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+      VALKEY_FORK_GITHUB_TOKEN: ${{ secrets.VALKEY_FORK_GITHUB_TOKEN }}
+    steps:
+      - name: Checkout agent repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Select target repository token
+        id: target-token
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${VALKEY_FORK_GITHUB_TOKEN}" ]]; then
+            echo "token=${VALKEY_FORK_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
+            echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
+          else
+            echo "Configure VALKEY_FORK_GITHUB_TOKEN or VALKEY_GITHUB_TOKEN for proof campaigns." >&2
+            exit 1
+          fi
+
+      - name: Run proof campaign
+        shell: bash
+        env:
+          FAILURE_REPORT_JSON: ${{ inputs.failure_report_json }}
+        run: |
+          python -m scripts.prove_pr_fix \
+            --repo "${{ inputs.target_repo }}" \
+            --pr-number "${{ inputs.pr_number }}" \
+            --fingerprint "${{ inputs.fingerprint }}" \
+            --failure-report-json "${FAILURE_REPORT_JSON}" \
+            --config "${{ inputs.config_path }}" \
+            --token "${{ steps.target-token.outputs.token }}" \
+            --state-token "${{ github.token }}" \
+            --state-repo "${{ github.repository }}" \
+            --repeat-count "${{ inputs.repeat_count }}" \
+            --output proof-result.json
+
+      - name: Publish proof summary
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path("proof-result.json")
+          if not path.exists():
+              raise SystemExit(0)
+          result = json.loads(path.read_text(encoding="utf-8"))
+          lines = [
+              "## Daily Fix Proof",
+              "",
+              f"- PR: {result.get('pr_url', '')}",
+              f"- Status: **{result.get('proof_status', 'unknown')}**",
+              f"- Consecutive runs: **{result.get('passed_runs', 0)}/{result.get('proof_runs', 0)}**",
+          ]
+          if result.get("proof_run_url"):
+              lines.append(f"- Workflow run: {result['proof_run_url']}")
+          if result.get("ready_for_review"):
+              lines.append("- PR was marked ready for review automatically.")
+          if result.get("comment_url"):
+              lines.append(f"- Proof comment: {result['comment_url']}")
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          summary.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload proof result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-fix-proof-${{ github.run_id }}
+          path: proof-result.json
+          if-no-files-found: warn
+          retention-days: 14

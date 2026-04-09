@@ -122,6 +122,7 @@ def test_publish_workflow_builds_pages_site() -> None:
         "CI Agent Replay Lab",
         "Monitor Valkey Daily Failures",
         "Monitor Valkey Fuzzer Runs",
+        "Prove Daily Fix",
         "Review Pull Request",
         "Review External Pull Request",
         "Backport PR",

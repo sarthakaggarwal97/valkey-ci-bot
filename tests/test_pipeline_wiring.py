@@ -567,15 +567,23 @@ class TestRunReconciliation:
         assert pr_manager.create_pr.call_count == 2
         assert rate_limiter.record_pr_created.call_count == 2
 
+    @patch("scripts.main._dispatch_proof_campaign")
     @patch("scripts.main._load_runtime_config")
     @patch("scripts.main.FailureStore")
     @patch("scripts.main.PRManager")
     @patch("scripts.main.Github")
     def test_reconciliation_can_open_draft_prs(
-        self, mock_gh, mock_pr_mgr, mock_store, mock_load_config,
+        self, mock_gh, mock_pr_mgr, mock_store, mock_load_config, mock_dispatch_proof,
     ):
         """Queued failures can be reconciled into draft PRs."""
-        mock_load_config.return_value = BotConfig()
+        report = _make_report(workflow_file="daily.yml")
+        root_cause = _make_root_cause(is_flaky=True)
+        mock_load_config.return_value = BotConfig(
+            soak_validation_workflows=["daily.yml"],
+            soak_validation_passes=100,
+            flaky_campaign_enabled=True,
+            flaky_validation_passes=3,
+        )
 
         rate_limiter = MagicMock()
         rate_limiter.get_queued_failures.return_value = ["fp1"]
@@ -583,7 +591,7 @@ class TestRunReconciliation:
 
         store_instance = MagicMock()
         entry = MagicMock(failure_identifier="TestSuite.TestCase")
-        entry.queued_pr_payload = self._queued_payload()
+        entry.queued_pr_payload = self._queued_payload(report=report, root_cause=root_cause)
         store_instance.get_entry.return_value = entry
         store_instance.has_open_pr.return_value = False
         store_instance.record_queued_pr_failure.return_value = 1
@@ -597,6 +605,8 @@ class TestRunReconciliation:
             "owner/repo",
             "config.yml",
             "token",
+            state_github_token="state-token",
+            state_repo_name="owner/state-repo",
             rate_limiter=rate_limiter,
             draft_prs=True,
         )
@@ -604,6 +614,9 @@ class TestRunReconciliation:
         assert count == 1
         pr_manager.create_pr.assert_called_once()
         assert pr_manager.create_pr.call_args.kwargs["draft"] is True
+        mock_dispatch_proof.assert_called_once()
+        assert mock_dispatch_proof.call_args.kwargs["repeat_count"] == 100
+        store_instance.update_proof_campaign.assert_called_once()
 
     @patch("scripts.main._load_runtime_config")
     @patch("scripts.main.FailureStore")

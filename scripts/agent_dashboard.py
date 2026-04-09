@@ -400,6 +400,10 @@ def _build_flaky_metrics(failure_store: JsonObject) -> JsonObject:
     status_counts = Counter(
         _str(campaign.get("status"), "unknown") for campaign in campaigns
     )
+    proof_counts = Counter(
+        _str(campaign.get("proof_status"), "none") for campaign in campaigns
+        if _str(campaign.get("proof_status"))
+    )
     active = [
         campaign
         for campaign in campaigns
@@ -430,6 +434,7 @@ def _build_flaky_metrics(failure_store: JsonObject) -> JsonObject:
         "campaigns": len(campaigns),
         "active_campaigns": len(active),
         "status_counts": _counter_dict(status_counts),
+        "proof_counts": _counter_dict(proof_counts),
         "subsystem_counts": _counter_dict(subsystem_counts),
         "total_attempts": attempts,
         "failed_hypotheses": failed_hypotheses,
@@ -599,6 +604,9 @@ def _build_agent_outcome_metrics(events: list[JsonObject]) -> JsonObject:
     pr_closed_without_merge = event_type_counts.get("pr.closed_without_merge", 0)
     validation_passed = event_type_counts.get("validation.passed", 0)
     validation_failed = event_type_counts.get("validation.failed", 0)
+    proof_passed = event_type_counts.get("proof.passed", 0)
+    proof_failed = event_type_counts.get("proof.failed", 0)
+    proof_dispatched = event_type_counts.get("proof.dispatched", 0)
     dead_lettered = event_type_counts.get("fix.dead_lettered", 0)
     recent_events = _recent(events, "created_at", limit=15)
     return {
@@ -607,6 +615,9 @@ def _build_agent_outcome_metrics(events: list[JsonObject]) -> JsonObject:
         "subjects": len(subject_counts),
         "validation_passed": validation_passed,
         "validation_failed": validation_failed,
+        "proof_dispatched": proof_dispatched,
+        "proof_passed": proof_passed,
+        "proof_failed": proof_failed,
         "prs_created": pr_created,
         "prs_merged": pr_merged,
         "prs_closed_without_merge": pr_closed_without_merge,
@@ -871,7 +882,8 @@ def render_markdown(dashboard: JsonObject) -> str:
             f"Campaigns: **{flaky_tests.get('campaigns', 0)}** total, "
             f"**{flaky_tests.get('active_campaigns', 0)}** active. "
             f"Status counts: {_status_counts_text(_mapping(flaky_tests.get('status_counts')))}. "
-            f"Subsystems: {_status_counts_text(_mapping(flaky_tests.get('subsystem_counts')))}."
+            f"Subsystems: {_status_counts_text(_mapping(flaky_tests.get('subsystem_counts')))}. "
+            f"Proof: {_status_counts_text(_mapping(flaky_tests.get('proof_counts')))}."
         ),
         "",
         _table(
@@ -879,10 +891,12 @@ def render_markdown(dashboard: JsonObject) -> str:
                 "Failure",
                 "Subsystem",
                 "Status",
+                "Proof",
                 "Job",
                 "Branch",
                 "Attempts",
                 "Full Passes",
+                "Proof Runs",
                 "Failed Hypotheses",
                 "Queued PR",
                 "Updated",
@@ -892,10 +906,17 @@ def render_markdown(dashboard: JsonObject) -> str:
                     campaign.get("failure_identifier", ""),
                     campaign.get("subsystem", ""),
                     campaign.get("status", ""),
+                    campaign.get("proof_status", ""),
                     campaign.get("job_name", ""),
                     campaign.get("branch", ""),
                     campaign.get("total_attempts", 0),
                     campaign.get("consecutive_full_passes", 0),
+                    (
+                        f"{campaign.get('proof_passed_runs', 0)}/"
+                        f"{campaign.get('proof_required_runs', 0)}"
+                        if _int(campaign.get("proof_required_runs"))
+                        else ""
+                    ),
                     len(_list(campaign.get("failed_hypotheses"))),
                     _bool_text(isinstance(campaign.get("queued_pr_payload"), dict)),
                     campaign.get("updated_at", ""),
@@ -934,6 +955,9 @@ def render_markdown(dashboard: JsonObject) -> str:
                 ["Subjects", agent_outcomes.get("subjects", 0)],
                 ["Validation passed", agent_outcomes.get("validation_passed", 0)],
                 ["Validation failed", agent_outcomes.get("validation_failed", 0)],
+                ["Proof campaigns dispatched", agent_outcomes.get("proof_dispatched", 0)],
+                ["Proof passed", agent_outcomes.get("proof_passed", 0)],
+                ["Proof failed", agent_outcomes.get("proof_failed", 0)],
                 ["PRs created", agent_outcomes.get("prs_created", 0)],
                 ["PRs merged", agent_outcomes.get("prs_merged", 0)],
                 [
@@ -1152,11 +1176,11 @@ def _chip(value: object) -> _Html:
     label = _str(value, "unknown") or "unknown"
     normalized = label.lower()
     tone = "neutral"
-    if any(word in normalized for word in ["passed", "success", "merged", "normal"]):
+    if any(word in normalized for word in ["passed", "success", "merged", "normal", "ready"]):
         tone = "good"
     elif any(word in normalized for word in ["failed", "dead", "abandoned", "anomalous", "missing"]):
         tone = "bad"
-    elif any(word in normalized for word in ["queued", "retry", "warning", "incomplete"]):
+    elif any(word in normalized for word in ["queued", "retry", "warning", "incomplete", "pending", "running"]):
         tone = "warn"
     return _safe_html(
         f'<span class="chip chip-{tone}">{_html(label)}</span>'
@@ -1375,6 +1399,7 @@ def render_html(dashboard: JsonObject) -> str:
             ("Failed Hypotheses", flaky_tests.get("failed_hypotheses", 0)),
             ("Full Passes", flaky_tests.get("consecutive_full_passes", 0)),
             ("Status", _html_status_counts(_mapping(flaky_tests.get("status_counts")))),
+            ("Proof", _html_status_counts(_mapping(flaky_tests.get("proof_counts")))),
             ("Subsystems", _html_status_counts(_mapping(flaky_tests.get("subsystem_counts")))),
         ])
         + _html_table(
@@ -1382,10 +1407,12 @@ def render_html(dashboard: JsonObject) -> str:
                 "Failure",
                 "Subsystem",
                 "Status",
+                "Proof",
                 "Job",
                 "Branch",
                 "Attempts",
                 "Full Passes",
+                "Proof Runs",
                 "Failed Hypotheses",
                 "Queued PR",
                 "Updated",
@@ -1395,10 +1422,17 @@ def render_html(dashboard: JsonObject) -> str:
                     campaign.get("failure_identifier", ""),
                     campaign.get("subsystem", ""),
                     _chip(campaign.get("status", "")),
+                    _chip(campaign.get("proof_status", "")),
                     campaign.get("job_name", ""),
                     campaign.get("branch", ""),
                     campaign.get("total_attempts", 0),
                     campaign.get("consecutive_full_passes", 0),
+                    (
+                        f"{campaign.get('proof_passed_runs', 0)}/"
+                        f"{campaign.get('proof_required_runs', 0)}"
+                        if _int(campaign.get("proof_required_runs"))
+                        else ""
+                    ),
                     len(_list(campaign.get("failed_hypotheses"))),
                     _chip("queued" if isinstance(campaign.get("queued_pr_payload"), dict) else "none"),
                     campaign.get("updated_at", ""),
@@ -1452,6 +1486,9 @@ def render_html(dashboard: JsonObject) -> str:
             ("Subjects", agent_outcomes.get("subjects", 0)),
             ("Validation Passed", agent_outcomes.get("validation_passed", 0)),
             ("Validation Failed", agent_outcomes.get("validation_failed", 0)),
+            ("Proof Dispatched", agent_outcomes.get("proof_dispatched", 0)),
+            ("Proof Passed", agent_outcomes.get("proof_passed", 0)),
+            ("Proof Failed", agent_outcomes.get("proof_failed", 0)),
             ("PRs Created", agent_outcomes.get("prs_created", 0)),
             ("PRs Merged", agent_outcomes.get("prs_merged", 0)),
             ("Closed Without Merge", agent_outcomes.get("prs_closed_without_merge", 0)),

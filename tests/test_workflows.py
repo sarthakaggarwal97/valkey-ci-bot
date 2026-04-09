@@ -220,3 +220,40 @@ def test_validate_fix_workflow_requires_explicit_build_only_opt_in() -> None:
     assert "allow_build_only" in test_step["env"]["ALLOW_BUILD_ONLY"]
     assert "Missing test commands. Provide at least one test command or set allow_build_only=true." in test_step["run"]
     assert "Validation passed with explicit build-only checks." in result_step["run"]
+
+
+def test_prove_daily_fix_workflow_dispatches_pr_proof_loop() -> None:
+    workflow = _load_yaml(REPO_ROOT / ".github/workflows/prove-daily-fix.yml")
+    on_block = _get_on_block(workflow)
+    inputs = on_block["workflow_dispatch"]["inputs"]
+
+    assert workflow["permissions"] == {"contents": "write"}
+    assert inputs["target_repo"]["required"] is True
+    assert inputs["pr_number"]["required"] is True
+    assert inputs["fingerprint"]["required"] is True
+    assert inputs["failure_report_json"]["required"] is True
+    assert inputs["repeat_count"]["required"] is True
+
+    job = workflow["jobs"]["prove"]
+    assert job["timeout-minutes"] == 360
+    assert "prove-daily-fix-" in job["concurrency"]["group"]
+
+    run_step = next(
+        step
+        for step in job["steps"]
+        if step["name"] == "Run proof campaign"
+    )
+    summary_step = next(
+        step
+        for step in job["steps"]
+        if step["name"] == "Publish proof summary"
+    )
+    upload_step = next(
+        step
+        for step in job["steps"]
+        if step["name"] == "Upload proof result"
+    )
+    assert "-m scripts.prove_pr_fix" in run_step["run"]
+    assert "--failure-report-json" in run_step["run"]
+    assert "proof-result.json" in summary_step["run"]
+    assert upload_step["uses"] == "actions/upload-artifact@v4"

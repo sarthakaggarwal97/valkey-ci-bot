@@ -18,7 +18,13 @@ from hypothesis import strategies as st
 from github.GithubException import GithubException
 
 from scripts.failure_store import FailureStore
-from scripts.models import FailureStoreEntry, FailureReport, ParsedFailure, RootCauseReport
+from scripts.models import (
+    FailureStoreEntry,
+    FailureReport,
+    FlakyCampaignState,
+    ParsedFailure,
+    RootCauseReport,
+)
 
 # --- Strategies ---
 
@@ -212,6 +218,53 @@ def test_mark_queued_pr_dead_letter_preserves_payload_for_debugging() -> None:
         entry.queued_pr_payload["reconciliation"]["dead_letter_reason"]
         == "GitHub 500"
     )
+
+
+def test_update_proof_campaign_persists_proof_status() -> None:
+    store = FailureStore()
+    store.entries["fp1"] = FailureStoreEntry(
+        fingerprint="fp1",
+        failure_identifier="test-cache-flush",
+        test_name="test-cache-flush",
+        incident_key="fp1",
+        error_signature="boom",
+        file_path="tests/unit/cache.tcl",
+        pr_url="https://github.com/owner/repo/pull/42",
+        status="open",
+        created_at="2026-04-08T00:00:00+00:00",
+        updated_at="2026-04-08T00:00:00+00:00",
+        campaign_status="pr-created",
+    )
+    store.campaigns["fp1"] = FlakyCampaignState(
+        fingerprint="fp1",
+        history_key="hist-1",
+        failure_identifier="test-cache-flush",
+        workflow_file="daily.yml",
+        job_name="daily / linux",
+        matrix_params={},
+        repo_full_name="owner/repo",
+        branch="unstable",
+        status="pr-created",
+        created_at="2026-04-08T00:00:00+00:00",
+        updated_at="2026-04-08T00:00:00+00:00",
+    )
+
+    store.update_proof_campaign(
+        "fp1",
+        status="passed",
+        summary="Proof passed across 100/100 GitHub-native validation runs.",
+        proof_url="https://github.com/owner/repo/actions/runs/123",
+        required_runs=100,
+        passed_runs=100,
+        attempted_runs=100,
+    )
+
+    payload = store.to_dict()["campaigns"]["fp1"]
+    assert payload["proof_status"] == "passed"
+    assert payload["proof_required_runs"] == 100
+    assert payload["proof_passed_runs"] == 100
+    assert payload["proof_attempted_runs"] == 100
+    assert "GitHub-native validation runs" in payload["proof_summary"]
 
 
 def test_reconcile_pr_states_returns_maintainer_outcome_transitions() -> None:

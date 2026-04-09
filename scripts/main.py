@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -31,6 +34,7 @@ from scripts.models import (
     RootCauseReport,
     ValidationResult,
     WorkflowRun,
+    failure_report_to_dict,
     failure_report_from_dict,
     root_cause_report_from_dict,
 )
@@ -49,6 +53,7 @@ from scripts.valkey_repo_context import (
 )
 
 logger = logging.getLogger(__name__)
+_PROOF_WORKFLOW_FILE = "prove-daily-fix.yml"
 
 
 def _build_parser_router() -> LogParserRouter:
@@ -339,6 +344,89 @@ def _required_validation_runs(
     ):
         repeat_count = max(repeat_count, config.soak_validation_passes)
     return repeat_count
+
+
+def _parse_pr_number(pr_url: str) -> int | None:
+    """Extract a pull request number from a GitHub PR URL."""
+    try:
+        return int(pr_url.rstrip("/").split("/")[-1])
+    except (TypeError, ValueError):
+        return None
+
+
+def _dispatch_workflow(
+    *,
+    repo_full_name: str,
+    workflow_file: str,
+    ref: str,
+    token: str,
+    inputs: dict[str, str],
+) -> None:
+    """Dispatch a GitHub Actions workflow using the REST API."""
+    url = (
+        f"https://api.github.com/repos/{repo_full_name}/actions/workflows/"
+        f"{workflow_file}/dispatches"
+    )
+    payload = json.dumps({"ref": ref, "inputs": inputs}).encode("utf-8")
+    request = urllib_request.Request(
+        url,
+        data=payload,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+            "User-Agent": "valkey-ci-agent",
+        },
+    )
+    try:
+        with urllib_request.urlopen(request, timeout=30):
+            return
+    except urllib_error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"workflow-dispatch-failed: {workflow_file} {exc.code} {detail}"
+        ) from exc
+    except OSError as exc:
+        raise RuntimeError(
+            f"workflow-dispatch-failed: {workflow_file} transport error: {exc}"
+        ) from exc
+
+
+def _dispatch_proof_campaign(
+    *,
+    state_gh: Github,
+    state_repo_name: str,
+    state_github_token: str,
+    target_repo_name: str,
+    pr_url: str,
+    fingerprint: str,
+    report: FailureReport,
+    repeat_count: int,
+    config_path: str,
+) -> None:
+    """Dispatch the GitHub-native proof workflow for one draft PR."""
+    pr_number = _parse_pr_number(pr_url)
+    if pr_number is None:
+        raise RuntimeError(f"proof-dispatch-invalid-pr-url: {pr_url}")
+    state_repo = state_gh.get_repo(state_repo_name)
+    _dispatch_workflow(
+        repo_full_name=state_repo_name,
+        workflow_file=_PROOF_WORKFLOW_FILE,
+        ref=state_repo.default_branch,
+        token=state_github_token,
+        inputs={
+            "target_repo": target_repo_name,
+            "pr_number": str(pr_number),
+            "fingerprint": fingerprint,
+            "config_path": config_path,
+            "repeat_count": str(max(1, repeat_count)),
+            "failure_report_json": json.dumps(
+                failure_report_to_dict(report),
+                separators=(",", ":"),
+            ),
+        },
+    )
 
 
 def _retrieve_failure_report(
@@ -1399,6 +1487,7 @@ def run_reconciliation(
     gh = Github(auth=Auth.Token(github_token))
     state_gh = Github(auth=Auth.Token(state_github_token or github_token))
     state_repo = state_repo_name or repo_name
+    dispatch_token = state_github_token or github_token
     config = _load_runtime_config(gh, repo_name, config_path)
 
     # Build rate limiter
@@ -1535,6 +1624,59 @@ def run_reconciliation(
                 pr_url=pr_url,
                 source="reconciliation",
             )
+            if draft_prs and dispatch_token:
+                proof_runs = _required_validation_runs(report, root_cause, config)
+                if proof_runs > 1:
+                    failure_store.update_proof_campaign(
+                        fingerprint,
+                        status="pending",
+                        proof_url=pr_url,
+                        required_runs=proof_runs,
+                    )
+                    try:
+                        _dispatch_proof_campaign(
+                            state_gh=state_gh,
+                            state_repo_name=state_repo,
+                            state_github_token=dispatch_token,
+                            target_repo_name=repo_name,
+                            pr_url=pr_url,
+                            fingerprint=fingerprint,
+                            report=report,
+                            repeat_count=proof_runs,
+                            config_path=config_path,
+                        )
+                        event_ledger.record(
+                            "proof.dispatched",
+                            fingerprint,
+                            job_name=report.job_name,
+                            failure_identifier=entry.failure_identifier,
+                            pr_url=pr_url,
+                            proof_runs=proof_runs,
+                            source="reconciliation",
+                        )
+                    except RuntimeError as exc:
+                        failure_store.update_proof_campaign(
+                            fingerprint,
+                            status="dispatch-failed",
+                            summary=str(exc),
+                            proof_url=pr_url,
+                            required_runs=proof_runs,
+                        )
+                        event_ledger.record(
+                            "proof.dispatch_failed",
+                            fingerprint,
+                            job_name=report.job_name,
+                            failure_identifier=entry.failure_identifier,
+                            pr_url=pr_url,
+                            proof_runs=proof_runs,
+                            error=str(exc),
+                            source="reconciliation",
+                        )
+                        logger.warning(
+                            "Proof workflow dispatch failed for %s: %s",
+                            fingerprint[:12],
+                            exc,
+                        )
             summary.add_result(
                 report.job_name, entry.failure_identifier, "pr-created",
             )

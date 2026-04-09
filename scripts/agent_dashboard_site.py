@@ -101,7 +101,7 @@ def _chip(value: object) -> _Html:
         tone = "good"
     elif any(word in normalized for word in ("fail", "dead", "abandoned", "anomalous", "missing")):
         tone = "bad"
-    elif any(word in normalized for word in ("warning", "queued", "retry", "incomplete", "needs")):
+    elif any(word in normalized for word in ("warning", "queued", "retry", "incomplete", "needs", "pending", "running")):
         tone = "warn"
     return _safe_html(f'<span class="chip chip-{tone}">{_html(label)}</span>')
 
@@ -651,6 +651,12 @@ def _campaign_cards(flaky_tests: JsonObject) -> str:
             f"<li>{_html(hypothesis)}</li>"
             for hypothesis in hypotheses[:3]
         ) or "<li>none yet</li>"
+        proof_runs = (
+            f"{_format_number(campaign.get('proof_passed_runs', 0))}/"
+            f"{_format_number(campaign.get('proof_required_runs', 0))}"
+            if _int(campaign.get("proof_required_runs", 0))
+            else "n/a"
+        )
         cards.append(
             '<article class="detail-card" data-filter-item="'
             + _html_attr(
@@ -666,6 +672,7 @@ def _campaign_cards(flaky_tests: JsonObject) -> str:
             + _html(_str(campaign.get("failure_identifier")))
             + "</h3>"
             + str(_chip(campaign.get("status", "")))
+            + str(_chip(campaign.get("proof_status", "")))
             + '</div><p class="detail-meta">'
             + _html(
                 f"{_str(campaign.get('subsystem'), 'unknown subsystem')} · {_str(campaign.get('job_name'))} · {_str(campaign.get('branch'))}"
@@ -673,6 +680,7 @@ def _campaign_cards(flaky_tests: JsonObject) -> str:
             + '</p><dl class="detail-stats">'
             + f"<div><dt>Attempts</dt><dd>{_format_number(campaign.get('total_attempts', 0))}</dd></div>"
             + f"<div><dt>Full passes</dt><dd>{_format_number(campaign.get('consecutive_full_passes', 0))}</dd></div>"
+            + f"<div><dt>Proof runs</dt><dd>{_html(proof_runs)}</dd></div>"
             + f"<div><dt>Queued PR</dt><dd>{_html('yes' if isinstance(campaign.get('queued_pr_payload'), dict) else 'no')}</dd></div>"
             + "</dl><h4>Failed hypotheses</h4><ul>"
             + hypothesis_list
@@ -698,6 +706,7 @@ def _render_flaky(dashboard: JsonObject) -> str:
                     ("Attempts", flaky_tests.get("total_attempts", 0)),
                     ("Failed hypotheses", flaky_tests.get("failed_hypotheses", 0)),
                     ("Full passes", flaky_tests.get("consecutive_full_passes", 0)),
+                    ("Proof", _status_counts(_mapping(flaky_tests.get("proof_counts")))),
                     ("Subsystem mix", _status_counts(_mapping(flaky_tests.get("subsystem_counts")))),
                 ]
             ),

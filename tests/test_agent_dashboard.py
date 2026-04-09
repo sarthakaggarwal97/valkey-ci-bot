@@ -47,6 +47,9 @@ def _failure_store() -> dict:
                 "consecutive_full_passes": 1,
                 "failed_hypotheses": ["timeout theory"],
                 "queued_pr_payload": {"title": "Fix flaky cache flush"},
+                "proof_status": "pending",
+                "proof_required_runs": 100,
+                "proof_passed_runs": 0,
             },
             "campaign-done": {
                 "fingerprint": "campaign-done",
@@ -58,6 +61,9 @@ def _failure_store() -> dict:
                 "total_attempts": 1,
                 "consecutive_full_passes": 2,
                 "failed_hypotheses": [],
+                "proof_status": "passed",
+                "proof_required_runs": 100,
+                "proof_passed_runs": 100,
             },
         },
     }
@@ -264,6 +270,20 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
             },
             {
                 "event_id": "evt-3",
+                "event_type": "proof.dispatched",
+                "created_at": "2026-04-08T02:35:00+00:00",
+                "subject": "fp-queued",
+                "attributes": {"pr_url": "https://github.com/o/r/pull/1", "proof_runs": 100},
+            },
+            {
+                "event_id": "evt-4",
+                "event_type": "proof.passed",
+                "created_at": "2026-04-08T02:38:00+00:00",
+                "subject": "fp-queued",
+                "attributes": {"pr_url": "https://github.com/o/r/pull/1", "passed_runs": 100},
+            },
+            {
+                "event_id": "evt-5",
                 "event_type": "pr.merged",
                 "created_at": "2026-04-08T02:40:00+00:00",
                 "subject": "fp-queued",
@@ -292,10 +312,11 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
     assert dashboard["snapshot"]["tracked_review_prs"] == 1
     assert dashboard["snapshot"]["fuzzer_runs_analyzed"] == 2
     assert dashboard["snapshot"]["fuzzer_anomalous_runs"] == 1
-    assert dashboard["snapshot"]["agent_events"] == 9
+    assert dashboard["snapshot"]["agent_events"] == 11
     assert dashboard["ci_failures"]["history_failures"] == 2
     assert dashboard["ci_failures"]["daily_job_outcome_counts"] == {"pr-created": 1}
     assert dashboard["flaky_tests"]["failed_hypotheses"] == 1
+    assert dashboard["flaky_tests"]["proof_counts"] == {"pending": 1, "passed": 1}
     assert dashboard["flaky_tests"]["subsystem_counts"] == {"memory": 1}
     assert dashboard["pr_reviews"]["coverage_incomplete_cases"] == 1
     assert dashboard["acceptance"]["readiness"] == "pilot-ready"
@@ -309,6 +330,8 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
     assert dashboard["ai_reliability"]["prompt_safety_coverage"] == 0.9
     assert dashboard["fuzzer"]["raw_log_fallbacks"] == 1
     assert dashboard["agent_outcomes"]["prs_created"] == 1
+    assert dashboard["agent_outcomes"]["proof_dispatched"] == 1
+    assert dashboard["agent_outcomes"]["proof_passed"] == 1
     assert dashboard["agent_outcomes"]["prs_merged"] == 1
     assert dashboard["trends"]["failure_rate"]["totals"][-3:] == [1, 1, 1]
     assert dashboard["trends"]["failure_rate"]["rates"][-3:] == [1.0, 0.0, 1.0]
@@ -336,8 +359,10 @@ def test_render_markdown_includes_all_dashboards() -> None:
     assert "Schema toolChoice rejections" in markdown
     assert "Instrumentation gaps:" in markdown
     assert "Subsystems:" in markdown
+    assert "Proof:" in markdown
     assert "slot-coverage-drop" in markdown
     assert "possible-core-valkey-bug" in markdown
+    assert "pending" in markdown
 
 
 def test_render_html_is_polished_static_dashboard() -> None:
@@ -358,6 +383,7 @@ def test_render_html_is_polished_static_dashboard() -> None:
     assert "Review Health" in html
     assert 'class="sparkline"' in html
     assert "Flaky Test Lab" in html
+    assert "Proof" in html
     assert "Fuzzer Watch" in html
     assert "AI Reliability" in html
     assert "memory" in html

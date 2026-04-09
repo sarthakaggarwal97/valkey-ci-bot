@@ -172,6 +172,14 @@ class FlakyCampaignState:
     attempts: list[FlakyCampaignAttempt] = field(default_factory=list)
     failed_hypotheses: list[str] = field(default_factory=list)
     queued_pr_payload: dict | None = None
+    proof_status: str = ""
+    proof_summary: str = ""
+    proof_url: str = ""
+    proof_required_runs: int = 0
+    proof_passed_runs: int = 0
+    proof_attempted_runs: int = 0
+    proof_started_at: str = ""
+    proof_updated_at: str = ""
 
 
 @dataclass
@@ -460,6 +468,14 @@ def flaky_campaign_state_from_dict(data: dict) -> FlakyCampaignState:
         queued_pr_payload=data.get("queued_pr_payload")
         if isinstance(data.get("queued_pr_payload"), dict)
         else None,
+        proof_status=str(data.get("proof_status", "")),
+        proof_summary=str(data.get("proof_summary", "")),
+        proof_url=str(data.get("proof_url", "")),
+        proof_required_runs=int(data.get("proof_required_runs", 0)),
+        proof_passed_runs=int(data.get("proof_passed_runs", 0)),
+        proof_attempted_runs=int(data.get("proof_attempted_runs", 0)),
+        proof_started_at=str(data.get("proof_started_at", "")),
+        proof_updated_at=str(data.get("proof_updated_at", "")),
     )
 
 

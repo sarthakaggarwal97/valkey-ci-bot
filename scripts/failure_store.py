@@ -385,6 +385,41 @@ class FailureStore:
             entry.campaign_status = status
             entry.updated_at = campaign.updated_at
 
+    def update_proof_campaign(
+        self,
+        fingerprint: str,
+        *,
+        status: str,
+        summary: str = "",
+        proof_url: str = "",
+        required_runs: int = 0,
+        passed_runs: int = 0,
+        attempted_runs: int = 0,
+    ) -> None:
+        """Persist GitHub-native proof status for an existing flaky campaign."""
+        campaign = self._campaigns.get(fingerprint)
+        if campaign is None:
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        campaign.proof_status = status
+        if summary:
+            campaign.proof_summary = summary
+        if proof_url:
+            campaign.proof_url = proof_url
+        if required_runs > 0:
+            campaign.proof_required_runs = required_runs
+        campaign.proof_passed_runs = max(0, passed_runs)
+        campaign.proof_attempted_runs = max(0, attempted_runs)
+        if status in {"pending", "running"} and not campaign.proof_started_at:
+            campaign.proof_started_at = now
+        if status and not campaign.proof_started_at:
+            campaign.proof_started_at = now
+        campaign.proof_updated_at = now
+        campaign.updated_at = now
+        entry = self.get_entry(fingerprint)
+        if entry is not None:
+            entry.updated_at = now
+
     def record_queued_pr(
         self,
         fingerprint: str,
