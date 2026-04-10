@@ -32,6 +32,23 @@ def test_monitor_state_store_defaults_to_zero() -> None:
     assert store.get_last_seen_run_id("missing") == 0
 
 
+def test_monitor_state_store_supports_multi_event_keys() -> None:
+    store = MonitorStateStore()
+    store.mark_seen(
+        "valkey-io/valkey:ci.yml:pull_request,push",
+        last_seen_run_id=23456,
+        target_repo="valkey-io/valkey",
+        workflow_file="ci.yml",
+        event="pull_request,push",
+    )
+
+    payload = store.to_dict()
+    restored = MonitorStateStore()
+    restored.from_dict(payload)
+
+    assert restored.get_last_seen_run_id("valkey-io/valkey:ci.yml:pull_request,push") == 23456
+
+
 def test_monitor_state_store_load_raises_on_unexpected_error() -> None:
     repo = MagicMock()
     repo.get_contents.side_effect = GithubException(500, {"message": "boom"})

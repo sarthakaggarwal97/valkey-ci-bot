@@ -184,6 +184,11 @@ def test_ci_workflow_declares_checkout_permissions_and_current_action() -> None:
     assert setup_step["uses"] == "actions/setup-python@v6"
 
     acceptance_job = workflow["jobs"]["acceptance"]
+    test_run = next(
+        step
+        for step in workflow["jobs"]["test"]["steps"]
+        if step["name"] == "Run pytest with coverage"
+    )
     acceptance_run = next(
         step
         for step in acceptance_job["steps"]
@@ -194,6 +199,7 @@ def test_ci_workflow_declares_checkout_permissions_and_current_action() -> None:
         for step in acceptance_job["steps"]
         if step["name"] == "Upload acceptance report"
     )
+    assert "--cov-fail-under=74" in test_run["run"]
     assert "-m scripts.valkey_acceptance" in acceptance_run["run"]
     assert "--manifest examples/ci-agent-acceptance.yml" in acceptance_run["run"]
     assert acceptance_upload["uses"] == "actions/upload-artifact@v4"
@@ -243,6 +249,11 @@ def test_prove_daily_fix_workflow_dispatches_pr_proof_loop() -> None:
         for step in job["steps"]
         if step["name"] == "Run proof campaign"
     )
+    landing_token_step = next(
+        step
+        for step in job["steps"]
+        if step["name"] == "Select landing repository token"
+    )
     summary_step = next(
         step
         for step in job["steps"]
@@ -254,8 +265,11 @@ def test_prove_daily_fix_workflow_dispatches_pr_proof_loop() -> None:
         if step["name"] == "Upload proof result"
     )
     assert "-m scripts.prove_pr_fix" in run_step["run"]
+    assert "--landing-token" in run_step["run"]
+    assert "VALKEY_GITHUB_TOKEN" in landing_token_step["run"]
     assert "--failure-report-json" in run_step["run"]
     assert "proof-result.json" in summary_step["run"]
+    assert "Upstream landing" in summary_step["run"]
     assert upload_step["uses"] == "actions/upload-artifact@v4"
 
 

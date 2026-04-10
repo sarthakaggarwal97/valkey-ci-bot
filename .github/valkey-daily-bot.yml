@@ -25,7 +25,10 @@ validation:
   soak_passes: 100
 
 monitored_workflows:
+  - ci.yml
   - daily.yml
+  - external.yml
+  - weekly.yml
 
 project:
   language: "C"

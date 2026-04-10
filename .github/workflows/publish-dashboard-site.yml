@@ -6,7 +6,7 @@ on:
       - CI
       - CI Agent Capability Dashboard
       - CI Agent Replay Lab
-      - Monitor Valkey Daily Failures
+      - Monitor Valkey CI Failures
       - Monitor Valkey Fuzzer Runs
       - Prove Daily Fix
       - Review Pull Request

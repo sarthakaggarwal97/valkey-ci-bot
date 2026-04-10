@@ -22,7 +22,7 @@ from scripts.valkey_repo_context import infer_valkey_subsystem
 
 JsonObject = dict[str, Any]
 
-_TERMINAL_CAMPAIGN_STATUSES = {"abandoned", "merged", "pr-created", "validated"}
+_TERMINAL_CAMPAIGN_STATUSES = {"abandoned", "landed", "merged", "pr-created", "validated"}
 _SNAPSHOT_LABELS = {
     "failure_incidents": "Failure incidents",
     "queued_failures": "Queued failures",
@@ -374,9 +374,16 @@ def _build_ci_failure_metrics(
         )
 
     queued_failures = [
-        _str(fingerprint)
-        for fingerprint in _list(rate_state.get("queued_failures"))
+        _str(entry.get("fingerprint"))
+        for entry in entries
+        if _str(entry.get("status")) in {"queued", "queued-pr-retry"}
+        and isinstance(entry.get("queued_pr_payload"), dict)
     ]
+    if not queued_failures:
+        queued_failures = [
+            _str(fingerprint)
+            for fingerprint in _list(rate_state.get("queued_failures"))
+        ]
     return {
         "failure_incidents": len(entries),
         "entry_status_counts": _counter_dict(entry_status_counts),

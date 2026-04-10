@@ -21,7 +21,6 @@ from scripts.failure_detector import FailureDetector
 from scripts.failure_store import FailureStore
 from scripts.main import run_pipeline
 from scripts.monitor_state_store import MonitorStateStore
-from scripts.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ class MonitorArgs:
 
     target_repo: str
     workflow_file: str
-    event: str
+    events: tuple[str, ...]
     config_path: str
     target_token: str
     state_token: str
@@ -54,7 +53,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target-repo", required=True)
     parser.add_argument("--workflow-file", required=True)
-    parser.add_argument("--event", default="schedule")
+    parser.add_argument(
+        "--event",
+        action="append",
+        default=None,
+        help=(
+            "Workflow event(s) to inspect. Repeat the flag or pass a comma-"
+            "separated list. Defaults to 'schedule'."
+        ),
+    )
     parser.add_argument("--config", default=".github/ci-failure-bot.yml")
     parser.add_argument("--target-token", required=True)
     parser.add_argument("--state-token", required=True)
@@ -81,7 +88,7 @@ def parse_args(argv: list[str] | None = None) -> MonitorArgs:
     return MonitorArgs(
         target_repo=ns.target_repo,
         workflow_file=ns.workflow_file,
-        event=ns.event,
+        events=_normalize_events(ns.event),
         config_path=ns.config,
         target_token=ns.target_token,
         state_token=ns.state_token,
@@ -94,9 +101,32 @@ def parse_args(argv: list[str] | None = None) -> MonitorArgs:
     )
 
 
-def _build_monitor_key(target_repo: str, workflow_file: str, event: str) -> str:
+def _normalize_events(raw_events: list[str] | None) -> tuple[str, ...]:
+    """Normalize repeated or comma-separated event filters."""
+    events: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_events or ["schedule"]:
+        for chunk in str(raw).split(","):
+            event = chunk.strip()
+            if not event or event in seen:
+                continue
+            seen.add(event)
+            events.append(event)
+    return tuple(events or ["schedule"])
+
+
+def _events_metadata_value(events: tuple[str, ...]) -> str:
+    """Render a stable event filter value for state and summaries."""
+    return ",".join(events)
+
+
+def _build_monitor_key(
+    target_repo: str,
+    workflow_file: str,
+    events: tuple[str, ...],
+) -> str:
     """Build a stable monitor key for persisted state."""
-    return f"{target_repo}:{workflow_file}:{event}"
+    return f"{target_repo}:{workflow_file}:{_events_metadata_value(events)}"
 
 
 def _fetch_recent_completed_runs(args: MonitorArgs, last_seen_run_id: int) -> list[Any]:
@@ -104,16 +134,17 @@ def _fetch_recent_completed_runs(args: MonitorArgs, last_seen_run_id: int) -> li
     gh = Github(auth=Auth.Token(args.target_token))
     repo = gh.get_repo(args.target_repo)
     workflow = repo.get_workflow(args.workflow_file)
-    runs = workflow.get_runs(event=args.event, status="completed")
+    fresh_runs_by_id: dict[int, Any] = {}
+    for event_name in args.events:
+        runs = workflow.get_runs(event=event_name, status="completed")
+        for index, run in enumerate(runs):
+            if index >= args.max_runs:
+                break
+            if run.id <= last_seen_run_id:
+                break
+            fresh_runs_by_id.setdefault(int(run.id), run)
 
-    fresh_runs: list[Any] = []
-    for index, run in enumerate(runs):
-        if index >= args.max_runs:
-            break
-        if run.id <= last_seen_run_id:
-            break
-        fresh_runs.append(run)
-
+    fresh_runs = list(fresh_runs_by_id.values())
     fresh_runs.sort(key=lambda run: run.id)
     return fresh_runs
 
@@ -180,7 +211,7 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
     monitor_key = _build_monitor_key(
         args.target_repo,
         args.workflow_file,
-        args.event,
+        args.events,
     )
     state_store = MonitorStateStore(
         state_gh,
@@ -194,7 +225,8 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
     result: dict[str, object] = {
         "target_repo": args.target_repo,
         "workflow_file": args.workflow_file,
-        "event": args.event,
+        "event": args.events[0] if len(args.events) == 1 else "",
+        "events": list(args.events),
         "config_path": args.config_path,
         "dry_run": args.dry_run,
         "queue_only": args.queue_only,
@@ -221,6 +253,11 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                 run_result: dict[str, object] = {
                     "run_id": run.id,
                     "run_number": run.run_number,
+                    "event": (
+                        getattr(run, "event")
+                        if isinstance(getattr(run, "event", ""), str)
+                        else ""
+                    ),
                     "conclusion": run.conclusion or "",
                     "head_sha": run.head_sha,
                     "html_url": run.html_url,
@@ -316,13 +353,12 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                 new_last_seen = max(new_last_seen, run.id)
 
         result["new_last_seen_run_id"] = new_last_seen
-        queue_state = RateLimiter(
-            BotConfig(),
+        queue_state = FailureStore(
             state_github_client=state_gh,
             state_repo_full_name=args.state_repo,
         )
         queue_state.load()
-        queued_failures = queue_state.get_queued_failures()
+        queued_failures = queue_state.list_queued_failures()
         result["queued_failure_count"] = len(queued_failures)
         result["has_queued_failures"] = bool(queued_failures)
 
@@ -332,12 +368,12 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                 last_seen_run_id=new_last_seen,
                 target_repo=args.target_repo,
                 workflow_file=args.workflow_file,
-                event=args.event,
+                event=_events_metadata_value(args.events),
             )
             state_store.save()
             event_ledger.record(
                 "monitor.state_saved",
-                f"{args.target_repo}:{args.workflow_file}:{args.event}",
+                monitor_key,
                 last_seen_run_id=new_last_seen,
                 queued_failure_count=len(queued_failures),
             )

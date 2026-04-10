@@ -14,10 +14,8 @@ if __package__ in {None, ""}:
 
 from github import Auth, Github
 
-from scripts.config import BotConfig
 from scripts.failure_store import FailureStore
 from scripts.models import failure_report_from_dict
-from scripts.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -60,15 +58,6 @@ def run_preflight(
     state_gh = Github(auth=Auth.Token(state_github_token or github_token))
     state_repo = state_repo_name or repo_name
 
-    rate_limiter = RateLimiter(
-        BotConfig(),
-        gh,
-        repo_name,
-        state_github_client=state_gh,
-        state_repo_full_name=state_repo,
-    )
-    rate_limiter.load()
-
     failure_store = FailureStore(
         gh,
         repo_name,
@@ -77,7 +66,7 @@ def run_preflight(
     )
     failure_store.load()
 
-    queued = rate_limiter.get_queued_failures()
+    queued = failure_store.list_queued_failures()
     target_branches: set[str] = set()
     for fingerprint in queued:
         entry = failure_store.get_entry(fingerprint)

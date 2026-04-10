@@ -68,16 +68,16 @@ def test_dashboard_workflow_generates_static_artifacts() -> None:
 
 
 def test_monitor_workflows_publish_capability_dashboard() -> None:
-    daily = _load_yaml(REPO_ROOT / ".github/workflows/monitor-valkey-daily.yml")
+    monitor = _load_yaml(REPO_ROOT / ".github/workflows/monitor-valkey-daily.yml")
     fuzzer = _load_yaml(REPO_ROOT / ".github/workflows/monitor-valkey-fuzzer.yml")
 
-    daily_steps = daily["jobs"]["monitor"]["steps"]
+    monitor_steps = monitor["jobs"]["dashboard"]["steps"]
     fuzzer_steps = fuzzer["jobs"]["monitor"]["steps"]
-    daily_generate = next(
-        step for step in daily_steps if step["name"] == "Generate capability dashboard"
+    monitor_generate = next(
+        step for step in monitor_steps if step["name"] == "Generate capability dashboard"
     )
-    daily_site = next(
-        step for step in daily_steps if step["name"] == "Generate observability site"
+    monitor_site = next(
+        step for step in monitor_steps if step["name"] == "Generate observability site"
     )
     fuzzer_generate = next(
         step for step in fuzzer_steps if step["name"] == "Generate capability dashboard"
@@ -85,26 +85,26 @@ def test_monitor_workflows_publish_capability_dashboard() -> None:
     fuzzer_site = next(
         step for step in fuzzer_steps if step["name"] == "Generate observability site"
     )
-    daily_upload = next(
-        step for step in daily_steps if step["name"] == "Upload capability dashboard"
+    monitor_upload = next(
+        step for step in monitor_steps if step["name"] == "Upload capability dashboard"
     )
     fuzzer_upload = next(
         step for step in fuzzer_steps if step["name"] == "Upload capability dashboard"
     )
 
-    assert "--daily-result monitor-result.json" in daily_generate["run"]
+    assert "daily-monitor/monitor-result.json" in monitor_generate["run"]
     assert "--fuzzer-result fuzzer-monitor-result.json" in fuzzer_generate["run"]
-    assert "--event-log bot-data/agent-events.jsonl" in daily_generate["run"]
+    assert "--event-log bot-data/agent-events.jsonl" in monitor_generate["run"]
     assert "--event-log bot-data/agent-events.jsonl" in fuzzer_generate["run"]
-    assert "--output-html agent-dashboard.html" in daily_generate["run"]
+    assert "--output-html agent-dashboard.html" in monitor_generate["run"]
     assert "--output-html agent-dashboard.html" in fuzzer_generate["run"]
-    assert "-m scripts.agent_dashboard_site" in daily_site["run"]
+    assert "-m scripts.agent_dashboard_site" in monitor_site["run"]
     assert "-m scripts.agent_dashboard_site" in fuzzer_site["run"]
-    assert daily_upload["uses"] == "actions/upload-artifact@v4"
+    assert monitor_upload["uses"] == "actions/upload-artifact@v4"
     assert fuzzer_upload["uses"] == "actions/upload-artifact@v4"
-    assert "agent-dashboard.html" in daily_upload["with"]["path"]
+    assert "agent-dashboard.html" in monitor_upload["with"]["path"]
     assert "agent-dashboard.html" in fuzzer_upload["with"]["path"]
-    assert "dashboard-site" in daily_upload["with"]["path"]
+    assert "dashboard-site" in monitor_upload["with"]["path"]
     assert "dashboard-site" in fuzzer_upload["with"]["path"]
 
 
@@ -120,7 +120,7 @@ def test_publish_workflow_builds_pages_site() -> None:
         "CI",
         "CI Agent Capability Dashboard",
         "CI Agent Replay Lab",
-        "Monitor Valkey Daily Failures",
+        "Monitor Valkey CI Failures",
         "Monitor Valkey Fuzzer Runs",
         "Prove Daily Fix",
         "Review Pull Request",

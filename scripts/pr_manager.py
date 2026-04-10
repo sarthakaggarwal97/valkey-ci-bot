@@ -225,6 +225,64 @@ def _is_permission_denied_for_branch_creation(exc: Exception) -> bool:
     return exc.status in {403, 404} or "resource not accessible" in message
 
 
+def upsert_pull_request(
+    repo: "Repository",
+    *,
+    head: str,
+    base: str,
+    title: str,
+    body: str,
+    draft: bool = False,
+    labels: tuple[str, ...] = (),
+) -> "PullRequest":
+    """Return an existing open PR for ``head``/``base`` or create one."""
+    head_filter = head
+    if ":" not in head_filter:
+        owner = getattr(getattr(repo, "owner", None), "login", "")
+        if owner:
+            head_filter = f"{owner}:{head_filter}"
+    pulls = retry_github_call(
+        lambda: repo.get_pulls(state="open", base=base, head=head_filter),
+        retries=2,
+        description=f"list pull requests for {head_filter}->{base}",
+    )
+    pr = next(iter(pulls), None)
+    if pr is None:
+        pr = retry_github_call(
+            lambda: repo.create_pull(
+                title=title,
+                body=body,
+                head=head,
+                base=base,
+                draft=draft,
+            ),
+            retries=2,
+            description=f"create pull request for {head}->{base}",
+        )
+    else:
+        current_title = str(getattr(pr, "title", "") or "")
+        current_body = str(getattr(pr, "body", "") or "")
+        if current_title != title or current_body != body:
+            retry_github_call(
+                lambda: pr.edit(title=title, body=body),
+                retries=2,
+                description=f"update pull request #{pr.number}",
+            )
+    for label in labels:
+        try:
+            def _add_label() -> None:
+                pr.add_to_labels(label)
+
+            retry_github_call(
+                _add_label,
+                retries=2,
+                description=f"label pull request #{pr.number} with {label}",
+            )
+        except Exception as exc:
+            logger.warning("Could not apply %r label to PR #%s: %s", label, pr.number, exc)
+    return pr
+
+
 class PRManager:
     """Creates branches, commits patches, and opens pull requests."""
 
@@ -334,23 +392,16 @@ class PRManager:
                 title = f"[bot-fix] Fix failure in {failure_report.job_name}"
 
             # 4. Open PR
-            pr = self._find_existing_open_pr(repo, pr_head, target_branch)
-            if pr is None:
-                pr = repo.create_pull(
-                    title=title,
-                    body=pr_body,
-                    head=pr_head,
-                    base=target_branch,
-                    draft=draft,
-                )
+            pr = upsert_pull_request(
+                repo,
+                head=pr_head,
+                base=target_branch,
+                title=title,
+                body=pr_body,
+                draft=draft,
+                labels=("bot-fix",),
+            )
             logger.info("Opened PR #%d: %s", pr.number, pr.html_url)
-
-            # 5. Apply bot-fix label (Req 6.5)
-            try:
-                pr.add_to_labels("bot-fix")
-            except Exception as exc:
-                # Label may not exist yet — non-fatal
-                logger.warning("Could not apply 'bot-fix' label: %s", exc)
 
             # 6. Record in failure store (Req 6.6)
             pr_url = pr.html_url
@@ -445,23 +496,6 @@ class PRManager:
         if not owner:
             raise RuntimeError("fork repo owner could not be determined")
         return fork_repo, f"{owner}:{branch_name}"
-
-    def _find_existing_open_pr(
-        self,
-        repo: "Repository",
-        pr_head: str,
-        target_branch: str,
-    ) -> "PullRequest | None":
-        """Return an existing open PR for the same head/base pair if present."""
-        head_filter = pr_head
-        if ":" not in head_filter:
-            owner = getattr(getattr(repo, "owner", None), "login", "")
-            if owner:
-                head_filter = f"{owner}:{pr_head}"
-        pulls = repo.get_pulls(state="open", base=target_branch, head=head_filter)
-        for pr in pulls:
-            return pr
-        return None
 
     def post_summary_comment(
         self,
