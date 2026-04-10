@@ -264,7 +264,6 @@ def _layout(
     current_page: str,
     page_title: str,
     eyebrow: str,
-    intro: str,
     body: str,
 ) -> str:
     snapshot = _mapping(dashboard.get("snapshot"))
@@ -336,7 +335,6 @@ def _layout(
         <div>
           <span class="eyebrow">{_html(eyebrow)}</span>
           <h1 class="page-title">{_html(page_title)}</h1>
-          <p class="page-intro">{_html(intro)}</p>
         </div>
       </div>
       <section class="hero-metrics">{hero_stats}</section>
@@ -420,7 +418,7 @@ def _render_overview(dashboard: JsonObject) -> str:
         _page_card(
             "Daily heatmap",
             "daily.html",
-            "Track which failures keep returning, how often they hit, and whether daily stability is recovering.",
+            "Recurring failures and daily stability trends.",
             [
                 ("Runs seen", snapshot.get("daily_runs_seen", 0)),
                 ("Failures", snapshot.get("failure_incidents", 0)),
@@ -429,7 +427,7 @@ def _render_overview(dashboard: JsonObject) -> str:
         _page_card(
             "Flaky lab",
             "flaky.html",
-            "See active campaigns, hypotheses that already failed, and where Valkey subsystem pain is clustering.",
+            "Active campaigns, failed hypotheses, subsystem clustering.",
             [
                 ("Active", snapshot.get("active_flaky_campaigns", 0)),
                 ("Queued", snapshot.get("queued_failures", 0)),
@@ -438,7 +436,7 @@ def _render_overview(dashboard: JsonObject) -> str:
         _page_card(
             "Review quality",
             "review.html",
-            "Show maintainers what the reviewer posts, how often coverage degrades, and which PRs are being tracked.",
+            "PR review state, comments posted, coverage gaps.",
             [
                 ("Tracked PRs", snapshot.get("tracked_review_prs", 0)),
                 ("Comments", snapshot.get("review_comments", 0)),
@@ -447,7 +445,7 @@ def _render_overview(dashboard: JsonObject) -> str:
         _page_card(
             "Fuzzer watch",
             "fuzzer.html",
-            "Watch anomalies, issues, seeds, and root-cause categories without hunting through raw logs.",
+            "Anomalies, seeds, root-cause categories, issue actions.",
             [
                 ("Analyzed", snapshot.get("fuzzer_runs_analyzed", 0)),
                 ("Anomalous", snapshot.get("fuzzer_anomalous_runs", 0)),
@@ -456,7 +454,7 @@ def _render_overview(dashboard: JsonObject) -> str:
         _page_card(
             "AI reliability",
             "ai.html",
-            "Audit how the model is behaving: schema success rate, retries, tool-loop quality, and safety coverage.",
+            "Schema success rate, retries, token usage, safety coverage.",
             [
                 ("Tokens", snapshot.get("ai_token_usage", 0)),
                 ("Gaps", snapshot.get("instrumentation_gaps", 0)),
@@ -514,7 +512,6 @@ def _render_overview(dashboard: JsonObject) -> str:
         current_page="index.html",
         page_title="Overview",
         eyebrow="Control Room",
-        intro="A polished front door for the Valkey CI agent: one shared observability site, with each workflow family getting its own page.",
         body=body,
     )
 
@@ -631,7 +628,6 @@ def _render_daily(dashboard: JsonObject) -> str:
         current_page="daily.html",
         page_title="Daily",
         eyebrow="Failure Heatmap",
-        intro="A focused Daily view, built to feel closer to a maintainer dashboard than a workflow artifact.",
         body=body,
     )
 
@@ -720,7 +716,6 @@ def _render_flaky(dashboard: JsonObject) -> str:
         current_page="flaky.html",
         page_title="Flaky",
         eyebrow="Campaign Lab",
-        intro="A dedicated surface for flaky failures: subsystem clustering, prior failed ideas, validation streaks, and queued PR pressure.",
         body=body,
     )
 
@@ -772,7 +767,6 @@ def _render_review(dashboard: JsonObject) -> str:
         current_page="review.html",
         page_title="Review",
         eyebrow="PR Quality",
-        intro="What the reviewer is posting, how complete the coverage is, and which PRs are being tracked.",
         body=body,
     )
 
@@ -828,7 +822,6 @@ def _render_fuzzer(dashboard: JsonObject) -> str:
         current_page="fuzzer.html",
         page_title="Fuzzer",
         eyebrow="Anomaly Watch",
-        intro="A focused view for fuzzer maintainers: scenario IDs, seeds, issue actions, and the root-cause categories that keep recurring.",
         body=body,
     )
 
@@ -885,7 +878,6 @@ def _render_ai(dashboard: JsonObject) -> str:
         current_page="ai.html",
         page_title="AI",
         eyebrow="Reliability",
-        intro="The AI usage page: schema discipline, safety coverage, tool-loop quality, retries, and the gaps we still need to instrument.",
         body=body,
     )
 
@@ -987,7 +979,6 @@ def _render_ops(dashboard: JsonObject) -> str:
         current_page="ops.html",
         page_title="Ops",
         eyebrow="Ledger and State",
-        intro="The operational backbone: incident queue, outcome ledger, and the monitor state that keeps the bot from losing context.",
         body=body,
     )
 
@@ -1107,10 +1098,6 @@ a:hover { text-decoration: underline; }
 .page-title {
   font-size: 20px; font-weight: 700;
   color: var(--heading); line-height: 1.3;
-}
-.page-intro {
-  margin-top: 4px; font-size: 13px;
-  color: var(--text-secondary); max-width: 72ch;
 }
 
 /* ── Metric tiles ── */
