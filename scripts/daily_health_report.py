@@ -10,6 +10,7 @@ Can be used standalone or imported by the agent dashboard.
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import logging
 import re
@@ -75,26 +76,39 @@ def fetch_daily_runs(
         retries=3,
         description=f"get workflow {workflow_file}",
     )
-    runs = retry_github_call(
-        lambda: workflow.get_runs(
-            branch=branch,
-            status="completed",
-        ),
+
+    # Fetch both completed and in-progress runs so recent days are never blank.
+    completed_runs = retry_github_call(
+        lambda: workflow.get_runs(branch=branch, status="completed"),
         retries=3,
-        description=f"get workflow runs for {workflow_file}",
+        description=f"get completed runs for {workflow_file}",
+    )
+    in_progress_runs = retry_github_call(
+        lambda: workflow.get_runs(branch=branch, status="in_progress"),
+        retries=3,
+        description=f"get in-progress runs for {workflow_file}",
     )
 
     collected: list[JsonObject] = []
     seen_dates: set[str] = set()
     now = datetime.now(timezone.utc)
 
-    for run in runs:
+    # Process in-progress runs first so today's run is never missing.
+    # Then completed runs fill in the rest.
+    all_runs = itertools.chain(in_progress_runs, completed_runs)
+
+    max_api_pages = days * 3  # safety cap to avoid infinite iteration
+    seen_runs = 0
+    for run in all_runs:
+        seen_runs += 1
+        if seen_runs > max_api_pages:
+            break
         run_date = run.created_at.strftime("%Y-%m-%d")
         age_days = (now - run.created_at.replace(tzinfo=timezone.utc)).days
         if age_days > days:
-            break
+            continue
 
-        # One run per date (the latest)
+        # One run per date (prefer in-progress for today, completed otherwise)
         if run_date in seen_dates:
             continue
         seen_dates.add(run_date)
@@ -140,7 +154,7 @@ def fetch_daily_runs(
         collected.append({
             "run_id": run.id,
             "date": run_date,
-            "status": run.conclusion or "unknown",
+            "status": run.conclusion or run.status or "unknown",
             "commit_sha": commit_sha,
             "full_sha": run.head_sha or "",
             "run_url": run.html_url,
@@ -615,8 +629,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--workflow",
-        default="daily.yml",
-        help="Workflow file name (default: daily.yml)",
+        default=["daily.yml"],
+        nargs="+",
+        help="Workflow file name(s) (default: daily.yml). Pass multiple to combine.",
     )
     parser.add_argument(
         "--branch",
@@ -665,16 +680,21 @@ def main(argv: list[str] | None = None) -> int:
     gh = Github(auth=Auth.Token(token))
 
     logger.info(
-        "Fetching %d days of %s runs for %s/%s...",
-        args.days, args.workflow, args.repo, args.branch,
+        "Fetching %d days of runs for %s (workflows: %s, branch: %s)...",
+        args.days, args.repo, ", ".join(args.workflow), args.branch,
     )
-    runs = fetch_daily_runs(gh, args.repo, args.workflow, args.branch, args.days)
-    logger.info("Collected %d runs.", len(runs))
+    all_runs: list[dict[str, Any]] = []
+    for wf in args.workflow:
+        wf_runs = fetch_daily_runs(gh, args.repo, wf, args.branch, args.days)
+        for run in wf_runs:
+            run["workflow"] = wf
+        logger.info("Collected %d runs from %s.", len(wf_runs), wf)
+        all_runs.extend(wf_runs)
 
     data = build_report_data(
-        runs,
+        all_runs,
         repo_full_name=args.repo,
-        workflow_file=args.workflow,
+        workflow_file=", ".join(args.workflow),
         branch=args.branch,
     )
 

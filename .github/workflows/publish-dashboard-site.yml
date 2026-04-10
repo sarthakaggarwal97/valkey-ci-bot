@@ -74,7 +74,7 @@ jobs:
         run: |
           python3 -m scripts.daily_health_report \
             --repo "valkey-io/valkey" \
-            --workflow "daily.yml" \
+            --workflow "daily.yml" "weekly.yml" \
             --branch "unstable" \
             --days 14 \
             --token "${GITHUB_TOKEN}" \
