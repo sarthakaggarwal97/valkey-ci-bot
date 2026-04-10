@@ -200,24 +200,6 @@ def _page_card(title: str, href: str, body: str, stats: list[tuple[str, object]]
     )
 
 
-def _callout(title: str, body: str, *, tone: str = "blue") -> str:
-    return (
-        f'<div class="callout callout-{_html_attr(tone)}">'
-        f"<strong>{_html(title)}</strong>"
-        f"<p>{_html(body)}</p>"
-        "</div>"
-    )
-
-
-def _meta_pill(label: str, value: object, *, tone: str = "blue") -> _Html:
-    return _safe_html(
-        f'<span class="meta-pill meta-pill-{_html_attr(tone)}">'
-        f"<strong>{_html(label)}</strong>"
-        f"<span>{_html_cell(value)}</span>"
-        "</span>"
-    )
-
-
 def _sparkline_svg(
     values: list[float],
     *,
@@ -319,18 +301,6 @@ def _layout(
             ),
         ]
     )
-    hero_meta = "".join(
-        [
-            str(_meta_pill("Repo", repo_label, tone="blue")),
-            str(_meta_pill("Generated", generated_at, tone="amber")),
-            str(_meta_pill("Readiness", _chip(readiness), tone="green")),
-        ]
-    )
-    posture_note = (
-        f"{_format_number(snapshot.get('failure_incidents', 0))} incidents tracked, "
-        f"{_format_number(snapshot.get('active_flaky_campaigns', 0))} flaky campaigns active, "
-        f"and {_format_number(snapshot.get('tracked_review_prs', 0))} PRs under review."
-    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -413,7 +383,7 @@ def _render_trend_watch(dashboard: JsonObject) -> str:
                 [_float(value) for value in _list(failure_rate.get("rates"))],
                 color="#38bdf8",
             ),
-            f"{_format_number(_int(failure_rate.get('window_days')))} tracked day slots",
+            f"{_format_number(_int(trends.get('window_days')))} tracked day slots",
         ),
         (
             "Review health",
@@ -523,12 +493,8 @@ def _render_overview(dashboard: JsonObject) -> str:
     body = (
         '<section class="page-grid page-grid-wide">'
         + _panel(
-            "Why this site exists",
-            _callout(
-                "Made for maintainers, not just workflows",
-                "Each page focuses on one Valkey workflow surface so you can answer a real operational question quickly, instead of decoding one giant report.",
-            )
-            + '<div class="card-grid">'
+            "Pages",
+            '<div class="card-grid">'
             + "".join(page_cards)
             + "</div>",
             wide=True,
@@ -546,11 +512,6 @@ def _render_overview(dashboard: JsonObject) -> str:
                     ("Terminal rejections", ai_reliability.get("terminal_validation_rejections", 0)),
                 ]
             )
-            + _callout(
-                "Adoption story",
-                "Replay proof, Daily stability, PR review quality, fuzzer anomalies, and AI reliability now live in one place with a shared visual language.",
-                tone="green",
-            ),
         )
         + _panel(
             "Latest agent outcomes",
@@ -655,10 +616,6 @@ def _render_daily(dashboard: JsonObject) -> str:
                     ("Queued failures", ci_failures.get("queued_failures", 0)),
                     ("Recent incidents", ci_failures.get("failure_incidents", 0)),
                 ]
-            )
-            + _callout(
-                "Daily-focused view",
-                "This page is intentionally shaped like the maintainer question: what keeps failing in Daily, how often, and is it getting better or worse?",
             ),
             wide=True,
         )
@@ -771,20 +728,6 @@ def _render_flaky(dashboard: JsonObject) -> str:
             wide=True,
         )
         + _panel("Campaign board", _campaign_cards(flaky_tests), wide=True)
-        + _panel(
-            "Status mix",
-            _summary_rows(
-                [
-                    ("Status counts", _status_counts(_mapping(flaky_tests.get("status_counts")))),
-                    ("Subsystems", _status_counts(_mapping(flaky_tests.get("subsystem_counts")))),
-                ]
-            )
-            + _callout(
-                "What makes this page different",
-                "It keeps the experiment history visible, so the bot looks less like it is thrashing and more like it is learning.",
-                tone="green",
-            ),
-        )
         + "</section>"
     )
     return _layout(
@@ -850,10 +793,6 @@ def _render_review(dashboard: JsonObject) -> str:
                     ("Findings", acceptance.get("finding_count", 0)),
                     ("Replay followups", _status_counts(_mapping(acceptance.get("model_followup_counts")))),
                 ]
-            )
-            + _callout(
-                "Defect-oriented by design",
-                "This page keeps the reviewer honest: high-confidence findings, replay proof, and visible followups when coverage degrades.",
             ),
             wide=True,
         )
@@ -933,11 +872,6 @@ def _render_acceptance(dashboard: JsonObject) -> str:
                     ("Backport cases", acceptance.get("backport_replay_cases", 0)),
                     ("Payloads seen", acceptance.get("payloads_seen", 0)),
                 ]
-            )
-            + _callout(
-                "Proof over vibes",
-                "This page is the adoption anchor: it makes the bot prove itself against real Valkey-shaped cases instead of relying on a nice demo alone.",
-                tone="green",
             ),
             wide=True,
         )
@@ -1477,20 +1411,6 @@ a:hover { text-decoration: underline; }
   font-size: 12px; color: var(--text-secondary); margin-bottom: 3px;
 }
 
-/* ── Callout ── */
-.callout {
-  background: var(--bg-surface); border: 1px solid var(--border);
-  border-left: 3px solid var(--blue);
-  border-radius: 6px; padding: 12px 14px; margin-bottom: 12px;
-}
-.callout-green { border-left-color: var(--green); }
-.callout-amber { border-left-color: var(--amber); }
-.callout strong {
-  display: block; font-size: 13px; font-weight: 600;
-  color: var(--heading); margin-bottom: 4px;
-}
-.callout p { margin: 0; font-size: 12px; color: var(--text-secondary); }
-
 /* ── Trend / sparklines ── */
 .trend-grid {
   display: grid;
@@ -1605,25 +1525,6 @@ tr:last-child td { border-bottom: 0; }
   box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
 }
 .search input::placeholder { color: var(--text-muted); }
-
-/* ── Meta pills ── */
-.meta-pill {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 3px 10px; background: var(--bg-surface);
-  border: 1px solid var(--border); border-radius: 20px; font-size: 11px;
-}
-.meta-pill strong {
-  font-size: 10px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
-.meta-pill > span {
-  color: var(--heading);
-  font-family: "JetBrains Mono", monospace; font-size: 11px;
-}
-.meta-pill-blue, .meta-pill-amber, .meta-pill-green {
-  background: var(--bg-surface);
-}
 
 /* ── Empty states ── */
 .empty {
