@@ -4,13 +4,13 @@
   "token_window_start": "2026-04-09T09:55:01.676592+00:00",
   "queued_failures": [],
   "ai_metrics": {
-    "bedrock.invoke_schema.calls": 18,
+    "bedrock.invoke_schema.calls": 19,
     "bedrock.invoke_schema.success": 17,
-    "bedrock.retrieval.calls": 62,
-    "bedrock.retrieval.snippets": 133,
-    "bedrock.retrieval.hits": 31,
-    "bedrock.prompt_safety_guard.checked": 35,
-    "bedrock.prompt_safety_guard.present": 35,
+    "bedrock.retrieval.calls": 64,
+    "bedrock.retrieval.snippets": 138,
+    "bedrock.retrieval.hits": 32,
+    "bedrock.prompt_safety_guard.checked": 37,
+    "bedrock.prompt_safety_guard.present": 37,
     "bedrock.tool_loop.calls": 18,
     "bedrock.tool_loop.turns": 254,
     "bedrock.tool_loop.success": 18,
@@ -18,8 +18,8 @@
     "reviewer.verifier.kept": 3,
     "bedrock.tool_loop.terminal_validation_rejections": 8,
     "bedrock.retrieval.cache_hits": 16,
-    "bedrock.errors.token_budget_exceeded": 2,
-    "bedrock.invoke.calls": 1,
+    "bedrock.errors.token_budget_exceeded": 4,
+    "bedrock.invoke.calls": 2,
     "bedrock.tool_loop.forced_submissions": 5
   }
 }
