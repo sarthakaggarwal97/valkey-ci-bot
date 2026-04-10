@@ -1,0 +1,190 @@
+name: Demo Valkey CI Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_dashboard:
+        description: "Refresh the capability dashboard and site."
+        required: false
+        default: true
+        type: boolean
+      run_replay:
+        description: "Run the replay lab against the acceptance manifest."
+        required: false
+        default: true
+        type: boolean
+      replay_manifest:
+        description: "Replay manifest path."
+        required: false
+        default: "examples/valkey-acceptance.yml"
+        type: string
+      replay_run_models:
+        description: "Run Bedrock model passes in the replay lab."
+        required: false
+        default: false
+        type: boolean
+      run_daily:
+        description: "Run the Daily monitor as part of the demo bundle."
+        required: false
+        default: true
+        type: boolean
+      daily_dry_run:
+        description: "Keep the Daily monitor in dry-run mode."
+        required: false
+        default: true
+        type: boolean
+      daily_max_runs:
+        description: "Maximum recent Daily runs to inspect."
+        required: false
+        default: "3"
+        type: string
+      run_fuzzer:
+        description: "Run the Fuzzer monitor as part of the demo bundle."
+        required: false
+        default: true
+        type: boolean
+      fuzzer_dry_run:
+        description: "Keep the Fuzzer monitor in dry-run mode."
+        required: false
+        default: true
+        type: boolean
+      fuzzer_max_runs:
+        description: "Maximum recent fuzzer runs to inspect."
+        required: false
+        default: "1"
+        type: string
+      review_target_repo:
+        description: "Optional owner/repo for a live external review demo."
+        required: false
+        default: ""
+        type: string
+      review_pr_number:
+        description: "Optional PR number for the live external review demo."
+        required: false
+        default: ""
+        type: string
+      review_config_path:
+        description: "Reviewer config path for the external review demo."
+        required: false
+        default: ".github/pr-review-bot.yml"
+        type: string
+      publish_site:
+        description: "Force a fresh Pages publish after the child workflows finish."
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  actions: write
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    concurrency:
+      group: demo-valkey-ci-agent
+      cancel-in-progress: false
+    steps:
+      - name: Check out agent repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        shell: bash
+        run: pip install -r requirements.txt
+
+      - name: Check out agent data snapshots
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          ref: bot-data
+          path: bot-data
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Build demo bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          owner="${repo%%/*}"
+          repository="${repo#*/}"
+          pages_url="https://${owner}.github.io/${repository}/"
+          args=(
+            -m scripts.demo_bundle
+            --repo "${repo}"
+            --token "${{ github.token }}"
+            --ref "${{ github.ref_name }}"
+            --pages-url "${pages_url}"
+            --failure-store "bot-data/failure-store.json"
+            --replay-manifest "${{ github.event.inputs.replay_manifest || 'examples/valkey-acceptance.yml' }}"
+            --review-target-repo "${{ github.event.inputs.review_target_repo }}"
+            --review-config-path "${{ github.event.inputs.review_config_path || '.github/pr-review-bot.yml' }}"
+            --output-markdown demo-report.md
+            --output-json demo-report.json
+            --output-html demo-report.html
+            --site-dir demo-site
+          )
+
+          if [[ "${{ github.event.inputs.run_dashboard || 'true' }}" == "true" ]]; then
+            args+=(--run-dashboard)
+          fi
+          if [[ "${{ github.event.inputs.run_replay || 'true' }}" == "true" ]]; then
+            args+=(--run-replay)
+          fi
+          if [[ "${{ github.event.inputs.replay_run_models || 'false' }}" == "true" ]]; then
+            args+=(--replay-run-models)
+          fi
+          if [[ "${{ github.event.inputs.run_daily || 'true' }}" == "true" ]]; then
+            args+=(--run-daily)
+          fi
+          if [[ "${{ github.event.inputs.daily_dry_run || 'true' }}" == "true" ]]; then
+            args+=(--daily-dry-run)
+          fi
+          if [[ "${{ github.event.inputs.run_fuzzer || 'true' }}" == "true" ]]; then
+            args+=(--run-fuzzer)
+          fi
+          if [[ "${{ github.event.inputs.fuzzer_dry_run || 'true' }}" == "true" ]]; then
+            args+=(--fuzzer-dry-run)
+          fi
+          if [[ "${{ github.event.inputs.publish_site || 'true' }}" == "true" ]]; then
+            args+=(--publish-site)
+          fi
+          if [[ -n "${{ github.event.inputs.review_pr_number }}" ]]; then
+            args+=(--review-pr-number "${{ github.event.inputs.review_pr_number }}")
+          fi
+          if [[ -n "${{ github.event.inputs.daily_max_runs }}" ]]; then
+            args+=(--daily-max-runs "${{ github.event.inputs.daily_max_runs }}")
+          fi
+          if [[ -n "${{ github.event.inputs.fuzzer_max_runs }}" ]]; then
+            args+=(--fuzzer-max-runs "${{ github.event.inputs.fuzzer_max_runs }}")
+          fi
+
+          python3 "${args[@]}"
+
+      - name: Publish demo report to summary
+        shell: bash
+        run: cat demo-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload demo bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: valkey-ci-demo-bundle-${{ github.run_id }}
+          path: |
+            demo-report.md
+            demo-report.json
+            demo-report.html
+            demo-site
+          retention-days: 30

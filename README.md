@@ -96,6 +96,40 @@ python3 -m scripts.agent_dashboard_site \
   --site-dir dashboard-site
 ```
 
+## Demo Bundle
+
+Workflow at `.github/workflows/demo-valkey-agent.yml`.
+
+This is the "one click, no tab spelunking" demo path for the repo. It
+dispatches the real child workflows you actually want to show, waits for them,
+and produces a polished packet with the important links already stitched
+together:
+
+- the public GitHub Pages control room
+- a fresh replay lab run
+- a fresh dashboard refresh
+- optional Daily and Fuzzer monitor probes
+- an optional live external PR review on a fork
+- the latest proofed Daily-fix example pulled from `bot-data` when available
+
+Outputs:
+
+- `demo-report.md` — a short presenter-friendly walkthrough
+- `demo-report.json` — structured link and status payload
+- `demo-report.html` — a polished single-page demo packet
+- `demo-site/index.html` — the same packet packaged as a shareable mini site
+
+The workflow is safe by default: Daily and Fuzzer runs stay in dry-run mode,
+and live PR review is skipped unless you pass both `review_target_repo` and
+`review_pr_number`.
+
+Typical usage:
+
+1. Run `Demo Valkey CI Agent`
+2. Leave the defaults on for dashboard, replay, Daily dry-run, and Fuzzer dry-run
+3. Optionally add a fork PR for `review_target_repo` plus `review_pr_number`
+4. Open the uploaded `valkey-ci-demo-bundle-*` artifact and start with `demo-site/index.html`
+
 ## Valkey-Native Context
 
 For Valkey repositories, the agent now loads live upstream context instead of

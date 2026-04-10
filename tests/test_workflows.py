@@ -257,3 +257,36 @@ def test_prove_daily_fix_workflow_dispatches_pr_proof_loop() -> None:
     assert "--failure-report-json" in run_step["run"]
     assert "proof-result.json" in summary_step["run"]
     assert upload_step["uses"] == "actions/upload-artifact@v4"
+
+
+def test_demo_workflow_builds_one_click_packet() -> None:
+    workflow = _load_yaml(REPO_ROOT / ".github/workflows/demo-valkey-agent.yml")
+    on_block = _get_on_block(workflow)
+    inputs = on_block["workflow_dispatch"]["inputs"]
+
+    assert workflow["permissions"] == {"actions": "write", "contents": "read"}
+    assert workflow["env"]["FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"] is True
+    assert inputs["run_dashboard"]["default"] is True
+    assert inputs["run_replay"]["default"] is True
+    assert inputs["run_daily"]["default"] is True
+    assert inputs["daily_dry_run"]["default"] is True
+    assert inputs["run_fuzzer"]["default"] is True
+    assert inputs["fuzzer_dry_run"]["default"] is True
+    assert inputs["publish_site"]["default"] is True
+    assert inputs["review_target_repo"]["default"] == ""
+    assert inputs["review_pr_number"]["default"] == ""
+
+    job = workflow["jobs"]["demo"]
+    assert job["timeout-minutes"] == 180
+    assert job["concurrency"]["group"] == "demo-valkey-ci-agent"
+    build_step = next(
+        step for step in job["steps"] if step["name"] == "Build demo bundle"
+    )
+    upload_step = next(
+        step for step in job["steps"] if step["name"] == "Upload demo bundle artifact"
+    )
+    assert "-m scripts.demo_bundle" in build_step["run"]
+    assert "--failure-store \"bot-data/failure-store.json\"" in build_step["run"]
+    assert "--site-dir demo-site" in build_step["run"]
+    assert upload_step["uses"] == "actions/upload-artifact@v4"
+    assert "demo-site" in upload_step["with"]["path"]
