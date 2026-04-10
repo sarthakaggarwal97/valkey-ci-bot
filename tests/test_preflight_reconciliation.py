@@ -64,21 +64,17 @@ def test_resolve_target_branch_prefers_payload_value() -> None:
 
 
 @patch("scripts.preflight_reconciliation.FailureStore")
-@patch("scripts.preflight_reconciliation.RateLimiter")
 @patch("scripts.preflight_reconciliation.Github")
 def test_run_preflight_collects_target_branches(
     mock_github_cls,
-    mock_rate_limiter_cls,
     mock_failure_store_cls,
 ) -> None:
     repo = MagicMock()
     mock_github_cls.return_value.get_repo.return_value = repo
 
-    rate_limiter = mock_rate_limiter_cls.return_value
-    rate_limiter.get_queued_failures.return_value = ["fp1", "fp2"]
-
     report = _make_report(target_branch="unstable")
     store = mock_failure_store_cls.return_value
+    store.list_queued_failures.return_value = ["fp1", "fp2"]
     store.get_entry.side_effect = [
         MagicMock(
             queued_pr_payload={
@@ -112,11 +108,9 @@ def test_run_preflight_collects_target_branches(
 
 
 @patch("scripts.preflight_reconciliation.FailureStore")
-@patch("scripts.preflight_reconciliation.RateLimiter")
 @patch("scripts.preflight_reconciliation.Github")
 def test_run_preflight_reports_missing_branches(
     mock_github_cls,
-    mock_rate_limiter_cls,
     mock_failure_store_cls,
 ) -> None:
     repo = MagicMock()
@@ -129,10 +123,8 @@ def test_run_preflight_reports_missing_branches(
     repo.get_git_ref.side_effect = get_git_ref
     mock_github_cls.return_value.get_repo.return_value = repo
 
-    rate_limiter = mock_rate_limiter_cls.return_value
-    rate_limiter.get_queued_failures.return_value = ["fp1", "fp2"]
-
     store = mock_failure_store_cls.return_value
+    store.list_queued_failures.return_value = ["fp1", "fp2"]
     store.get_entry.side_effect = [
         MagicMock(
             queued_pr_payload={

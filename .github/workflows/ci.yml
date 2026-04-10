@@ -31,7 +31,7 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Run pytest with coverage
-        run: pytest --cov=scripts --cov-report=term-missing --cov-report=xml -v
+        run: pytest --cov=scripts --cov-report=term-missing --cov-report=xml --cov-fail-under=74 -v
 
       - name: Run mypy type checking
         run: mypy scripts/ --ignore-missing-imports

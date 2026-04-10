@@ -180,6 +180,11 @@ class FlakyCampaignState:
     proof_attempted_runs: int = 0
     proof_started_at: str = ""
     proof_updated_at: str = ""
+    landing_status: str = ""
+    landing_summary: str = ""
+    landing_url: str = ""
+    landing_repo: str = ""
+    landing_updated_at: str = ""
 
 
 @dataclass
@@ -476,6 +481,11 @@ def flaky_campaign_state_from_dict(data: dict) -> FlakyCampaignState:
         proof_attempted_runs=int(data.get("proof_attempted_runs", 0)),
         proof_started_at=str(data.get("proof_started_at", "")),
         proof_updated_at=str(data.get("proof_updated_at", "")),
+        landing_status=str(data.get("landing_status", "")),
+        landing_summary=str(data.get("landing_summary", "")),
+        landing_url=str(data.get("landing_url", "")),
+        landing_repo=str(data.get("landing_repo", "")),
+        landing_updated_at=str(data.get("landing_updated_at", "")),
     )
 
 

@@ -18,6 +18,7 @@ from scripts.pr_manager import (
     _build_pr_body,
     _compute_fingerprint,
     _parse_unified_diff,
+    upsert_pull_request,
 )
 
 
@@ -624,6 +625,47 @@ class TestLabelApplication:
         # Should succeed despite label failure
         url = mgr.create_pr(SAMPLE_PATCH, report, root_cause, "unstable")
         assert url == pr_mock.html_url
+
+
+class TestUpsertPullRequest:
+    def test_creates_pull_request_when_none_exists(self):
+        repo = _make_mock_repo()
+        repo.get_pulls.return_value = []
+
+        pr = upsert_pull_request(
+            repo,
+            head="owner:bot/fix/fp1",
+            base="unstable",
+            title="Title",
+            body="Body",
+            draft=False,
+            labels=("bot-fix",),
+        )
+
+        assert pr is repo.create_pull.return_value
+        repo.create_pull.assert_called_once()
+        repo.create_pull.return_value.add_to_labels.assert_called_once_with("bot-fix")
+
+    def test_reuses_and_updates_existing_pull_request(self):
+        repo = _make_mock_repo()
+        existing_pr = MagicMock()
+        existing_pr.number = 42
+        existing_pr.title = "Old title"
+        existing_pr.body = "Old body"
+        repo.get_pulls.return_value = [existing_pr]
+
+        pr = upsert_pull_request(
+            repo,
+            head="owner:bot/fix/fp1",
+            base="unstable",
+            title="New title",
+            body="New body",
+            draft=False,
+        )
+
+        assert pr is existing_pr
+        repo.create_pull.assert_not_called()
+        existing_pr.edit.assert_called_once_with(title="New title", body="New body")
 
 
 class TestPostSummaryComment:

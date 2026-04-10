@@ -1,17 +1,28 @@
-name: Monitor Valkey Daily Failures
+name: Monitor Valkey CI Failures
 
 on:
   schedule:
     - cron: "23 * * * *"
   workflow_dispatch:
     inputs:
+      workflow_scope:
+        description: "Workflow surface to inspect."
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - ci
+          - daily
+          - external
+          - weekly
       dry_run:
-        description: "List candidate Daily runs without processing them or advancing state."
+        description: "List candidate runs without processing them or advancing state."
         required: false
         default: true
         type: boolean
       max_runs:
-        description: "Maximum recent Daily runs to inspect."
+        description: "Maximum recent runs per monitored event to inspect."
         required: false
         default: "14"
         type: string
@@ -31,16 +42,41 @@ env:
 
 jobs:
   monitor:
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.workflow_scope == 'all' || github.event.inputs.workflow_scope == matrix.scope }}
+    name: Monitor ${{ matrix.label }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scope: ci
+            label: CI
+            workflow_file: ci.yml
+            monitor_events: "pull_request,push"
+          - scope: daily
+            label: Daily
+            workflow_file: daily.yml
+            monitor_events: "schedule,pull_request"
+          - scope: external
+            label: External
+            workflow_file: external.yml
+            monitor_events: "schedule,pull_request,push"
+          - scope: weekly
+            label: Weekly
+            workflow_file: weekly.yml
+            monitor_events: "schedule"
     concurrency:
-      group: monitor-valkey-daily-scan
+      group: monitor-valkey-ci-${{ matrix.scope }}
       cancel-in-progress: false
     env:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       MONITOR_DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || github.event.inputs.dry_run || 'true' }}
       MONITOR_MAX_RUNS: ${{ github.event.inputs.max_runs || '14' }}
       MONITOR_VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
+      MONITOR_SCOPE: ${{ matrix.scope }}
+      MONITOR_WORKFLOW_FILE: ${{ matrix.workflow_file }}
+      MONITOR_EVENTS: ${{ matrix.monitor_events }}
       CI_BOT_COMMIT_NAME: ${{ vars.CI_BOT_COMMIT_NAME || '' }}
       CI_BOT_COMMIT_EMAIL: ${{ vars.CI_BOT_COMMIT_EMAIL || '' }}
       CI_BOT_REQUIRE_DCO_SIGNOFF: ${{ vars.CI_BOT_REQUIRE_DCO_SIGNOFF || 'false' }}
@@ -99,10 +135,10 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: valkey-daily-monitor-${{ github.run_id }}
+          role-session-name: valkey-ci-monitor-${{ matrix.scope }}-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Monitor and queue Valkey Daily failures
+      - name: Monitor and queue Valkey workflow failures
         id: run-monitor
         shell: bash
         run: |
@@ -110,7 +146,7 @@ jobs:
           args=(
             -m scripts.monitor_workflow_runs
             --target-repo "valkey-io/valkey"
-            --workflow-file "daily.yml"
+            --workflow-file "${MONITOR_WORKFLOW_FILE}"
             --config ".github/valkey-daily-bot.yml"
             --target-token "${{ steps.target-token.outputs.token }}"
             --state-token "${{ github.token }}"
@@ -119,6 +155,11 @@ jobs:
             --aws-region "${AWS_REGION}"
             --queue-only
           )
+
+          IFS=',' read -ra monitor_events <<< "${MONITOR_EVENTS}"
+          for event_name in "${monitor_events[@]}"; do
+            args+=(--event "${event_name}")
+          done
 
           if [[ "${MONITOR_DRY_RUN}" == "true" ]]; then
             args+=(--dry-run)
@@ -148,19 +189,19 @@ jobs:
           queued_failure_count = 0
 
           if result_path.exists():
-            result = json.loads(result_path.read_text(encoding="utf-8"))
-            monitor_dry_run = bool(result.get("dry_run", monitor_dry_run))
-            has_queued_failures = bool(result.get("has_queued_failures", False))
-            queued_failure_count = int(result.get("queued_failure_count", 0))
+              result = json.loads(result_path.read_text(encoding="utf-8"))
+              monitor_dry_run = bool(result.get("dry_run", monitor_dry_run))
+              has_queued_failures = bool(result.get("has_queued_failures", False))
+              queued_failure_count = int(result.get("queued_failure_count", 0))
 
           with output_path.open("a", encoding="utf-8") as fh:
-            fh.write(
-              f"monitor_dry_run={'true' if monitor_dry_run else 'false'}\n"
-            )
-            fh.write(
-              f"has_queued_failures={'true' if has_queued_failures else 'false'}\n"
-            )
-            fh.write(f"queued_failure_count={queued_failure_count}\n")
+              fh.write(
+                  f"monitor_dry_run={'true' if monitor_dry_run else 'false'}\n"
+              )
+              fh.write(
+                  f"has_queued_failures={'true' if has_queued_failures else 'false'}\n"
+              )
+              fh.write(f"queued_failure_count={queued_failure_count}\n")
           PY
 
       - name: Select fork repository token
@@ -201,17 +242,48 @@ jobs:
             --state-repo "${{ github.repository }}" \
             --draft-prs
 
-      - name: Upload daily monitor result
+      - name: Upload monitor result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: valkey-daily-monitor-result-${{ github.run_id }}
+          name: valkey-${{ matrix.scope }}-monitor-result-${{ github.run_id }}
           path: monitor-result.json
           if-no-files-found: warn
           retention-days: 14
 
+  dashboard:
+    if: always()
+    name: Build dashboard
+    needs: monitor
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: monitor-valkey-ci-dashboard
+      cancel-in-progress: false
+    steps:
+      - name: Check out agent repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download Daily monitor result
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: valkey-daily-monitor-result-${{ github.run_id }}
+          path: daily-monitor
+
       - name: Check out agent data snapshots
-        if: always()
         continue-on-error: true
         uses: actions/checkout@v6
         with:
@@ -221,10 +293,9 @@ jobs:
           fetch-depth: 1
 
       - name: Generate daily CI health report
-        if: always()
         continue-on-error: true
         env:
-          GITHUB_TOKEN: ${{ steps.target-token.outputs.token || github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           python3 -m scripts.daily_health_report \
@@ -237,23 +308,32 @@ jobs:
             --output-json daily-health-report.json
 
       - name: Generate capability dashboard
-        if: always()
         shell: bash
         run: |
-          python3 -m scripts.agent_dashboard \
-            --failure-store bot-data/failure-store.json \
-            --rate-state bot-data/rate-state.json \
-            --monitor-state bot-data/monitor-state.json \
-            --review-state bot-data/review-state.json \
-            --event-log bot-data/agent-events.jsonl \
-            --daily-result monitor-result.json \
-            --daily-health daily-health-report.json \
-            --output-markdown agent-dashboard.md \
-            --output-json agent-dashboard.json \
+          set -euo pipefail
+          args=(
+            -m scripts.agent_dashboard
+            --failure-store bot-data/failure-store.json
+            --rate-state bot-data/rate-state.json
+            --monitor-state bot-data/monitor-state.json
+            --review-state bot-data/review-state.json
+            --event-log bot-data/agent-events.jsonl
+            --output-markdown agent-dashboard.md
+            --output-json agent-dashboard.json
             --output-html agent-dashboard.html
+          )
+
+          if [[ -f "daily-monitor/monitor-result.json" ]]; then
+            args+=(--daily-result "daily-monitor/monitor-result.json")
+          fi
+
+          if [[ -f "daily-health-report.json" ]]; then
+            args+=(--daily-health "daily-health-report.json")
+          fi
+
+          python3 "${args[@]}"
 
       - name: Generate observability site
-        if: always()
         shell: bash
         run: |
           python3 -m scripts.agent_dashboard_site \
@@ -261,19 +341,18 @@ jobs:
             --site-dir dashboard-site
 
       - name: Publish capability dashboard to summary
-        if: always()
         shell: bash
         run: cat agent-dashboard.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload capability dashboard
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: valkey-daily-agent-dashboard-${{ github.run_id }}
+          name: valkey-ci-agent-dashboard-${{ github.run_id }}
           path: |
             agent-dashboard.md
             agent-dashboard.json
             agent-dashboard.html
+            daily-monitor
             daily-health-report.html
             daily-health-report.json
             dashboard-site

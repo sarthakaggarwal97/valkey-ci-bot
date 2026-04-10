@@ -518,8 +518,9 @@ class TestRunReconciliation:
         """When no failures are queued, returns 0."""
         mock_load_config.return_value = BotConfig()
         rate_limiter = MagicMock()
-        rate_limiter.get_queued_failures.return_value = []
-        mock_store.return_value.reconcile_pr_states.return_value = []
+        store_instance = mock_store.return_value
+        store_instance.reconcile_pr_states.return_value = []
+        store_instance.list_queued_failures.return_value = []
 
         count = run_reconciliation(
             "owner/repo", "config.yml", "token",
@@ -527,8 +528,8 @@ class TestRunReconciliation:
         )
 
         assert count == 0
-        mock_store.return_value.reconcile_pr_states.assert_called_once()
-        mock_store.return_value.save.assert_called_once()
+        store_instance.reconcile_pr_states.assert_called_once()
+        store_instance.save.assert_called_once()
 
     @patch("scripts.main._load_runtime_config")
     @patch("scripts.main.FailureStore")
@@ -541,11 +542,11 @@ class TestRunReconciliation:
         mock_load_config.return_value = BotConfig()
 
         rate_limiter = MagicMock()
-        rate_limiter.get_queued_failures.return_value = ["fp1", "fp2", "fp3"]
         # Allow first 2, then block
         rate_limiter.can_create_pr.side_effect = [True, True, False]
 
         store_instance = MagicMock()
+        store_instance.list_queued_failures.return_value = ["fp1", "fp2", "fp3"]
         entry = MagicMock(failure_identifier="TestSuite.TestCase")
         entry.queued_pr_payload = self._queued_payload()
         store_instance.get_entry.return_value = entry
@@ -563,7 +564,7 @@ class TestRunReconciliation:
         )
 
         assert count == 2
-        assert rate_limiter.dequeue_failure.call_count == 2
+        assert store_instance.clear_queued_pr.call_count == 2
         assert pr_manager.create_pr.call_count == 2
         assert rate_limiter.record_pr_created.call_count == 2
 
@@ -586,10 +587,10 @@ class TestRunReconciliation:
         )
 
         rate_limiter = MagicMock()
-        rate_limiter.get_queued_failures.return_value = ["fp1"]
         rate_limiter.can_create_pr.return_value = True
 
         store_instance = MagicMock()
+        store_instance.list_queued_failures.return_value = ["fp1"]
         entry = MagicMock(failure_identifier="TestSuite.TestCase")
         entry.queued_pr_payload = self._queued_payload(report=report, root_cause=root_cause)
         store_instance.get_entry.return_value = entry
@@ -629,10 +630,10 @@ class TestRunReconciliation:
         mock_load_config.return_value = BotConfig()
 
         rate_limiter = MagicMock()
-        rate_limiter.get_queued_failures.return_value = ["fp1"]
         rate_limiter.can_create_pr.return_value = True
 
         store_instance = MagicMock()
+        store_instance.list_queued_failures.return_value = ["fp1"]
         store_instance.get_entry.return_value = MagicMock(
             failure_identifier="test",
             queued_pr_payload=self._queued_payload(),
@@ -646,7 +647,7 @@ class TestRunReconciliation:
         )
 
         assert count == 1
-        rate_limiter.dequeue_failure.assert_called_once_with("fp1")
+        store_instance.clear_queued_pr.assert_called_once_with("fp1")
 
     @patch("scripts.main._load_runtime_config")
     @patch("scripts.main.FailureStore")
@@ -659,10 +660,10 @@ class TestRunReconciliation:
         mock_load_config.return_value = BotConfig()
 
         rate_limiter = MagicMock()
-        rate_limiter.get_queued_failures.return_value = ["fp1"]
         rate_limiter.can_create_pr.return_value = True
 
         store_instance = MagicMock()
+        store_instance.list_queued_failures.return_value = ["fp1"]
         store_instance.get_entry.return_value = MagicMock(
             failure_identifier="test",
             queued_pr_payload=None,
@@ -676,7 +677,7 @@ class TestRunReconciliation:
         )
 
         assert count == 1
-        rate_limiter.dequeue_failure.assert_called_once_with("fp1")
+        store_instance.clear_queued_pr.assert_called_once_with("fp1")
         mock_pr_mgr.return_value.create_pr.assert_not_called()
 
     @patch("scripts.main._load_runtime_config")
@@ -690,10 +691,10 @@ class TestRunReconciliation:
         mock_load_config.return_value = BotConfig()
 
         rate_limiter = MagicMock()
-        rate_limiter.get_queued_failures.return_value = ["fp1"]
         rate_limiter.can_create_pr.return_value = True
 
         store_instance = MagicMock()
+        store_instance.list_queued_failures.return_value = ["fp1"]
         entry = MagicMock(failure_identifier="TestSuite.TestCase")
         entry.queued_pr_payload = self._queued_payload()
         store_instance.get_entry.return_value = entry
@@ -711,7 +712,7 @@ class TestRunReconciliation:
         )
 
         assert count == 0
-        rate_limiter.dequeue_failure.assert_not_called()
+        store_instance.clear_queued_pr.assert_not_called()
         store_instance.clear_queued_pr.assert_not_called()
         pr_manager.create_pr.assert_called_once()
 
@@ -1059,7 +1060,6 @@ class TestRunPipeline:
 
         assert len(reports.reports) == 1
         failure_store.record_queued_pr.assert_called_once()
-        rate_limiter.queue_failure.assert_called_once_with("fp1")
         mock_pr_manager.return_value.create_pr.assert_not_called()
 
     @patch("scripts.main._build_workflow_run")
@@ -1159,7 +1159,6 @@ class TestRunPipeline:
         )
 
         failure_store.record_queued_pr.assert_called_once()
-        rate_limiter.queue_failure.assert_called_once_with("fp1")
         mock_pr_manager.return_value.create_pr.assert_not_called()
         mock_approval_summary.return_value.add_candidate.assert_called_once()
 
@@ -1305,7 +1304,6 @@ class TestRunPipeline:
         )
 
         failure_store.record_queued_pr.assert_called_once()
-        rate_limiter.queue_failure.assert_called_once_with("fp1")
         mock_pr_manager.return_value.create_pr.assert_not_called()
 
     @patch("scripts.main._build_workflow_run")

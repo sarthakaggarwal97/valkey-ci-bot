@@ -308,22 +308,25 @@ Required GitHub configuration in the consumer repo:
 
 Workflow at `.github/workflows/monitor-valkey-daily.yml`.
 
-Runs from this repo, watches new scheduled `Daily` runs in `valkey-io/valkey`, analyzes new failures, records per-job pass/fail history, validates candidate fixes, and then, in the same workflow job, reconciles any queue-worthy fixes into draft PRs in `sarthakaggarwal97/valkey` using the local config at `.github/valkey-daily-bot.yml`.
+Runs from this repo, watches the live Valkey CI surface in `valkey-io/valkey`, analyzes new failures, records per-job pass/fail history, validates candidate fixes, and reconciles any queue-worthy fixes into draft PRs in `sarthakaggarwal97/valkey` using the local config at `.github/valkey-daily-bot.yml`. When a draft fix survives proof, the proof job now opens or updates the real upstream PR in `valkey-io/valkey` automatically.
 
 The flow is intentionally simple:
 
-- monitor new `Daily` runs
+- monitor new `CI`, `Daily`, `External`, and `Weekly` runs
 - queue only the fixes that validate and pass the normal safety heuristics
 - verify the target branches exist in your fork
 - open draft PRs automatically in your fork
+- proof successful draft fixes and hand them off upstream automatically
 
 Runner-specific duplicates are collapsed at a canonical incident level, so the same underlying test failure across multiple runners produces one queued fix / one draft PR while still preserving the per-runner observations in bot state.
 
-The internal queue is still used for persistence and rate limiting, but there is no separate approval job or manual gate in the workflow anymore.
+The monitor now understands multiple workflow events per surface, so the same workflow file can be scanned across `pull_request`, `push`, and `schedule` traffic without needing separate wrappers or separate persisted watermarks.
+
+The validated-fix queue now lives in `FailureStore`, so reconciliation, preflight checks, and dashboarding all read the same authoritative queue state. Rate limiting still lives in `RateLimiter`, but it no longer owns queue membership.
 
 Approval context is written into the workflow summary so you can review the root-cause rationale, files the agent wants to change, observed failure streak, and last known good / first bad commits when history exists.
 
-Manual dispatch defaults to `dry_run=true` so you can inspect candidate runs without advancing state or queueing fixes. Dispatch with `dry_run=false` for a real automated pass; any queued fixes will be reconciled automatically into draft PRs in your fork.
+Manual dispatch defaults to `dry_run=true` so you can inspect candidate runs without advancing state or queueing fixes. Dispatch with `dry_run=false` for a real automated pass; any queued fixes will be reconciled automatically into draft PRs in your fork. You can also narrow a manual run to one workflow surface with the `workflow_scope` input.
 
 Required GitHub configuration:
 

@@ -44,6 +44,8 @@ jobs:
       cancel-in-progress: false
     env:
       VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+      VALKEY_GITHUB_APP_ID: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
+      VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
       VALKEY_FORK_GITHUB_TOKEN: ${{ secrets.VALKEY_FORK_GITHUB_TOKEN }}
     steps:
       - name: Checkout agent repository
@@ -75,6 +77,32 @@ jobs:
             exit 1
           fi
 
+      - name: Create upstream GitHub App token
+        id: app-token
+        if: ${{ env.VALKEY_GITHUB_TOKEN == '' && env.VALKEY_GITHUB_APP_ID != '' && env.VALKEY_GITHUB_APP_PRIVATE_KEY != '' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ env.VALKEY_GITHUB_APP_ID }}
+          private-key: ${{ env.VALKEY_GITHUB_APP_PRIVATE_KEY }}
+          owner: valkey-io
+          repositories: valkey
+          permission-actions: read
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Select landing repository token
+        id: landing-token
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
+            echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ steps.app-token.outputs.token }}" ]]; then
+            echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "token=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run proof campaign
         shell: bash
         env:
@@ -87,6 +115,7 @@ jobs:
             --failure-report-json "${FAILURE_REPORT_JSON}" \
             --config "${{ inputs.config_path }}" \
             --token "${{ steps.target-token.outputs.token }}" \
+            --landing-token "${{ steps.landing-token.outputs.token }}" \
             --state-token "${{ github.token }}" \
             --state-repo "${{ github.repository }}" \
             --repeat-count "${{ inputs.repeat_count }}" \
@@ -116,6 +145,10 @@ jobs:
               lines.append(f"- Workflow run: {result['proof_run_url']}")
           if result.get("ready_for_review"):
               lines.append("- PR was marked ready for review automatically.")
+          if result.get("landing_status") == "passed":
+              lines.append(f"- Upstream landing: {result.get('landing_url', '')}")
+          elif result.get("landing_status") == "failed":
+              lines.append(f"- Upstream landing failed: {result.get('landing_summary', '')}")
           if result.get("comment_url"):
               lines.append(f"- Proof comment: {result['comment_url']}")
           summary = Path(os.environ["GITHUB_STEP_SUMMARY"])

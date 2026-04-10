@@ -507,14 +507,14 @@ def _record_or_skip_failure(
                 first.failure_identifier, incident_key[:12],
             )
             return None
-        if existing and existing.status == "queued":
+        if existing and failure_store.has_queued_pr_payload(incident_key):
             failure_store.record_incident_observation(
                 report,
                 incident_key=incident_key,
                 max_entries=max_history_entries,
             )
             logger.info(
-                "Skipping already queued failure: identifier=%s, incident=%s",
+                "Skipping already queued/deferred failure: identifier=%s, incident=%s",
                 first.failure_identifier, incident_key[:12],
             )
             return None
@@ -556,14 +556,14 @@ def _record_or_skip_failure(
                 report.job_name, incident_key[:12],
             )
             return None
-        if existing and existing.status == "queued":
+        if existing and failure_store.has_queued_pr_payload(incident_key):
             failure_store.record_incident_observation(
                 report,
                 incident_key=incident_key,
                 max_entries=max_history_entries,
             )
             logger.info(
-                "Skipping already queued unparseable failure: job=%s, incident=%s",
+                "Skipping already queued/deferred unparseable failure: job=%s, incident=%s",
                 report.job_name, incident_key[:12],
             )
             return None
@@ -1316,7 +1316,6 @@ def run_pipeline(
                         validated_diff,
                         report.target_branch or "unstable",
                     )
-                    rate_limiter.queue_failure(fingerprint)
                     logger.info(
                         "Queued validated fix for job %s pending manual approval, "
                         "fingerprint=%s.",
@@ -1401,7 +1400,6 @@ def run_pipeline(
                         validated_diff,
                         report.target_branch or "unstable",
                     )
-                    rate_limiter.queue_failure(fingerprint)
                     logger.warning(
                         "Skipping PR creation for job %s: "
                         "daily-rate-limit, fingerprint=%s queued.",
@@ -1534,7 +1532,7 @@ def run_reconciliation(
             source="reconciliation",
         )
 
-    queued = rate_limiter.get_queued_failures()
+    queued = failure_store.list_queued_failures()
     if not queued:
         failure_store.save()
         event_ledger.save()
@@ -1561,10 +1559,9 @@ def run_reconciliation(
         entry = failure_store.get_entry(fingerprint)
         if entry is None:
             logger.warning(
-                "Queued fingerprint %s not found in failure store, dequeuing.",
+                "Queued fingerprint %s not found in failure store.",
                 fingerprint[:12],
             )
-            rate_limiter.dequeue_failure(fingerprint)
             summary.add_result("", fingerprint[:12], "dequeued-not-found")
             processed += 1
             continue
@@ -1572,21 +1569,20 @@ def run_reconciliation(
         # Skip if already has an open PR
         if failure_store.has_open_pr(fingerprint):
             logger.info(
-                "Queued fingerprint %s already has an open PR, dequeuing.",
+                "Queued fingerprint %s already has an open PR, clearing queue payload.",
                 fingerprint[:12],
             )
-            rate_limiter.dequeue_failure(fingerprint)
+            failure_store.clear_queued_pr(fingerprint)
             summary.add_result("", entry.failure_identifier, "dequeued-has-open-pr")
             processed += 1
             continue
 
         if not entry.queued_pr_payload:
             logger.warning(
-                "Queued fingerprint %s has no persisted PR payload, dequeuing.",
+                "Queued fingerprint %s has no persisted PR payload.",
                 fingerprint[:12],
             )
             failure_store.clear_queued_pr(fingerprint)
-            rate_limiter.dequeue_failure(fingerprint)
             summary.add_result("", entry.failure_identifier, "dequeued-missing-payload")
             processed += 1
             continue
@@ -1615,7 +1611,6 @@ def run_reconciliation(
             rate_limiter.record_pr_created()
             failure_store.mark_flaky_campaign_status(fingerprint, "pr-created")
             failure_store.clear_queued_pr(fingerprint)
-            rate_limiter.dequeue_failure(fingerprint)
             event_ledger.record(
                 "pr.created",
                 fingerprint,
@@ -1697,7 +1692,6 @@ def run_reconciliation(
             )
             if attempts >= max(1, config.queued_pr_max_attempts):
                 failure_store.mark_queued_pr_dead_letter(fingerprint, str(exc))
-                rate_limiter.dequeue_failure(fingerprint)
                 event_ledger.record(
                     "fix.dead_lettered",
                     fingerprint,

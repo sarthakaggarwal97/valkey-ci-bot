@@ -153,6 +153,33 @@ def test_record_queued_pr_persists_payload() -> None:
     assert entry.incident_key == "fp1"
 
 
+def test_list_queued_failures_uses_failure_store_as_queue_authority() -> None:
+    store = FailureStore()
+    report = FailureReport(
+        workflow_name="CI",
+        job_name="job",
+        matrix_params={},
+        commit_sha="abc123",
+        failure_source="trusted",
+        repo_full_name="owner/repo",
+        workflow_run_id=7,
+        target_branch="unstable",
+    )
+    root_cause = RootCauseReport(
+        description="root cause",
+        files_to_change=["src/foo.c"],
+        confidence="high",
+        rationale="because",
+        is_flaky=False,
+        flakiness_indicators=None,
+    )
+    store.record_queued_pr("fp2", report, root_cause, "diff-2", "unstable")
+    store.record_queued_pr("fp1", report, root_cause, "diff-1", "unstable")
+    store.mark_queued_pr_dead_letter("fp2", "debug")
+
+    assert store.list_queued_failures() == ["fp1"]
+
+
 def test_record_queued_pr_failure_keeps_payload_for_retry() -> None:
     store = FailureStore()
     report = FailureReport(
@@ -265,6 +292,51 @@ def test_update_proof_campaign_persists_proof_status() -> None:
     assert payload["proof_passed_runs"] == 100
     assert payload["proof_attempted_runs"] == 100
     assert "GitHub-native validation runs" in payload["proof_summary"]
+
+
+def test_update_landing_campaign_persists_upstream_handoff() -> None:
+    store = FailureStore()
+    store.entries["fp1"] = FailureStoreEntry(
+        fingerprint="fp1",
+        failure_identifier="test-cache-flush",
+        test_name="test-cache-flush",
+        incident_key="fp1",
+        error_signature="boom",
+        file_path="tests/unit/cache.tcl",
+        pr_url="https://github.com/owner/fork/pull/42",
+        status="open",
+        created_at="2026-04-08T00:00:00+00:00",
+        updated_at="2026-04-08T00:00:00+00:00",
+        campaign_status="pr-created",
+    )
+    store.campaigns["fp1"] = FlakyCampaignState(
+        fingerprint="fp1",
+        history_key="hist-1",
+        failure_identifier="test-cache-flush",
+        workflow_file="daily.yml",
+        job_name="daily / linux",
+        matrix_params={},
+        repo_full_name="owner/fork",
+        branch="unstable",
+        status="pr-created",
+        created_at="2026-04-08T00:00:00+00:00",
+        updated_at="2026-04-08T00:00:00+00:00",
+    )
+
+    store.update_landing_campaign(
+        "fp1",
+        status="passed",
+        summary="Opened upstream PR automatically.",
+        landing_url="https://github.com/valkey-io/valkey/pull/4242",
+        landing_repo="valkey-io/valkey",
+    )
+
+    payload = store.to_dict()["campaigns"]["fp1"]
+    assert payload["status"] == "landed"
+    assert payload["landing_status"] == "passed"
+    assert payload["landing_summary"] == "Opened upstream PR automatically."
+    assert payload["landing_url"] == "https://github.com/valkey-io/valkey/pull/4242"
+    assert payload["landing_repo"] == "valkey-io/valkey"
 
 
 def test_reconcile_pr_states_returns_maintainer_outcome_transitions() -> None:

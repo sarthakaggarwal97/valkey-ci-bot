@@ -7,7 +7,8 @@ import json
 import logging
 from datetime import datetime, timezone
 from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+from urllib import parse as urllib_parse
 
 from github.GithubException import GithubException
 
@@ -34,6 +35,7 @@ logger = logging.getLogger(__name__)
 _STORE_BRANCH = "bot-data"
 _STORE_FILE = "failure-store.json"
 _MAX_ERROR_SIGNATURE_CHARS = 10_000
+_ACTIVE_QUEUE_STATUSES = {"queued", "queued-pr-retry"}
 
 
 @dataclass
@@ -54,6 +56,20 @@ def _is_missing_store_error(exc: Exception) -> bool:
     if isinstance(exc, GithubException):
         return exc.status == 404
     return isinstance(exc, FileNotFoundError)
+
+
+def _parse_pr_url(pr_url: str) -> tuple[str, int] | None:
+    """Extract ``owner/repo`` and PR number from a GitHub pull request URL."""
+    parsed = urllib_parse.urlparse(pr_url)
+    if parsed.netloc not in {"github.com", "www.github.com"}:
+        return None
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) < 4 or parts[2] != "pull":
+        return None
+    try:
+        return f"{parts[0]}/{parts[1]}", int(parts[3])
+    except ValueError:
+        return None
 
 
 class FailureStore:
@@ -158,6 +174,24 @@ class FailureStore:
             if self._entry_incident_key(candidate) == fingerprint:
                 return candidate
         return None
+
+    def has_queued_pr_payload(self, fingerprint: str) -> bool:
+        """Return whether an incident already has a persisted validated fix."""
+        entry = self.get_entry(fingerprint)
+        return bool(entry and isinstance(entry.queued_pr_payload, dict))
+
+    def list_queued_failures(self) -> list[str]:
+        """Return actively queued incidents in FIFO-ish order."""
+        queued_entries = [
+            entry
+            for entry in self._entries.values()
+            if entry.status in _ACTIVE_QUEUE_STATUSES
+            and isinstance(entry.queued_pr_payload, dict)
+        ]
+        queued_entries.sort(
+            key=lambda entry: (entry.updated_at, entry.created_at, entry.fingerprint)
+        )
+        return [entry.fingerprint for entry in queued_entries]
 
     def record(
         self,
@@ -418,6 +452,38 @@ class FailureStore:
         campaign.updated_at = now
         entry = self.get_entry(fingerprint)
         if entry is not None:
+            entry.updated_at = now
+
+    def update_landing_campaign(
+        self,
+        fingerprint: str,
+        *,
+        status: str,
+        summary: str = "",
+        landing_url: str = "",
+        landing_repo: str = "",
+    ) -> None:
+        """Persist upstream landing status for an existing flaky campaign."""
+        campaign = self._campaigns.get(fingerprint)
+        if campaign is None:
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        campaign.landing_status = status
+        if summary:
+            campaign.landing_summary = summary
+        if landing_url:
+            campaign.landing_url = landing_url
+        if landing_repo:
+            campaign.landing_repo = landing_repo
+        campaign.landing_updated_at = now
+        campaign.updated_at = now
+        if status == "passed":
+            campaign.status = "landed"
+        elif status == "failed":
+            campaign.status = "landing-failed"
+        entry = self.get_entry(fingerprint)
+        if entry is not None:
+            entry.campaign_status = campaign.status
             entry.updated_at = now
 
     def record_queued_pr(
@@ -768,7 +834,7 @@ class FailureStore:
             logger.warning("Cannot reconcile: no GitHub client or repo configured.")
             return []
 
-        repo = self._gh.get_repo(self._repo_name)
+        repo_cache: dict[str, Any] = {}
         transitions: list[PRStateTransition] = []
         for fingerprint, entry in self._entries.items():
             if entry.status not in ("open", "processing"):
@@ -776,26 +842,37 @@ class FailureStore:
             if not entry.pr_url:
                 continue
             try:
-                # Extract PR number from URL
-                pr_number = int(entry.pr_url.rstrip("/").split("/")[-1])
+                parsed_pr = _parse_pr_url(entry.pr_url)
+                if parsed_pr is None:
+                    logger.warning(
+                        "Failed to parse PR URL for %s: %s",
+                        fingerprint[:12],
+                        entry.pr_url,
+                    )
+                    continue
+                repo_name, pr_number = parsed_pr
+                repo = repo_cache.get(repo_name)
+                if repo is None:
+                    repo = self._gh.get_repo(repo_name)
+                    repo_cache[repo_name] = repo
                 pr = repo.get_pull(pr_number)
                 previous_status = entry.status
+                campaign = self._campaigns.get(fingerprint)
+                landing_complete = bool(
+                    campaign is not None and campaign.landing_status == "passed"
+                )
                 if pr.merged:
                     entry.status = "merged"
-                    if entry.campaign_status:
-                        entry.campaign_status = "pr-created"
-                    campaign = self._campaigns.get(fingerprint)
                     if campaign is not None:
-                        campaign.status = "pr-created"
+                        campaign.status = "merged" if not landing_complete else "landed"
                         campaign.updated_at = datetime.now(timezone.utc).isoformat()
+                        entry.campaign_status = campaign.status
                 elif pr.state == "closed":
                     entry.status = "abandoned"
-                    if entry.campaign_status:
-                        entry.campaign_status = "abandoned"
-                    campaign = self._campaigns.get(fingerprint)
                     if campaign is not None:
-                        campaign.status = "abandoned"
+                        campaign.status = "abandoned" if not landing_complete else "landed"
                         campaign.updated_at = datetime.now(timezone.utc).isoformat()
+                        entry.campaign_status = campaign.status
                 entry.updated_at = datetime.now(timezone.utc).isoformat()
                 if entry.status != previous_status:
                     transitions.append(

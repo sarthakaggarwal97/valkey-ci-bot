@@ -16,11 +16,14 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from github import Auth, Github
+from github.GithubException import GithubException
 
 from scripts.config import load_config
 from scripts.event_ledger import EventLedger
 from scripts.failure_store import FailureStore
+from scripts.github_client import retry_github_call
 from scripts.models import FailureReport, ValidationResult, failure_report_from_dict
+from scripts.pr_manager import upsert_pull_request
 from scripts.validation_runner import ValidationRunner
 
 logger = logging.getLogger(__name__)
@@ -68,6 +71,10 @@ def _render_comment(
     proof_run_url: str,
     marked_ready: bool,
     was_draft: bool,
+    landing_status: str = "",
+    landing_url: str = "",
+    landing_repo: str = "",
+    landing_summary: str = "",
 ) -> str:
     """Render a stable PR comment for the proof campaign."""
     status = "passed" if result.passed else "failed"
@@ -89,6 +96,13 @@ def _render_comment(
         lines.append("- PR state: already ready for review.")
     else:
         lines.append("- PR state: left in draft for human follow-up.")
+    if landing_status == "passed" and landing_url:
+        landing_target = landing_repo or "upstream"
+        lines.append(f"- Landing: upstream PR opened in `{landing_target}` at [link]({landing_url}).")
+    elif landing_status == "skipped":
+        lines.append("- Landing: not needed because the proof PR already targets the canonical repo.")
+    elif landing_status == "failed":
+        lines.append(f"- Landing: failed. {landing_summary or 'Manual follow-up is required.'}")
     output = result.output.strip()
     if output:
         lines.extend(
@@ -169,6 +183,94 @@ def _prepare_report(raw_report: FailureReport, pr) -> FailureReport:
     )
 
 
+def _build_landing_body(
+    *,
+    existing_body: str,
+    fork_pr_url: str,
+    proof_run_url: str,
+    required_runs: int,
+    passed_runs: int,
+) -> str:
+    """Append proof and staging context to the upstream landing PR body."""
+    body = (existing_body or "").rstrip()
+    lines = [body] if body else []
+    lines.extend(
+        [
+            "",
+            "## Automated Landing",
+            "",
+            f"- Proofed staging PR: [link]({fork_pr_url})",
+            f"- Consecutive proof runs: **{passed_runs}/{required_runs}**",
+        ]
+    )
+    if proof_run_url:
+        lines.append(f"- Proof workflow: [run]({proof_run_url})")
+    return "\n".join(lines).strip()
+
+
+def _remove_bot_fix_label(pr) -> bool:
+    """Best-effort cleanup so the fork proof PR stops counting toward bot caps."""
+    try:
+        pr.remove_from_labels("bot-fix")
+        return True
+    except GithubException as exc:
+        if exc.status == 404:
+            return False
+        raise
+
+
+def _land_upstream_pr(
+    *,
+    landing_gh: Github,
+    landing_token: str,
+    landing_repo_name: str,
+    fork_pr,
+    proof_run_url: str,
+    repeat_count: int,
+    passed_runs: int,
+) -> tuple[str, bool]:
+    """Create or update the upstream PR that carries the proofed fork branch."""
+    landing_repo = landing_gh.get_repo(landing_repo_name)
+    head_repo = getattr(fork_pr.head, "repo", None)
+    owner = str(getattr(getattr(head_repo, "owner", None), "login", "") or "").strip()
+    head_ref = str(getattr(fork_pr.head, "ref", "") or "").strip()
+    if not owner or not head_ref:
+        raise RuntimeError("landing-pr-invalid-head")
+    head_spec = f"{owner}:{head_ref}"
+    title = str(getattr(fork_pr, "title", "") or "").strip()
+    if not title:
+        raise RuntimeError("landing-pr-missing-title")
+    body = _build_landing_body(
+        existing_body=str(getattr(fork_pr, "body", "") or ""),
+        fork_pr_url=str(getattr(fork_pr, "html_url", "") or ""),
+        proof_run_url=proof_run_url,
+        required_runs=max(1, repeat_count),
+        passed_runs=passed_runs,
+    )
+    existing_open = retry_github_call(
+        lambda: landing_repo.get_pulls(
+            state="open",
+            base=str(getattr(fork_pr.base, "ref", "") or ""),
+            head=head_spec,
+        ),
+        retries=2,
+        description=f"list landing pull requests for {head_spec}",
+    )
+    reused = next(iter(existing_open), None) is not None
+    pr = upsert_pull_request(
+        landing_repo,
+        head=head_spec,
+        base=str(getattr(fork_pr.base, "ref", "") or ""),
+        title=title,
+        body=body,
+        draft=False,
+        labels=("bot-fix",),
+    )
+    if getattr(pr, "draft", False):
+        _mark_ready_for_review(landing_repo_name, int(pr.number), landing_token)
+    return str(getattr(pr, "html_url", "") or ""), reused
+
+
 def run_proof_campaign(args: argparse.Namespace) -> dict[str, object]:
     """Execute one proof campaign and persist its outcome."""
     config = load_config(args.config)
@@ -239,6 +341,94 @@ def run_proof_campaign(args: argparse.Namespace) -> dict[str, object]:
                 source="proof-campaign",
             )
 
+    landing_repo_name = str(raw_report.repo_full_name or args.repo)
+    landing_status = ""
+    landing_url = ""
+    landing_summary = ""
+    landing_reused = False
+    if result.passed:
+        if landing_repo_name == args.repo:
+            landing_status = "skipped"
+            landing_summary = "Proof PR already targets the canonical repository."
+            failure_store.update_landing_campaign(
+                args.fingerprint,
+                status=landing_status,
+                summary=landing_summary,
+                landing_repo=landing_repo_name,
+            )
+        else:
+            landing_token = str(getattr(args, "landing_token", "") or "").strip()
+            if not landing_token:
+                landing_status = "failed"
+                landing_summary = (
+                    f"upstream-landing-missing-token: configure credentials for {landing_repo_name}"
+                )
+            else:
+                try:
+                    landing_gh = Github(auth=Auth.Token(landing_token))
+                    landing_url, landing_reused = _land_upstream_pr(
+                        landing_gh=landing_gh,
+                        landing_token=landing_token,
+                        landing_repo_name=landing_repo_name,
+                        fork_pr=pr,
+                        proof_run_url=proof_run_url,
+                        repeat_count=max(1, args.repeat_count),
+                        passed_runs=result.passed_runs,
+                    )
+                    landing_status = "passed"
+                    landing_summary = (
+                        "Reused the existing upstream PR for the proofed branch."
+                        if landing_reused
+                        else "Opened a new upstream PR for the proofed branch."
+                    )
+                    try:
+                        if _remove_bot_fix_label(pr):
+                            event_ledger.record(
+                                "pr.staging_label_removed",
+                                args.fingerprint,
+                                pr_url=str(pr.html_url),
+                                pr_number=pr.number,
+                                source="proof-campaign",
+                            )
+                    except Exception as exc:
+                        logger.warning(
+                            "Failed to remove bot-fix from staging PR #%s: %s",
+                            pr.number,
+                            exc,
+                        )
+                except Exception as exc:
+                    landing_status = "failed"
+                    landing_summary = f"upstream-landing-failed: {exc}"
+
+            failure_store.update_landing_campaign(
+                args.fingerprint,
+                status=landing_status,
+                summary=landing_summary,
+                landing_url=landing_url,
+                landing_repo=landing_repo_name,
+            )
+            if landing_status == "passed":
+                event_ledger.record(
+                    "pr.landed",
+                    args.fingerprint,
+                    pr_url=landing_url,
+                    landing_repo=landing_repo_name,
+                    source="proof-campaign",
+                    reused=landing_reused,
+                    staging_pr_url=str(pr.html_url),
+                    staging_pr_number=pr.number,
+                )
+            elif landing_status == "failed":
+                event_ledger.record(
+                    "pr.landing_failed",
+                    args.fingerprint,
+                    pr_url=str(pr.html_url),
+                    pr_number=pr.number,
+                    landing_repo=landing_repo_name,
+                    source="proof-campaign",
+                    error=landing_summary,
+                )
+
     comment_url = _upsert_proof_comment(
         target_repo,
         args.pr_number,
@@ -250,6 +440,10 @@ def run_proof_campaign(args: argparse.Namespace) -> dict[str, object]:
             proof_run_url=proof_run_url,
             marked_ready=marked_ready,
             was_draft=was_draft,
+            landing_status=landing_status,
+            landing_url=landing_url,
+            landing_repo=landing_repo_name,
+            landing_summary=landing_summary,
         ),
     )
 
@@ -278,6 +472,9 @@ def run_proof_campaign(args: argparse.Namespace) -> dict[str, object]:
         attempted_runs=result.attempted_runs,
         comment_url=comment_url,
         ready_for_review=marked_ready,
+        landing_status=landing_status,
+        landing_url=landing_url,
+        landing_repo=landing_repo_name,
     )
     failure_store.save()
     event_ledger.save()
@@ -295,6 +492,11 @@ def run_proof_campaign(args: argparse.Namespace) -> dict[str, object]:
         "ready_for_review": marked_ready,
         "comment_url": comment_url,
         "proof_run_url": proof_run_url,
+        "landing_status": landing_status,
+        "landing_url": landing_url,
+        "landing_repo": landing_repo_name,
+        "landing_summary": landing_summary,
+        "landing_reused": landing_reused,
     }
 
 
@@ -306,6 +508,11 @@ def main() -> None:
     parser.add_argument("--failure-report-json", required=True, help="Serialized FailureReport.")
     parser.add_argument("--config", required=True, help="Bot config path.")
     parser.add_argument("--token", required=True, help="GitHub token for the target repo.")
+    parser.add_argument(
+        "--landing-token",
+        default=None,
+        help="GitHub token for opening the canonical upstream PR after proof passes.",
+    )
     parser.add_argument("--state-token", default=None, help="GitHub token for state writes.")
     parser.add_argument("--state-repo", required=True, help="Repository full name for bot state.")
     parser.add_argument("--repeat-count", required=True, type=int, help="Required proof runs.")
@@ -326,6 +533,8 @@ def main() -> None:
     output_path = Path(args.output)
     output_path.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
     print(json.dumps(result, indent=2, sort_keys=True))
+    if result.get("proof_status") == "passed" and result.get("landing_status") == "failed":
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
