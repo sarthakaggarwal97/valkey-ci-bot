@@ -81,22 +81,18 @@ def test_build_site_writes_multi_page_observability_site(tmp_path: Path) -> None
     assert (site_dir / "daily.html").exists()
     assert (site_dir / "flaky.html").exists()
     assert (site_dir / "review.html").exists()
-    assert (site_dir / "acceptance.html").exists()
     assert (site_dir / "assets" / "site.css").exists()
     assert (site_dir / "assets" / "site.js").exists()
     assert (site_dir / "data" / "dashboard.json").exists()
 
     index_html = (site_dir / "index.html").read_text(encoding="utf-8")
     daily_html = (site_dir / "daily.html").read_text(encoding="utf-8")
-    acceptance_html = (site_dir / "acceptance.html").read_text(encoding="utf-8")
 
     assert "Observatory" in index_html
     assert "Trend Watch" in index_html
     assert "Daily heatmap" in index_html
     assert "Failure Heatmap" in daily_html
     assert "jemalloc / sanitize" in daily_html
-    assert "Replay scorecard" in acceptance_html
-    assert "pilot-ready" in acceptance_html
 
 
 def test_cli_reads_dashboard_json_and_writes_site(tmp_path: Path) -> None:

@@ -22,7 +22,6 @@ _NAV_PAGES: list[tuple[str, str, str]] = [
     ("daily.html", "Daily", "Failure heatmap"),
     ("flaky.html", "Flaky", "Campaign lab"),
     ("review.html", "Review", "PR quality"),
-    ("acceptance.html", "Acceptance", "Replay proof"),
     ("fuzzer.html", "Fuzzer", "Anomaly watch"),
     ("ai.html", "AI", "Reliability"),
     ("ops.html", "Ops", "Ledger and state"),
@@ -269,10 +268,8 @@ def _layout(
     body: str,
 ) -> str:
     snapshot = _mapping(dashboard.get("snapshot"))
-    acceptance = _mapping(dashboard.get("acceptance"))
     repo_label = _top_repo_label(dashboard)
     generated_at = _str(dashboard.get("generated_at"), "unknown")
-    readiness = acceptance.get("readiness", "unknown")
     hero_stats = "".join(
         [
             _metric_tile(
@@ -294,10 +291,10 @@ def _layout(
                 note="PRs with durable review state",
             ),
             _metric_tile(
-                "Acceptance readiness",
-                readiness,
+                "Agent events",
+                snapshot.get("agent_events", 0),
                 tone="green",
-                note="Replay scorecard posture",
+                note="Total ledger entries",
             ),
         ]
     )
@@ -325,7 +322,6 @@ def _layout(
       <div class="topbar-meta">
         <span class="topbar-pill">{_html(repo_label)}</span>
         <span class="topbar-pill">{_html(generated_at)}</span>
-        <span class="topbar-pill">{_html_cell(_chip(readiness))}</span>
       </div>
     </div>
   </header>
@@ -418,7 +414,6 @@ def _render_trend_watch(dashboard: JsonObject) -> str:
 
 def _render_overview(dashboard: JsonObject) -> str:
     snapshot = _mapping(dashboard.get("snapshot"))
-    acceptance = _mapping(dashboard.get("acceptance"))
     ai_reliability = _mapping(dashboard.get("ai_reliability"))
     agent_outcomes = _mapping(dashboard.get("agent_outcomes"))
     page_cards = [
@@ -447,15 +442,6 @@ def _render_overview(dashboard: JsonObject) -> str:
             [
                 ("Tracked PRs", snapshot.get("tracked_review_prs", 0)),
                 ("Comments", snapshot.get("review_comments", 0)),
-            ],
-        ),
-        _page_card(
-            "Replay proof",
-            "acceptance.html",
-            "Keep the adoption story honest with a replay scorecard and workflow contract checks.",
-            [
-                ("Readiness", _chip(acceptance.get("readiness", "unknown"))),
-                ("Review cases", acceptance.get("review_cases", 0)),
             ],
         ),
         _page_card(
@@ -504,7 +490,6 @@ def _render_overview(dashboard: JsonObject) -> str:
             "Executive pulse",
             _summary_rows(
                 [
-                    ("Replay readiness", _chip(acceptance.get("readiness", "unknown"))),
                     ("PRs created", agent_outcomes.get("prs_created", 0)),
                     ("PRs merged", agent_outcomes.get("prs_merged", 0)),
                     ("Prompt safety", _format_percent(ai_reliability.get("prompt_safety_coverage", 0.0))),
@@ -554,7 +539,7 @@ def _daily_heatmap(daily_health: JsonObject) -> str:
     )
     head = "".join(f"<th>{_html(date[-2:])}</th>" for date in dates)
     body_rows: list[str] = []
-    for row in heatmap_rows[:24]:
+    for row in heatmap_rows:
         cells = []
         for cell in _list(row.get("cells")):
             data = _mapping(cell)
@@ -742,7 +727,6 @@ def _render_flaky(dashboard: JsonObject) -> str:
 
 def _render_review(dashboard: JsonObject) -> str:
     pr_reviews = _mapping(dashboard.get("pr_reviews"))
-    acceptance = _mapping(dashboard.get("acceptance"))
     reviews = [
         _mapping(review)
         for review in _list(pr_reviews.get("recent_reviews"))
@@ -758,7 +742,6 @@ def _render_review(dashboard: JsonObject) -> str:
                     ("Summary comments", pr_reviews.get("summary_comments", 0)),
                     ("Review comments", pr_reviews.get("review_comments", 0)),
                     ("Coverage incomplete", pr_reviews.get("coverage_incomplete_cases", 0)),
-                    ("Acceptance passed", pr_reviews.get("acceptance_passed", 0)),
                     ("Model followups", _status_counts(_mapping(pr_reviews.get("model_followup_counts")))),
                 ]
             ),
@@ -782,20 +765,6 @@ def _render_review(dashboard: JsonObject) -> str:
             ),
             wide=True,
         )
-        + _panel(
-            "Replay signal",
-            _summary_rows(
-                [
-                    ("Readiness", _chip(acceptance.get("readiness", "unknown"))),
-                    ("Review cases", acceptance.get("review_cases", 0)),
-                    ("Review passed", acceptance.get("review_passed", 0)),
-                    ("Review failed", acceptance.get("review_failed", 0)),
-                    ("Findings", acceptance.get("finding_count", 0)),
-                    ("Replay followups", _status_counts(_mapping(acceptance.get("model_followup_counts")))),
-                ]
-            ),
-            wide=True,
-        )
         + "</section>"
     )
     return _layout(
@@ -803,107 +772,7 @@ def _render_review(dashboard: JsonObject) -> str:
         current_page="review.html",
         page_title="Review",
         eyebrow="PR Quality",
-        intro="A maintainer-facing view of what the reviewer is posting, how complete the coverage is, and whether replay cases still pass.",
-        body=body,
-    )
-
-
-def _acceptance_review_rows(acceptance: JsonObject) -> tuple[list[list[object]], list[str]]:
-    rows: list[list[object]] = []
-    attrs: list[str] = []
-    for result in _list(acceptance.get("recent_review_results")):
-        if not isinstance(result, dict):
-            continue
-        followups = ", ".join(_str(value) for value in _list(result.get("model_followups"))) or "none"
-        expectation_checks = _list(result.get("expectation_checks"))
-        passed_checks = sum(
-            1 for check in expectation_checks if _mapping(check).get("passed") is True
-        )
-        rows.append(
-            [
-                result.get("name", ""),
-                result.get("pr_number", ""),
-                _chip("pass" if bool(result.get("passed")) else "needs follow-up"),
-                f"{passed_checks}/{len(expectation_checks)}",
-                len(_list(result.get("findings"))),
-                followups,
-            ]
-        )
-        attrs.append(
-            'data-filter-item="'
-            + _html_attr(
-                " ".join(
-                    [
-                        _str(result.get("name")),
-                        str(result.get("pr_number")),
-                        followups,
-                    ]
-                )
-            )
-            + '"'
-        )
-    return rows, attrs
-
-
-def _render_acceptance(dashboard: JsonObject) -> str:
-    acceptance = _mapping(dashboard.get("acceptance"))
-    review_rows, review_row_attrs = _acceptance_review_rows(acceptance)
-    workflow_rows = [
-        [
-            result.get("name", ""),
-            result.get("workflow_path", ""),
-            _chip("pass" if bool(result.get("passed")) else "needs follow-up"),
-            len(_list(result.get("checks"))),
-            result.get("notes", ""),
-        ]
-        for result in _list(acceptance.get("recent_workflow_results"))
-        if isinstance(result, dict)
-    ]
-    body = (
-        '<section class="page-grid">'
-        + _panel(
-            "Replay scorecard",
-            _summary_rows(
-                [
-                    ("Readiness", _chip(acceptance.get("readiness", "unknown"))),
-                    ("Review cases", acceptance.get("review_cases", 0)),
-                    ("Workflow cases", acceptance.get("workflow_cases", 0)),
-                    ("CI replay cases", acceptance.get("ci_replay_cases", 0)),
-                    ("Backport cases", acceptance.get("backport_replay_cases", 0)),
-                    ("Payloads seen", acceptance.get("payloads_seen", 0)),
-                ]
-            ),
-            wide=True,
-        )
-        + _panel(
-            "Review replay cases",
-            '<div class="toolbar"><label class="search"><span>Filter replay cases</span>'
-            '<input type="search" placeholder="docs, DCO, core-team..." data-filter-target="acceptance-reviews"></label></div>'
-            + _table(
-                ["Case", "PR", "Verdict", "Checks", "Findings", "Followups"],
-                review_rows,
-                empty="No replay review results were available.",
-                row_attrs=review_row_attrs,
-            ),
-            wide=True,
-        )
-        + _panel(
-            "Workflow contract cases",
-            _table(
-                ["Case", "Workflow", "Verdict", "Checks", "Notes"],
-                workflow_rows,
-                empty="No workflow contract results were available.",
-            ),
-            wide=True,
-        )
-        + "</section>"
-    )
-    return _layout(
-        dashboard,
-        current_page="acceptance.html",
-        page_title="Acceptance",
-        eyebrow="Replay Proof",
-        intro="The proof layer for rollout conversations: replay verdicts, workflow contracts, and the cases that still need follow-up.",
+        intro="What the reviewer is posting, how complete the coverage is, and which PRs are being tracked.",
         body=body,
     )
 
@@ -1603,7 +1472,6 @@ def build_site(dashboard: JsonObject, site_dir: Path) -> None:
         "daily.html": _render_daily(dashboard),
         "flaky.html": _render_flaky(dashboard),
         "review.html": _render_review(dashboard),
-        "acceptance.html": _render_acceptance(dashboard),
         "fuzzer.html": _render_fuzzer(dashboard),
         "ai.html": _render_ai(dashboard),
         "ops.html": _render_ops(dashboard),
