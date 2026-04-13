@@ -19,17 +19,17 @@ from typing import Any
 JsonObject = dict[str, Any]
 
 _VISIBLE_PAGES: list[tuple[str, str, str]] = [
-    ("index.html", "Overview", "Summary"),
-    ("daily.html", "Daily CI", "Runs and failures"),
+    ("index.html", "Daily CI", "Runs and failures"),
     ("review.html", "PRs", "Review state"),
     ("fuzzer.html", "Fuzzer", "Anomalies"),
-    ("ops.html", "Ops", "Coverage and state"),
 ]
 
 _ALIAS_PAGES: dict[str, tuple[str, str]] = {
-    "flaky.html": ("daily.html#campaigns", "Flaky campaigns moved into the Daily page."),
+    "daily.html": ("index.html", "Daily CI is now the homepage."),
+    "flaky.html": ("index.html#campaigns", "Flaky campaigns moved into the Daily page."),
     "acceptance.html": ("review.html#replay", "Replay proof moved into the PRs page."),
-    "ai.html": ("ops.html#ai-reliability", "AI reliability moved into the Ops page."),
+    "ops.html": ("diagnostics.html", "Diagnostics moved out of the main navigation."),
+    "ai.html": ("diagnostics.html#ai-reliability", "AI reliability moved into Diagnostics."),
 }
 
 _VALKEY_LOGO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 187.9 63.5" role="img" aria-labelledby="valkey-logo-title">
@@ -733,11 +733,6 @@ def _layout(
         <strong>{_html_cell(_chip(readiness))}</strong>
         <span>{_html(posture)}</span>
       </section>
-      <section class="sidebar-card">
-        <p>Coverage</p>
-        <strong>{_format_number(len(_coverage_items(dashboard)) - _missing_count(dashboard))}/{_format_number(len(_coverage_items(dashboard)))}</strong>
-        <span>{_format_number(_missing_count(dashboard))} missing sources need follow-up</span>
-      </section>
     </aside>
     <main class="page">
       <header class="hero">
@@ -1113,6 +1108,61 @@ def _render_daily(dashboard: JsonObject) -> str:
     )
 
 
+def _render_daily_home(dashboard: JsonObject) -> str:
+    daily_health = _mapping(dashboard.get("daily_health"))
+    ci_failures = _mapping(dashboard.get("ci_failures"))
+    campaign_rows, campaign_attrs = _campaign_rows(dashboard)
+    body = (
+        '<section class="page-grid page-grid-wide">'
+        + _panel(
+            "Failure heatmap",
+            _daily_heatmap(daily_health),
+            subtitle="Recurring Daily failures render with red intensity so every-day offenders stand out immediately.",
+            wide=True,
+        )
+        + _panel(
+            "Recent Daily runs",
+            _table(
+                ["Date", "Status", "Commit", "Unique failures", "Failed jobs", "Run"],
+                _daily_run_rows(dashboard),
+                empty="No Daily run records were supplied.",
+            ),
+            subtitle=(
+                f"Queued failures: {_format_number(ci_failures.get('queued_failures', 0))}. "
+                "Commits and runs resolve back to GitHub."
+            ),
+            wide=True,
+        )
+        + _panel(
+            "Active remediation campaigns",
+            '<div class="toolbar"><label class="search"><span>Filter campaigns</span>'
+            '<input type="search" placeholder="memory, timeout, replication..." '
+            'data-filter-target="campaign-table"></label></div>'
+            + '<div id="campaign-table">'
+            + _table(
+                ["Failure", "Subsystem", "Status", "Proof", "Attempts", "Pass streak", "Draft/PR", "Updated"],
+                campaign_rows,
+                empty="No flaky remediation campaigns were available.",
+                row_attrs=campaign_attrs,
+            )
+            + "</div>",
+            subtitle="Repeated failures and the remediation loop around them stay together on the primary operator page.",
+            wide=True,
+            anchor="campaigns",
+        )
+        + "</section>"
+    )
+    return _layout(
+        dashboard,
+        current_page="index.html",
+        page_title="Daily CI",
+        eyebrow="Failure Surface",
+        intro="Recurring failures, recent commits, and active remediation loops.",
+        body=body,
+        header_metrics=_daily_metrics(dashboard),
+    )
+
+
 def _review_metrics(dashboard: JsonObject) -> list[str]:
     pr_reviews = _mapping(dashboard.get("pr_reviews"))
     acceptance = _mapping(dashboard.get("acceptance"))
@@ -1301,7 +1351,7 @@ def _fuzzer_metrics(dashboard: JsonObject) -> list[str]:
             note="Non-normal analyzed runs",
             tone="bad" if _mapping(fuzzer.get("status_counts")).get("anomalous", 0) else "good",
         ),
-        _metric("Raw-log fallbacks", fuzzer.get("raw_log_fallbacks", 0), note="Artifact gaps"),
+        _metric("Scenarios", len(_mapping(fuzzer.get("scenario_counts"))), note="Distinct affected paths"),
         _metric("Issues updated", _mapping(fuzzer.get("issue_action_counts")).get("updated", 0), note="GitHub issue actions"),
     ]
 
@@ -1359,12 +1409,12 @@ def _render_fuzzer(dashboard: JsonObject) -> str:
                     ("Statuses", _chip(", ".join(sorted(_mapping(fuzzer.get("status_counts")).keys())) or "none", tone="info")),
                     ("Issue actions", _chip(", ".join(sorted(_mapping(fuzzer.get("issue_action_counts")).keys())) or "none", tone="info")),
                     ("Scenarios", _format_number(len(_mapping(fuzzer.get("scenario_counts"))))),
-                    ("Result files", _format_number(fuzzer.get("result_files", 0))),
                     ("Runs seen", _format_number(fuzzer.get("runs_seen", 0))),
                     ("Analyzed", _format_number(fuzzer.get("runs_analyzed", 0))),
+                    ("Anomalies", _format_number(_mapping(fuzzer.get("status_counts")).get("anomalous", 0))),
                 ]
             ),
-            subtitle="Fuzzer operators usually need the mix before they need the full table.",
+            subtitle="Fuzzer operators usually need the live anomaly mix before they need the full table.",
         )
         + _panel(
             "Recent anomalies",
@@ -1547,8 +1597,8 @@ def _render_ops(dashboard: JsonObject) -> str:
     )
     return _layout(
         dashboard,
-        current_page="ops.html",
-        page_title="Ops",
+        current_page="",
+        page_title="Diagnostics",
         eyebrow="State and Coverage",
         intro="Source coverage, incident queue, event ledger, watermarks, and AI counters.",
         body=body,
@@ -2308,11 +2358,10 @@ searchInputs.forEach((input) => {
 def build_site(dashboard: JsonObject, site_dir: Path) -> None:
     """Write the full multi-page observability site."""
     pages = {
-        "index.html": _render_overview(dashboard),
-        "daily.html": _render_daily(dashboard),
+        "index.html": _render_daily_home(dashboard),
+        "diagnostics.html": _render_ops(dashboard),
         "review.html": _render_review(dashboard),
         "fuzzer.html": _render_fuzzer(dashboard),
-        "ops.html": _render_ops(dashboard),
     }
     for alias_name, (target, reason) in _ALIAS_PAGES.items():
         pages[alias_name] = _redirect_page(alias_name.replace(".html", ""), target, reason)

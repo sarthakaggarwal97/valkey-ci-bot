@@ -80,9 +80,11 @@ def test_build_site_writes_multi_page_observability_site(tmp_path: Path) -> None
 
     assert (site_dir / "index.html").exists()
     assert (site_dir / "daily.html").exists()
+    assert (site_dir / "diagnostics.html").exists()
     assert (site_dir / "flaky.html").exists()
     assert (site_dir / "review.html").exists()
     assert (site_dir / "acceptance.html").exists()
+    assert (site_dir / "ops.html").exists()
     assert (site_dir / "assets" / "site.css").exists()
     assert (site_dir / "assets" / "site.js").exists()
     assert (site_dir / "assets" / "valkey-horizontal.svg").exists()
@@ -92,20 +94,25 @@ def test_build_site_writes_multi_page_observability_site(tmp_path: Path) -> None
     daily_html = (site_dir / "daily.html").read_text(encoding="utf-8")
     review_html = (site_dir / "review.html").read_text(encoding="utf-8")
     acceptance_html = (site_dir / "acceptance.html").read_text(encoding="utf-8")
+    diagnostics_html = (site_dir / "diagnostics.html").read_text(encoding="utf-8")
+    ops_html = (site_dir / "ops.html").read_text(encoding="utf-8")
     site_css = (site_dir / "assets" / "site.css").read_text(encoding="utf-8")
 
     assert "Operator Console" in index_html
     assert 'alt="Valkey logo"' in index_html
     assert "Open+Sans" in index_html
-    assert "Data coverage" in index_html
-    assert "Trend watch" in index_html
-    assert "Failure heatmap" in daily_html
-    assert "jemalloc / sanitize" in daily_html
-    assert "--heat-alpha:1.00" in daily_html
-    assert "https://github.com/valkey-io/valkey/commit/abcd1234ef567890" in daily_html
+    assert 'href="index.html"' in index_html
+    assert "Failure heatmap" in index_html
+    assert "jemalloc / sanitize" in index_html
+    assert "--heat-alpha:1.00" in index_html
+    assert "https://github.com/valkey-io/valkey/commit/abcd1234ef567890" in index_html
+    assert "Daily CI is now the homepage." in daily_html
     assert "Replay review cases" in review_html
     assert "https://github.com/valkey-io/valkey/pull/1" in review_html
     assert "Replay proof moved into the PRs page." in acceptance_html
+    assert "Diagnostics" in diagnostics_html
+    assert "Data coverage" in diagnostics_html
+    assert "Diagnostics moved out of the main navigation." in ops_html
     assert "color-scheme: dark;" in site_css
     assert "--panel: #111c2d;" in site_css
     assert "#30176e" in site_css
@@ -130,4 +137,4 @@ def test_cli_reads_dashboard_json_and_writes_site(tmp_path: Path) -> None:
     )
 
     assert exit_code == 0
-    assert (tmp_path / "site" / "ops.html").exists()
+    assert (tmp_path / "site" / "diagnostics.html").exists()
