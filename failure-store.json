@@ -1709,38 +1709,6 @@
           "incident_key": "a3049768df74e31777e361df6dd72203c2d60f874f94de63bf39e2c3eb1c7f53"
         }
       ]
-    },
-    "8956ba5bdddaa15df639c557465c90d93d383fe5e93e98ca91a3168c036d0bb7": {
-      "fingerprint": "8956ba5bdddaa15df639c557465c90d93d383fe5e93e98ca91a3168c036d0bb7",
-      "failure_identifier": "test-sanitizer-address",
-      "test_name": null,
-      "incident_key": "8956ba5bdddaa15df639c557465c90d93d383fe5e93e98ca91a3168c036d0bb7",
-      "error_signature": "2026-04-06T18:15:08.2710000Z Evaluating test-sanitizer-address.if\n2026-04-06T18:15:08.2710000Z Evaluating: success()\n2026-04-06T18:15:08.2710000Z Result: true\n2026-04-06T18:15:08.4230000Z Job is about to start running on the hosted runner: GitHub Actions 1000632032\n2026-04-06T18:15:08.4060000Z Requested labels: ubuntu-latest\n2026-04-06T18:15:08.4060000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/unstable\n2026-04-06T18:15:08.4060000Z Waiting for a runner to pick up this job...\n2026-04-06T18:15:08.4230000Z Job is waiting for a hosted runner to come online.",
-      "file_path": "",
-      "pr_url": null,
-      "status": "processing",
-      "created_at": "2026-04-13T06:28:19.172482+00:00",
-      "updated_at": "2026-04-13T06:28:19.172482+00:00",
-      "queued_pr_payload": null,
-      "campaign_status": null,
-      "incident_observations": [
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-13T06:28:19.172564+00:00",
-          "commit_sha": "ecba3e312300a12fa3bbd4718aedcab3e26ff425",
-          "workflow_run_id": 24044259328,
-          "workflow_name": "CI",
-          "workflow_file": "ci.yml",
-          "job_name": "test-sanitizer-address",
-          "matrix_params": {},
-          "failure_identifier": "test-sanitizer-address",
-          "test_name": null,
-          "error_signature": "2026-04-06T18:15:08.2710000Z Evaluating test-sanitizer-address.if\n2026-04-06T18:15:08.2710000Z Evaluating: success()\n2026-04-06T18:15:08.2710000Z Result: true\n2026-04-06T18:15:08.4230000Z Job is about to start running on the hosted runner: GitHub Actions 1000632032\n2026-04-06T18:15:08.4060000Z Requested labels: ubuntu-latest\n2026-04-06T18:15:08.4060000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/unstable\n2026-04-06T18:15:08.4060000Z Waiting for a runner to pick up this job...\n2026-04-06T18:15:08.4230000Z Job is waiting for a hosted runner to come online.",
-          "file_path": "",
-          "fingerprint": "8956ba5bdddaa15df639c557465c90d93d383fe5e93e98ca91a3168c036d0bb7",
-          "incident_key": "8956ba5bdddaa15df639c557465c90d93d383fe5e93e98ca91a3168c036d0bb7"
-        }
-      ]
     }
   },
   "history": {
@@ -7108,64 +7076,6 @@
           "error_signature": "2026-04-10T00:21:53.3120000Z Evaluating test-ubuntu-tls.if\n2026-04-10T00:21:53.3120000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-10T00:21:53.3120000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'tls')))\n2026-04-10T00:21:53.3120000Z Result: true\n2026-04-10T00:21:53.3130000Z Requested labels: ubuntu-latest\n2026-04-10T00:21:53.3130000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-10T00:21:53.3130000Z Waiting for a runner to pick up this job...\n2026-04-10T00:21:53.3710000Z Job is waiting for a hosted runner to come online.\n2026-04-10T00:21:53.3710000Z Job is about to start running on the hosted runner: GitHub Actions 1000641856",
           "file_path": "",
           "fingerprint": "a3049768df74e31777e361df6dd72203c2d60f874f94de63bf39e2c3eb1c7f53",
-          "incident_key": null
-        }
-      ]
-    },
-    "70d450e62624dab63b96176911e714892d4e02867a8376664b0760aebe34b3aa": {
-      "key": "70d450e62624dab63b96176911e714892d4e02867a8376664b0760aebe34b3aa",
-      "workflow_file": "ci.yml",
-      "job_name": "test-sanitizer-address",
-      "matrix_params": {},
-      "failure_identifier": "test-sanitizer-address",
-      "test_name": null,
-      "observations": [
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-13T06:28:19.172606+00:00",
-          "commit_sha": "ecba3e312300a12fa3bbd4718aedcab3e26ff425",
-          "workflow_run_id": 24044259328,
-          "workflow_name": "CI",
-          "workflow_file": "ci.yml",
-          "job_name": "test-sanitizer-address",
-          "matrix_params": {},
-          "failure_identifier": "test-sanitizer-address",
-          "test_name": null,
-          "error_signature": "2026-04-06T18:15:08.2710000Z Evaluating test-sanitizer-address.if\n2026-04-06T18:15:08.2710000Z Evaluating: success()\n2026-04-06T18:15:08.2710000Z Result: true\n2026-04-06T18:15:08.4230000Z Job is about to start running on the hosted runner: GitHub Actions 1000632032\n2026-04-06T18:15:08.4060000Z Requested labels: ubuntu-latest\n2026-04-06T18:15:08.4060000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/unstable\n2026-04-06T18:15:08.4060000Z Waiting for a runner to pick up this job...\n2026-04-06T18:15:08.4230000Z Job is waiting for a hosted runner to come online.",
-          "file_path": "",
-          "fingerprint": "8956ba5bdddaa15df639c557465c90d93d383fe5e93e98ca91a3168c036d0bb7",
-          "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-13T06:28:26.945794+00:00",
-          "commit_sha": "034d16ac44e8f722b26d30ea7be9422427092d05",
-          "workflow_run_id": 24071438822,
-          "workflow_name": "CI",
-          "workflow_file": "ci.yml",
-          "job_name": "test-sanitizer-address",
-          "matrix_params": {},
-          "failure_identifier": "test-sanitizer-address",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-13T06:28:31.030999+00:00",
-          "commit_sha": "2585f60ebc93c7b44a23e4df9fb02f2012e185fd",
-          "workflow_run_id": 24082496160,
-          "workflow_name": "CI",
-          "workflow_file": "ci.yml",
-          "job_name": "test-sanitizer-address",
-          "matrix_params": {},
-          "failure_identifier": "test-sanitizer-address",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
           "incident_key": null
         }
       ]
