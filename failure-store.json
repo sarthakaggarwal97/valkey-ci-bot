@@ -7199,6 +7199,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T06:28:56.715873+00:00",
+          "commit_sha": "c35dbdfc83b7860a66d2b88685b1d31739ceb962",
+          "workflow_run_id": 24114420056,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-sanitizer-address",
+          "matrix_params": {},
+          "failure_identifier": "test-sanitizer-address",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -7224,6 +7240,22 @@
           "error_signature": "2026-04-07T12:56:35.7210000Z Evaluating test-ubuntu-latest.if\n2026-04-07T12:56:35.7210000Z Evaluating: success()\n2026-04-07T12:56:35.7210000Z Result: true\n2026-04-07T12:56:35.8640000Z Requested labels: ubuntu-latest\n2026-04-07T12:56:35.8640000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/unstable\n2026-04-07T12:56:35.8640000Z Waiting for a runner to pick up this job...\n2026-04-07T12:56:35.8840000Z Job is waiting for a hosted runner to come online.\n2026-04-07T12:56:35.8840000Z Job is about to start running on the hosted runner: GitHub Actions 1000634097",
           "file_path": "",
           "fingerprint": "3b7a42fe123edba45b5465d47a6402d7aa197aefc7ff4c05f555182b0611037e",
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T06:28:56.715925+00:00",
+          "commit_sha": "c35dbdfc83b7860a66d2b88685b1d31739ceb962",
+          "workflow_run_id": 24114420056,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-ubuntu-latest",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-latest",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
           "incident_key": null
         }
       ]
