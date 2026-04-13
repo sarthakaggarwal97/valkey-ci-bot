@@ -1464,7 +1464,7 @@ def _watermark_rows(dashboard: JsonObject) -> list[list[object]]:
 
 def _ai_guardrail_rows(dashboard: JsonObject) -> str:
     ai = _mapping(dashboard.get("ai_reliability"))
-    rows = [
+    rows: list[tuple[str, object]] = [
         ("Token usage", _format_number(ai.get("token_usage", 0))),
         ("Schema calls", _format_number(ai.get("schema_calls", 0))),
         ("Schema successes", _format_number(ai.get("schema_successes", 0))),
