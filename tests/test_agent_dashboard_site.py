@@ -106,6 +106,8 @@ def test_build_site_writes_multi_page_observability_site(tmp_path: Path) -> None
     assert "Replay review cases" in review_html
     assert "https://github.com/valkey-io/valkey/pull/1" in review_html
     assert "Replay proof moved into the PRs page." in acceptance_html
+    assert "color-scheme: dark;" in site_css
+    assert "--panel: #111c2d;" in site_css
     assert "#30176e" in site_css
     assert '"Open Sans"' in site_css
     assert "rgba(207, 60, 79, var(--heat-alpha))" in site_css

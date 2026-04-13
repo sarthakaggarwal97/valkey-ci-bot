@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -71,20 +72,51 @@ jobs:
             --output acceptance-report.md \
             --json-output acceptance-report.json
 
+      - name: Download latest fuzzer analysis snapshot
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id="$(gh run list \
+            --workflow "Monitor Valkey Fuzzer Runs" \
+            --branch "${DEFAULT_BRANCH}" \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId')"
+          if [[ -z "${run_id}" || "${run_id}" == "null" ]]; then
+            exit 0
+          fi
+          mkdir -p latest-fuzzer
+          gh run download "${run_id}" \
+            --name "valkey-fuzzer-monitor-result-${run_id}" \
+            --dir latest-fuzzer
+
       - name: Generate capability dashboard
         shell: bash
         run: |
-          python3 -m scripts.agent_dashboard \
-            --failure-store bot-data/failure-store.json \
-            --rate-state bot-data/rate-state.json \
-            --monitor-state bot-data/monitor-state.json \
-            --review-state bot-data/review-state.json \
-            --event-log bot-data/agent-events.jsonl \
-            --acceptance-result acceptance-report.json \
-            --daily-health daily-health-report.json \
-            --output-markdown agent-dashboard.md \
-            --output-json agent-dashboard.json \
+          args=(
+            python3 -m scripts.agent_dashboard
+            --failure-store bot-data/failure-store.json
+            --rate-state bot-data/rate-state.json
+            --monitor-state bot-data/monitor-state.json
+            --review-state bot-data/review-state.json
+            --event-log bot-data/agent-events.jsonl
+            --acceptance-result acceptance-report.json
+            --daily-health daily-health-report.json
+            --output-markdown agent-dashboard.md
+            --output-json agent-dashboard.json
             --output-html agent-dashboard.html
+          )
+
+          if [[ -f "latest-fuzzer/fuzzer-monitor-result.json" ]]; then
+            args+=(--fuzzer-result "latest-fuzzer/fuzzer-monitor-result.json")
+          fi
+
+          "${args[@]}"
 
       - name: Generate observability site
         shell: bash
