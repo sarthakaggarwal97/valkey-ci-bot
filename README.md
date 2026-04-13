@@ -42,19 +42,16 @@ into:
 - `agent-dashboard.html` — the single-page executive dashboard artifact
 - `agent-dashboard.md` — a GitHub-summary-friendly report
 - `agent-dashboard.json` — the structured payload for automation
-- `dashboard-site/` — a multi-page observability site with workflow-specific views
+- `dashboard-site/` — a multi-page operator dashboard with focused workflow views
 
 The site is intentionally static: no database to operate, no app server to
 deploy, and no extra runtime surface to secure. It covers:
 
-- flaky campaign status, validation pass counts, attempts, failed hypotheses, and queued PR payloads
-- 7-day trend watch for failure-rate movement, flaky subsystem activity, and review health drift
-- CI failure incidents, pass/fail history, queued failures, and Daily monitor outcomes
-- PR review state, summary/review comment counts, acceptance follow-ups, and coverage gaps
-- fuzzer run status, anomaly issues, root-cause categories, scenarios, seeds, and raw-log fallback usage
-- an append-only agent outcome ledger covering validation, queueing, PR creation, merge/abandonment outcomes, and dead-letter events
-- AI reliability signals such as token usage, schema tool-use calls/successes, toolChoice fallback success, prompt-safety guard coverage, tool-loop terminal validation rejections, retry pressure, and explicit remaining instrumentation gaps
-- monitor watermarks and missing input warnings
+- `Overview` for trend watch, event stream, and explicit data-coverage checks
+- `Daily CI` for the red failure heatmap, recent runs, and active remediation campaigns
+- `PRs` for tracked review state, replay acceptance cases, and workflow contract checks
+- `Fuzzer` for anomalies, seeds, issue actions, and root-cause categories
+- `Ops` for incident queue, event ledger, monitor watermarks, AI reliability counters, and loader warnings
 
 The standalone workflow runs on a schedule and manual dispatch, checks out the
 `bot-data` branch snapshots when present, refreshes the Daily health report,

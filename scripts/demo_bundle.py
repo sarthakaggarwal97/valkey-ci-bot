@@ -380,9 +380,9 @@ def _render_markdown(
         "",
         f"- Control room: {_section_link('GitHub Pages site', pages_url)}",
         f"- Daily view: {_section_link('Daily', pages_url + 'daily.html')}",
-        f"- Replay proof: {_section_link('Acceptance', pages_url + 'acceptance.html')}",
-        f"- Review quality: {_section_link('Review', pages_url + 'review.html')}",
+        f"- PR view: {_section_link('PRs', pages_url + 'review.html')}",
         f"- Fuzzer watch: {_section_link('Fuzzer', pages_url + 'fuzzer.html')}",
+        f"- Operations: {_section_link('Ops', pages_url + 'ops.html')}",
         "",
         "## Demo Health",
         "",
@@ -424,7 +424,7 @@ def _render_markdown(
                 "## Live Review Example",
                 "",
                 f"- Target PR: {_section_link('Open reviewed PR', review_pr_url)}",
-                "- Use this alongside the Review page on GitHub Pages to show how the reviewer "
+                "- Use this alongside the PRs page on GitHub Pages to show how the reviewer "
                 "posts findings and policy notes without checking out untrusted PR head code.",
             ]
         )
@@ -435,10 +435,10 @@ def _render_markdown(
             "## Suggested Walkthrough",
             "",
             "1. Open the Control room page and orient everyone to the system-level view.",
-            "2. Jump to Acceptance to show replay proof against real Valkey-shaped cases.",
+            "2. Jump to PRs to show replay proof and tracked review state together.",
             "3. Open the Daily proof example so people see a real bot-created fix loop.",
             "4. Show the live review run or reviewed fork PR if one was included.",
-            "5. Finish on Fuzzer or AI pages depending on what the audience cares about.",
+            "5. Finish on Fuzzer or Ops depending on whether the audience cares more about anomalies or agent state.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -501,7 +501,7 @@ def _render_html(
             "</div>"
             "<p>This is the PR to open when you want to show the reviewer in a real fork-safe setting.</p>"
             f'<ul class="bullet-list"><li>{_html_link("Reviewed PR", review_pr_url)}</li>'
-            f'<li>{_html_link("Review page on the site", pages_url + "review.html")}</li></ul>'
+            f'<li>{_html_link("PRs page on the site", pages_url + "review.html")}</li></ul>'
             "</article>"
         )
 
@@ -516,10 +516,10 @@ def _render_html(
             + "</p></a>"
             for suffix, title, body in [
                 ("", "Control room", "The cleanest first screen for maintainers."),
-                ("acceptance.html", "Replay proof", "Real Valkey-shaped cases instead of a toy scenario."),
                 ("daily.html", "Daily", "Failure health and proof-ready campaign context."),
-                ("review.html", "Review", "PR quality, coverage, and policy surface."),
+                ("review.html", "PRs", "Tracked review state plus replay proof on one page."),
                 ("fuzzer.html", "Fuzzer", "Anomalies, possible core bugs, and issue routing."),
+                ("ops.html", "Ops", "State coverage, event stream, and AI reliability."),
             ]
         ]
     )
@@ -527,10 +527,10 @@ def _render_html(
     walkthrough = (
         "<ol class=\"bullet-list\">"
         "<li>Open the Control room page and show the multi-workflow view.</li>"
-        "<li>Jump to Acceptance to prove the bot earns trust against replayed cases.</li>"
+        "<li>Jump to PRs to prove the bot earns trust against replayed cases.</li>"
         "<li>Use the featured proof example to show a Daily failure closing into a PR and proof run.</li>"
         "<li>Open the live review target if you included one.</li>"
-        "<li>Finish on Fuzzer or AI depending on whether the audience cares more about triage or model discipline.</li>"
+        "<li>Finish on Fuzzer or Ops depending on whether the audience cares more about triage or operational state.</li>"
         "</ol>"
     )
 

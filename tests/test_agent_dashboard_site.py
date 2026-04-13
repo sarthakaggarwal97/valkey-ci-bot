@@ -62,6 +62,7 @@ def _dashboard_payload() -> dict:
                     "date": "2026-04-08",
                     "status": "failure",
                     "commit_sha": "abcd123",
+                    "full_sha": "abcd1234ef567890",
                     "unique_failures": 1,
                     "failed_jobs": 2,
                     "run_url": "https://github.com/valkey-io/valkey/actions/runs/1",
@@ -84,19 +85,25 @@ def test_build_site_writes_multi_page_observability_site(tmp_path: Path) -> None
     assert (site_dir / "acceptance.html").exists()
     assert (site_dir / "assets" / "site.css").exists()
     assert (site_dir / "assets" / "site.js").exists()
+    assert (site_dir / "assets" / "valkey-horizontal.svg").exists()
     assert (site_dir / "data" / "dashboard.json").exists()
 
     index_html = (site_dir / "index.html").read_text(encoding="utf-8")
     daily_html = (site_dir / "daily.html").read_text(encoding="utf-8")
+    review_html = (site_dir / "review.html").read_text(encoding="utf-8")
     acceptance_html = (site_dir / "acceptance.html").read_text(encoding="utf-8")
+    site_css = (site_dir / "assets" / "site.css").read_text(encoding="utf-8")
 
-    assert "Observatory" in index_html
-    assert "Trend Watch" in index_html
-    assert "Daily heatmap" in index_html
-    assert "Failure Heatmap" in daily_html
+    assert "Operator Dashboard" in index_html
+    assert "Data coverage" in index_html
+    assert "Trend watch" in index_html
+    assert "Failure heatmap" in daily_html
     assert "jemalloc / sanitize" in daily_html
-    assert "Replay scorecard" in acceptance_html
-    assert "pilot-ready" in acceptance_html
+    assert "https://github.com/valkey-io/valkey/commit/abcd1234ef567890" in daily_html
+    assert "Replay review cases" in review_html
+    assert "https://github.com/valkey-io/valkey/pull/1" in review_html
+    assert "Replay proof moved into the PRs page." in acceptance_html
+    assert "rgba(247, 95, 99, var(--heat-alpha))" in site_css
 
 
 def test_cli_reads_dashboard_json_and_writes_site(tmp_path: Path) -> None:
