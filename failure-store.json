@@ -749,12 +749,12 @@
       "failure_identifier": "test-almalinux9-tls-module",
       "test_name": null,
       "incident_key": "b48215facc6680a0138d28d4feb5e9faecee8e6288afea48e20aafacd7e4ee29",
-      "error_signature": "2026-04-11T00:21:31.7500000Z Evaluating test-rpm-distros-tls-module.if\n2026-04-11T00:21:31.7500000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-11T00:21:31.7500000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'tls')))\n2026-04-11T00:21:31.7500000Z Result: true\n2026-04-11T00:21:32.0060000Z Requested labels: ubuntu-latest\n2026-04-11T00:21:32.0060000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-11T00:21:32.0060000Z Waiting for a runner to pick up this job...\n2026-04-11T00:21:32.4850000Z Job is about to start running on the hosted runner: GitHub Actions 1000645021\n2026-04-11T00:21:32.4840000Z Job is waiting for a hosted runner to come online.",
+      "error_signature": "2026-04-12T00:24:05.0280000Z Evaluating test-rpm-distros-tls-module.if\n2026-04-12T00:24:05.0280000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-12T00:24:05.0280000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'tls')))\n2026-04-12T00:24:05.0280000Z Result: true\n2026-04-12T00:24:05.2700000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.2700000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.2700000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.7590000Z Job is about to start running on the hosted runner: GitHub Actions 1000646078\n2026-04-12T00:24:05.7590000Z Job is waiting for a hosted runner to come online.",
       "file_path": "",
       "pr_url": null,
       "status": "processing",
       "created_at": "2026-04-01T07:57:49.158116+00:00",
-      "updated_at": "2026-04-13T20:00:36.679196+00:00",
+      "updated_at": "2026-04-13T20:01:43.577143+00:00",
       "queued_pr_payload": null,
       "campaign_status": null,
       "incident_observations": [
@@ -786,6 +786,22 @@
           "failure_identifier": "test-almalinux9-tls-module",
           "test_name": null,
           "error_signature": "2026-04-11T00:21:31.7500000Z Evaluating test-rpm-distros-tls-module.if\n2026-04-11T00:21:31.7500000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-11T00:21:31.7500000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'tls')))\n2026-04-11T00:21:31.7500000Z Result: true\n2026-04-11T00:21:32.0060000Z Requested labels: ubuntu-latest\n2026-04-11T00:21:32.0060000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-11T00:21:32.0060000Z Waiting for a runner to pick up this job...\n2026-04-11T00:21:32.4850000Z Job is about to start running on the hosted runner: GitHub Actions 1000645021\n2026-04-11T00:21:32.4840000Z Job is waiting for a hosted runner to come online.",
+          "file_path": "",
+          "fingerprint": "b48215facc6680a0138d28d4feb5e9faecee8e6288afea48e20aafacd7e4ee29",
+          "incident_key": "b48215facc6680a0138d28d4feb5e9faecee8e6288afea48e20aafacd7e4ee29"
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T20:01:43.577209+00:00",
+          "commit_sha": "2871efd43644f9bf222dca882a184e36f3e28d4a",
+          "workflow_run_id": 24294869067,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-almalinux9-tls-module",
+          "matrix_params": {},
+          "failure_identifier": "test-almalinux9-tls-module",
+          "test_name": null,
+          "error_signature": "2026-04-12T00:24:05.0280000Z Evaluating test-rpm-distros-tls-module.if\n2026-04-12T00:24:05.0280000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-12T00:24:05.0280000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'tls')))\n2026-04-12T00:24:05.0280000Z Result: true\n2026-04-12T00:24:05.2700000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.2700000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.2700000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.7590000Z Job is about to start running on the hosted runner: GitHub Actions 1000646078\n2026-04-12T00:24:05.7590000Z Job is waiting for a hosted runner to come online.",
           "file_path": "",
           "fingerprint": "b48215facc6680a0138d28d4feb5e9faecee8e6288afea48e20aafacd7e4ee29",
           "incident_key": "b48215facc6680a0138d28d4feb5e9faecee8e6288afea48e20aafacd7e4ee29"
@@ -845,12 +861,12 @@
       "failure_identifier": "test-valgrind-no-malloc-usable-size-test",
       "test_name": null,
       "incident_key": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3",
-      "error_signature": "2026-04-11T00:21:31.7460000Z Evaluating test-valgrind-no-malloc-usable-size-test.if\n2026-04-11T00:21:31.7460000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'valgrind') && !contains(github.event.inputs.skiptests, 'valkey'))))\n2026-04-11T00:21:31.7460000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'valgrind') && !contains(null, 'valkey')))\n2026-04-11T00:21:31.7460000Z Result: true\n2026-04-11T00:21:31.9970000Z Requested labels: ubuntu-latest\n2026-04-11T00:21:31.9970000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-11T00:21:31.9970000Z Waiting for a runner to pick up this job...\n2026-04-11T00:21:32.9750000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-11T00:22:55.4560000Z Job is about to start running on the hosted runner: GitHub Actions 1000645027\n2026-04-11T00:22:55.4550000Z Job is waiting for a hosted runner to come online.",
+      "error_signature": "2026-04-12T00:24:05.0260000Z Evaluating test-valgrind-no-malloc-usable-size-test.if\n2026-04-12T00:24:05.0260000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'valgrind') && !contains(github.event.inputs.skiptests, 'valkey'))))\n2026-04-12T00:24:05.0260000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'valgrind') && !contains(null, 'valkey')))\n2026-04-12T00:24:05.0260000Z Result: true\n2026-04-12T00:24:05.2550000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.2550000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.2550000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.2650000Z Job is waiting for a hosted runner to come online.\n2026-04-12T00:24:05.2650000Z Job is about to start running on the hosted runner: GitHub Actions 1000646053",
       "file_path": "",
       "pr_url": null,
       "status": "processing",
       "created_at": "2026-04-03T05:52:14.718128+00:00",
-      "updated_at": "2026-04-13T20:01:03.001888+00:00",
+      "updated_at": "2026-04-13T20:02:07.501086+00:00",
       "queued_pr_payload": null,
       "campaign_status": null,
       "incident_observations": [
@@ -1029,6 +1045,22 @@
           "file_path": "",
           "fingerprint": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3",
           "incident_key": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3"
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T20:02:07.501155+00:00",
+          "commit_sha": "2871efd43644f9bf222dca882a184e36f3e28d4a",
+          "workflow_run_id": 24294869067,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-valgrind-no-malloc-usable-size-test",
+          "matrix_params": {},
+          "failure_identifier": "test-valgrind-no-malloc-usable-size-test",
+          "test_name": null,
+          "error_signature": "2026-04-12T00:24:05.0260000Z Evaluating test-valgrind-no-malloc-usable-size-test.if\n2026-04-12T00:24:05.0260000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'valgrind') && !contains(github.event.inputs.skiptests, 'valkey'))))\n2026-04-12T00:24:05.0260000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'valgrind') && !contains(null, 'valkey')))\n2026-04-12T00:24:05.0260000Z Result: true\n2026-04-12T00:24:05.2550000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.2550000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.2550000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.2650000Z Job is waiting for a hosted runner to come online.\n2026-04-12T00:24:05.2650000Z Job is about to start running on the hosted runner: GitHub Actions 1000646053",
+          "file_path": "",
+          "fingerprint": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3",
+          "incident_key": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3"
         }
       ]
     },
@@ -1037,12 +1069,12 @@
       "failure_identifier": "test-valgrind-test",
       "test_name": null,
       "incident_key": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8",
-      "error_signature": "2026-04-11T00:21:31.7410000Z Evaluating test-valgrind-test.if\n2026-04-11T00:21:31.7410000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'valgrind') && !contains(github.event.inputs.skiptests, 'valkey'))))\n2026-04-11T00:21:31.7410000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'valgrind') && !contains(null, 'valkey')))\n2026-04-11T00:21:31.7410000Z Result: true\n2026-04-11T00:21:31.9990000Z Job is waiting for a hosted runner to come online.\n2026-04-11T00:21:31.9860000Z Requested labels: ubuntu-latest\n2026-04-11T00:21:31.9860000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-11T00:21:31.9860000Z Waiting for a runner to pick up this job...\n2026-04-11T00:21:32.0080000Z Job is about to start running on the hosted runner: GitHub Actions 1000644998",
+      "error_signature": "2026-04-12T00:24:05.0280000Z Evaluating test-valgrind-test.if\n2026-04-12T00:24:05.0280000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'valgrind') && !contains(github.event.inputs.skiptests, 'valkey'))))\n2026-04-12T00:24:05.0280000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'valgrind') && !contains(null, 'valkey')))\n2026-04-12T00:24:05.0280000Z Result: true\n2026-04-12T00:24:05.2610000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.2610000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.2610000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.2790000Z Job is about to start running on the hosted runner: GitHub Actions 1000646070\n2026-04-12T00:24:05.2780000Z Job is waiting for a hosted runner to come online.",
       "file_path": "",
       "pr_url": null,
       "status": "processing",
       "created_at": "2026-04-03T05:52:20.421727+00:00",
-      "updated_at": "2026-04-13T20:01:08.876292+00:00",
+      "updated_at": "2026-04-13T20:02:12.971594+00:00",
       "queued_pr_payload": null,
       "campaign_status": null,
       "incident_observations": [
@@ -1218,6 +1250,22 @@
           "failure_identifier": "test-valgrind-test",
           "test_name": null,
           "error_signature": "2026-04-11T00:21:31.7410000Z Evaluating test-valgrind-test.if\n2026-04-11T00:21:31.7410000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'valgrind') && !contains(github.event.inputs.skiptests, 'valkey'))))\n2026-04-11T00:21:31.7410000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'valgrind') && !contains(null, 'valkey')))\n2026-04-11T00:21:31.7410000Z Result: true\n2026-04-11T00:21:31.9990000Z Job is waiting for a hosted runner to come online.\n2026-04-11T00:21:31.9860000Z Requested labels: ubuntu-latest\n2026-04-11T00:21:31.9860000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-11T00:21:31.9860000Z Waiting for a runner to pick up this job...\n2026-04-11T00:21:32.0080000Z Job is about to start running on the hosted runner: GitHub Actions 1000644998",
+          "file_path": "",
+          "fingerprint": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8",
+          "incident_key": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8"
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T20:02:12.971664+00:00",
+          "commit_sha": "2871efd43644f9bf222dca882a184e36f3e28d4a",
+          "workflow_run_id": 24294869067,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-valgrind-test",
+          "matrix_params": {},
+          "failure_identifier": "test-valgrind-test",
+          "test_name": null,
+          "error_signature": "2026-04-12T00:24:05.0280000Z Evaluating test-valgrind-test.if\n2026-04-12T00:24:05.0280000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'valgrind') && !contains(github.event.inputs.skiptests, 'valkey'))))\n2026-04-12T00:24:05.0280000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'valgrind') && !contains(null, 'valkey')))\n2026-04-12T00:24:05.0280000Z Result: true\n2026-04-12T00:24:05.2610000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.2610000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.2610000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.2790000Z Job is about to start running on the hosted runner: GitHub Actions 1000646070\n2026-04-12T00:24:05.2780000Z Job is waiting for a hosted runner to come online.",
           "file_path": "",
           "fingerprint": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8",
           "incident_key": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8"
@@ -1729,12 +1777,12 @@
       "failure_identifier": "test-sanitizer-undefined (clang)",
       "test_name": null,
       "incident_key": "979aaa4fd37c41903d76452414855c8b507cfc6dce16fa15d2e83e886c091426",
-      "error_signature": "2026-04-08T00:23:10.1180000Z Evaluating test-sanitizer-undefined.if\n2026-04-08T00:23:10.1180000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-08T00:23:10.1180000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-08T00:23:10.1180000Z Result: true\n2026-04-08T00:23:10.3820000Z Requested labels: ubuntu-latest\n2026-04-08T00:23:10.3820000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-08T00:23:10.3820000Z Waiting for a runner to pick up this job...\n2026-04-08T00:23:10.5040000Z Job is about to start running on the hosted runner: GitHub Actions 1000635200\n2026-04-08T00:23:10.5040000Z Job is waiting for a hosted runner to come online.",
+      "error_signature": "2026-04-12T00:24:05.0250000Z Evaluating test-sanitizer-undefined.if\n2026-04-12T00:24:05.0250000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-12T00:24:05.0250000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-12T00:24:05.0250000Z Result: true\n2026-04-12T00:24:05.2540000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.2540000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.2540000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.2640000Z Job is about to start running on the hosted runner: GitHub Actions 1000646051\n2026-04-12T00:24:05.2640000Z Job is waiting for a hosted runner to come online.",
       "file_path": "",
       "pr_url": null,
       "status": "processing",
       "created_at": "2026-04-08T07:55:25.499222+00:00",
-      "updated_at": "2026-04-08T07:55:25.499222+00:00",
+      "updated_at": "2026-04-13T20:01:49.860133+00:00",
       "queued_pr_payload": null,
       "campaign_status": null,
       "incident_observations": [
@@ -1752,6 +1800,24 @@
           "failure_identifier": "test-sanitizer-undefined (clang)",
           "test_name": null,
           "error_signature": "2026-04-08T00:23:10.1180000Z Evaluating test-sanitizer-undefined.if\n2026-04-08T00:23:10.1180000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-08T00:23:10.1180000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-08T00:23:10.1180000Z Result: true\n2026-04-08T00:23:10.3820000Z Requested labels: ubuntu-latest\n2026-04-08T00:23:10.3820000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-08T00:23:10.3820000Z Waiting for a runner to pick up this job...\n2026-04-08T00:23:10.5040000Z Job is about to start running on the hosted runner: GitHub Actions 1000635200\n2026-04-08T00:23:10.5040000Z Job is waiting for a hosted runner to come online.",
+          "file_path": "",
+          "fingerprint": "979aaa4fd37c41903d76452414855c8b507cfc6dce16fa15d2e83e886c091426",
+          "incident_key": "979aaa4fd37c41903d76452414855c8b507cfc6dce16fa15d2e83e886c091426"
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T20:01:49.860202+00:00",
+          "commit_sha": "2871efd43644f9bf222dca882a184e36f3e28d4a",
+          "workflow_run_id": 24294869067,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-sanitizer-undefined (clang)",
+          "matrix_params": {
+            "param_0": "clang"
+          },
+          "failure_identifier": "test-sanitizer-undefined (clang)",
+          "test_name": null,
+          "error_signature": "2026-04-12T00:24:05.0250000Z Evaluating test-sanitizer-undefined.if\n2026-04-12T00:24:05.0250000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-12T00:24:05.0250000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-12T00:24:05.0250000Z Result: true\n2026-04-12T00:24:05.2540000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.2540000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.2540000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.2640000Z Job is about to start running on the hosted runner: GitHub Actions 1000646051\n2026-04-12T00:24:05.2640000Z Job is waiting for a hosted runner to come online.",
           "file_path": "",
           "fingerprint": "979aaa4fd37c41903d76452414855c8b507cfc6dce16fa15d2e83e886c091426",
           "incident_key": "979aaa4fd37c41903d76452414855c8b507cfc6dce16fa15d2e83e886c091426"
@@ -1947,6 +2013,70 @@
           "file_path": "",
           "fingerprint": "ea054375da5407a071eaed1f7be927342d0a9156131f3ea0d9d650260e70cfe5",
           "incident_key": "ea054375da5407a071eaed1f7be927342d0a9156131f3ea0d9d650260e70cfe5"
+        }
+      ]
+    },
+    "5f1830d6dc2390e3c4289be908d2ab8d96583d370f40b089b0b224a9d3001278": {
+      "fingerprint": "5f1830d6dc2390e3c4289be908d2ab8d96583d370f40b089b0b224a9d3001278",
+      "failure_identifier": "test-ubuntu-32bit",
+      "test_name": null,
+      "incident_key": "5f1830d6dc2390e3c4289be908d2ab8d96583d370f40b089b0b224a9d3001278",
+      "error_signature": "2026-04-12T00:24:05.0230000Z Evaluating test-ubuntu-32bit.if\n2026-04-12T00:24:05.0230000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, '32bit'))))\n2026-04-12T00:24:05.0230000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, '32bit')))\n2026-04-12T00:24:05.0230000Z Result: true\n2026-04-12T00:24:05.0290000Z Job is about to start running on the hosted runner: GitHub Actions 1000646038\n2026-04-12T00:24:05.0240000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.0240000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.0240000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.0290000Z Job is waiting for a hosted runner to come online.",
+      "file_path": "",
+      "pr_url": null,
+      "status": "processing",
+      "created_at": "2026-04-13T20:01:55.408215+00:00",
+      "updated_at": "2026-04-13T20:01:55.408215+00:00",
+      "queued_pr_payload": null,
+      "campaign_status": null,
+      "incident_observations": [
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T20:01:55.408298+00:00",
+          "commit_sha": "2871efd43644f9bf222dca882a184e36f3e28d4a",
+          "workflow_run_id": 24294869067,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-32bit",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-32bit",
+          "test_name": null,
+          "error_signature": "2026-04-12T00:24:05.0230000Z Evaluating test-ubuntu-32bit.if\n2026-04-12T00:24:05.0230000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, '32bit'))))\n2026-04-12T00:24:05.0230000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, '32bit')))\n2026-04-12T00:24:05.0230000Z Result: true\n2026-04-12T00:24:05.0290000Z Job is about to start running on the hosted runner: GitHub Actions 1000646038\n2026-04-12T00:24:05.0240000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.0240000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.0240000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.0290000Z Job is waiting for a hosted runner to come online.",
+          "file_path": "",
+          "fingerprint": "5f1830d6dc2390e3c4289be908d2ab8d96583d370f40b089b0b224a9d3001278",
+          "incident_key": "5f1830d6dc2390e3c4289be908d2ab8d96583d370f40b089b0b224a9d3001278"
+        }
+      ]
+    },
+    "81c1d71313aa4a43ade9407470ebf397a8f4e0cab5378be1ebed0d1fbfd1525f": {
+      "fingerprint": "81c1d71313aa4a43ade9407470ebf397a8f4e0cab5378be1ebed0d1fbfd1525f",
+      "failure_identifier": "test-ubuntu-tls-no-tls",
+      "test_name": null,
+      "incident_key": "81c1d71313aa4a43ade9407470ebf397a8f4e0cab5378be1ebed0d1fbfd1525f",
+      "error_signature": "2026-04-12T00:24:05.0260000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.0260000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.0260000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.0230000Z Evaluating test-ubuntu-tls-no-tls.if\n2026-04-12T00:24:05.0230000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-12T00:24:05.0230000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'tls')))\n2026-04-12T00:24:05.0230000Z Result: true\n2026-04-12T00:24:05.0300000Z Job is about to start running on the hosted runner: GitHub Actions 1000646042\n2026-04-12T00:24:05.0300000Z Job is waiting for a hosted runner to come online.",
+      "file_path": "",
+      "pr_url": null,
+      "status": "processing",
+      "created_at": "2026-04-13T20:02:01.424570+00:00",
+      "updated_at": "2026-04-13T20:02:01.424570+00:00",
+      "queued_pr_payload": null,
+      "campaign_status": null,
+      "incident_observations": [
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T20:02:01.424650+00:00",
+          "commit_sha": "2871efd43644f9bf222dca882a184e36f3e28d4a",
+          "workflow_run_id": 24294869067,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-tls-no-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-tls-no-tls",
+          "test_name": null,
+          "error_signature": "2026-04-12T00:24:05.0260000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.0260000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.0260000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.0230000Z Evaluating test-ubuntu-tls-no-tls.if\n2026-04-12T00:24:05.0230000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-12T00:24:05.0230000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'tls')))\n2026-04-12T00:24:05.0230000Z Result: true\n2026-04-12T00:24:05.0300000Z Job is about to start running on the hosted runner: GitHub Actions 1000646042\n2026-04-12T00:24:05.0300000Z Job is waiting for a hosted runner to come online.",
+          "file_path": "",
+          "fingerprint": "81c1d71313aa4a43ade9407470ebf397a8f4e0cab5378be1ebed0d1fbfd1525f",
+          "incident_key": "81c1d71313aa4a43ade9407470ebf397a8f4e0cab5378be1ebed0d1fbfd1525f"
         }
       ]
     }
@@ -2784,6 +2914,22 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T20:01:55.408330+00:00",
+          "commit_sha": "2871efd43644f9bf222dca882a184e36f3e28d4a",
+          "workflow_run_id": 24294869067,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-32bit",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-32bit",
+          "test_name": null,
+          "error_signature": "2026-04-12T00:24:05.0230000Z Evaluating test-ubuntu-32bit.if\n2026-04-12T00:24:05.0230000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, '32bit'))))\n2026-04-12T00:24:05.0230000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, '32bit')))\n2026-04-12T00:24:05.0230000Z Result: true\n2026-04-12T00:24:05.0290000Z Job is about to start running on the hosted runner: GitHub Actions 1000646038\n2026-04-12T00:24:05.0240000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.0240000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.0240000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.0290000Z Job is waiting for a hosted runner to come online.",
+          "file_path": "",
+          "fingerprint": "5f1830d6dc2390e3c4289be908d2ab8d96583d370f40b089b0b224a9d3001278",
           "incident_key": null
         }
       ]
@@ -3990,6 +4136,22 @@
           "failure_identifier": "test-valgrind-no-malloc-usable-size-test",
           "test_name": null,
           "error_signature": "2026-04-11T00:21:31.7460000Z Evaluating test-valgrind-no-malloc-usable-size-test.if\n2026-04-11T00:21:31.7460000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'valgrind') && !contains(github.event.inputs.skiptests, 'valkey'))))\n2026-04-11T00:21:31.7460000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'valgrind') && !contains(null, 'valkey')))\n2026-04-11T00:21:31.7460000Z Result: true\n2026-04-11T00:21:31.9970000Z Requested labels: ubuntu-latest\n2026-04-11T00:21:31.9970000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-11T00:21:31.9970000Z Waiting for a runner to pick up this job...\n2026-04-11T00:21:32.9750000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-11T00:22:55.4560000Z Job is about to start running on the hosted runner: GitHub Actions 1000645027\n2026-04-11T00:22:55.4550000Z Job is waiting for a hosted runner to come online.",
+          "file_path": "",
+          "fingerprint": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3",
+          "incident_key": null
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T20:02:07.501194+00:00",
+          "commit_sha": "2871efd43644f9bf222dca882a184e36f3e28d4a",
+          "workflow_run_id": 24294869067,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-valgrind-no-malloc-usable-size-test",
+          "matrix_params": {},
+          "failure_identifier": "test-valgrind-no-malloc-usable-size-test",
+          "test_name": null,
+          "error_signature": "2026-04-12T00:24:05.0260000Z Evaluating test-valgrind-no-malloc-usable-size-test.if\n2026-04-12T00:24:05.0260000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'valgrind') && !contains(github.event.inputs.skiptests, 'valkey'))))\n2026-04-12T00:24:05.0260000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'valgrind') && !contains(null, 'valkey')))\n2026-04-12T00:24:05.0260000Z Result: true\n2026-04-12T00:24:05.2550000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.2550000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.2550000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.2650000Z Job is waiting for a hosted runner to come online.\n2026-04-12T00:24:05.2650000Z Job is about to start running on the hosted runner: GitHub Actions 1000646053",
           "file_path": "",
           "fingerprint": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3",
           "incident_key": null
@@ -5469,6 +5631,24 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T20:01:49.860242+00:00",
+          "commit_sha": "2871efd43644f9bf222dca882a184e36f3e28d4a",
+          "workflow_run_id": 24294869067,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-sanitizer-undefined (clang)",
+          "matrix_params": {
+            "param_0": "clang"
+          },
+          "failure_identifier": "test-sanitizer-undefined (clang)",
+          "test_name": null,
+          "error_signature": "2026-04-12T00:24:05.0250000Z Evaluating test-sanitizer-undefined.if\n2026-04-12T00:24:05.0250000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-12T00:24:05.0250000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-12T00:24:05.0250000Z Result: true\n2026-04-12T00:24:05.2540000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.2540000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.2540000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.2640000Z Job is about to start running on the hosted runner: GitHub Actions 1000646051\n2026-04-12T00:24:05.2640000Z Job is waiting for a hosted runner to come online.",
+          "file_path": "",
+          "fingerprint": "979aaa4fd37c41903d76452414855c8b507cfc6dce16fa15d2e83e886c091426",
+          "incident_key": null
         }
       ]
     },
@@ -6216,6 +6396,22 @@
           "failure_identifier": "test-almalinux9-tls-module",
           "test_name": null,
           "error_signature": "2026-04-11T00:21:31.7500000Z Evaluating test-rpm-distros-tls-module.if\n2026-04-11T00:21:31.7500000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-11T00:21:31.7500000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'tls')))\n2026-04-11T00:21:31.7500000Z Result: true\n2026-04-11T00:21:32.0060000Z Requested labels: ubuntu-latest\n2026-04-11T00:21:32.0060000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-11T00:21:32.0060000Z Waiting for a runner to pick up this job...\n2026-04-11T00:21:32.4850000Z Job is about to start running on the hosted runner: GitHub Actions 1000645021\n2026-04-11T00:21:32.4840000Z Job is waiting for a hosted runner to come online.",
+          "file_path": "",
+          "fingerprint": "b48215facc6680a0138d28d4feb5e9faecee8e6288afea48e20aafacd7e4ee29",
+          "incident_key": null
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T20:01:43.577249+00:00",
+          "commit_sha": "2871efd43644f9bf222dca882a184e36f3e28d4a",
+          "workflow_run_id": 24294869067,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-almalinux9-tls-module",
+          "matrix_params": {},
+          "failure_identifier": "test-almalinux9-tls-module",
+          "test_name": null,
+          "error_signature": "2026-04-12T00:24:05.0280000Z Evaluating test-rpm-distros-tls-module.if\n2026-04-12T00:24:05.0280000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-12T00:24:05.0280000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'tls')))\n2026-04-12T00:24:05.0280000Z Result: true\n2026-04-12T00:24:05.2700000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.2700000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.2700000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.7590000Z Job is about to start running on the hosted runner: GitHub Actions 1000646078\n2026-04-12T00:24:05.7590000Z Job is waiting for a hosted runner to come online.",
           "file_path": "",
           "fingerprint": "b48215facc6680a0138d28d4feb5e9faecee8e6288afea48e20aafacd7e4ee29",
           "incident_key": null
@@ -7104,6 +7300,22 @@
           "failure_identifier": "test-valgrind-test",
           "test_name": null,
           "error_signature": "2026-04-11T00:21:31.7410000Z Evaluating test-valgrind-test.if\n2026-04-11T00:21:31.7410000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'valgrind') && !contains(github.event.inputs.skiptests, 'valkey'))))\n2026-04-11T00:21:31.7410000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'valgrind') && !contains(null, 'valkey')))\n2026-04-11T00:21:31.7410000Z Result: true\n2026-04-11T00:21:31.9990000Z Job is waiting for a hosted runner to come online.\n2026-04-11T00:21:31.9860000Z Requested labels: ubuntu-latest\n2026-04-11T00:21:31.9860000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-11T00:21:31.9860000Z Waiting for a runner to pick up this job...\n2026-04-11T00:21:32.0080000Z Job is about to start running on the hosted runner: GitHub Actions 1000644998",
+          "file_path": "",
+          "fingerprint": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8",
+          "incident_key": null
+        },
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T20:02:12.971721+00:00",
+          "commit_sha": "2871efd43644f9bf222dca882a184e36f3e28d4a",
+          "workflow_run_id": 24294869067,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-valgrind-test",
+          "matrix_params": {},
+          "failure_identifier": "test-valgrind-test",
+          "test_name": null,
+          "error_signature": "2026-04-12T00:24:05.0280000Z Evaluating test-valgrind-test.if\n2026-04-12T00:24:05.0280000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'valgrind') && !contains(github.event.inputs.skiptests, 'valkey'))))\n2026-04-12T00:24:05.0280000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'valgrind') && !contains(null, 'valkey')))\n2026-04-12T00:24:05.0280000Z Result: true\n2026-04-12T00:24:05.2610000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.2610000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.2610000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.2790000Z Job is about to start running on the hosted runner: GitHub Actions 1000646070\n2026-04-12T00:24:05.2780000Z Job is waiting for a hosted runner to come online.",
           "file_path": "",
           "fingerprint": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8",
           "incident_key": null
@@ -8686,6 +8898,32 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null,
+          "incident_key": null
+        }
+      ]
+    },
+    "305f823ad93cebf1c599f5987b66a910ace0b17f253421b25466cfea317052e8": {
+      "key": "305f823ad93cebf1c599f5987b66a910ace0b17f253421b25466cfea317052e8",
+      "workflow_file": "daily.yml",
+      "job_name": "test-ubuntu-tls-no-tls",
+      "matrix_params": {},
+      "failure_identifier": "test-ubuntu-tls-no-tls",
+      "test_name": null,
+      "observations": [
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T20:02:01.424682+00:00",
+          "commit_sha": "2871efd43644f9bf222dca882a184e36f3e28d4a",
+          "workflow_run_id": 24294869067,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-tls-no-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-tls-no-tls",
+          "test_name": null,
+          "error_signature": "2026-04-12T00:24:05.0260000Z Requested labels: ubuntu-latest\n2026-04-12T00:24:05.0260000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-12T00:24:05.0260000Z Waiting for a runner to pick up this job...\n2026-04-12T00:24:05.0230000Z Evaluating test-ubuntu-tls-no-tls.if\n2026-04-12T00:24:05.0230000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-12T00:24:05.0230000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'tls')))\n2026-04-12T00:24:05.0230000Z Result: true\n2026-04-12T00:24:05.0300000Z Job is about to start running on the hosted runner: GitHub Actions 1000646042\n2026-04-12T00:24:05.0300000Z Job is waiting for a hosted runner to come online.",
+          "file_path": "",
+          "fingerprint": "81c1d71313aa4a43ade9407470ebf397a8f4e0cab5378be1ebed0d1fbfd1525f",
           "incident_key": null
         }
       ]
