@@ -38,6 +38,7 @@ def test_monitor_workflow_uses_oidc_and_matrixed_ci_scope() -> None:
     assert "github.event_name != 'workflow_dispatch'" in job_env["MONITOR_DRY_RUN"]
     assert job_env["MONITOR_WORKFLOW_FILE"] == "${{ matrix.workflow_file }}"
     assert job_env["MONITOR_EVENTS"] == "${{ matrix.monitor_events }}"
+    assert "matrix.scope" in job_env["MONITOR_SCOPE_SELECTED"]
     assert job_env["VALKEY_GITHUB_TOKEN"] == "${{ secrets.VALKEY_GITHUB_TOKEN }}"
     assert job_env["VALKEY_GITHUB_APP_ID"] == "${{ vars.VALKEY_GITHUB_APP_ID || '' }}"
     assert job_env["VALKEY_GITHUB_APP_PRIVATE_KEY"] == "${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}"
@@ -100,6 +101,16 @@ def test_monitor_workflow_runs_central_monitor_script_for_matrix_entries() -> No
         for step in monitor_steps
         if step["name"] == "Monitor and queue Valkey workflow failures"
     )
+    checkout_step = next(
+        step
+        for step in monitor_steps
+        if step["name"] == "Check out agent repository"
+    )
+    capture_step = next(
+        step
+        for step in monitor_steps
+        if step["name"] == "Capture monitor outputs"
+    )
     script = run_step["run"]
     assert "-m scripts.monitor_workflow_runs" in script
     assert '--workflow-file "${MONITOR_WORKFLOW_FILE}"' in script
@@ -107,6 +118,9 @@ def test_monitor_workflow_runs_central_monitor_script_for_matrix_entries() -> No
     assert "--queue-only" in script
     assert "read -ra monitor_events" in script
     assert 'args+=(--event "${event_name}")' in script
+    assert "env.MONITOR_SCOPE_SELECTED == 'true'" in checkout_step["if"]
+    assert "env.MONITOR_SCOPE_SELECTED == 'true'" in run_step["if"]
+    assert "env.MONITOR_SCOPE_SELECTED == 'true'" in capture_step["if"]
 
     preflight_step = next(
         step
@@ -150,6 +164,7 @@ def test_monitor_workflow_builds_dashboard_in_separate_job() -> None:
 
     assert dashboard_job["needs"] == "monitor"
     assert dashboard_job["concurrency"]["group"] == "monitor-valkey-ci-dashboard"
+    assert "workflow_scope == 'daily'" in dashboard_job["if"]
 
     download_step = next(
         step
