@@ -10,6 +10,7 @@ preserved.
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -381,6 +382,57 @@ def test_load_raises_on_non_missing_remote_error() -> None:
 
     with pytest.raises(RuntimeError, match="failed to load failure store"):
         store.load()
+
+
+def test_load_falls_back_to_download_url_when_contents_encoding_is_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = MagicMock()
+    contents = MagicMock()
+    contents.encoding = None
+    contents.content = ""
+    contents.download_url = "https://example.test/failure-store.json"
+    type(contents).decoded_content = property(
+        lambda self: (_ for _ in ()).throw(AssertionError("unsupported encoding: none"))
+    )
+    repo.get_contents.return_value = contents
+    gh = MagicMock()
+    gh.get_repo.return_value = repo
+    store = FailureStore(gh, "owner/repo")
+
+    class _Response:
+        def __enter__(self) -> "_Response":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "entries": {
+                        "fp1": {
+                            "fingerprint": "fp1",
+                            "failure_identifier": "suite.case",
+                            "incident_key": "fp1",
+                            "error_signature": "boom",
+                            "file_path": "src/foo.c",
+                            "status": "open",
+                            "created_at": "2026-04-13T00:00:00+00:00",
+                            "updated_at": "2026-04-13T00:00:00+00:00",
+                        }
+                    }
+                }
+            ).encode("utf-8")
+
+    monkeypatch.setattr(
+        "scripts.failure_store.urllib_request.urlopen",
+        lambda request, timeout=30: _Response(),
+    )
+
+    store.load()
+
+    assert "fp1" in store.entries
 
 
 def test_compute_incident_key_ignores_runner_specific_error_text() -> None:

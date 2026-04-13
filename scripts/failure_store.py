@@ -5,10 +5,12 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from base64 import b64decode
 from datetime import datetime, timezone
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
 from urllib import parse as urllib_parse
+from urllib import request as urllib_request
 
 from github.GithubException import GithubException
 
@@ -70,6 +72,27 @@ def _parse_pr_url(pr_url: str) -> tuple[str, int] | None:
         return f"{parts[0]}/{parts[1]}", int(parts[3])
     except ValueError:
         return None
+
+
+def _read_repo_file_text(contents: Any) -> str:
+    """Read a GitHub contents response as UTF-8 text with API fallbacks."""
+    try:
+        return contents.decoded_content.decode()
+    except AssertionError:
+        encoding = getattr(contents, "encoding", None)
+        content = getattr(contents, "content", None)
+        if isinstance(content, str) and encoding == "base64":
+            return b64decode(content.encode("utf-8")).decode()
+
+        download_url = getattr(contents, "download_url", None)
+        if isinstance(download_url, str) and download_url:
+            request = urllib_request.Request(
+                download_url,
+                headers={"Accept": "application/vnd.github.raw+json"},
+            )
+            with urllib_request.urlopen(request, timeout=30) as response:
+                return response.read().decode("utf-8")
+        raise
 
 
 class FailureStore:
@@ -1022,7 +1045,7 @@ class FailureStore:
             contents = repo.get_contents(_STORE_FILE, ref=_STORE_BRANCH)
             if isinstance(contents, list):
                 raise ValueError("Failure store path resolved to a directory.")
-            data = json.loads(contents.decoded_content.decode())
+            data = json.loads(_read_repo_file_text(contents))
             self.from_dict(data)
             logger.info("Loaded %d entries from failure store.", len(self._entries))
         except Exception as exc:

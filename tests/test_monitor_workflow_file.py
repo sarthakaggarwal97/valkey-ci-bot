@@ -36,6 +36,7 @@ def test_monitor_workflow_uses_oidc_and_matrixed_ci_scope() -> None:
     assert workflow["env"]["FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"] is True
     assert "concurrency" not in workflow
     assert "github.event_name != 'workflow_dispatch'" in job_env["MONITOR_DRY_RUN"]
+    assert "matrix.max_runs" in job_env["MONITOR_MAX_RUNS"]
     assert job_env["MONITOR_WORKFLOW_FILE"] == "${{ matrix.workflow_file }}"
     assert job_env["MONITOR_EVENTS"] == "${{ matrix.monitor_events }}"
     assert "matrix.scope" in job_env["MONITOR_SCOPE_SELECTED"]
@@ -54,13 +55,13 @@ def test_monitor_workflow_uses_oidc_and_matrixed_ci_scope() -> None:
         "weekly",
     }
     assert {
-        (entry["workflow_file"], entry["monitor_events"])
+        (entry["workflow_file"], entry["monitor_events"], entry["max_runs"])
         for entry in matrix_entries
     } == {
-        ("ci.yml", "pull_request,push"),
-        ("daily.yml", "schedule,pull_request"),
-        ("external.yml", "schedule,pull_request,push"),
-        ("weekly.yml", "schedule"),
+        ("ci.yml", "pull_request,push", "14"),
+        ("daily.yml", "schedule,pull_request", "14"),
+        ("external.yml", "schedule,pull_request,push", "14"),
+        ("weekly.yml", "schedule", "4"),
     }
 
     app_token_step = next(
@@ -118,6 +119,8 @@ def test_monitor_workflow_runs_central_monitor_script_for_matrix_entries() -> No
     assert "--queue-only" in script
     assert "read -ra monitor_events" in script
     assert 'args+=(--event "${event_name}")' in script
+    assert "raw_result = result_path.read_text(encoding=\"utf-8\").strip()" in capture_step["run"]
+    assert "except json.JSONDecodeError" in capture_step["run"]
     assert "env.MONITOR_SCOPE_SELECTED == 'true'" in checkout_step["if"]
     assert "env.MONITOR_SCOPE_SELECTED == 'true'" in run_step["if"]
     assert "env.MONITOR_SCOPE_SELECTED == 'true'" in capture_step["if"]
