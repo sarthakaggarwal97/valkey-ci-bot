@@ -339,6 +339,31 @@ def test_build_dashboard_summarizes_agent_capabilities() -> None:
     assert dashboard["trends"]["flaky_subsystems"]["top_subsystems"] == ["memory"]
 
 
+def test_build_dashboard_exposes_campaign_pr_links_from_failure_store() -> None:
+    failure_store = _failure_store()
+    failure_store["entries"]["campaign-active"] = {
+        "fingerprint": "campaign-active",
+        "failure_identifier": "maxmemory-eviction",
+        "status": "open",
+        "file_path": "tests/unit/maxmemory.tcl",
+        "pr_url": "https://github.com/valkey-io/valkey/pull/42",
+        "updated_at": "2026-04-08T12:30:00+00:00",
+    }
+
+    dashboard = build_dashboard(
+        failure_store=failure_store,
+        generated_at="2026-04-08T03:00:00+00:00",
+    )
+
+    active_campaign = next(
+        campaign
+        for campaign in dashboard["flaky_tests"]["recent_campaigns"]
+        if campaign["fingerprint"] == "campaign-active"
+    )
+
+    assert active_campaign["pr_url"] == "https://github.com/valkey-io/valkey/pull/42"
+
+
 def test_render_markdown_includes_all_dashboards() -> None:
     dashboard = build_dashboard(
         failure_store=_failure_store(),

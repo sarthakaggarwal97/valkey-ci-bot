@@ -404,6 +404,11 @@ def _build_ci_failure_metrics(
 
 def _build_flaky_metrics(failure_store: JsonObject) -> JsonObject:
     campaigns = _flaky_campaigns(failure_store)
+    entry_pr_urls = {
+        _str(entry.get("fingerprint")): _str(entry.get("pr_url"))
+        for entry in _failure_entries(failure_store)
+        if _str(entry.get("fingerprint")) and _str(entry.get("pr_url"))
+    }
     status_counts = Counter(
         _str(campaign.get("status"), "unknown") for campaign in campaigns
     )
@@ -437,6 +442,9 @@ def _build_flaky_metrics(failure_store: JsonObject) -> JsonObject:
         if subsystem:
             campaign["subsystem"] = subsystem
             subsystem_counts[subsystem] += 1
+        pr_url = entry_pr_urls.get(_str(campaign.get("fingerprint")))
+        if pr_url:
+            campaign["pr_url"] = pr_url
     return {
         "campaigns": len(campaigns),
         "active_campaigns": len(active),
