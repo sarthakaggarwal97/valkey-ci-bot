@@ -1747,12 +1747,12 @@
       "failure_identifier": "test-ubuntu-latest",
       "test_name": null,
       "incident_key": "3b7a42fe123edba45b5465d47a6402d7aa197aefc7ff4c05f555182b0611037e",
-      "error_signature": "2026-04-08T13:06:16.8070000Z Requested labels: ubuntu-latest\n2026-04-08T13:06:16.8070000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/unstable\n2026-04-08T13:06:16.8070000Z Waiting for a runner to pick up this job...\n2026-04-08T13:06:16.8020000Z Evaluating test-ubuntu-latest.if\n2026-04-08T13:06:16.8020000Z Evaluating: success()\n2026-04-08T13:06:16.8020000Z Result: true\n2026-04-08T13:06:17.0240000Z Job is waiting for a hosted runner to come online.\n2026-04-08T13:06:17.0240000Z Job is about to start running on the hosted runner: GitHub Actions 1000636686",
+      "error_signature": "2026-04-07T12:56:35.7210000Z Evaluating test-ubuntu-latest.if\n2026-04-07T12:56:35.7210000Z Evaluating: success()\n2026-04-07T12:56:35.7210000Z Result: true\n2026-04-07T12:56:35.8640000Z Requested labels: ubuntu-latest\n2026-04-07T12:56:35.8640000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/unstable\n2026-04-07T12:56:35.8640000Z Waiting for a runner to pick up this job...\n2026-04-07T12:56:35.8840000Z Job is waiting for a hosted runner to come online.\n2026-04-07T12:56:35.8840000Z Job is about to start running on the hosted runner: GitHub Actions 1000634097",
       "file_path": "",
       "pr_url": null,
       "status": "processing",
       "created_at": "2026-04-13T06:28:48.754744+00:00",
-      "updated_at": "2026-04-13T06:29:25.917258+00:00",
+      "updated_at": "2026-04-13T06:28:48.754744+00:00",
       "queued_pr_payload": null,
       "campaign_status": null,
       "incident_observations": [
@@ -1768,22 +1768,6 @@
           "failure_identifier": "test-ubuntu-latest",
           "test_name": null,
           "error_signature": "2026-04-07T12:56:35.7210000Z Evaluating test-ubuntu-latest.if\n2026-04-07T12:56:35.7210000Z Evaluating: success()\n2026-04-07T12:56:35.7210000Z Result: true\n2026-04-07T12:56:35.8640000Z Requested labels: ubuntu-latest\n2026-04-07T12:56:35.8640000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/unstable\n2026-04-07T12:56:35.8640000Z Waiting for a runner to pick up this job...\n2026-04-07T12:56:35.8840000Z Job is waiting for a hosted runner to come online.\n2026-04-07T12:56:35.8840000Z Job is about to start running on the hosted runner: GitHub Actions 1000634097",
-          "file_path": "",
-          "fingerprint": "3b7a42fe123edba45b5465d47a6402d7aa197aefc7ff4c05f555182b0611037e",
-          "incident_key": "3b7a42fe123edba45b5465d47a6402d7aa197aefc7ff4c05f555182b0611037e"
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-13T06:29:25.917370+00:00",
-          "commit_sha": "f6b5461b7348987da65f17a8c072ab46e93baaa4",
-          "workflow_run_id": 24136929274,
-          "workflow_name": "CI",
-          "workflow_file": "ci.yml",
-          "job_name": "test-ubuntu-latest",
-          "matrix_params": {},
-          "failure_identifier": "test-ubuntu-latest",
-          "test_name": null,
-          "error_signature": "2026-04-08T13:06:16.8070000Z Requested labels: ubuntu-latest\n2026-04-08T13:06:16.8070000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/unstable\n2026-04-08T13:06:16.8070000Z Waiting for a runner to pick up this job...\n2026-04-08T13:06:16.8020000Z Evaluating test-ubuntu-latest.if\n2026-04-08T13:06:16.8020000Z Evaluating: success()\n2026-04-08T13:06:16.8020000Z Result: true\n2026-04-08T13:06:17.0240000Z Job is waiting for a hosted runner to come online.\n2026-04-08T13:06:17.0240000Z Job is about to start running on the hosted runner: GitHub Actions 1000636686",
           "file_path": "",
           "fingerprint": "3b7a42fe123edba45b5465d47a6402d7aa197aefc7ff4c05f555182b0611037e",
           "incident_key": "3b7a42fe123edba45b5465d47a6402d7aa197aefc7ff4c05f555182b0611037e"
@@ -7352,22 +7336,6 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null,
-          "incident_key": null
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-13T06:29:25.917442+00:00",
-          "commit_sha": "f6b5461b7348987da65f17a8c072ab46e93baaa4",
-          "workflow_run_id": 24136929274,
-          "workflow_name": "CI",
-          "workflow_file": "ci.yml",
-          "job_name": "test-ubuntu-latest",
-          "matrix_params": {},
-          "failure_identifier": "test-ubuntu-latest",
-          "test_name": null,
-          "error_signature": "2026-04-08T13:06:16.8070000Z Requested labels: ubuntu-latest\n2026-04-08T13:06:16.8070000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/unstable\n2026-04-08T13:06:16.8070000Z Waiting for a runner to pick up this job...\n2026-04-08T13:06:16.8020000Z Evaluating test-ubuntu-latest.if\n2026-04-08T13:06:16.8020000Z Evaluating: success()\n2026-04-08T13:06:16.8020000Z Result: true\n2026-04-08T13:06:17.0240000Z Job is waiting for a hosted runner to come online.\n2026-04-08T13:06:17.0240000Z Job is about to start running on the hosted runner: GitHub Actions 1000636686",
-          "file_path": "",
-          "fingerprint": "3b7a42fe123edba45b5465d47a6402d7aa197aefc7ff4c05f555182b0611037e",
           "incident_key": null
         }
       ]
