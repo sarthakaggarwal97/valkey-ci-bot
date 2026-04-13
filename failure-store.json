@@ -1789,6 +1789,38 @@
           "incident_key": "3b7a42fe123edba45b5465d47a6402d7aa197aefc7ff4c05f555182b0611037e"
         }
       ]
+    },
+    "ac32160917926c4bdee1b1665028c51cc22bb9599d1814cd42980bdded3b4c90": {
+      "fingerprint": "ac32160917926c4bdee1b1665028c51cc22bb9599d1814cd42980bdded3b4c90",
+      "failure_identifier": "test-ubuntu-latest-cmake-tls",
+      "test_name": null,
+      "incident_key": "ac32160917926c4bdee1b1665028c51cc22bb9599d1814cd42980bdded3b4c90",
+      "error_signature": "2026-04-10T15:56:04.6830000Z Job is about to start running on the hosted runner: GitHub Actions 1000643676\n2026-04-10T15:56:04.6830000Z Job is waiting for a hosted runner to come online.\n2026-04-10T15:56:04.6770000Z Requested labels: ubuntu-latest\n2026-04-10T15:56:04.6770000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/forkless\n2026-04-10T15:56:04.6770000Z Waiting for a runner to pick up this job...\n2026-04-10T15:56:04.6720000Z Evaluating test-ubuntu-latest-cmake-tls.if\n2026-04-10T15:56:04.6720000Z Evaluating: success()\n2026-04-10T15:56:04.6720000Z Result: true",
+      "file_path": "",
+      "pr_url": null,
+      "status": "processing",
+      "created_at": "2026-04-13T06:30:40.396007+00:00",
+      "updated_at": "2026-04-13T06:30:40.396007+00:00",
+      "queued_pr_payload": null,
+      "campaign_status": null,
+      "incident_observations": [
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T06:30:40.396082+00:00",
+          "commit_sha": "3f88d60ceea7268f6e8c1b5c0e75010bb32ecb25",
+          "workflow_run_id": 24251753532,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-ubuntu-latest-cmake-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-latest-cmake-tls",
+          "test_name": null,
+          "error_signature": "2026-04-10T15:56:04.6830000Z Job is about to start running on the hosted runner: GitHub Actions 1000643676\n2026-04-10T15:56:04.6830000Z Job is waiting for a hosted runner to come online.\n2026-04-10T15:56:04.6770000Z Requested labels: ubuntu-latest\n2026-04-10T15:56:04.6770000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/forkless\n2026-04-10T15:56:04.6770000Z Waiting for a runner to pick up this job...\n2026-04-10T15:56:04.6720000Z Evaluating test-ubuntu-latest-cmake-tls.if\n2026-04-10T15:56:04.6720000Z Evaluating: success()\n2026-04-10T15:56:04.6720000Z Result: true",
+          "file_path": "",
+          "fingerprint": "ac32160917926c4bdee1b1665028c51cc22bb9599d1814cd42980bdded3b4c90",
+          "incident_key": "ac32160917926c4bdee1b1665028c51cc22bb9599d1814cd42980bdded3b4c90"
+        }
+      ]
     }
   },
   "history": {
@@ -7496,6 +7528,32 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null,
+          "incident_key": null
+        }
+      ]
+    },
+    "9b7e2e987b5617599abc3c10d0e016cc7cdd5a2a9fcafe8857fa2fa46a6b9c6c": {
+      "key": "9b7e2e987b5617599abc3c10d0e016cc7cdd5a2a9fcafe8857fa2fa46a6b9c6c",
+      "workflow_file": "ci.yml",
+      "job_name": "test-ubuntu-latest-cmake-tls",
+      "matrix_params": {},
+      "failure_identifier": "test-ubuntu-latest-cmake-tls",
+      "test_name": null,
+      "observations": [
+        {
+          "outcome": "fail",
+          "observed_at": "2026-04-13T06:30:40.396120+00:00",
+          "commit_sha": "3f88d60ceea7268f6e8c1b5c0e75010bb32ecb25",
+          "workflow_run_id": 24251753532,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-ubuntu-latest-cmake-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-latest-cmake-tls",
+          "test_name": null,
+          "error_signature": "2026-04-10T15:56:04.6830000Z Job is about to start running on the hosted runner: GitHub Actions 1000643676\n2026-04-10T15:56:04.6830000Z Job is waiting for a hosted runner to come online.\n2026-04-10T15:56:04.6770000Z Requested labels: ubuntu-latest\n2026-04-10T15:56:04.6770000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/forkless\n2026-04-10T15:56:04.6770000Z Waiting for a runner to pick up this job...\n2026-04-10T15:56:04.6720000Z Evaluating test-ubuntu-latest-cmake-tls.if\n2026-04-10T15:56:04.6720000Z Evaluating: success()\n2026-04-10T15:56:04.6720000Z Result: true",
+          "file_path": "",
+          "fingerprint": "ac32160917926c4bdee1b1665028c51cc22bb9599d1814cd42980bdded3b4c90",
           "incident_key": null
         }
       ]
