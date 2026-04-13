@@ -12,5 +12,12 @@
     "workflow_file": "fuzzer-run.yml",
     "event": "schedule",
     "updated_at": "2026-04-13T04:02:32.136096+00:00"
+  },
+  "valkey-io/valkey:external.yml:schedule,pull_request,push": {
+    "last_seen_run_id": 24323835435,
+    "target_repo": "valkey-io/valkey",
+    "workflow_file": "external.yml",
+    "event": "schedule,pull_request,push",
+    "updated_at": "2026-04-13T06:31:10.418682+00:00"
   }
 }
