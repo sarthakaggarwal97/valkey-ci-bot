@@ -2811,6 +2811,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807437+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-fedorarawhide-tls-module-no-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-fedorarawhide-tls-module-no-tls",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -3227,6 +3243,22 @@
           "observed_at": "2026-04-13T14:21:02.076317+00:00",
           "commit_sha": "fb655dbf5cfaf254e0b8bb6617f1f734dbebc07d",
           "workflow_run_id": 23928112441,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-32bit",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-32bit",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807385+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-ubuntu-32bit",
@@ -4179,6 +4211,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807320+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-jemalloc",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-jemalloc",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -4727,6 +4775,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807376+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-arm",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-arm",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -5009,6 +5073,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:56.120442+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-almalinux9-jemalloc",
+          "matrix_params": {},
+          "failure_identifier": "test-almalinux9-jemalloc",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -5227,6 +5307,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807473+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-almalinux9-tls-module-no-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-almalinux9-tls-module-no-tls",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -5419,6 +5515,22 @@
           "observed_at": "2026-04-13T14:21:02.076380+00:00",
           "commit_sha": "fb655dbf5cfaf254e0b8bb6617f1f734dbebc07d",
           "workflow_run_id": 23928112441,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-centosstream9-tls-module-no-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-centosstream9-tls-module-no-tls",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:56.120417+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-centosstream9-tls-module-no-tls",
@@ -5631,6 +5743,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807505+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-fedorarawhide-jemalloc",
+          "matrix_params": {},
+          "failure_identifier": "test-fedorarawhide-jemalloc",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -5829,6 +5957,24 @@
           "observed_at": "2026-04-13T14:21:03.025304+00:00",
           "commit_sha": "fb655dbf5cfaf254e0b8bb6617f1f734dbebc07d",
           "workflow_run_id": 23928112441,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-sanitizer-undefined (clang)",
+          "matrix_params": {
+            "param_0": "clang"
+          },
+          "failure_identifier": "test-sanitizer-undefined (clang)",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807429+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-sanitizer-undefined (clang)",
@@ -6107,6 +6253,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:56.120525+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-almalinux8-tls-module",
+          "matrix_params": {},
+          "failure_identifier": "test-almalinux8-tls-module",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -6373,6 +6535,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807496+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-almalinux8-tls-module-no-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-almalinux8-tls-module-no-tls",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -6597,6 +6775,22 @@
           "observed_at": "2026-04-13T14:21:02.076490+00:00",
           "commit_sha": "fb655dbf5cfaf254e0b8bb6617f1f734dbebc07d",
           "workflow_run_id": 23928112441,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-almalinux9-tls-module",
+          "matrix_params": {},
+          "failure_identifier": "test-almalinux9-tls-module",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:56.120508+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-almalinux9-tls-module",
@@ -6857,6 +7051,22 @@
           "file_path": "",
           "fingerprint": "0245877d4f958858296bf004c60f89b703eefb01589fdb6820540fe3bf57c375",
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:56.120486+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-almalinux8-jemalloc",
+          "matrix_params": {},
+          "failure_identifier": "test-almalinux8-jemalloc",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -7075,6 +7285,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:56.120533+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "reply-schemas-validator",
+          "matrix_params": {},
+          "failure_identifier": "reply-schemas-validator",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -7260,6 +7486,22 @@
           "error_signature": "2026-04-03T00:21:25.0490000Z Evaluating test-rpm-distros-jemalloc.if\n2026-04-03T00:21:25.0490000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-04-03T00:21:25.0490000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-04-03T00:21:25.0490000Z Result: true\n2026-04-03T00:21:25.3290000Z Requested labels: ubuntu-latest\n2026-04-03T00:21:25.3290000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-03T00:21:25.3290000Z Waiting for a runner to pick up this job...\n2026-04-03T00:21:25.6300000Z Job is waiting for a hosted runner to come online.\n2026-04-03T00:21:25.6290000Z Job is about to start running on the hosted runner: GitHub Actions 1000626627",
           "file_path": "",
           "fingerprint": "fd279a97e8aa9fab75e541e6d3d73867b10c8da7f76eb1955e571719f852292f",
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:56.120471+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-fedoralatest-jemalloc",
+          "matrix_params": {},
+          "failure_identifier": "test-fedoralatest-jemalloc",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
           "incident_key": null
         }
       ]
@@ -7899,6 +8141,24 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807464+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-sanitizer-address (gcc)",
+          "matrix_params": {
+            "param_0": "gcc"
+          },
+          "failure_identifier": "test-sanitizer-address (gcc)",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -8011,6 +8271,22 @@
           "observed_at": "2026-04-13T14:21:02.076372+00:00",
           "commit_sha": "fb655dbf5cfaf254e0b8bb6617f1f734dbebc07d",
           "workflow_run_id": 23928112441,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-sanitizer-force-defrag",
+          "matrix_params": {},
+          "failure_identifier": "test-sanitizer-force-defrag",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:56.120453+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-sanitizer-force-defrag",
@@ -8143,6 +8419,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807512+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-lttng",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-lttng",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -8265,6 +8557,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807361+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-no-malloc-usable-size",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-no-malloc-usable-size",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -8371,6 +8679,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:56.120495+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-reclaim-cache",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-reclaim-cache",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -8445,6 +8769,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807454+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-alpine-libc-malloc",
+          "matrix_params": {},
+          "failure_identifier": "test-alpine-libc-malloc",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -8503,6 +8843,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807446+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-centosstream9-jemalloc",
+          "matrix_params": {},
+          "failure_identifier": "test-centosstream9-jemalloc",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -8551,6 +8907,22 @@
           "observed_at": "2026-04-13T14:21:02.076326+00:00",
           "commit_sha": "fb655dbf5cfaf254e0b8bb6617f1f734dbebc07d",
           "workflow_run_id": 23928112441,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-tls",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807351+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-ubuntu-tls",
@@ -8815,6 +9187,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:56.120517+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-centosstream9-tls-module",
+          "matrix_params": {},
+          "failure_identifier": "test-centosstream9-tls-module",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -8857,6 +9245,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:56.120462+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-fedoralatest-tls-module",
+          "matrix_params": {},
+          "failure_identifier": "test-fedoralatest-tls-module",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -8889,6 +9293,22 @@
           "observed_at": "2026-04-13T14:21:03.025320+00:00",
           "commit_sha": "fb655dbf5cfaf254e0b8bb6617f1f734dbebc07d",
           "workflow_run_id": 23928112441,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-fedoralatest-tls-module-no-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-fedoralatest-tls-module-no-tls",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807520+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-fedoralatest-tls-module-no-tls",
@@ -8947,6 +9367,24 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807488+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-sanitizer-address (clang)",
+          "matrix_params": {
+            "param_0": "clang"
+          },
+          "failure_identifier": "test-sanitizer-address (clang)",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -8989,6 +9427,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807342+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-jemalloc-fortify",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-jemalloc-fortify",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -9021,6 +9475,22 @@
           "observed_at": "2026-04-13T14:21:02.076498+00:00",
           "commit_sha": "fb655dbf5cfaf254e0b8bb6617f1f734dbebc07d",
           "workflow_run_id": 23928112441,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-tls-no-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-tls-no-tls",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:21:54.807368+00:00",
+          "commit_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+          "workflow_run_id": 23967098766,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-ubuntu-tls-no-tls",
