@@ -4067,6 +4067,22 @@
           "file_path": "",
           "fingerprint": "6da3eeda4a284676bce06dfc3233f038f426bef450eaca9f363930d15e532509",
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:17:35.222920+00:00",
+          "commit_sha": "2e12d27b97f5bda8400275f66ae7838516912544",
+          "workflow_run_id": 23877358428,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-jemalloc",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-jemalloc",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -4599,6 +4615,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:17:35.222898+00:00",
+          "commit_sha": "2e12d27b97f5bda8400275f66ae7838516912544",
+          "workflow_run_id": 23877358428,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-arm",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-arm",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -5082,6 +5114,22 @@
           "error_signature": "2026-03-31T00:21:21.4410000Z Evaluating test-rpm-distros-tls-module-no-tls.if\n2026-03-31T00:21:21.4410000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-03-31T00:21:21.4410000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'tls')))\n2026-03-31T00:21:21.4410000Z Result: true\n2026-03-31T00:21:21.6260000Z Requested labels: ubuntu-latest\n2026-03-31T00:21:21.6260000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-31T00:21:21.6260000Z Waiting for a runner to pick up this job...\n2026-03-31T00:21:21.7890000Z Job is waiting for a hosted runner to come online.\n2026-03-31T00:21:21.7890000Z Job is about to start running on the hosted runner: GitHub Actions 1000615347",
           "file_path": "",
           "fingerprint": "37bedfd3c1826dfc3339168fb61ca34f12359fe856690f3034e221992dbe7564",
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:17:36.699184+00:00",
+          "commit_sha": "2e12d27b97f5bda8400275f66ae7838516912544",
+          "workflow_run_id": 23877358428,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-almalinux9-tls-module-no-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-almalinux9-tls-module-no-tls",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
           "incident_key": null
         }
       ]
@@ -5664,6 +5712,24 @@
           "error_signature": "2026-03-31T00:21:21.4420000Z Evaluating test-sanitizer-undefined.if\n2026-03-31T00:21:21.4420000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-03-31T00:21:21.4420000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-03-31T00:21:21.4420000Z Result: true\n2026-03-31T00:21:21.7620000Z Requested labels: ubuntu-latest\n2026-03-31T00:21:21.7620000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-03-31T00:21:21.7620000Z Waiting for a runner to pick up this job...\n2026-03-31T00:21:21.9550000Z Job is about to start running on the hosted runner: GitHub Actions 1000615356\n2026-03-31T00:21:21.9550000Z Job is waiting for a hosted runner to come online.",
           "file_path": "",
           "fingerprint": "979aaa4fd37c41903d76452414855c8b507cfc6dce16fa15d2e83e886c091426",
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:17:36.699214+00:00",
+          "commit_sha": "2e12d27b97f5bda8400275f66ae7838516912544",
+          "workflow_run_id": 23877358428,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-sanitizer-undefined (clang)",
+          "matrix_params": {
+            "param_0": "clang"
+          },
+          "failure_identifier": "test-sanitizer-undefined (clang)",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
           "incident_key": null
         }
       ]
@@ -6851,6 +6917,22 @@
           "file_path": "",
           "fingerprint": "6b8b1f58eff7c3697ffaf57df9805140320c95e9a9e21a4abdbff973673d8b13",
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:17:35.223000+00:00",
+          "commit_sha": "2e12d27b97f5bda8400275f66ae7838516912544",
+          "workflow_run_id": 23877358428,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "reply-schemas-validator",
+          "matrix_params": {},
+          "failure_identifier": "reply-schemas-validator",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -7165,6 +7247,22 @@
           "observed_at": "2026-04-13T14:14:13.419237+00:00",
           "commit_sha": "95860937d555ce13b6cad32b7c3510fceb809861",
           "workflow_run_id": 23825749975,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-valgrind-test",
+          "matrix_params": {},
+          "failure_identifier": "test-valgrind-test",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:17:35.222931+00:00",
+          "commit_sha": "2e12d27b97f5bda8400275f66ae7838516912544",
+          "workflow_run_id": 23877358428,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-valgrind-test",
@@ -7625,6 +7723,24 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:17:35.222956+00:00",
+          "commit_sha": "2e12d27b97f5bda8400275f66ae7838516912544",
+          "workflow_run_id": 23877358428,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-sanitizer-address (gcc)",
+          "matrix_params": {
+            "param_0": "gcc"
+          },
+          "failure_identifier": "test-sanitizer-address (gcc)",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -7737,6 +7853,22 @@
           "observed_at": "2026-04-13T14:14:13.419202+00:00",
           "commit_sha": "95860937d555ce13b6cad32b7c3510fceb809861",
           "workflow_run_id": 23825749975,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-sanitizer-force-defrag",
+          "matrix_params": {},
+          "failure_identifier": "test-sanitizer-force-defrag",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:17:35.222980+00:00",
+          "commit_sha": "2e12d27b97f5bda8400275f66ae7838516912544",
+          "workflow_run_id": 23877358428,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-sanitizer-force-defrag",
@@ -8055,6 +8187,22 @@
           "observed_at": "2026-04-13T14:14:13.419212+00:00",
           "commit_sha": "95860937d555ce13b6cad32b7c3510fceb809861",
           "workflow_run_id": 23825749975,
+          "workflow_name": "Daily",
+          "workflow_file": "daily.yml",
+          "job_name": "test-ubuntu-reclaim-cache",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-reclaim-cache",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-13T14:17:35.223024+00:00",
+          "commit_sha": "2e12d27b97f5bda8400275f66ae7838516912544",
+          "workflow_run_id": 23877358428,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-ubuntu-reclaim-cache",
