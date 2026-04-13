@@ -94,16 +94,21 @@ def test_build_site_writes_multi_page_observability_site(tmp_path: Path) -> None
     acceptance_html = (site_dir / "acceptance.html").read_text(encoding="utf-8")
     site_css = (site_dir / "assets" / "site.css").read_text(encoding="utf-8")
 
-    assert "Operator Dashboard" in index_html
+    assert "Valkey Operator Dashboard" in index_html
+    assert 'alt="Valkey logo"' in index_html
+    assert "Open+Sans" in index_html
     assert "Data coverage" in index_html
     assert "Trend watch" in index_html
     assert "Failure heatmap" in daily_html
     assert "jemalloc / sanitize" in daily_html
+    assert "--heat-alpha:1.00" in daily_html
     assert "https://github.com/valkey-io/valkey/commit/abcd1234ef567890" in daily_html
     assert "Replay review cases" in review_html
     assert "https://github.com/valkey-io/valkey/pull/1" in review_html
     assert "Replay proof moved into the PRs page." in acceptance_html
-    assert "rgba(247, 95, 99, var(--heat-alpha))" in site_css
+    assert "#30176e" in site_css
+    assert '"Open Sans"' in site_css
+    assert "rgba(207, 60, 79, var(--heat-alpha))" in site_css
 
 
 def test_cli_reads_dashboard_json_and_writes_site(tmp_path: Path) -> None:
