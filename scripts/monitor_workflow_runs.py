@@ -258,6 +258,11 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                         if isinstance(getattr(run, "event", ""), str)
                         else ""
                     ),
+                    "created_at": (
+                        run.created_at.isoformat()
+                        if getattr(run, "created_at", None) is not None
+                        else ""
+                    ),
                     "conclusion": run.conclusion or "",
                     "head_sha": run.head_sha,
                     "html_url": run.html_url,

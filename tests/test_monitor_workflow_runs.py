@@ -37,6 +37,7 @@ def _run(run_id: int, conclusion: str) -> MagicMock:
     run.run_number = run_id - 900
     run.event = "schedule"
     run.conclusion = conclusion
+    run.created_at.isoformat.return_value = f"2026-04-{run_id - 94:02d}T02:00:00+00:00"
     run.head_sha = f"sha-{run_id}"
     run.html_url = f"https://github.com/valkey-io/valkey/actions/runs/{run_id}"
     return run
@@ -79,6 +80,7 @@ def test_monitor_processes_only_new_failed_runs_and_updates_watermark(
     result = monitor(_args())
 
     assert [item["run_id"] for item in result["runs"]] == [101, 102, 103]
+    assert result["runs"][0]["created_at"] == "2026-04-07T02:00:00+00:00"
     assert [item["action"] for item in result["runs"]] == [
         "processed-failure",
         "processed-failure",

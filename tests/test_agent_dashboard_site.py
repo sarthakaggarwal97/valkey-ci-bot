@@ -94,7 +94,7 @@ def test_build_site_writes_multi_page_observability_site(tmp_path: Path) -> None
     acceptance_html = (site_dir / "acceptance.html").read_text(encoding="utf-8")
     site_css = (site_dir / "assets" / "site.css").read_text(encoding="utf-8")
 
-    assert "Valkey Operator Dashboard" in index_html
+    assert "Operator Console" in index_html
     assert 'alt="Valkey logo"' in index_html
     assert "Open+Sans" in index_html
     assert "Data coverage" in index_html

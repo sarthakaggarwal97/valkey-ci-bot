@@ -94,6 +94,29 @@ jobs:
             --output acceptance-report.md \
             --json-output acceptance-report.json
 
+      - name: Download latest daily monitor snapshot
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id="$(gh run list \
+            --workflow "Monitor Valkey CI Failures" \
+            --branch "${DEFAULT_BRANCH}" \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId')"
+          if [[ -z "${run_id}" || "${run_id}" == "null" ]]; then
+            exit 0
+          fi
+          mkdir -p latest-daily
+          gh run download "${run_id}" \
+            --name "valkey-daily-monitor-result-${run_id}" \
+            --dir latest-daily
+
       - name: Download latest fuzzer analysis snapshot
         continue-on-error: true
         env:
@@ -133,6 +156,10 @@ jobs:
             --output-json agent-dashboard.json
             --output-html agent-dashboard.html
           )
+
+          if [[ -f "latest-daily/monitor-result.json" ]]; then
+            args+=(--daily-result "latest-daily/monitor-result.json")
+          fi
 
           if [[ -f "latest-fuzzer/fuzzer-monitor-result.json" ]]; then
             args+=(--fuzzer-result "latest-fuzzer/fuzzer-monitor-result.json")

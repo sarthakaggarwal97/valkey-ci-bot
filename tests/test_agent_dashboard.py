@@ -364,6 +364,53 @@ def test_build_dashboard_exposes_campaign_pr_links_from_failure_store() -> None:
     assert active_campaign["pr_url"] == "https://github.com/valkey-io/valkey/pull/42"
 
 
+def test_build_dashboard_backfills_daily_health_from_monitor_results() -> None:
+    dashboard = build_dashboard(
+        daily_results=[
+            {
+                "target_repo": "valkey-io/valkey",
+                "workflow_file": "daily.yml",
+                "runs": [
+                    {
+                        "run_id": 101,
+                        "created_at": "2026-04-07T02:00:00+00:00",
+                        "conclusion": "failure",
+                        "head_sha": "abcd1234ef567890",
+                        "html_url": "https://github.com/valkey-io/valkey/actions/runs/101",
+                        "job_outcomes": [
+                            {
+                                "job_name": "daily / linux",
+                                "failure_identifier": "cluster slot coverage",
+                                "outcome": "queued",
+                            }
+                        ],
+                    },
+                    {
+                        "run_id": 102,
+                        "created_at": "2026-04-08T02:00:00+00:00",
+                        "conclusion": "success",
+                        "head_sha": "bcde2345fa678901",
+                        "html_url": "https://github.com/valkey-io/valkey/actions/runs/102",
+                        "job_outcomes": [],
+                    },
+                ],
+            }
+        ],
+        generated_at="2026-04-08T03:00:00+00:00",
+    )
+
+    daily_health = dashboard["daily_health"]
+
+    assert daily_health["repo"] == "valkey-io/valkey"
+    assert daily_health["workflow"] == "daily.yml"
+    assert daily_health["total_runs"] == 2
+    assert daily_health["failed_runs"] == 1
+    assert daily_health["unique_failures"] == 1
+    assert daily_health["dates"] == ["2026-04-07", "2026-04-08"]
+    assert daily_health["runs"][0]["run_url"] == "https://github.com/valkey-io/valkey/actions/runs/102"
+    assert daily_health["heatmap"][0]["name"] == "cluster slot coverage"
+
+
 def test_render_markdown_includes_all_dashboards() -> None:
     dashboard = build_dashboard(
         failure_store=_failure_store(),

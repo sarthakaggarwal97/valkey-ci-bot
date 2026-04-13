@@ -19,11 +19,11 @@ from typing import Any
 JsonObject = dict[str, Any]
 
 _VISIBLE_PAGES: list[tuple[str, str, str]] = [
-    ("index.html", "Overview", "Control room"),
-    ("daily.html", "Daily CI", "Failures and campaigns"),
-    ("review.html", "PRs", "Review and replay"),
-    ("fuzzer.html", "Fuzzer", "Anomaly watch"),
-    ("ops.html", "Ops", "State and coverage"),
+    ("index.html", "Overview", "Summary"),
+    ("daily.html", "Daily CI", "Runs and failures"),
+    ("review.html", "PRs", "Review state"),
+    ("fuzzer.html", "Fuzzer", "Anomalies"),
+    ("ops.html", "Ops", "Coverage and state"),
 ]
 
 _ALIAS_PAGES: dict[str, tuple[str, str]] = {
@@ -722,19 +722,19 @@ def _layout(
       <section class="brand">
         <div class="brand-logo"><img src="assets/valkey-horizontal.svg" alt="Valkey logo"></div>
         <div class="brand-copy">
-          <p>Official Valkey CI surface</p>
-          <h1>Valkey Operator Dashboard</h1>
+          <p>Valkey CI</p>
+          <h1>Operator Console</h1>
           <span>{_html(repo_label)}</span>
         </div>
       </section>
       <nav class="nav">{_site_nav(current_page)}</nav>
       <section class="sidebar-card">
-        <p>Current posture</p>
+        <p>Status</p>
         <strong>{_html_cell(_chip(readiness))}</strong>
         <span>{_html(posture)}</span>
       </section>
       <section class="sidebar-card">
-        <p>Data coverage</p>
+        <p>Coverage</p>
         <strong>{_format_number(len(_coverage_items(dashboard)) - _missing_count(dashboard))}/{_format_number(len(_coverage_items(dashboard)))}</strong>
         <span>{_format_number(_missing_count(dashboard))} missing sources need follow-up</span>
       </section>
@@ -890,7 +890,7 @@ def _render_overview(dashboard: JsonObject) -> str:
         current_page="index.html",
         page_title="Overview",
         eyebrow="Control Room",
-        intro="Professional operator surface for the Valkey CI agent: Daily failure pressure, PR review posture, fuzzer anomalies, and state coverage without the presentation fluff.",
+        intro="Daily failures, review state, fuzzer anomalies, and source coverage in one console.",
         body=body,
         header_metrics=_overview_metrics(dashboard),
     )
@@ -1107,7 +1107,7 @@ def _render_daily(dashboard: JsonObject) -> str:
         current_page="daily.html",
         page_title="Daily CI",
         eyebrow="Failure Surface",
-        intro="One focused page for Daily: which failures recur, which commits broke recently, and which remediation loops are still active.",
+        intro="Recurring failures, recent commits, and active remediation loops.",
         body=body,
         header_metrics=_daily_metrics(dashboard),
     )
@@ -1284,7 +1284,7 @@ def _render_review(dashboard: JsonObject) -> str:
         current_page="review.html",
         page_title="PRs",
         eyebrow="Review Surface",
-        intro="Operator page for pull requests: tracked review state, replay evidence, and workflow contract checks in one place.",
+        intro="Tracked review state, replay evidence, and workflow contract checks.",
         body=body,
         header_metrics=_review_metrics(dashboard),
     )
@@ -1383,7 +1383,7 @@ def _render_fuzzer(dashboard: JsonObject) -> str:
         current_page="fuzzer.html",
         page_title="Fuzzer",
         eyebrow="Anomaly Watch",
-        intro="Dedicated surface for fuzzer anomalies: seeds, scenarios, issue actions, and root-cause classifications without digging through raw logs.",
+        intro="Fuzzer anomalies, seeds, issue actions, and root-cause classifications.",
         body=body,
         header_metrics=_fuzzer_metrics(dashboard),
     )
@@ -1550,7 +1550,7 @@ def _render_ops(dashboard: JsonObject) -> str:
         current_page="ops.html",
         page_title="Ops",
         eyebrow="State and Coverage",
-        intro="Operational backbone for the dashboard: source coverage, incident queue, event ledger, watermarks, and AI reliability counters.",
+        intro="Source coverage, incident queue, event ledger, watermarks, and AI counters.",
         body=body,
         header_metrics=_ops_metrics(dashboard),
     )

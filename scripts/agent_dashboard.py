@@ -708,6 +708,113 @@ def _build_state_health(
     }
 
 
+def _daily_failure_name(job_outcome: JsonObject) -> str:
+    failure_identifier = _str(job_outcome.get("failure_identifier")).strip()
+    if failure_identifier:
+        return failure_identifier
+    job_name = _str(job_outcome.get("job_name")).strip()
+    if job_name:
+        return f"Process error: {job_name}"
+    outcome = _str(job_outcome.get("outcome")).strip()
+    return outcome or "workflow failure"
+
+
+def _build_daily_health_fallback(
+    daily_results: list[JsonObject],
+) -> JsonObject:
+    from scripts.daily_health_report import build_report_data
+
+    normalized_runs: list[JsonObject] = []
+    repo_full_name = ""
+    workflow_files: list[str] = []
+
+    for result in daily_results:
+        repo_full_name = repo_full_name or _str(result.get("target_repo"))
+        workflow_file = _str(result.get("workflow_file"))
+        if workflow_file and workflow_file not in workflow_files:
+            workflow_files.append(workflow_file)
+        for run in _list(result.get("runs")):
+            if not isinstance(run, dict):
+                continue
+            run_data = _mapping(run)
+            created_at = _parse_datetime(run_data.get("created_at"))
+            date = (
+                created_at.date().isoformat()
+                if created_at is not None
+                else _str(run_data.get("date"))
+            )
+            if not date:
+                continue
+
+            status = _str(run_data.get("conclusion") or run_data.get("status"), "unknown")
+            full_sha = _str(run_data.get("head_sha"))
+            job_outcomes = [
+                _mapping(item)
+                for item in _list(run_data.get("job_outcomes"))
+                if isinstance(item, dict)
+            ]
+            failure_names = sorted({_daily_failure_name(item) for item in job_outcomes if _daily_failure_name(item)})
+            failed_job_names = sorted(
+                {
+                    _str(item.get("job_name")).strip()
+                    for item in job_outcomes
+                    if _str(item.get("job_name")).strip()
+                }
+            )
+            failed_jobs = len(failed_job_names) or (len(failure_names) if status == "failure" else 0)
+
+            normalized_runs.append(
+                {
+                    "run_id": run_data.get("run_id"),
+                    "date": date,
+                    "status": status,
+                    "commit_sha": full_sha[:7] if full_sha else "",
+                    "full_sha": full_sha,
+                    "run_url": run_data.get("html_url") or run_data.get("run_url") or "",
+                    "total_jobs": failed_jobs,
+                    "failed_jobs": failed_jobs,
+                    "failed_job_names": failed_job_names,
+                    "unique_failures": len(failure_names),
+                    "failure_names": failure_names,
+                    "failure_jobs": {},
+                }
+            )
+
+    if not normalized_runs:
+        return {}
+
+    return build_report_data(
+        normalized_runs,
+        repo_full_name=repo_full_name or "valkey-io/valkey",
+        workflow_file=", ".join(workflow_files) or "daily monitor",
+        branch="unstable",
+    )
+
+
+def _coalesce_daily_health(
+    daily_health_data: JsonObject,
+    daily_results: list[JsonObject],
+) -> JsonObject:
+    reported = _mapping(daily_health_data)
+    derived = _build_daily_health_fallback(daily_results)
+    if not reported:
+        return derived
+    if not derived:
+        return reported
+
+    merged = dict(reported)
+    for key in ("repo", "workflow", "branch", "generated_at"):
+        if not _str(merged.get(key)):
+            merged[key] = derived.get(key, "")
+    for key in ("dates", "heatmap", "runs"):
+        if not _list(merged.get(key)):
+            merged[key] = derived.get(key, [])
+    for key in ("total_runs", "failed_runs", "unique_failures"):
+        if _int(merged.get(key)) == 0 and _int(derived.get(key)) > 0:
+            merged[key] = derived.get(key, 0)
+    return merged
+
+
 def build_dashboard(
     *,
     failure_store: JsonObject | None = None,
@@ -782,7 +889,7 @@ def build_dashboard(
         "ai_reliability": ai_reliability,
         "state_health": state_health,
         "trends": trend_metrics,
-        "daily_health": daily_health_data or {},
+        "daily_health": _coalesce_daily_health(_mapping(daily_health_data), daily_results),
     }
 
 

@@ -43,6 +43,7 @@ def test_dashboard_workflow_generates_static_artifacts() -> None:
     setup_step = _step(workflow, "Set up Python 3.11")
     daily_health_step = _step(workflow, "Generate daily CI health report")
     acceptance_step = _step(workflow, "Run replay acceptance scorecard")
+    daily_snapshot_step = _step(workflow, "Download latest daily monitor snapshot")
     fuzzer_step = _step(workflow, "Download latest fuzzer analysis snapshot")
     generate_step = _step(workflow, "Generate capability dashboard")
     site_step = _step(workflow, "Generate observability site")
@@ -54,6 +55,10 @@ def test_dashboard_workflow_generates_static_artifacts() -> None:
     assert setup_step["uses"] == "actions/setup-python@v6"
     assert "-m scripts.daily_health_report" in daily_health_step["run"]
     assert "-m scripts.valkey_acceptance" in acceptance_step["run"]
+    assert 'gh run list' in daily_snapshot_step["run"]
+    assert 'Monitor Valkey CI Failures' in daily_snapshot_step["run"]
+    assert 'valkey-daily-monitor-result-' in daily_snapshot_step["run"]
+    assert 'gh run download' in daily_snapshot_step["run"]
     assert 'gh run list' in fuzzer_step["run"]
     assert 'Monitor Valkey Fuzzer Runs' in fuzzer_step["run"]
     assert 'valkey-fuzzer-monitor-result-' in fuzzer_step["run"]
@@ -64,6 +69,7 @@ def test_dashboard_workflow_generates_static_artifacts() -> None:
     assert "--event-log bot-data/agent-events.jsonl" in generate_step["run"]
     assert "--acceptance-result acceptance-report.json" in generate_step["run"]
     assert "--daily-health daily-health-report.json" in generate_step["run"]
+    assert "latest-daily/monitor-result.json" in generate_step["run"]
     assert "--fuzzer-result" in generate_step["run"]
     assert "latest-fuzzer/fuzzer-monitor-result.json" in generate_step["run"]
     assert "--output-html agent-dashboard.html" in generate_step["run"]
@@ -148,6 +154,9 @@ def test_publish_workflow_builds_pages_site() -> None:
     assert "workflow_run.head_branch == github.event.repository.default_branch" in build_job["if"]
 
     build_steps = build_job["steps"]
+    download_daily = next(
+        step for step in build_steps if step["name"] == "Download latest daily monitor snapshot"
+    )
     download_fuzzer = next(
         step for step in build_steps if step["name"] == "Download latest fuzzer analysis snapshot"
     )
@@ -161,12 +170,17 @@ def test_publish_workflow_builds_pages_site() -> None:
         step for step in build_steps if step["name"] == "Upload Pages artifact"
     )
 
+    assert "gh run list" in download_daily["run"]
+    assert "Monitor Valkey CI Failures" in download_daily["run"]
+    assert "valkey-daily-monitor-result-" in download_daily["run"]
+    assert "gh run download" in download_daily["run"]
     assert "gh run list" in download_fuzzer["run"]
     assert "Monitor Valkey Fuzzer Runs" in download_fuzzer["run"]
     assert "valkey-fuzzer-monitor-result-" in download_fuzzer["run"]
     assert "gh run download" in download_fuzzer["run"]
     assert "--acceptance-result acceptance-report.json" in generate_dashboard["run"]
     assert "--daily-health daily-health-report.json" in generate_dashboard["run"]
+    assert "latest-daily/monitor-result.json" in generate_dashboard["run"]
     assert "--fuzzer-result" in generate_dashboard["run"]
     assert "latest-fuzzer/fuzzer-monitor-result.json" in generate_dashboard["run"]
     assert "-m scripts.agent_dashboard_site" in generate_site["run"]
