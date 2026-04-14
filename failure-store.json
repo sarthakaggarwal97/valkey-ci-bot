@@ -7855,22 +7855,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-14T22:07:45.834270+00:00",
-          "commit_sha": "606ee8af3dd48b7fd8d7ab84a4d1990e96dca31b",
-          "workflow_run_id": 24419439242,
-          "workflow_name": "CI",
-          "workflow_file": "ci.yml",
-          "job_name": "test-sanitizer-address",
-          "matrix_params": {},
-          "failure_identifier": "test-sanitizer-address",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
