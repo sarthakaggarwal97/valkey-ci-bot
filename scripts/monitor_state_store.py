@@ -16,6 +16,12 @@ logger = logging.getLogger(__name__)
 
 _STATE_BRANCH = "bot-data"
 _STATE_FILE = "monitor-state.json"
+_MAX_PERSIST_ATTEMPTS = 3
+
+
+def _github_status(exc: Exception) -> int | None:
+    status = getattr(exc, "status", None)
+    return status if isinstance(status, int) else None
 
 
 def _is_missing_state_error(exc: Exception) -> bool:
@@ -23,6 +29,15 @@ def _is_missing_state_error(exc: Exception) -> bool:
     if isinstance(exc, GithubException):
         return exc.status == 404
     return isinstance(exc, FileNotFoundError)
+
+
+def _is_write_conflict(exc: Exception) -> bool:
+    """Return whether the remote state changed underneath this writer."""
+    status = _github_status(exc)
+    if status in {409, 422}:
+        return True
+    message = str(exc).lower()
+    return "sha" in message or "already exists" in message or "conflict" in message
 
 
 class MonitorStateStore:
@@ -124,31 +139,60 @@ class MonitorStateStore:
         try:
             repo = self._gh.get_repo(self._repo_name)
             self._ensure_state_branch(repo)
-            content = json.dumps(self.to_dict(), indent=2)
-            try:
-                existing = repo.get_contents(_STATE_FILE, ref=_STATE_BRANCH)
-            except Exception as exc:
-                if not _is_missing_state_error(exc):
-                    raise
-                existing = None
+            for attempt in range(1, _MAX_PERSIST_ATTEMPTS + 1):
+                existing_entries: dict[str, dict[str, str | int]] = {}
+                try:
+                    existing = repo.get_contents(_STATE_FILE, ref=_STATE_BRANCH)
+                except Exception as exc:
+                    if not _is_missing_state_error(exc):
+                        raise
+                    existing = None
 
-            if isinstance(existing, list):
-                raise ValueError("Monitor state path resolved to a directory.")
-            if existing is None:
-                repo.create_file(
-                    _STATE_FILE,
-                    "Initialize monitor state",
-                    content,
-                    branch=_STATE_BRANCH,
-                )
-            else:
-                repo.update_file(
-                    _STATE_FILE,
-                    "Update monitor state",
-                    content,
-                    existing.sha,
-                    branch=_STATE_BRANCH,
-                )
-            logger.info("Saved monitor state with %d entries.", len(self._entries))
+                if isinstance(existing, list):
+                    raise ValueError("Monitor state path resolved to a directory.")
+                if existing is not None:
+                    data = json.loads(existing.decoded_content.decode())
+                    if isinstance(data, dict):
+                        for key, raw in data.items():
+                            if isinstance(key, str) and isinstance(raw, dict):
+                                existing_entries[key] = {
+                                    "last_seen_run_id": raw.get("last_seen_run_id", 0),
+                                    "target_repo": str(raw.get("target_repo", "")),
+                                    "workflow_file": str(raw.get("workflow_file", "")),
+                                    "event": str(raw.get("event", "")),
+                                    "updated_at": str(raw.get("updated_at", "")),
+                                }
+
+                merged_entries = dict(existing_entries)
+                merged_entries.update(self.to_dict())
+                content = json.dumps(merged_entries, indent=2)
+                try:
+                    if existing is None:
+                        repo.create_file(
+                            _STATE_FILE,
+                            "Initialize monitor state",
+                            content,
+                            branch=_STATE_BRANCH,
+                        )
+                    else:
+                        repo.update_file(
+                            _STATE_FILE,
+                            "Update monitor state",
+                            content,
+                            existing.sha,
+                            branch=_STATE_BRANCH,
+                        )
+                    self._entries = merged_entries
+                    logger.info("Saved monitor state with %d entries.", len(self._entries))
+                    return
+                except Exception as exc:
+                    if attempt < _MAX_PERSIST_ATTEMPTS and _is_write_conflict(exc):
+                        logger.info(
+                            "Monitor state write conflict on attempt %d/%d; retrying.",
+                            attempt,
+                            _MAX_PERSIST_ATTEMPTS,
+                        )
+                        continue
+                    raise
         except Exception as exc:
             raise RuntimeError(f"failed to save monitor state: {exc}") from exc
