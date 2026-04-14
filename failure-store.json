@@ -7359,6 +7359,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-14T06:14:14.081480+00:00",
+          "commit_sha": "4c3089385283729ec3e96dc0039e97d7fa46fd83",
+          "workflow_run_id": 24377863190,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-sanitizer-address",
+          "matrix_params": {},
+          "failure_identifier": "test-sanitizer-address",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -7529,6 +7545,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-14T06:14:14.081504+00:00",
+          "commit_sha": "4c3089385283729ec3e96dc0039e97d7fa46fd83",
+          "workflow_run_id": 24377863190,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-ubuntu-latest",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-latest",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -7554,6 +7586,22 @@
           "error_signature": "2026-04-14T02:23:19.5610000Z Job is waiting for a hosted runner to come online.\n2026-04-14T02:23:19.5580000Z Requested labels: ubuntu-latest\n2026-04-14T02:23:19.5580000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/unstable\n2026-04-14T02:23:19.5580000Z Waiting for a runner to pick up this job...\n2026-04-14T02:23:19.5560000Z Evaluating test-ubuntu-latest-cmake-tls.if\n2026-04-14T02:23:19.5560000Z Evaluating: success()\n2026-04-14T02:23:19.5560000Z Result: true\n2026-04-14T02:23:19.5620000Z Job is about to start running on the hosted runner: GitHub Actions 1000649810",
           "file_path": "",
           "fingerprint": "ac32160917926c4bdee1b1665028c51cc22bb9599d1814cd42980bdded3b4c90",
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-14T06:14:14.081440+00:00",
+          "commit_sha": "4c3089385283729ec3e96dc0039e97d7fa46fd83",
+          "workflow_run_id": 24377863190,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-ubuntu-latest-cmake-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-latest-cmake-tls",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
           "incident_key": null
         }
       ]
