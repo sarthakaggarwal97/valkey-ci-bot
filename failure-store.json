@@ -7855,6 +7855,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-14T23:06:29.064695+00:00",
+          "commit_sha": "94c68e11d80961c5e770d61c2a137de7d6bfd653",
+          "workflow_run_id": 24419427362,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-sanitizer-address",
+          "matrix_params": {},
+          "failure_identifier": "test-sanitizer-address",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -8159,6 +8175,22 @@
           "observed_at": "2026-04-14T23:06:25.155712+00:00",
           "commit_sha": "9005476e980468b29678e2109f14590a272132f8",
           "workflow_run_id": 24418356366,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-ubuntu-latest",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-latest",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-14T23:06:29.064666+00:00",
+          "commit_sha": "94c68e11d80961c5e770d61c2a137de7d6bfd653",
+          "workflow_run_id": 24419427362,
           "workflow_name": "CI",
           "workflow_file": "ci.yml",
           "job_name": "test-ubuntu-latest",
