@@ -69,6 +69,10 @@ def load_backport_config(raw: Any) -> BackportConfig:
             raw.get("llm_conflict_label"),
             defaults.llm_conflict_label,
         ),
+        thinking_budget=_coerce_int(
+            raw.get("thinking_budget"),
+            defaults.thinking_budget,
+        ),
     )
 
 

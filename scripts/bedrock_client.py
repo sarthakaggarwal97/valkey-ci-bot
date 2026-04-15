@@ -78,6 +78,7 @@ class PromptClient(Protocol):
         model_id: str | None = None,
         max_output_tokens: int | None = None,
         temperature: float | None = None,
+        thinking_budget: int | None = None,
     ) -> str: ...
 
     def invoke_with_schema(
@@ -91,6 +92,7 @@ class PromptClient(Protocol):
         model_id: str | None = None,
         max_output_tokens: int | None = None,
         temperature: float | None = None,
+        thinking_budget: int | None = None,
     ) -> str:
         """Invoke with a tool-use JSON schema for structured output.
 
@@ -257,6 +259,7 @@ class BedrockClient:
         model_id: str | None = None,
         max_output_tokens: int | None = None,
         temperature: float | None = None,
+        thinking_budget: int | None = None,
     ) -> str:
         """Call Bedrock Converse API with the configured model.
 
@@ -269,6 +272,9 @@ class BedrockClient:
             model_id: Optional model override for this call.
             max_output_tokens: Optional output-token override for this call.
             temperature: Optional sampling temperature for this call.
+            thinking_budget: Optional token budget for extended thinking.
+                When set, enables Claude's extended thinking mode.  Temperature
+                is ignored (API requirement).
 
         Returns:
             The model's text response.
@@ -301,20 +307,34 @@ class BedrockClient:
             }
         ]
 
+        # When thinking is enabled, maxTokens must exceed budget_tokens.
+        effective_max_tokens = output_tokens
+        if thinking_budget is not None and thinking_budget > 0:
+            effective_max_tokens = max(output_tokens, thinking_budget + output_tokens)
+
         converse_kwargs: dict[str, Any] = {
             "modelId": model_id or self._config.bedrock_model_id,
             "system": [{"text": full_system_prompt}],
             "messages": messages,
             "inferenceConfig": {
-                "maxTokens": output_tokens,
+                "maxTokens": effective_max_tokens,
             },
         }
-        if temperature is not None:
+        if thinking_budget is not None and thinking_budget > 0:
+            # Extended thinking: temperature must not be set.
+            converse_kwargs["additionalModelRequestFields"] = {
+                "thinking": {
+                    "type": "enabled",
+                    "budget_tokens": thinking_budget,
+                },
+            }
+            self._record_ai_metric("bedrock.invoke.thinking_enabled")
+        elif temperature is not None:
             converse_kwargs["inferenceConfig"]["temperature"] = temperature
 
         max_attempts = self._config.max_retries_bedrock + 1  # initial + retries
         last_error: ClientError | None = None
-        reserved_tokens = estimated_input_tokens + output_tokens
+        reserved_tokens = estimated_input_tokens + effective_max_tokens
 
         # Reserve tokens once before the retry loop.  On retryable failures
         # the reservation stays in place (the work *was* attempted); on
@@ -460,6 +480,7 @@ class BedrockClient:
         model_id: str | None = None,
         max_output_tokens: int | None = None,
         temperature: float | None = None,
+        thinking_budget: int | None = None,
     ) -> str:
         """Call Bedrock Converse API with tool-use for structured JSON output.
 
@@ -476,6 +497,9 @@ class BedrockClient:
             model_id: Optional model override for this call.
             max_output_tokens: Optional output-token override for this call.
             temperature: Optional sampling temperature for this call.
+            thinking_budget: Optional token budget for extended thinking.
+                When set, forced toolChoice is replaced with ``any`` (API
+                requirement) and temperature is ignored.
 
         Returns:
             JSON string from the tool-use response.
@@ -508,12 +532,18 @@ class BedrockClient:
             }
         ]
 
+        # When thinking is enabled, maxTokens must exceed budget_tokens.
+        thinking_enabled = thinking_budget is not None and thinking_budget > 0
+        effective_max_tokens = output_tokens
+        if thinking_enabled:
+            effective_max_tokens = max(output_tokens, thinking_budget + output_tokens)
+
         converse_kwargs: dict[str, Any] = {
             "modelId": model_id or self._config.bedrock_model_id,
             "system": [{"text": full_system_prompt}],
             "messages": messages,
             "inferenceConfig": {
-                "maxTokens": output_tokens,
+                "maxTokens": effective_max_tokens,
             },
             "toolConfig": {
                 "tools": [
@@ -527,19 +557,31 @@ class BedrockClient:
                         }
                     }
                 ],
-                "toolChoice": {
-                    "tool": {
-                        "name": tool_name,
-                    },
-                },
             },
         }
-        if temperature is not None:
-            converse_kwargs["inferenceConfig"]["temperature"] = temperature
+        if thinking_enabled:
+            # Extended thinking: use toolChoice "any" (forced tool not supported)
+            # and temperature must not be set.
+            converse_kwargs["toolConfig"]["toolChoice"] = {"any": {}}
+            converse_kwargs["additionalModelRequestFields"] = {
+                "thinking": {
+                    "type": "enabled",
+                    "budget_tokens": thinking_budget,
+                },
+            }
+            self._record_ai_metric("bedrock.invoke_schema.thinking_enabled")
+        else:
+            converse_kwargs["toolConfig"]["toolChoice"] = {
+                "tool": {
+                    "name": tool_name,
+                },
+            }
+            if temperature is not None:
+                converse_kwargs["inferenceConfig"]["temperature"] = temperature
 
         max_attempts = self._config.max_retries_bedrock + 1
         last_error: ClientError | None = None
-        reserved_tokens = estimated_input_tokens + output_tokens
+        reserved_tokens = estimated_input_tokens + effective_max_tokens
 
         # Reserve tokens once before the retry loop (same as invoke).
         if self._rate_limiter is not None:
@@ -674,6 +716,7 @@ class BedrockClient:
         model_id: str | None = None,
         max_output_tokens: int | None = None,
         temperature: float | None = None,
+        thinking_budget: int | None = None,
     ) -> str:
         """Run a multi-turn Converse loop with tool use.
 
@@ -692,6 +735,9 @@ class BedrockClient:
             model_id: Optional model override.
             max_output_tokens: Optional output-token override.
             temperature: Optional sampling temperature.
+            thinking_budget: Optional token budget for extended thinking.
+                When set, temperature is ignored and thinking blocks are
+                preserved across turns as required by the API.
 
         Returns:
             JSON string from the terminal tool invocation.
@@ -705,6 +751,10 @@ class BedrockClient:
         self._record_ai_metric("bedrock.tool_loop.calls")
         self._record_prompt_safety_guard(full_system_prompt, user_prompt)
         output_tokens = max_output_tokens or self._config.max_output_tokens
+        thinking_enabled = thinking_budget is not None and thinking_budget > 0
+        effective_max_tokens = output_tokens
+        if thinking_enabled:
+            effective_max_tokens = max(output_tokens, thinking_budget + output_tokens)
         messages: list[dict[str, Any]] = [
             {"role": "user", "content": [{"text": user_prompt}]},
         ]
@@ -712,10 +762,18 @@ class BedrockClient:
         converse_kwargs: dict[str, Any] = {
             "modelId": model_id or self._config.bedrock_model_id,
             "system": [{"text": full_system_prompt}],
-            "inferenceConfig": {"maxTokens": output_tokens},
+            "inferenceConfig": {"maxTokens": effective_max_tokens},
             "toolConfig": {"tools": tools},
         }
-        if temperature is not None:
+        if thinking_enabled:
+            converse_kwargs["additionalModelRequestFields"] = {
+                "thinking": {
+                    "type": "enabled",
+                    "budget_tokens": thinking_budget,
+                },
+            }
+            self._record_ai_metric("bedrock.tool_loop.thinking_enabled")
+        elif temperature is not None:
             converse_kwargs["inferenceConfig"]["temperature"] = temperature
 
         for turn in range(max_turns):
@@ -898,7 +956,7 @@ class BedrockClient:
         forced_kwargs["toolConfig"] = {
             "tools": forced_tools,
         }
-        if forced_tools:
+        if forced_tools and not thinking_enabled:
             forced_kwargs["toolConfig"]["toolChoice"] = {
                 "tool": {
                     "name": terminal_tool,

@@ -157,6 +157,7 @@ Relevant file context:
             model_id=config.models.heavy_model_id,
             max_output_tokens=config.max_output_tokens,
             temperature=config.models.temperature,
+            thinking_budget=config.models.thinking_budget,
         )
         return _normalize_reply(reply, requester)
 
@@ -243,6 +244,7 @@ Relevant file context:
                 model_id=config.models.heavy_model_id,
                 max_output_tokens=config.max_output_tokens,
                 temperature=config.models.temperature,
+                thinking_budget=config.models.thinking_budget,
             )
         except Exception as exc:
             import logging

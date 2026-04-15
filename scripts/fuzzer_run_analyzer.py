@@ -814,6 +814,7 @@ class FuzzerRunAnalyzer:
         log_retriever: LogRetriever | None = None,
         retriever: BedrockRetriever | None = None,
         retrieval_config: RetrievalConfig | None = None,
+        thinking_budget: int = 32_000,
     ) -> None:
         self._gh = github_client
         self._bedrock = bedrock_client
@@ -827,6 +828,7 @@ class FuzzerRunAnalyzer:
         )
         self._retriever = retriever
         self._retrieval_config = retrieval_config or RetrievalConfig()
+        self._thinking_budget = thinking_budget
 
     def analyze_workflow_run(
         self,
@@ -979,6 +981,7 @@ class FuzzerRunAnalyzer:
                     ),
                     json_schema=_FUZZER_ANALYSIS_SCHEMA,
                     temperature=0.0,
+                    thinking_budget=self._thinking_budget,
                 )
                 payload = json.loads(response) if isinstance(response, str) else response
                 if isinstance(payload, dict):
@@ -994,5 +997,6 @@ class FuzzerRunAnalyzer:
             _SYSTEM_PROMPT,
             user_prompt,
             temperature=0.0,
+            thinking_budget=self._thinking_budget,
         )
         return _parse_model_payload(response)

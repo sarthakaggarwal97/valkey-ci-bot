@@ -343,6 +343,7 @@ class FixGenerator:
                     _SYSTEM_PROMPT,
                     user_prompt,
                     temperature=0.0,
+                    thinking_budget=self._config.thinking_budget,
                 )
             except BedrockError as exc:
                 logger.error(
@@ -507,6 +508,7 @@ class FixGenerator:
                 terminal_tool="submit_fix",
                 max_turns=20,
                 temperature=0.0,
+                thinking_budget=self._config.thinking_budget,
             )
         except Exception as exc:
             logger.warning("Agentic fix generation failed: %s. Falling back.", exc)

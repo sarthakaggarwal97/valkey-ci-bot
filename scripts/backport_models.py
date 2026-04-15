@@ -74,3 +74,4 @@ class BackportConfig:
     per_backport_token_budget: int = 100_000
     backport_label: str = "backport"
     llm_conflict_label: str = "llm-resolved-conflicts"
+    thinking_budget: int = 32_000

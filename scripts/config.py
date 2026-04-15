@@ -76,6 +76,7 @@ class BotConfig:
     require_validation_profile: bool = True
     soak_validation_workflows: list[str] = field(default_factory=list)
     soak_validation_passes: int = 1
+    thinking_budget: int = 32_000
     project: ProjectContext = field(default_factory=ProjectContext)
     validation_profiles: list[ValidationProfile] = field(default_factory=list)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
@@ -88,6 +89,7 @@ class ReviewerModels:
     light_model_id: str = "us.anthropic.claude-sonnet-4-v1"
     heavy_model_id: str = "us.anthropic.claude-opus-4-6-v1"
     temperature: float = 0.0
+    thinking_budget: int = 32_000
 
 
 @dataclass
@@ -199,6 +201,10 @@ def _merge_reviewer_models(data: dict) -> ReviewerModels:
         temperature=_coerce_float(
             data.get("temperature"),
             defaults.temperature,
+        ),
+        thinking_budget=_coerce_int(
+            data.get("thinking_budget"),
+            defaults.thinking_budget,
         ),
     )
 
@@ -408,6 +414,10 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
         soak_validation_passes=_coerce_int(
             validation.get("soak_passes"),
             defaults.soak_validation_passes,
+        ),
+        thinking_budget=_coerce_int(
+            bedrock.get("thinking_budget"),
+            defaults.thinking_budget,
         ),
         project=_merge_project(raw.get("project", {})) if isinstance(raw.get("project"), dict) else defaults.project,
         validation_profiles=_merge_validation_profiles(raw.get("validation_profiles", [])) if isinstance(raw.get("validation_profiles"), list) else defaults.validation_profiles,

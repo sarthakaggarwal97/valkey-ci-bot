@@ -1028,7 +1028,7 @@ def run_pipeline(
             boto3.client("bedrock-agent-runtime", region_name=aws_region),
             metric_recorder=rate_limiter.record_ai_metric,
         )
-    root_cause_analyzer = RootCauseAnalyzer(bedrock_client, gh)
+    root_cause_analyzer = RootCauseAnalyzer(bedrock_client, gh, thinking_budget=config.thinking_budget)
     root_cause_analyzer.with_retriever(retriever, config.retrieval)
     fix_generator = FixGenerator(
         bedrock_client, config,

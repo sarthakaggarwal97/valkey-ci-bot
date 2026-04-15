@@ -213,6 +213,7 @@ class ConflictResolver:
                     user_prompt,
                     model_id=self._config.bedrock_model_id,
                     temperature=0.0,
+                    thinking_budget=self._config.thinking_budget,
                 )
             except Exception:
                 logger.exception(
@@ -462,6 +463,7 @@ class ConflictResolver:
                 max_turns=20,
                 model_id=self._config.bedrock_model_id,
                 temperature=0.0,
+                thinking_budget=self._config.thinking_budget,
             )
         except Exception as exc:
             logger.warning(

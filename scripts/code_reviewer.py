@@ -2508,6 +2508,7 @@ CRITICAL rules:
             model_id=config.models.heavy_model_id,
             max_output_tokens=config.max_output_tokens,
             temperature=config.models.temperature,
+            thinking_budget=config.models.thinking_budget,
         )
         raw_findings = self._extract_raw_findings(payload)
         drafts = self._normalize_raw_findings(raw_findings, diff_scope, config)
@@ -2707,6 +2708,7 @@ CRITICAL rules:
                 model_id=config.models.heavy_model_id,
                 max_output_tokens=config.max_output_tokens,
                 temperature=config.models.temperature,
+                thinking_budget=config.models.thinking_budget,
             )
         except Exception as exc:
             logger.warning(
@@ -2895,6 +2897,7 @@ CRITICAL rules:
         model_id: str,
         max_output_tokens: int,
         temperature: float,
+        thinking_budget: int | None = None,
     ) -> Any:
         """Invoke a model and parse a structured JSON response."""
         has_schema = (
@@ -2912,6 +2915,7 @@ CRITICAL rules:
                     model_id=model_id,
                     max_output_tokens=max_output_tokens,
                     temperature=temperature,
+                    thinking_budget=thinking_budget,
                 )
                 return json.loads(response) if isinstance(response, str) else response
             except Exception as exc:
@@ -2927,6 +2931,7 @@ CRITICAL rules:
             model_id=model_id,
             max_output_tokens=max_output_tokens,
             temperature=temperature,
+            thinking_budget=thinking_budget,
         )
         if isinstance(response, (dict, list)):
             return response

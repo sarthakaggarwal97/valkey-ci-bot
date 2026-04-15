@@ -290,12 +290,13 @@ class RootCauseAnalyzer:
     instance) in its constructor.
     """
 
-    def __init__(self, bedrock_client: BedrockClient, github_client: Any):
+    def __init__(self, bedrock_client: BedrockClient, github_client: Any, *, thinking_budget: int = 32_000):
         self._bedrock = bedrock_client
         self._github = github_client
         self._retriever: BedrockRetriever | None = None
         self._retrieval_config = RetrievalConfig()
         self._domain_context = ""
+        self._thinking_budget = thinking_budget
 
     def with_retriever(
         self,
@@ -421,6 +422,7 @@ class RootCauseAnalyzer:
                     ),
                     json_schema=_ROOT_CAUSE_SCHEMA,
                     temperature=0.0,
+                    thinking_budget=self._thinking_budget,
                 )
                 logger.info("Used structured tool-use output for root cause analysis.")
                 return response if isinstance(response, str) else json.dumps(response)
@@ -434,6 +436,7 @@ class RootCauseAnalyzer:
             _SYSTEM_PROMPT,
             user_prompt,
             temperature=0.0,
+            thinking_budget=self._thinking_budget,
         )
 
     def identify_relevant_files(
