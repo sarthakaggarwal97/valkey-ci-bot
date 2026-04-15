@@ -1,0 +1,38 @@
+{
+  "captured_at": "2026-04-15T19:05:47.444904+00:00",
+  "date": "2026-04-05",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_sha": "e8ca6c0",
+    "date": "2026-04-05",
+    "failed_job_names": [
+      "test-fedorarawhide-jemalloc",
+      "test-sanitizer-address (gcc)",
+      "test-ubuntu-jemalloc",
+      "test-valgrind-no-malloc-usable-size-test",
+      "test-valgrind-test"
+    ],
+    "failed_jobs": 5,
+    "failure_jobs": {
+      "test": [
+        69969624277,
+        69969624376,
+        69969624380,
+        69969624390,
+        69969624392
+      ]
+    },
+    "failure_names": [
+      "test"
+    ],
+    "full_sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba",
+    "run_id": 23990637784,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/23990637784",
+    "status": "failure",
+    "total_jobs": 49,
+    "unique_failures": 1,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
