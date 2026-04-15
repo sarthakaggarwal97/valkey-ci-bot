@@ -93,6 +93,31 @@ python3 -m scripts.agent_dashboard_site \
   --site-dir dashboard-site
 ```
 
+To keep the Daily/Weekly heatmap durable across GitHub retention gaps, you can
+also backfill and reuse stored run snapshots from `bot-data`:
+
+```bash
+python3 -m scripts.backfill_daily_health_history \
+  --repo "valkey-io/valkey" \
+  --workflow "daily.yml" "weekly.yml" \
+  --branch "unstable" \
+  --days 14 \
+  --token "$GITHUB_TOKEN" \
+  --state-token "$GITHUB_TOKEN" \
+  --state-repo "owner/repo" \
+  --mirror-dir "bot-data/dashboard-history/daily-health"
+
+python3 -m scripts.daily_health_report \
+  --repo "valkey-io/valkey" \
+  --workflow "daily.yml" "weekly.yml" \
+  --branch "unstable" \
+  --days 14 \
+  --token "$GITHUB_TOKEN" \
+  --history-dir "bot-data/dashboard-history/daily-health" \
+  --output daily-health-report.html \
+  --output-json daily-health-report.json
+```
+
 ## Demo Bundle
 
 Workflow at `.github/workflows/demo-valkey-agent.yml`.

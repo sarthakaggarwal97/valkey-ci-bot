@@ -768,6 +768,7 @@ def _build_daily_health_fallback(
                     "run_id": run_data.get("run_id"),
                     "date": date,
                     "status": status,
+                    "workflow": workflow_file,
                     "commit_sha": full_sha[:7] if full_sha else "",
                     "full_sha": full_sha,
                     "run_url": run_data.get("html_url") or run_data.get("run_url") or "",
@@ -783,11 +784,29 @@ def _build_daily_health_fallback(
     if not normalized_runs:
         return {}
 
+    run_dates = sorted(
+        {
+            _str(run.get("date"))
+            for run in normalized_runs
+            if _str(run.get("date"))
+        }
+    )
+    expected_dates: list[str] | None = None
+    if run_dates:
+        start_day = datetime.fromisoformat(run_dates[0]).date()
+        end_day = datetime.fromisoformat(run_dates[-1]).date()
+        span = (end_day - start_day).days + 1
+        expected_dates = [
+            (start_day + timedelta(days=offset)).isoformat()
+            for offset in range(span)
+        ]
+
     return build_report_data(
         normalized_runs,
         repo_full_name=repo_full_name or "valkey-io/valkey",
         workflow_file=", ".join(workflow_files) or "daily monitor",
         branch="unstable",
+        expected_dates=expected_dates,
     )
 
 
@@ -809,7 +828,13 @@ def _coalesce_daily_health(
     for key in ("dates", "heatmap", "runs"):
         if not _list(merged.get(key)):
             merged[key] = derived.get(key, [])
-    for key in ("total_runs", "failed_runs", "unique_failures"):
+    for key in ("missing_dates",):
+        if not _list(merged.get(key)):
+            merged[key] = derived.get(key, [])
+    for key in ("workflows", "workflow_reports"):
+        if not _list(merged.get(key)):
+            merged[key] = derived.get(key, [])
+    for key in ("total_runs", "failed_runs", "unique_failures", "days_with_runs"):
         if _int(merged.get(key)) == 0 and _int(derived.get(key)) > 0:
             merged[key] = derived.get(key, 0)
     return merged

@@ -307,6 +307,22 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
+      - name: Backfill durable daily health history
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 -m scripts.backfill_daily_health_history \
+            --repo "valkey-io/valkey" \
+            --workflow "daily.yml" "weekly.yml" \
+            --branch "unstable" \
+            --days 14 \
+            --token "${GITHUB_TOKEN}" \
+            --state-token "${GITHUB_TOKEN}" \
+            --state-repo "${{ github.repository }}" \
+            --mirror-dir "bot-data/dashboard-history/daily-health"
+
       - name: Generate daily CI health report
         continue-on-error: true
         env:
@@ -319,6 +335,7 @@ jobs:
             --branch "unstable" \
             --days 14 \
             --token "${GITHUB_TOKEN}" \
+            --history-dir "bot-data/dashboard-history/daily-health" \
             --output daily-health-report.html \
             --output-json daily-health-report.json
 

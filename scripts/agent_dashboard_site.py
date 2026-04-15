@@ -384,6 +384,32 @@ def _truncate(value: object, *, limit: int = 96) -> str:
     return text[: limit - 1] + "…"
 
 
+def _workflow_label(value: object) -> str:
+    text = _str(value)
+    if text.endswith((".yml", ".yaml")):
+        text = text.rsplit(".", 1)[0]
+    text = text.replace("-", " ").replace("_", " ").strip()
+    return text.title() or "Unknown"
+
+
+def _workflow_slug(value: object) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", _str(value).lower()).strip("-")
+    return slug or "workflow"
+
+
+def _workflow_reports(daily_health: JsonObject) -> list[JsonObject]:
+    reports = [
+        _mapping(report)
+        for report in _list(daily_health.get("workflow_reports"))
+        if isinstance(report, dict) and _list(_mapping(report).get("heatmap"))
+    ]
+    if reports:
+        return reports
+    if _list(daily_health.get("heatmap")):
+        return [daily_health]
+    return []
+
+
 def _event_subject_url(event: JsonObject, repo_fallback: str) -> str:
     attributes = _mapping(event.get("attributes"))
     for key in ("pr_url", "issue_url", "run_url", "proof_url", "url"):
@@ -896,22 +922,26 @@ def _daily_metrics(dashboard: JsonObject) -> list[str]:
     flaky_tests = _mapping(dashboard.get("flaky_tests"))
     total_runs = _int(daily_health.get("total_runs"))
     failed_runs = _int(daily_health.get("failed_runs"))
+    total_days = len(_list(daily_health.get("dates")))
+    days_with_runs = _int(daily_health.get("days_with_runs"))
+    workflow_count = len(_workflow_reports(daily_health))
     return [
-        _metric("Tracked days", len(_list(daily_health.get("dates"))), note="Current heatmap window"),
-        _metric("Total runs", total_runs, note="Latest Daily samples"),
+        _metric("Tracked days", total_days, note=f"{days_with_runs}/{total_days or 0} with run data"),
+        _metric("Total runs", total_runs, note="Latest monitored samples"),
         _metric("Failed runs", failed_runs, note=_format_rate(failed_runs, total_runs), tone="bad"),
         _metric("Unique failures", daily_health.get("unique_failures", 0), note="Across current window", tone="warn"),
+        _metric("Run types", workflow_count or "n/a", note="Distinct workflow views"),
         _metric("Active campaigns", flaky_tests.get("active_campaigns", 0), note="Validation loops in progress"),
     ]
 
 
-def _daily_heatmap(daily_health: JsonObject) -> str:
+def _daily_heatmap_table(report: JsonObject, *, filter_id: str) -> str:
     heatmap_rows = [
         _mapping(row)
-        for row in _list(daily_health.get("heatmap"))
+        for row in _list(report.get("heatmap"))
         if isinstance(row, dict)
     ]
-    dates = [_str(date) for date in _list(daily_health.get("dates"))]
+    dates = [_str(date) for date in _list(report.get("dates"))]
     if not heatmap_rows or not dates:
         return '<p class="empty">No Daily heatmap is available in the supplied payload.</p>'
     max_count = max(
@@ -942,12 +972,20 @@ def _daily_heatmap(daily_health: JsonObject) -> str:
         for cell in _list(row.get("cells")):
             data = _mapping(cell)
             count = _int(data.get("count"))
+            has_run = bool(data.get("has_run", True))
             alpha = 0.20 + (count / max_count) * 0.80 if count else 0.0
-            text = str(count) if count else ""
-            style = f' style="--heat-alpha:{alpha:.2f}"' if count else ""
-            classes = "heat-cell heat-cell-hit" if count else "heat-cell"
+            if not has_run:
+                text = "—"
+                style = ""
+                classes = "heat-cell heat-cell-missing"
+                title = f"{_html_attr(data.get('date'))}: no run data"
+            else:
+                text = str(count) if count else ""
+                style = f' style="--heat-alpha:{alpha:.2f}"' if count else ""
+                classes = "heat-cell heat-cell-hit" if count else "heat-cell"
+                title = f"{_html_attr(data.get('date'))}: {count}"
             cells.append(
-                f'<td class="{classes}"{style} title="{_html_attr(data.get("date"))}: {count}">'
+                f'<td class="{classes}"{style} title="{title}">'
                 f"{_html(text)}</td>"
             )
         body_rows.append(
@@ -964,8 +1002,8 @@ def _daily_heatmap(daily_health: JsonObject) -> str:
     return (
         '<div class="toolbar"><label class="search"><span>Filter failures</span>'
         '<input type="search" placeholder="jemalloc, cluster, replication..." '
-        'data-filter-target="daily-heatmap"></label></div>'
-        '<div class="heatmap-wrap" id="daily-heatmap"><table class="heatmap-table"><thead><tr>'
+        f'data-filter-target="{_html_attr(filter_id)}"></label></div>'
+        f'<div class="heatmap-wrap" id="{_html_attr(filter_id)}"><table class="heatmap-table"><thead><tr>'
         '<th class="sticky-col">Failure</th><th class="sticky-col secondary-col">Freq</th>'
         + head
         + "</tr></thead><tbody>"
@@ -974,25 +1012,87 @@ def _daily_heatmap(daily_health: JsonObject) -> str:
     )
 
 
+def _daily_heatmap(daily_health: JsonObject) -> str:
+    reports = _workflow_reports(daily_health)
+    if not reports:
+        return '<p class="empty">No Daily heatmap is available in the supplied payload.</p>'
+    if len(reports) == 1:
+        return (
+            '<p class="split-note">A dash means no run data was available for that date.</p>'
+            + _daily_heatmap_table(reports[0], filter_id="daily-heatmap")
+        )
+
+    blocks: list[str] = []
+    for report in reports:
+        workflow = _workflow_label(report.get("workflow"))
+        slug = _workflow_slug(report.get("workflow"))
+        blocks.append(
+            '<section class="workflow-heatmap-block">'
+            '<div class="workflow-heatmap-head">'
+            f"<h3>{_html(workflow)}</h3>"
+            '<div class="workflow-heatmap-meta">'
+            f"{_meta_pill('Runs', _format_number(report.get('total_runs', 0)))}"
+            f"{_meta_pill('Failed', _format_number(report.get('failed_runs', 0)))}"
+            f"{_meta_pill('Unique failures', _format_number(report.get('unique_failures', 0)))}"
+            "</div></div>"
+            + _daily_heatmap_table(report, filter_id=f"daily-heatmap-{slug}")
+            + "</section>"
+        )
+    return (
+        '<p class="split-note">Failures stay separated by run type so weekly-only regressions do not distort the Daily view. A dash means no run data was available for that date.</p>'
+        '<div class="workflow-heatmap-stack">'
+        + "".join(blocks)
+        + "</div>"
+    )
+
+
 def _daily_run_rows(dashboard: JsonObject) -> list[list[object]]:
     daily_health = _mapping(dashboard.get("daily_health"))
     repo = _str(daily_health.get("repo"), _top_repo_label(dashboard))
-    rows: list[list[object]] = []
+    runs_by_date: dict[str, list[JsonObject]] = {}
     for run in _list(daily_health.get("runs")):
         if not isinstance(run, dict):
             continue
         run_data = _mapping(run)
-        sha = _str(run_data.get("full_sha") or run_data.get("commit_sha"))
-        rows.append(
-            [
-                run_data.get("date", ""),
-                _chip(run_data.get("status", "")),
-                _link_external(_short_sha(sha), _commit_url(repo, sha)),
-                run_data.get("unique_failures", 0),
-                run_data.get("failed_jobs", 0),
-                _link_external("run", run_data.get("run_url", "")),
-            ]
-        )
+        date = _str(run_data.get("date"))
+        if not date:
+            continue
+        runs_by_date.setdefault(date, []).append(run_data)
+
+    rows: list[list[object]] = []
+    ordered_dates = sorted(
+        [_str(item) for item in _list(daily_health.get("dates")) if _str(item)]
+        or list(runs_by_date.keys()),
+        reverse=True,
+    )
+    for date in ordered_dates:
+        date_runs = runs_by_date.get(date, [])
+        if not date_runs:
+            rows.append(
+                [
+                    date,
+                    "—",
+                    _chip("no data", tone="warn"),
+                    "—",
+                    "—",
+                    "—",
+                    "—",
+                ]
+            )
+            continue
+        for run_data in date_runs:
+            sha = _str(run_data.get("full_sha") or run_data.get("commit_sha"))
+            rows.append(
+                [
+                    date,
+                    _chip(_workflow_label(run_data.get("workflow")), tone="info"),
+                    _chip(run_data.get("status", "")),
+                    _link_external(_short_sha(sha), _commit_url(repo, sha)),
+                    run_data.get("unique_failures", 0),
+                    run_data.get("failed_jobs", 0),
+                    _link_external("run", run_data.get("run_url", "")),
+                ]
+            )
     return rows
 
 
@@ -1062,19 +1162,19 @@ def _render_daily(dashboard: JsonObject) -> str:
         + _panel(
             "Failure heatmap",
             _daily_heatmap(daily_health),
-            subtitle="Recurring Daily failures now render with red intensity so every-day offenders stand out immediately.",
+            subtitle="Recurring failures stay split by workflow so the run type is visible before you decide what is noise and what is signal.",
             wide=True,
         )
         + _panel(
-            "Recent Daily runs",
+            "Recent monitored runs",
             _table(
-                ["Date", "Status", "Commit", "Unique failures", "Failed jobs", "Run"],
+                ["Date", "Run type", "Status", "Commit", "Unique failures", "Failed jobs", "Run"],
                 _daily_run_rows(dashboard),
-                empty="No Daily run records were supplied.",
+                empty="No monitored run records were supplied.",
             ),
             subtitle=(
                 f"Queued failures: {_format_number(ci_failures.get('queued_failures', 0))}. "
-                "Commits and runs resolve back to GitHub."
+                "Workflow type, commits, and runs resolve back to GitHub. Dates with no run data stay visible."
             ),
             wide=True,
         )
@@ -1117,19 +1217,19 @@ def _render_daily_home(dashboard: JsonObject) -> str:
         + _panel(
             "Failure heatmap",
             _daily_heatmap(daily_health),
-            subtitle="Recurring Daily failures render with red intensity so every-day offenders stand out immediately.",
+            subtitle="Recurring failures stay split by workflow so the run type is visible before you decide what is noise and what is signal.",
             wide=True,
         )
         + _panel(
-            "Recent Daily runs",
+            "Recent monitored runs",
             _table(
-                ["Date", "Status", "Commit", "Unique failures", "Failed jobs", "Run"],
+                ["Date", "Run type", "Status", "Commit", "Unique failures", "Failed jobs", "Run"],
                 _daily_run_rows(dashboard),
-                empty="No Daily run records were supplied.",
+                empty="No monitored run records were supplied.",
             ),
             subtitle=(
                 f"Queued failures: {_format_number(ci_failures.get('queued_failures', 0))}. "
-                "Commits and runs resolve back to GitHub."
+                "Workflow type, commits, and runs resolve back to GitHub. Dates with no run data stay visible."
             ),
             wide=True,
         )
@@ -2247,10 +2347,43 @@ tr:last-child th {
   background: rgba(105, 131, 255, 0.03);
   font-weight: 700;
 }
+.heat-cell-missing {
+  color: #6f83a1;
+  background: rgba(148, 163, 184, 0.08);
+}
 .heat-cell-hit {
   color: #fff6f7;
   background: rgba(207, 60, 79, var(--heat-alpha));
   box-shadow: inset 0 0 0 1px rgba(120, 20, 39, 0.24);
+}
+.split-note {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+.workflow-heatmap-stack {
+  display: grid;
+  gap: 18px;
+}
+.workflow-heatmap-block {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+  background: rgba(15, 24, 40, 0.82);
+}
+.workflow-heatmap-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.workflow-heatmap-head h3 {
+  margin: 0;
+}
+.workflow-heatmap-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .redirect-body {
   display: grid;
@@ -2311,7 +2444,8 @@ tr:last-child th {
   .hero-meta,
   .eyebrow-row,
   .page-card-head,
-  .detail-card-head {
+  .detail-card-head,
+  .workflow-heatmap-head {
     flex-direction: column;
     align-items: start;
   }

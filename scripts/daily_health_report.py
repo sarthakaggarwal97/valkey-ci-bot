@@ -16,12 +16,13 @@ import logging
 import re
 import sys
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from github import Auth, Github
 
+from scripts.daily_health_history import load_history_runs, merge_runs
 from scripts.github_client import retry_github_call
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,31 @@ JsonObject = dict[str, Any]
 # ---------------------------------------------------------------------------
 # Data collection
 # ---------------------------------------------------------------------------
+
+
+def _workflow_name(value: object) -> str:
+    text = str(value or "").strip()
+    return text
+
+
+def _workflow_label(value: object) -> str:
+    text = _workflow_name(value)
+    if text.endswith((".yml", ".yaml")):
+        text = text.rsplit(".", 1)[0]
+    text = text.replace("-", " ").replace("_", " ").strip()
+    return text.title() or "Unknown"
+
+
+def _expected_dates(days: int, *, end_at: datetime | None = None) -> list[str]:
+    if days <= 0:
+        return []
+    end_dt = end_at or datetime.now(timezone.utc)
+    end_day = end_dt.date()
+    start_day = end_day - timedelta(days=days - 1)
+    return [
+        (start_day + timedelta(days=offset)).isoformat()
+        for offset in range(days)
+    ]
 
 
 def _job_failure_name(job: Any) -> str | None:
@@ -92,20 +118,16 @@ def fetch_daily_runs(
     collected: list[JsonObject] = []
     seen_dates: set[str] = set()
     now = datetime.now(timezone.utc)
+    expected_dates = _expected_dates(days, end_at=now)
+    expected_date_set = set(expected_dates)
 
     # Process in-progress runs first so today's run is never missing.
     # Then completed runs fill in the rest.
     all_runs = itertools.chain(in_progress_runs, completed_runs)
 
-    max_api_pages = days * 3  # safety cap to avoid infinite iteration
-    seen_runs = 0
     for run in all_runs:
-        seen_runs += 1
-        if seen_runs > max_api_pages:
-            break
         run_date = run.created_at.strftime("%Y-%m-%d")
-        age_days = (now - run.created_at.replace(tzinfo=timezone.utc)).days
-        if age_days > days:
+        if expected_date_set and run_date not in expected_date_set:
             continue
 
         # One run per date (prefer in-progress for today, completed otherwise)
@@ -155,6 +177,7 @@ def fetch_daily_runs(
             "run_id": run.id,
             "date": run_date,
             "status": run.conclusion or run.status or "unknown",
+            "workflow": workflow_file,
             "commit_sha": commit_sha,
             "full_sha": run.head_sha or "",
             "run_url": run.html_url,
@@ -166,7 +189,7 @@ def fetch_daily_runs(
             "failure_jobs": {k: v for k, v in failure_jobs.items()},
         })
 
-        if len(collected) >= days:
+        if expected_dates and len(seen_dates) >= len(expected_dates):
             break
 
     # Sort newest first
@@ -174,20 +197,23 @@ def fetch_daily_runs(
     return collected
 
 
-def build_report_data(
+def _build_report_snapshot(
     runs: list[JsonObject],
     *,
     repo_full_name: str = "",
     workflow_file: str = "",
     branch: str = "",
+    expected_dates: list[str] | None = None,
 ) -> JsonObject:
-    """Build the structured report payload from collected runs.
-
-    Returns a dict with dates, runs, heatmap (test × date failure counts),
-    and summary stats.
-    """
-    dates = sorted({r["date"] for r in runs})
-    date_set = set(dates)
+    """Build one report view from a set of workflow runs."""
+    run_dates = sorted(
+        {
+            str(r.get("date", "")).strip()
+            for r in runs
+            if str(r.get("date", "")).strip()
+        }
+    )
+    dates = expected_dates or run_dates
 
     # Build heatmap: for each failure name, count occurrences per date
     failure_dates: dict[str, Counter[str]] = defaultdict(Counter)
@@ -212,12 +238,16 @@ def build_report_data(
         row: JsonObject = {
             "name": name,
             "days_failed": failure_total_days[name],
-            "total_days": len(dates),
+            "total_days": len(run_dates),
             "cells": [],
         }
         for date in dates:
             count = failure_dates[name].get(date, 0)
-            row["cells"].append({"date": date, "count": count})
+            row["cells"].append({
+                "date": date,
+                "count": count,
+                "has_run": date in run_dates,
+            })
         heatmap.append(row)
 
     unique_failures = set()
@@ -233,12 +263,57 @@ def build_report_data(
         "branch": branch,
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "dates": dates,
+        "days_with_runs": len(run_dates),
+        "missing_dates": [date for date in dates if date not in run_dates],
         "total_runs": total_runs,
         "failed_runs": failed_runs,
         "unique_failures": len(unique_failures),
         "heatmap": heatmap,
         "runs": sorted(runs, key=lambda r: r["date"], reverse=True),
     }
+
+
+def build_report_data(
+    runs: list[JsonObject],
+    *,
+    repo_full_name: str = "",
+    workflow_file: str = "",
+    branch: str = "",
+    expected_dates: list[str] | None = None,
+) -> JsonObject:
+    """Build the structured report payload from collected runs.
+
+    Returns a dict with the combined report plus workflow-specific views when
+    multiple run types are present.
+    """
+    report = _build_report_snapshot(
+        runs,
+        repo_full_name=repo_full_name,
+        workflow_file=workflow_file,
+        branch=branch,
+        expected_dates=expected_dates,
+    )
+
+    workflow_runs: dict[str, list[JsonObject]] = defaultdict(list)
+    for run in runs:
+        workflow = _workflow_name(run.get("workflow"))
+        if workflow:
+            workflow_runs[workflow].append(run)
+
+    workflow_reports = [
+        _build_report_snapshot(
+            workflow_runs[name],
+            repo_full_name=repo_full_name,
+            workflow_file=name,
+            branch=branch,
+            expected_dates=expected_dates,
+        )
+        for name in sorted(workflow_runs)
+    ]
+    if workflow_reports:
+        report["workflows"] = [item["workflow"] for item in workflow_reports]
+        report["workflow_reports"] = workflow_reports
+    return report
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +379,11 @@ header .desc { color: var(--muted); font-size: 13px; margin-top: 8px; }
   background: #101f33;
 }
 .panel-body { padding: 0; overflow-x: auto; }
+.panel-copy {
+  padding: 14px 18px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
 table { width: 100%; border-collapse: collapse; }
 th, td {
   padding: 8px 10px;
@@ -337,6 +417,10 @@ tr:last-child td { border-bottom: 0; }
   min-width: 52px;
 }
 .cell-0 { color: #334155; }
+.cell-missing {
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.08);
+}
 .cell-1 { color: var(--amber); }
 .cell-2 { color: #fb923c; }
 .cell-3 { color: var(--red); }
@@ -344,6 +428,7 @@ tr:last-child td { border-bottom: 0; }
 .run-status { font-weight: 600; }
 .run-fail { color: var(--red); }
 .run-pass { color: var(--green); }
+.run-missing { color: var(--muted); }
 .failures-cell {
   max-width: 500px;
   white-space: normal;
@@ -355,6 +440,35 @@ tr:last-child td { border-bottom: 0; }
   font-size: 11px;
   color: var(--blue);
   margin-left: 2px;
+}
+.workflow-grid {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+.workflow-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0d1828;
+}
+.workflow-panel h3 {
+  font-size: 15px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #101f33;
+}
+.workflow-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+.workflow-meta strong {
+  color: var(--text);
 }
 .jobs-cell {
   max-width: 300px;
@@ -429,7 +543,10 @@ def _render_heatmap(data: JsonObject) -> str:
 
         for cell in cells:
             count = cell.get("count", 0)
-            if count == 0:
+            if not cell.get("has_run", True):
+                css = "cell cell-missing"
+                label = "—"
+            elif count == 0:
                 css = "cell cell-0"
                 label = "·"
             elif count == 1:
@@ -455,11 +572,23 @@ def _render_heatmap(data: JsonObject) -> str:
 def _render_run_details(data: JsonObject) -> str:
     """Render the per-run details table."""
     runs = data.get("runs", [])
-    if not runs:
+    expected_dates = [str(item) for item in data.get("dates", []) if str(item)]
+    if not runs and not expected_dates:
         return '<p style="padding:18px;color:var(--muted)">No runs available.</p>'
+
+    show_workflow = any(_workflow_name(run.get("workflow")) for run in runs if isinstance(run, dict))
+    runs_by_date: dict[str, list[JsonObject]] = defaultdict(list)
+    for run in runs:
+        if isinstance(run, dict):
+            date = str(run.get("date", "")).strip()
+            if date:
+                runs_by_date[date].append(run)
+    ordered_dates = sorted(expected_dates or runs_by_date.keys(), reverse=True)
 
     lines = ['<table>', '<thead><tr>']
     lines.append("<th>Date</th>")
+    if show_workflow:
+        lines.append("<th>Run Type</th>")
     lines.append("<th>Status</th>")
     lines.append("<th>Commit</th>")
     lines.append("<th>Failures</th>")
@@ -467,59 +596,102 @@ def _render_run_details(data: JsonObject) -> str:
     lines.append("<th>Failed Jobs</th>")
     lines.append("</tr></thead><tbody>")
 
-    for run in runs:
-        date = run.get("date", "")
-        status = run.get("status", "unknown")
-        sha = run.get("commit_sha", "")
-        run_url = run.get("run_url", "")
-        total_jobs = run.get("total_jobs", 0)
-        failed_jobs = run.get("failed_jobs", 0)
-        failure_names = run.get("failure_names", [])
-        failure_jobs_map = run.get("failure_jobs", {})
-        failed_job_names = run.get("failed_job_names", [])
+    for date in ordered_dates:
+        date_runs = runs_by_date.get(date, [])
+        if not date_runs:
+            lines.append("<tr>")
+            lines.append(f"<td>{_h(date)}</td>")
+            if show_workflow:
+                lines.append("<td>—</td>")
+            lines.append('<td class="run-status run-missing">NO DATA</td>')
+            lines.append("<td>—</td>")
+            lines.append("<td>—</td>")
+            lines.append('<td class="failures-cell">No run data was available for this date.</td>')
+            lines.append("<td>—</td>")
+            lines.append("</tr>")
+            continue
 
-        status_css = "run-fail" if status == "failure" else "run-pass"
-        status_label = f"FAIL ({failed_jobs}/{total_jobs})" if status == "failure" else "PASS"
+        for run in date_runs:
+            status = run.get("status", "unknown")
+            sha = run.get("commit_sha", "")
+            run_url = run.get("run_url", "")
+            total_jobs = run.get("total_jobs", 0)
+            failed_jobs = run.get("failed_jobs", 0)
+            failure_names = run.get("failure_names", [])
+            failure_jobs_map = run.get("failure_jobs", {})
+            failed_job_names = run.get("failed_job_names", [])
 
-        # Render failure names with job links
-        failure_parts = []
-        for fname in failure_names[:15]:
-            job_ids = failure_jobs_map.get(fname, [])
-            job_links = " ".join(
-                f'<a class="job-link" href="https://github.com/valkey-io/valkey/actions/runs/{run.get("run_id", "")}/job/{jid}" '
-                f'target="_blank">[{i + 1}]</a>'
-                for i, jid in enumerate(job_ids[:5])
-            )
-            failure_parts.append(
-                f'<span class="failure-entry">{_h(_truncate(fname, 70))} {job_links}</span>'
-            )
-        if len(failure_names) > 15:
-            failure_parts.append(
-                f'<span class="failure-entry" style="color:var(--muted)">+{len(failure_names) - 15} more</span>'
-            )
-        failures_html = "<br>".join(failure_parts) if failure_parts else "—"
+            status_css = "run-fail" if status == "failure" else "run-pass"
+            status_label = f"FAIL ({failed_jobs}/{total_jobs})" if status == "failure" else "PASS"
+            workflow_label = _workflow_label(run.get("workflow"))
 
-        # Failed job names
-        shown_jobs = failed_job_names[:5]
-        jobs_html = " ".join(_h(j) for j in shown_jobs)
-        if len(failed_job_names) > 5:
-            jobs_html += f' <span style="color:var(--muted)">+{len(failed_job_names) - 5} more</span>'
-        if not jobs_html:
-            jobs_html = "—"
+            # Render failure names with job links
+            failure_parts = []
+            for fname in failure_names[:15]:
+                job_ids = failure_jobs_map.get(fname, [])
+                job_links = " ".join(
+                    f'<a class="job-link" href="https://github.com/valkey-io/valkey/actions/runs/{run.get("run_id", "")}/job/{jid}" '
+                    f'target="_blank">[{i + 1}]</a>'
+                    for i, jid in enumerate(job_ids[:5])
+                )
+                failure_parts.append(
+                    f'<span class="failure-entry">{_h(_truncate(fname, 70))} {job_links}</span>'
+                )
+            if len(failure_names) > 15:
+                failure_parts.append(
+                    f'<span class="failure-entry" style="color:var(--muted)">+{len(failure_names) - 15} more</span>'
+                )
+            failures_html = "<br>".join(failure_parts) if failure_parts else "—"
 
-        sha_html = f'<a class="sha" href="{_h(run_url)}" target="_blank">{_h(sha)}</a>' if run_url else _h(sha)
+            # Failed job names
+            shown_jobs = failed_job_names[:5]
+            jobs_html = " ".join(_h(j) for j in shown_jobs)
+            if len(failed_job_names) > 5:
+                jobs_html += f' <span style="color:var(--muted)">+{len(failed_job_names) - 5} more</span>'
+            if not jobs_html:
+                jobs_html = "—"
 
-        lines.append("<tr>")
-        lines.append(f"<td>{_h(date)}</td>")
-        lines.append(f'<td class="run-status {status_css}">{status_label}</td>')
-        lines.append(f"<td>{sha_html}</td>")
-        lines.append(f"<td>{len(failure_names)}</td>")
-        lines.append(f'<td class="failures-cell">{failures_html}</td>')
-        lines.append(f'<td class="jobs-cell">{jobs_html}</td>')
-        lines.append("</tr>")
+            sha_html = f'<a class="sha" href="{_h(run_url)}" target="_blank">{_h(sha)}</a>' if run_url else _h(sha)
+
+            lines.append("<tr>")
+            lines.append(f"<td>{_h(date)}</td>")
+            if show_workflow:
+                lines.append(f"<td>{_h(workflow_label)}</td>")
+            lines.append(f'<td class="run-status {status_css}">{status_label}</td>')
+            lines.append(f"<td>{sha_html}</td>")
+            lines.append(f"<td>{len(failure_names)}</td>")
+            lines.append(f'<td class="failures-cell">{failures_html}</td>')
+            lines.append(f'<td class="jobs-cell">{jobs_html}</td>')
+            lines.append("</tr>")
 
     lines.append("</tbody></table>")
     return "\n".join(lines)
+
+
+def _render_workflow_panels(data: JsonObject) -> str:
+    workflow_reports = [
+        report
+        for report in data.get("workflow_reports", [])
+        if isinstance(report, dict)
+    ]
+    if len(workflow_reports) <= 1:
+        return ""
+
+    panels: list[str] = []
+    for report in workflow_reports:
+        workflow = _workflow_label(report.get("workflow"))
+        panels.append(
+            '<section class="workflow-panel">'
+            f"<h3>{_h(workflow)}</h3>"
+            '<div class="workflow-meta">'
+            f"<span><strong>{report.get('total_runs', 0)}</strong> runs</span>"
+            f"<span><strong>{report.get('failed_runs', 0)}</strong> failed</span>"
+            f"<span><strong>{report.get('unique_failures', 0)}</strong> unique failures</span>"
+            "</div>"
+            f'<div class="panel-body">{_render_heatmap(report)}</div>'
+            "</section>"
+        )
+    return '<div class="workflow-grid">' + "".join(panels) + "</div>"
 
 
 def render_html(data: JsonObject) -> str:
@@ -530,9 +702,11 @@ def render_html(data: JsonObject) -> str:
     generated_at = data.get("generated_at", "")
     total_runs = data.get("total_runs", 0)
     failed_runs = data.get("failed_runs", 0)
+    days_with_runs = data.get("days_with_runs", 0)
     unique_failures = data.get("unique_failures", 0)
 
     heatmap_html = _render_heatmap(data)
+    workflow_heatmaps_html = _render_workflow_panels(data)
     details_html = _render_run_details(data)
 
     return f"""<!doctype html>
@@ -564,12 +738,23 @@ def render_html(data: JsonObject) -> str:
         <div class="label">Unique Failures</div>
         <div class="value">{unique_failures}</div>
       </div>
+      <div class="metric">
+        <div class="label">Days With Data</div>
+        <div class="value">{days_with_runs}/{len(data.get("dates", []))}</div>
+      </div>
     </div>
 
     <div class="panel">
       <h2>Failure Heatmap</h2>
+      <p class="panel-copy">A dash means no run data was available for that date. A dot means the run was present and that failure did not occur.</p>
       <div class="panel-body">{heatmap_html}</div>
     </div>
+
+    {f'''<div class="panel">
+      <h2>Failure Heatmap By Run Type</h2>
+      <p class="panel-copy">Failures stay separated by workflow so weekly-only regressions do not blur into daily trends.</p>
+      {workflow_heatmaps_html}
+    </div>''' if workflow_heatmaps_html else ""}
 
     <div class="panel">
       <h2>Run Details (newest first)</h2>
@@ -660,6 +845,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Optional: also write JSON data to this path",
     )
     parser.add_argument(
+        "--history-dir",
+        default="",
+        help="Optional local checkout of durable daily-health history snapshots.",
+    )
+    parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Enable debug logging",
@@ -673,29 +863,43 @@ def main(argv: list[str] | None = None) -> int:
 
     import os
     token = args.token or os.environ.get("GITHUB_TOKEN", "")
-    if not token:
+    expected_dates = _expected_dates(args.days)
+    history_runs = load_history_runs(
+        args.history_dir,
+        workflows=args.workflow,
+        expected_dates=expected_dates,
+    )
+    if not token and not history_runs:
         logger.error("GitHub token required via --token or GITHUB_TOKEN env var.")
         return 1
 
-    gh = Github(auth=Auth.Token(token))
-
-    logger.info(
-        "Fetching %d days of runs for %s (workflows: %s, branch: %s)...",
-        args.days, args.repo, ", ".join(args.workflow), args.branch,
-    )
     all_runs: list[dict[str, Any]] = []
-    for wf in args.workflow:
-        wf_runs = fetch_daily_runs(gh, args.repo, wf, args.branch, args.days)
-        for run in wf_runs:
-            run["workflow"] = wf
-        logger.info("Collected %d runs from %s.", len(wf_runs), wf)
-        all_runs.extend(wf_runs)
+    if token:
+        gh = Github(auth=Auth.Token(token))
+        logger.info(
+            "Fetching %d days of runs for %s (workflows: %s, branch: %s)...",
+            args.days, args.repo, ", ".join(args.workflow), args.branch,
+        )
+        for wf in args.workflow:
+            wf_runs = fetch_daily_runs(gh, args.repo, wf, args.branch, args.days)
+            for run in wf_runs:
+                run["workflow"] = wf
+            logger.info("Collected %d live runs from %s.", len(wf_runs), wf)
+            all_runs.extend(wf_runs)
+    if history_runs:
+        logger.info(
+            "Loaded %d stored run snapshot(s) from %s.",
+            len(history_runs),
+            args.history_dir,
+        )
+    all_runs = merge_runs(all_runs, history_runs)
 
     data = build_report_data(
         all_runs,
         repo_full_name=args.repo,
         workflow_file=", ".join(args.workflow),
         branch=args.branch,
+        expected_dates=expected_dates,
     )
 
     html = render_html(data)

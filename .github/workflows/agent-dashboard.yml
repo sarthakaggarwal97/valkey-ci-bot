@@ -57,6 +57,7 @@ jobs:
             --branch "unstable" \
             --days 14 \
             --token "${GITHUB_TOKEN}" \
+            --history-dir "bot-data/dashboard-history/daily-health" \
             --output daily-health-report.html \
             --output-json daily-health-report.json
 
