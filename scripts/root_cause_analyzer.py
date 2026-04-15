@@ -80,6 +80,34 @@ files_to_change list, and explain what evidence is missing in the rationale.
 - Do not invent source paths. Prefer files referenced in the logs, stack \
 traces, supplied source snippets, or retrieved context.
 - Keep description and rationale concise but informative.
+
+## Examples
+
+### Example 1 — Assertion failure in a test
+Input: Job "test-ubuntu-x86" failed. Parsed failure: tests/unit/test_expire.tcl \
+line 42 — "Expected 0 but got 1" in test "expire-subcommand".
+Output:
+{
+  "description": "expire command returns wrong value when key has no TTL set",
+  "files_to_change": ["src/expire.c"],
+  "confidence": "high",
+  "rationale": "The assertion in test_expire.tcl line 42 checks the return value of EXPIRE on a key without TTL. The expire.c handler does not check for the no-TTL case before returning.",
+  "is_flaky": false,
+  "flakiness_indicators": null
+}
+
+### Example 2 — Intermittent timeout in cluster test
+Input: Job "test-ubuntu-x86" failed. Parsed failure: tests/integration/cluster.tcl \
+— "Timed out waiting for cluster to become stable after 30000ms".
+Output:
+{
+  "description": "Cluster stabilization timeout due to race in node handshake",
+  "files_to_change": ["src/cluster.c"],
+  "confidence": "medium",
+  "rationale": "The 30s timeout during cluster join suggests a race condition in the handshake path. The test has no deterministic wait — it polls with a fixed timeout. The cluster.c CLUSTERMSG_TYPE_MEET handler may not propagate state fast enough under load.",
+  "is_flaky": true,
+  "flakiness_indicators": ["timeout", "timed out", "cluster stabilization"]
+}
 """
 
 _ROOT_CAUSE_SCHEMA: dict[str, Any] = {

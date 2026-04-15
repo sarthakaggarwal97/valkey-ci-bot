@@ -72,7 +72,7 @@ class BotConfig:
     flaky_campaign_enabled: bool = True
     flaky_max_attempts_per_run: int = 3
     flaky_validation_passes: int = 3
-    flaky_max_failed_hypotheses: int = 20
+    flaky_max_failed_hypotheses: int = 8
     require_validation_profile: bool = True
     soak_validation_workflows: list[str] = field(default_factory=list)
     soak_validation_passes: int = 1

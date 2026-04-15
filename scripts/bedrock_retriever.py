@@ -168,6 +168,16 @@ class BedrockRetriever:
         """Render retrieved snippets into a bounded prompt section."""
         snippets = self.retrieve(query, config)
         if not snippets:
+            # Distinguish "no results" from "retrieval failed" so operators
+            # know when analyses are running without RAG context.
+            kbs = list(_configured_knowledge_bases(config))
+            if kbs:
+                self._record_metric("bedrock.retrieval.degraded_analysis")
+                logger.warning(
+                    "Retrieval returned no snippets for %d configured KB(s). "
+                    "Analysis will proceed without RAG context.",
+                    len(kbs),
+                )
             return ""
 
         lines = [f"## {section_title}"]

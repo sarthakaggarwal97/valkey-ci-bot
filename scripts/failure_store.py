@@ -51,6 +51,7 @@ class PRStateTransition:
     new_status: str
     github_state: str
     merged: bool
+    rejection_feedback: str = ""
 
 
 def _is_missing_store_error(exc: Exception) -> bool:
@@ -884,6 +885,7 @@ class FailureStore:
                 landing_complete = bool(
                     campaign is not None and campaign.landing_status == "passed"
                 )
+                rejection_feedback = ""
                 if pr.merged:
                     entry.status = "merged"
                     if campaign is not None:
@@ -892,6 +894,34 @@ class FailureStore:
                         entry.campaign_status = campaign.status
                 elif pr.state == "closed":
                     entry.status = "abandoned"
+                    # Scrape review comments as rejection feedback for future
+                    # campaigns so the agent avoids repeating the same mistakes.
+                    rejection_parts: list[str] = []
+                    try:
+                        for review in pr.get_reviews():
+                            body = (review.body or "").strip()
+                            if body and review.state in (
+                                "CHANGES_REQUESTED",
+                                "COMMENTED",
+                            ):
+                                rejection_parts.append(body[:500])
+                        for comment in pr.get_issue_comments():
+                            body = (comment.body or "").strip()
+                            if body and not body.startswith("<!--"):
+                                rejection_parts.append(body[:500])
+                    except Exception as feedback_exc:
+                        logger.debug(
+                            "Could not scrape review feedback for %s: %s",
+                            entry.pr_url, feedback_exc,
+                        )
+                    rejection_feedback = "\n---\n".join(rejection_parts[:5])
+                    if rejection_feedback and campaign is not None:
+                        hypothesis = (
+                            f"PR {entry.pr_url} was closed by maintainer. "
+                            f"Feedback: {rejection_feedback[:1000]}"
+                        )
+                        if hypothesis not in campaign.failed_hypotheses:
+                            campaign.failed_hypotheses.append(hypothesis)
                     if campaign is not None:
                         campaign.status = "abandoned" if not landing_complete else "landed"
                         campaign.updated_at = datetime.now(timezone.utc).isoformat()
@@ -907,6 +937,7 @@ class FailureStore:
                             new_status=entry.status,
                             github_state=str(pr.state),
                             merged=bool(pr.merged),
+                            rejection_feedback=rejection_feedback,
                         )
                     )
             except Exception as exc:
