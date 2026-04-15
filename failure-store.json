@@ -7843,22 +7843,6 @@
       "test_name": null,
       "observations": [
         {
-          "outcome": "fail",
-          "observed_at": "2026-04-13T06:28:19.172606+00:00",
-          "commit_sha": "ecba3e312300a12fa3bbd4718aedcab3e26ff425",
-          "workflow_run_id": 24044259328,
-          "workflow_name": "CI",
-          "workflow_file": "ci.yml",
-          "job_name": "test-sanitizer-address",
-          "matrix_params": {},
-          "failure_identifier": "test-sanitizer-address",
-          "test_name": null,
-          "error_signature": "2026-04-06T18:15:08.2710000Z Evaluating test-sanitizer-address.if\n2026-04-06T18:15:08.2710000Z Evaluating: success()\n2026-04-06T18:15:08.2710000Z Result: true\n2026-04-06T18:15:08.4230000Z Job is about to start running on the hosted runner: GitHub Actions 1000632032\n2026-04-06T18:15:08.4060000Z Requested labels: ubuntu-latest\n2026-04-06T18:15:08.4060000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/unstable\n2026-04-06T18:15:08.4060000Z Waiting for a runner to pick up this job...\n2026-04-06T18:15:08.4230000Z Job is waiting for a hosted runner to come online.",
-          "file_path": "",
-          "fingerprint": "8956ba5bdddaa15df639c557465c90d93d383fe5e93e98ca91a3168c036d0bb7",
-          "incident_key": null
-        },
-        {
           "outcome": "pass",
           "observed_at": "2026-04-13T06:28:26.945794+00:00",
           "commit_sha": "034d16ac44e8f722b26d30ea7be9422427092d05",
@@ -8321,6 +8305,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-15T08:09:59.901213+00:00",
+          "commit_sha": "a34f125d8e18201bc51878e2848c6b6187a8a3cb",
+          "workflow_run_id": 24433958218,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-sanitizer-address",
+          "matrix_params": {},
+          "failure_identifier": "test-sanitizer-address",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -8715,6 +8715,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-15T08:09:59.901263+00:00",
+          "commit_sha": "a34f125d8e18201bc51878e2848c6b6187a8a3cb",
+          "workflow_run_id": 24433958218,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-ubuntu-latest",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-latest",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -8740,6 +8756,22 @@
           "error_signature": "2026-04-15T02:54:10.6460000Z Requested labels: ubuntu-latest\n2026-04-15T02:54:10.6460000Z Job defined at: valkey-io/valkey/.github/workflows/ci.yml@refs/heads/unstable\n2026-04-15T02:54:10.6460000Z Waiting for a runner to pick up this job...\n2026-04-15T02:54:10.6400000Z Evaluating test-ubuntu-latest-cmake-tls.if\n2026-04-15T02:54:10.6400000Z Evaluating: success()\n2026-04-15T02:54:10.6400000Z Result: true\n2026-04-15T02:54:11.0510000Z Job is about to start running on the hosted runner: GitHub Actions 1000652605\n2026-04-15T02:54:11.0510000Z Job is waiting for a hosted runner to come online.",
           "file_path": "",
           "fingerprint": "ac32160917926c4bdee1b1665028c51cc22bb9599d1814cd42980bdded3b4c90",
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-15T08:09:59.901245+00:00",
+          "commit_sha": "a34f125d8e18201bc51878e2848c6b6187a8a3cb",
+          "workflow_run_id": 24433958218,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-ubuntu-latest-cmake-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-latest-cmake-tls",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
           "incident_key": null
         }
       ]
