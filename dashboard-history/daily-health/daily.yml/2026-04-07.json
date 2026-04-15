@@ -1,0 +1,22 @@
+{
+  "captured_at": "2026-04-15T19:05:44.008501+00:00",
+  "date": "2026-04-07",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_sha": "d6137a3",
+    "date": "2026-04-07",
+    "failed_job_names": [],
+    "failed_jobs": 0,
+    "failure_jobs": {},
+    "failure_names": [],
+    "full_sha": "d6137a362544d9304c04a86c195d05055570b7cd",
+    "run_id": 24103433464,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24103433464",
+    "status": "skipped",
+    "total_jobs": 33,
+    "unique_failures": 0,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
