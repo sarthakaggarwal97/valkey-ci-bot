@@ -49,7 +49,7 @@ def merge_runs(
             return workflow, date
         return "", str(run.get("run_id", "")).strip()
 
-    merged: dict[tuple[str, str, str], JsonObject] = {}
+    merged: dict[tuple[str, str], JsonObject] = {}
     for run in fallback_runs:
         if isinstance(run, dict):
             merged[key_for(run)] = dict(run)
