@@ -1,0 +1,54 @@
+{
+  "captured_at": "2026-04-15T19:05:31.784781+00:00",
+  "date": "2026-04-14",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_sha": "baa5a48",
+    "date": "2026-04-14",
+    "failed_job_names": [
+      "test-almalinux8-tls-module",
+      "test-almalinux9-tls-module-no-tls",
+      "test-alpine-jemalloc",
+      "test-centosstream9-tls-module-no-tls",
+      "test-fedorarawhide-jemalloc",
+      "test-macos-latest",
+      "test-sanitizer-undefined (clang)",
+      "test-sanitizer-undefined (gcc)",
+      "test-sanitizer-undefined-large-memory (clang)",
+      "test-sanitizer-undefined-large-memory (gcc)"
+    ],
+    "failed_jobs": 10,
+    "failure_jobs": {
+      "module api test": [
+        71360103072,
+        71360103102,
+        71360103174
+      ],
+      "test": [
+        71360103031,
+        71360103048,
+        71360103052,
+        71360103114,
+        71360103185
+      ],
+      "unittest": [
+        71360103187,
+        71360103189
+      ]
+    },
+    "failure_names": [
+      "module api test",
+      "test",
+      "unittest"
+    ],
+    "full_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
+    "run_id": 24425999685,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24425999685",
+    "status": "cancelled",
+    "total_jobs": 49,
+    "unique_failures": 3,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
