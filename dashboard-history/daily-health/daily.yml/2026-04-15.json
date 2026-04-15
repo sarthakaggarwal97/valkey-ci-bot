@@ -1,0 +1,52 @@
+{
+  "captured_at": "2026-04-15T19:05:30.484582+00:00",
+  "date": "2026-04-15",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_sha": "a34f125",
+    "date": "2026-04-15",
+    "failed_job_names": [
+      "test-fedoralatest-tls-module",
+      "test-macos-latest",
+      "test-sanitizer-undefined (clang)",
+      "test-sanitizer-undefined (gcc)",
+      "test-sanitizer-undefined-large-memory (clang)",
+      "test-sanitizer-undefined-large-memory (gcc)",
+      "test-ubuntu-no-malloc-usable-size",
+      "test-valgrind-no-malloc-usable-size-test",
+      "test-valgrind-test"
+    ],
+    "failed_jobs": 9,
+    "failure_jobs": {
+      "module api test": [
+        71384026147
+      ],
+      "test": [
+        71384025884,
+        71384026043,
+        71384026056,
+        71384026088,
+        71384026137,
+        71384026179
+      ],
+      "unittest": [
+        71384026169,
+        71384026178
+      ]
+    },
+    "failure_names": [
+      "module api test",
+      "test",
+      "unittest"
+    ],
+    "full_sha": "a34f125d8e18201bc51878e2848c6b6187a8a3cb",
+    "run_id": 24433958209,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24433958209",
+    "status": "failure",
+    "total_jobs": 49,
+    "unique_failures": 3,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
