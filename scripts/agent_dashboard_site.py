@@ -924,15 +924,34 @@ def _daily_metrics(dashboard: JsonObject) -> list[str]:
     failed_runs = _int(daily_health.get("failed_runs"))
     total_days = len(_list(daily_health.get("dates")))
     days_with_runs = _int(daily_health.get("days_with_runs"))
-    workflow_count = len(_workflow_reports(daily_health))
-    return [
+    reports = _workflow_reports(daily_health)
+    metrics = [
         _metric("Tracked days", total_days, note=f"{days_with_runs}/{total_days or 0} with run data"),
         _metric("Total runs", total_runs, note="Latest monitored samples"),
         _metric("Failed runs", failed_runs, note=_format_rate(failed_runs, total_runs), tone="bad"),
-        _metric("Unique failures", daily_health.get("unique_failures", 0), note="Across current window", tone="warn"),
-        _metric("Run types", workflow_count or "n/a", note="Distinct workflow views"),
-        _metric("Active campaigns", flaky_tests.get("active_campaigns", 0), note="Validation loops in progress"),
     ]
+    if len(reports) > 1:
+        for report in reports:
+            wf_label = _workflow_label(report.get("workflow"))
+            wf_total = _int(report.get("total_runs"))
+            wf_failed = _int(report.get("failed_runs"))
+            tone = "bad" if wf_failed else "good"
+            metrics.append(
+                _metric(
+                    f"{wf_label} failures",
+                    wf_failed,
+                    note=_format_rate(wf_failed, wf_total),
+                    tone=tone,
+                )
+            )
+    else:
+        metrics.append(
+            _metric("Unique failures", daily_health.get("unique_failures", 0), note="Across current window", tone="warn"),
+        )
+    metrics.append(
+        _metric("Active campaigns", flaky_tests.get("active_campaigns", 0), note="Validation loops in progress"),
+    )
+    return metrics
 
 
 def _daily_heatmap_table(report: JsonObject, *, filter_id: str) -> str:
@@ -1012,13 +1031,38 @@ def _daily_heatmap_table(report: JsonObject, *, filter_id: str) -> str:
     )
 
 
+def _heatmap_missing_count(report: JsonObject) -> int:
+    """Count dates with no run data in a heatmap report."""
+    missing = _list(report.get("missing_dates"))
+    if missing:
+        return len(missing)
+    dates = _list(report.get("dates"))
+    days_with_runs = _int(report.get("days_with_runs"))
+    if dates and days_with_runs:
+        return len(dates) - days_with_runs
+    # Fall back to scanning cells for has_run=false
+    seen_missing: set[str] = set()
+    for row in _list(report.get("heatmap")):
+        for cell in _list(_mapping(row).get("cells")):
+            data = _mapping(cell)
+            if not data.get("has_run", True):
+                seen_missing.add(_str(data.get("date")))
+    return len(seen_missing)
+
+
 def _daily_heatmap(daily_health: JsonObject) -> str:
     reports = _workflow_reports(daily_health)
     if not reports:
         return '<p class="empty">No Daily heatmap is available in the supplied payload.</p>'
     if len(reports) == 1:
+        missing = _heatmap_missing_count(reports[0])
+        missing_note = (
+            f" <strong>{missing}</strong> of {len(_list(reports[0].get('dates')))} dates had no run data."
+            if missing
+            else ""
+        )
         return (
-            '<p class="split-note">A dash means no run data was available for that date.</p>'
+            f'<p class="split-note">A dash means no run data was available for that date.{missing_note}</p>'
             + _daily_heatmap_table(reports[0], filter_id="daily-heatmap")
         )
 
@@ -1026,6 +1070,12 @@ def _daily_heatmap(daily_health: JsonObject) -> str:
     for report in reports:
         workflow = _workflow_label(report.get("workflow"))
         slug = _workflow_slug(report.get("workflow"))
+        missing = _heatmap_missing_count(report)
+        missing_pill = (
+            _meta_pill("Missing days", _format_number(missing))
+            if missing
+            else ""
+        )
         blocks.append(
             '<section class="workflow-heatmap-block">'
             '<div class="workflow-heatmap-head">'
@@ -1034,6 +1084,7 @@ def _daily_heatmap(daily_health: JsonObject) -> str:
             f"{_meta_pill('Runs', _format_number(report.get('total_runs', 0)))}"
             f"{_meta_pill('Failed', _format_number(report.get('failed_runs', 0)))}"
             f"{_meta_pill('Unique failures', _format_number(report.get('unique_failures', 0)))}"
+            f"{missing_pill}"
             "</div></div>"
             + _daily_heatmap_table(report, filter_id=f"daily-heatmap-{slug}")
             + "</section>"
@@ -1059,6 +1110,18 @@ def _daily_run_rows(dashboard: JsonObject) -> list[list[object]]:
             continue
         runs_by_date.setdefault(date, []).append(run_data)
 
+    # Determine which workflows were expected so missing-date rows are specific.
+    expected_workflows = [
+        _str(item) for item in _list(daily_health.get("workflows")) if _str(item)
+    ]
+    if not expected_workflows:
+        reports = _workflow_reports(daily_health)
+        expected_workflows = [
+            _str(report.get("workflow"))
+            for report in reports
+            if _str(report.get("workflow"))
+        ]
+
     rows: list[list[object]] = []
     ordered_dates = sorted(
         [_str(item) for item in _list(daily_health.get("dates")) if _str(item)]
@@ -1068,17 +1131,31 @@ def _daily_run_rows(dashboard: JsonObject) -> list[list[object]]:
     for date in ordered_dates:
         date_runs = runs_by_date.get(date, [])
         if not date_runs:
-            rows.append(
-                [
-                    date,
-                    "—",
-                    _chip("no data", tone="warn"),
-                    "—",
-                    "—",
-                    "—",
-                    "—",
-                ]
-            )
+            if expected_workflows:
+                for workflow in expected_workflows:
+                    rows.append(
+                        [
+                            date,
+                            _chip(_workflow_label(workflow), tone="info"),
+                            _chip("no data", tone="warn"),
+                            "—",
+                            "—",
+                            "—",
+                            "—",
+                        ]
+                    )
+            else:
+                rows.append(
+                    [
+                        date,
+                        "—",
+                        _chip("no data", tone="warn"),
+                        "—",
+                        "—",
+                        "—",
+                        "—",
+                    ]
+                )
             continue
         for run_data in date_runs:
             sha = _str(run_data.get("full_sha") or run_data.get("commit_sha"))
@@ -1999,7 +2076,7 @@ th {
 }
 .hero-metrics {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
   margin-bottom: 12px;
 }

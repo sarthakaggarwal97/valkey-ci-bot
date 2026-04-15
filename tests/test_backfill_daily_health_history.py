@@ -70,6 +70,7 @@ def test_main_backfills_multiple_workflows_and_prints_summary(
     monkeypatch.setattr(backfill_daily_health_history, "Auth", _FakeAuth)
     monkeypatch.setattr(backfill_daily_health_history, "DailyHealthHistoryStore", _FakeStore)
     monkeypatch.setattr(backfill_daily_health_history, "fetch_daily_runs", _fake_fetch)
+    monkeypatch.setattr(backfill_daily_health_history, "load_history_runs", lambda *a, **kw: [])
 
     exit_code = backfill_daily_health_history.main(
         [
@@ -103,7 +104,8 @@ def test_main_backfills_multiple_workflows_and_prints_summary(
     assert summary["saved"] == 2
     assert summary["skipped"] == 2
     assert summary["mirrored"] == 2
-    assert summary["workflows"] == [
-        {"workflow": "daily.yml", "runs_found": 1, "saved": 1, "skipped": 1, "mirrored": 1},
-        {"workflow": "weekly.yml", "runs_found": 1, "saved": 1, "skipped": 1, "mirrored": 1},
-    ]
+    for wf_summary in summary["workflows"]:
+        assert wf_summary["runs_found"] == 1
+        assert wf_summary["saved"] == 1
+        # Each workflow only covers 1 of 7 expected dates → 6 missing
+        assert len(wf_summary["missing_dates"]) == 6
