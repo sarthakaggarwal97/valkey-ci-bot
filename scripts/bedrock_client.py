@@ -535,7 +535,7 @@ class BedrockClient:
         # When thinking is enabled, maxTokens must exceed budget_tokens.
         thinking_enabled = thinking_budget is not None and thinking_budget > 0
         effective_max_tokens = output_tokens
-        if thinking_enabled:
+        if thinking_budget is not None and thinking_budget > 0:
             effective_max_tokens = max(output_tokens, thinking_budget + output_tokens)
 
         converse_kwargs: dict[str, Any] = {
@@ -753,7 +753,7 @@ class BedrockClient:
         output_tokens = max_output_tokens or self._config.max_output_tokens
         thinking_enabled = thinking_budget is not None and thinking_budget > 0
         effective_max_tokens = output_tokens
-        if thinking_enabled:
+        if thinking_budget is not None and thinking_budget > 0:
             effective_max_tokens = max(output_tokens, thinking_budget + output_tokens)
         messages: list[dict[str, Any]] = [
             {"role": "user", "content": [{"text": user_prompt}]},
