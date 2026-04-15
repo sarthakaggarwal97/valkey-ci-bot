@@ -82,13 +82,14 @@
   "sarthakaggarwal97/valkey#103": {
     "repo": "sarthakaggarwal97/valkey",
     "pr_number": 103,
-    "last_reviewed_head_sha": "a14cafbe1b3743edf18ab516326c88a33fbf6fde",
+    "last_reviewed_head_sha": "442f9c36fa03c1b5a519cf9a203f817c535c248b",
     "summary_comment_id": 4163115644,
     "review_comment_ids": [
       4064606422,
-      4079906137
+      4079906137,
+      4116499044
     ],
-    "updated_at": "2026-04-09T05:36:27.955779+00:00"
+    "updated_at": "2026-04-15T20:08:41.802548+00:00"
   },
   "sarthakaggarwal97/valkey#101": {
     "repo": "sarthakaggarwal97/valkey",
