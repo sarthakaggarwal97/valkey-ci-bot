@@ -1,0 +1,43 @@
+{
+  "captured_at": "2026-04-15T19:05:35.338275+00:00",
+  "date": "2026-04-12",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_sha": "2871efd",
+    "date": "2026-04-12",
+    "failed_job_names": [
+      "test-almalinux9-tls-module",
+      "test-sanitizer-undefined (clang)",
+      "test-ubuntu-32bit",
+      "test-ubuntu-tls-no-tls",
+      "test-valgrind-no-malloc-usable-size-test",
+      "test-valgrind-test"
+    ],
+    "failed_jobs": 6,
+    "failure_jobs": {
+      "module api test": [
+        70937980785
+      ],
+      "test": [
+        70937980645,
+        70937980673,
+        70937980753,
+        70937980759,
+        70937980808
+      ]
+    },
+    "failure_names": [
+      "module api test",
+      "test"
+    ],
+    "full_sha": "2871efd43644f9bf222dca882a184e36f3e28d4a",
+    "run_id": 24294869067,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24294869067",
+    "status": "failure",
+    "total_jobs": 49,
+    "unique_failures": 2,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
