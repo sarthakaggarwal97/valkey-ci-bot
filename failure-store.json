@@ -8643,6 +8643,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-15T03:45:32.931374+00:00",
+          "commit_sha": "a34f125d8e18201bc51878e2848c6b6187a8a3cb",
+          "workflow_run_id": 24433958218,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-sanitizer-address",
+          "matrix_params": {},
+          "failure_identifier": "test-sanitizer-address",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -9005,6 +9021,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-15T03:45:32.931433+00:00",
+          "commit_sha": "a34f125d8e18201bc51878e2848c6b6187a8a3cb",
+          "workflow_run_id": 24433958218,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-ubuntu-latest",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-latest",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -9030,6 +9062,22 @@
           "error_signature": "2026-04-15T02:56:41.1799833Z \n2026-04-15T02:56:41.1805823Z Waiting for background save to finish... [ok]: SPUBLISH/SSUBSCRIBE after UNSUBSCRIBE without arguments (164 ms)\n2026-04-15T02:56:41.2127107Z [ok]: Negative multibulk length in pipeline (109 ms)\n2026-04-15T02:56:41.2229641Z [ok]: BGSAVE (70 ms)\n2026-04-15T02:56:41.2252046Z [ok]: SELECT an out of range DB (1 ms)\n2026-04-15T02:56:41.2665808Z [3/151 done]: unit/replybufsize (2 seconds)\n2026-04-15T02:56:41.2719957Z Testing unit/hyperloglog\n2026-04-15T02:56:41.2754368Z [ignore]: large memory flag not provided\n2026-04-15T02:56:41.3147043Z [ok]: Out of range multibulk length (101 ms)\n2026-04-15T02:56:41.3200855Z [ok]: PING (7 ms)\n2026-04-15T02:56:41.3265774Z [ok]: CLIENT LIST (2 ms)\n2026-04-15T02:56:41.3302226Z [ok]: CLIENT LIST with IDs (2 ms)\n2026-04-15T02:56:41.3315100Z [ok]: CLIENT INFO (1 ms)\n2026-04-15T02:56:41.3336829Z [ok]: CLIENT LIST with ADDR filter (2 ms)\n2026-04-15T02:56:41.3359967Z [ok]: CLIENT LIST with LADDR filter (2 ms)\n2026-04-15T02:56:41.3424394Z === (shutdown external:skip) Starting server on 127.0.0.1:22115 ok\n2026-04-15T02:56:41.3469458Z [ok]: CLIENT LIST with MAXAGE filter (2 ms)\n2026-04-15T02:56:41.3506479Z [ok]: It's possible to allow subscribing to a subset of shard channels (212 ms)\n2026-04-15T02:56:41.3535134Z [ok]: CLIENT LIST with TYPE filter (6 ms)\n2026-04-15T02:56:41.3563712Z [ok]: CLIENT LIST with USER filter (1 ms)\n2026-04-15T02:56:41.3600562Z [ok]: CLIENT LIST with SKIPME filter (2 ms)\n2026-04-15T02:56:41.3605322Z [ok]: SSUBSCRIBE to one channel more than once (178 ms)\n2026-04-15T02:56:41.3672381Z === () Starting server on 127.0.0.1:28114 ok\n2026-04-15T02:56:41.3763204Z [ok]: {standalone} SCAN MATCH (265 ms)\n2026-04-15T02:56:41.4272032Z [ok]: Wrong multibulk payload header (112 ms)\n2026-04-15T02:56:41.5225418Z [ok]: SUNSUBSCRIBE from non-subscribed channels (164 ms)\n2026-04-15T02:56:41.5283214Z [ok]: PUBSUB command basics (3 ms)\n2026-04-15T02:56:41.5369970Z [ok]: It's possible to allow subscribing to a subset of channel patterns (196 ms)\n2026-04-15T02:56:41.5416571Z [ok]: FUNCTION - test function kill (487 ms)\n2026-04-15T02:56:41.5515190Z === (hll) Starting server on 127.0.0.1:25113 ok\n2026-04-15T02:56:41.5600800Z [ok]: RDB save will be failed in shutdown (13 ms)\n2026-04-15T02:56:41.5875140Z [ok]: Negative multibulk payload length (160 ms)\n2026-04-15T02:56:41.6219583Z [ok]: SHUTDOWN will abort if rdb save failed on signal (69 ms)\n2026-04-15T02:56:41.6315479Z [ok]: SHUTDOWN will abort if rdb save failed on shutdown command (2 ms)\n2026-04-15T02:56:41.6386427Z [ok]: SHUTDOWN can proceed if shutdown command was with nosave (14 ms)\n2026-04-15T02:56:41.6476352Z [ok]: Clean up rdb same named folder (2 ms)\n2026-04-15T02:56:41.7006471Z [ok]: Subscribers are killed when revoked of channel permission (174 ms)\n2026-04-15T02:56:41.7103808Z [ok]: Setup slave (730 ms)\n2026-04-15T02:56:41.7225164Z [ok]: WAIT out of range timeout (milliseconds) (3 ms)\n2026-04-15T02:56:41.7296450Z [ok]: WAIT should acknowledge 1 additional copy of the data (4 ms)\n2026-04-15T02:56:41.7696461Z [ok]: CONFIG SET bind address (703 ms)\n2026-04-15T02:56:41.7818864Z [ok]: Out of range multibulk payload length (191 ms)\n2026-04-15T02:56:41.7905146Z [ok]: {standalone} SCAN TYPE (417 ms)\n2026-04-15T02:56:41.8080879Z [ok]: Subscribers are killed when revoked of channel permission (108 ms)\n2026-04-15T02:56:41.8151793Z [ok]: CLIENT LIST with multiple IDs and TYPE filter (475 ms)\n2026-04-15T02:56:41.8795240Z [ok]: SPUBLISH/SSUBSCRIBE with two clients (352 ms)\n2026-04-15T02:56:41.9327500Z [ok]: Non-number multibulk payload length (156 ms)\n2026-04-15T02:56:41.9659756Z === (shutdown external:skip) Starting server on 127.0.0.1:22117 ok\n2026-04-15T02:56:41.9765333Z [ok]: Subscribers are killed when revoked of pattern permission (168 ms)\n2026-04-15T02:56:41.9886101Z [ok]: {standalone} SCAN unknown type (199 ms)\n2026-04-15T02:56:42.0803994Z === () Starting server on 127.0.0.1:28116 ok\n2026-04-15T02:56:42.0880728Z [ok]: Multi bulk request not followed by bulk arguments (153 ms)\n2026-04-15T02:56:42.1165317Z [ok]: FUNCTION - test script kill not working on function (586 ms)\n2026-04-15T02:56:42.1236152Z [ok]: BITFIELD overflow detection fuzzing (1572 ms)\n2026-04-15T02:56:42.1563844Z [ok]: Subscribers are killed when revoked of allchannels permission (180 ms)\n2026-04-15T02:56:42.1625361Z [ok]: CLIENT LIST with filters matching no clients (347 ms)\n2026-04-15T02:56:42.1697970Z [ok]: CLIENT LIST with NAME filter (1 ms)\n2026-04-15T02:56:42.1777718Z [ok]: CLIENT LIST with FLAGS filter (1 ms)\n2026-04-15T02:56:42.1797963Z [ok]: CLIENT LIST with TYPE filter (2 ms)\n2026-04-15T02:56:42.1875289Z [ok]: SHUTDOWN SIGTERM will abort if there's an initial AOFRW - default (58 ms)\n2026-04-15T02:56:42.1956279Z [ok]: CLIENT LIST with multiple filters (9 ms)\n2026-04-15T02:56:42.2080310Z [ok]: Generic wrong number of args (97 ms)\n2026-04-15T02:56:42.2764451Z [ok]: SPUBLISH/SSUBSCRIBE with PUBLISH/SUBSCRIBE (389 ms)\n2026-04-15T02:56:42.2892584Z [ok]: {standalone} SCAN with expired keys (291 ms)\n2026-04-15T03:11:26.1046475Z     used:  86.92 MB\n2026-04-15T03:11:26.1049469Z     frag:   0.24 MB\n2026-04-15T03:11:26.1052290Z     frag ratio: 1.00\n2026-04-15T03:11:26.1055099Z     hits: 0\n2026-04-15T03:11:26.1057904Z     misses: 0\n2026-04-15T03:11:26.1062635Z Validating frag (1.00) < 1.05\n2026-04-15T03:11:37.0402129Z Frag info: after fragmenting data\n2026-04-15T03:11:37.0406722Z     used:  45.02 MB\n2026-04-15T03:11:37.0414153Z     frag:  42.19 MB\n2026-04-15T03:11:37.0416562Z     frag ratio: 1.94\n2026-04-15T03:11:37.0419453Z     hits: 0\n2026-04-15T03:11:37.0422110Z     misses: 0\n2026-04-15T03:11:37.0424895Z Validating frag (1.94) > 1.4\n2026-04-15T03:11:37.3847962Z Frag info: defragging...\n2026-04-15T03:11:37.3852739Z     used:  45.03 MB\n2026-04-15T03:11:37.3856522Z     frag:   0.26 MB\n2026-04-15T03:11:37.3859823Z     frag ratio: 1.01\n2026-04-15T03:11:37.3862772Z     hits: 33769\n2026-04-15T03:11:37.3865170Z     misses: 32981\n2026-04-15T03:11:37.8279543Z Frag info: after defragging\n2026-04-15T03:11:37.8284106Z     used:  45.06 MB\n2026-04-15T03:11:37.8287717Z     frag:   0.33 MB\n2026-04-15T03:11:37.8290346Z     frag ratio: 1.01\n2026-04-15T03:11:37.8292941Z     hits: 33769\n2026-04-15T03:11:37.8295555Z     misses: 32981\n2026-04-15T03:11:37.8297985Z Validating frag (1.01) < 1.1\n2026-04-15T03:11:37.8301763Z Validating max latency (0) is LT 5\n2026-04-15T03:11:38.0226659Z [ok]: Active Defrag big list: cluster (23304 ms)\n2026-04-15T03:11:38.2105992Z === (defrag external:skip cluster) Starting server on 127.0.0.1:21485 ok\n2026-04-15T03:11:40.2959601Z Frag info: test start (Active Defrag big set: cluster)\n2026-04-15T03:11:40.2964249Z     used:   3.27 MB\n2026-04-15T03:11:40.2967173Z     frag:   0.13 MB\n2026-04-15T03:11:40.2970067Z     frag ratio: 1.04\n2026-04-15T03:11:40.2972349Z     hits: 0\n2026-04-15T03:11:40.2975116Z     misses: 0\n2026-04-15T03:11:51.6588767Z Frag info: after adding data\n2026-04-15T03:11:51.6593908Z     used:  68.20 MB\n2026-04-15T03:11:51.6597487Z     frag:   0.40 MB\n2026-04-15T03:11:51.6600761Z     frag ratio: 1.01\n2026-04-15T03:11:51.6603210Z     hits: 0\n2026-04-15T03:11:51.6606414Z     misses: 0\n2026-04-15T03:11:51.6611416Z Validating frag (1.01) < 1.05\n2026-04-15T03:12:01.3288589Z Frag info: after fragmenting data\n2026-04-15T03:12:01.3293154Z     used:  36.55 MB\n2026-04-15T03:12:01.3301450Z     frag:  31.02 MB\n2026-04-15T03:12:01.3304369Z     frag ratio: 1.85\n2026-04-15T03:12:01.3307037Z     hits: 0\n2026-04-15T03:12:01.3309599Z     misses: 0\n2026-04-15T03:12:01.3312139Z Validating frag (1.85) > 1.4\n2026-04-15T03:12:01.6301890Z Frag info: defragging...\n2026-04-15T03:12:01.6307446Z     used:  36.56 MB\n2026-04-15T03:12:01.6310655Z     frag:   0.27 MB\n2026-04-15T03:12:01.6313222Z     frag ratio: 1.01\n2026-04-15T03:12:01.6315799Z     hits: 54681\n2026-04-15T03:12:01.6318661Z     misses: 45551\n2026-04-15T03:12:02.0744495Z Frag info: after defragging\n2026-04-15T03:12:02.0749358Z     used:  36.60 MB\n2026-04-15T03:12:02.0752041Z     frag:   0.34 MB\n2026-04-15T03:12:02.0754861Z     frag ratio: 1.01\n2026-04-15T03:12:02.0757577Z     hits: 54681\n2026-04-15T03:12:02.0760274Z     misses: 45551\n2026-04-15T03:12:02.0762739Z Validating frag (1.01) < 1.1\n2026-04-15T03:12:02.0766945Z Validating max latency (0) is LT 5\n2026-04-15T03:12:02.3090194Z [ok]: Active Defrag big set: cluster (22134 ms)\n2026-04-15T03:12:02.5730842Z === (defrag external:skip cluster) Starting server on 127.0.0.1:21487 ok\n2026-04-15T03:12:04.6579066Z Frag info: test start (Active Defrag big zset: cluster random-score)\n2026-04-15T03:12:04.6584398Z     used:   3.27 MB\n2026-04-15T03:12:04.6587551Z     frag:   0.13 MB\n2026-04-15T03:12:04.6589863Z     frag ratio: 1.04\n2026-04-15T03:12:04.6592379Z     hits: 0\n2026-04-15T03:12:04.6595158Z     misses: 0\n2026-04-15T03:12:16.3745407Z Frag info: after adding data\n2026-04-15T03:12:16.3750495Z     used:  67.99 MB\n2026-04-15T03:12:16.3753706Z     frag:   0.38 MB\n2026-04-15T03:12:16.3756918Z     frag ratio: 1.01\n2026-04-15T03:12:16.3759671Z     hits: 0\n2026-04-15T03:12:16.3762425Z     misses: 0\n2026-04-15T03:12:16.3767950Z Validating frag (1.01) < 1.05\n2026-04-15T03:12:26.1617850Z Frag info: after fragmenting data\n2026-04-15T03:12:26.1622830Z     used:  36.99 MB\n2026-04-15T03:12:26.1631611Z     frag:  31.35 MB\n2026-04-15T03:12:26.1635129Z     frag ratio: 1.85\n2026-04-15T03:12:26.1638154Z     hits: 0\n2026-04-15T03:12:26.1640949Z     misses: 0\n2026-04-15T03:12:26.1643733Z Validating frag (1.85) > 1.4\n2026-04-15T03:12:26.5711750Z Frag info: defragging...\n2026-04-15T03:12:26.5721544Z     used:  36.97 MB\n2026-04-15T03:12:26.5724624Z     frag:   7.79 MB\n2026-04-15T03:12:26.5727702Z     frag ratio: 1.21\n2026-04-15T03:12:26.5735533Z     hits: 53537\n2026-04-15T03:12:26.5741401Z     misses: 116237\n2026-04-15T03:12:27.0167240Z Frag info: after defragging\n2026-04-15T03:12:27.0171809Z     used:  37.01 MB\n2026-04-15T03:12:27.0174713Z ",
           "file_path": "",
           "fingerprint": "ac32160917926c4bdee1b1665028c51cc22bb9599d1814cd42980bdded3b4c90",
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-15T03:45:32.931414+00:00",
+          "commit_sha": "a34f125d8e18201bc51878e2848c6b6187a8a3cb",
+          "workflow_run_id": 24433958218,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-ubuntu-latest-cmake-tls",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-latest-cmake-tls",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
           "incident_key": null
         }
       ]
