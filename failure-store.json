@@ -717,12 +717,12 @@
       "failure_identifier": "test-almalinux9-jemalloc",
       "test_name": null,
       "incident_key": "acb22ca6c75bf28b0facd1b9730ce80945d38d0549fb837ebf11ef2eeed529b5",
-      "error_signature": "2026-04-15T00:27:22.0180000Z Evaluating test-rpm-distros-jemalloc.if\n2026-04-15T00:27:22.0180000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-04-15T00:27:22.0180000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-04-15T00:27:22.0180000Z Result: true\n2026-04-15T00:27:22.1300000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.1300000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.1300000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.3970000Z Job is about to start running on the hosted runner: GitHub Actions 1000652208\n2026-04-15T00:27:22.3960000Z Job is waiting for a hosted runner to come online.",
+      "error_signature": "2026-04-01T00:23:48.2450000Z Evaluating test-rpm-distros-jemalloc.if\n2026-04-01T00:23:48.2450000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-04-01T00:23:48.2450000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-04-01T00:23:48.2450000Z Result: true\n2026-04-01T00:23:48.4590000Z Requested labels: ubuntu-latest\n2026-04-01T00:23:48.4590000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-01T00:23:48.4590000Z Waiting for a runner to pick up this job...\n2026-04-01T01:21:10.0970000Z Job is about to start running on the hosted runner: GitHub Actions 1000619642\n2026-04-01T01:21:10.0970000Z Job is waiting for a hosted runner to come online.",
       "file_path": "",
       "pr_url": null,
       "status": "processing",
       "created_at": "2026-04-01T07:57:35.942898+00:00",
-      "updated_at": "2026-04-15T03:45:09.118420+00:00",
+      "updated_at": "2026-04-01T07:57:35.942898+00:00",
       "queued_pr_payload": null,
       "campaign_status": null,
       "incident_observations": [
@@ -738,22 +738,6 @@
           "failure_identifier": "test-almalinux9-jemalloc",
           "test_name": null,
           "error_signature": "2026-04-01T00:23:48.2450000Z Evaluating test-rpm-distros-jemalloc.if\n2026-04-01T00:23:48.2450000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-04-01T00:23:48.2450000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-04-01T00:23:48.2450000Z Result: true\n2026-04-01T00:23:48.4590000Z Requested labels: ubuntu-latest\n2026-04-01T00:23:48.4590000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-01T00:23:48.4590000Z Waiting for a runner to pick up this job...\n2026-04-01T01:21:10.0970000Z Job is about to start running on the hosted runner: GitHub Actions 1000619642\n2026-04-01T01:21:10.0970000Z Job is waiting for a hosted runner to come online.",
-          "file_path": "",
-          "fingerprint": "acb22ca6c75bf28b0facd1b9730ce80945d38d0549fb837ebf11ef2eeed529b5",
-          "incident_key": "acb22ca6c75bf28b0facd1b9730ce80945d38d0549fb837ebf11ef2eeed529b5"
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:09.118496+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-almalinux9-jemalloc",
-          "matrix_params": {},
-          "failure_identifier": "test-almalinux9-jemalloc",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.0180000Z Evaluating test-rpm-distros-jemalloc.if\n2026-04-15T00:27:22.0180000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-04-15T00:27:22.0180000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-04-15T00:27:22.0180000Z Result: true\n2026-04-15T00:27:22.1300000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.1300000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.1300000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.3970000Z Job is about to start running on the hosted runner: GitHub Actions 1000652208\n2026-04-15T00:27:22.3960000Z Job is waiting for a hosted runner to come online.",
           "file_path": "",
           "fingerprint": "acb22ca6c75bf28b0facd1b9730ce80945d38d0549fb837ebf11ef2eeed529b5",
           "incident_key": "acb22ca6c75bf28b0facd1b9730ce80945d38d0549fb837ebf11ef2eeed529b5"
@@ -845,12 +829,12 @@
       "failure_identifier": "test-valgrind-no-malloc-usable-size-test",
       "test_name": null,
       "incident_key": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3",
-      "error_signature": "2026-04-15T00:36:52.1193068Z [ok]: Subscribers are killed when revoked of channel permission (21 ms)\n2026-04-15T00:36:52.1247913Z [ok]: Subscribers are killed when revoked of channel permission (5 ms)\n2026-04-15T00:36:52.1302918Z [ok]: Subscribers are killed when revoked of pattern permission (6 ms)\n2026-04-15T00:36:52.1356156Z [ok]: Subscribers are killed when revoked of allchannels permission (5 ms)\n2026-04-15T00:36:52.1449644Z [ok]: Subscribers are pardoned if literal permissions are retained and/or gaining allchannels (9 ms)\n2026-04-15T00:36:52.2462642Z [ok]: blocked command gets rejected when reprocessed after permission change (101 ms)\n2026-04-15T00:36:52.2477134Z [ok]: Users can be configured to authenticate with any password (1 ms)\n2026-04-15T00:36:52.2543168Z [ok]: ACLs can exclude single commands (7 ms)\n2026-04-15T00:36:52.2742772Z [ok]: ACLs can include or exclude whole classes of commands (20 ms)\n2026-04-15T00:36:52.2825308Z [ok]: ACLs can include single subcommands (8 ms)\n2026-04-15T00:36:52.2868706Z [ok]: ACLs can exclude single subcommands, case 1 (4 ms)\n2026-04-15T00:36:52.2924857Z [ok]: ACLs can exclude single subcommands, case 2 (6 ms)\n2026-04-15T00:36:52.2951850Z [ok]: ACLs cannot include a subcommand with a specific arg (2 ms)\n2026-04-15T00:36:52.2986473Z [ok]: ACLs cannot exclude or include a container commands with a specific arg (3 ms)\n2026-04-15T00:36:52.3022747Z [ok]: ACLs cannot exclude or include a container command with two args (4 ms)\n2026-04-15T00:36:52.3584942Z [ok]: ACLs including of a type includes also subcommands (56 ms)\n2026-04-15T00:36:52.3672089Z [ok]: ACLs can block SELECT of all but a specific DB (9 ms)\n2026-04-15T00:36:52.3848181Z [ok]: ACLs can block all DEBUG subcommands except one (17 ms)\n2026-04-15T00:36:52.3975348Z [ok]: ACLs set can include subcommands, if already full command exists (13 ms)\n2026-04-15T00:36:52.4312879Z [ok]: ACLs set can exclude subcommands, if already full command exists (34 ms)\n2026-04-15T00:36:52.4383302Z [ok]: ACL SETUSER RESET reverting to default newly created user (7 ms)\n2026-04-15T00:36:52.4500402Z [ok]: ACL GETUSER is able to translate back command permissions (11 ms)\n2026-04-15T00:36:52.6215245Z [ok]: ACL GETUSER provides reasonable results (172 ms)\n2026-04-15T00:36:52.6825515Z [ok]: ACL GETUSER provides correct results (61 ms)\n2026-04-15T00:36:52.6886182Z [ok]: ACL CAT with illegal arguments (6 ms)\n2026-04-15T00:36:52.6896686Z [ok]: ACL CAT without category - list all categories (1 ms)\n2026-04-15T00:36:52.6997850Z [ok]: ACL CAT category - list all commands/subcommands that belong to category (10 ms)\n2026-04-15T00:36:52.7053571Z [ok]: ACL requires explicit permission for scripting for EVAL_RO, EVALSHA_RO and FCALL_RO (6 ms)\n2026-04-15T00:36:52.7091554Z [ok]: ACL #5998 regression: memory leaks adding / removing subcommands (3 ms)\n2026-04-15T00:36:52.7325881Z [ok]: ACL LOG aggregates similar errors together and assigns unique entry-id to new errors (23 ms)\n2026-04-15T00:36:52.7394851Z [ok]: ACL LOG shows failed command executions at toplevel (7 ms)\n2026-04-15T00:36:52.7440951Z [ok]: ACL LOG shows failed subcommand executions at toplevel (4 ms)\n2026-04-15T00:36:52.7490047Z [ok]: ACL LOG is able to test similar events (5 ms)\n2026-04-15T00:36:52.7521588Z [ok]: ACL LOG is able to log keys access violations and key name (3 ms)\n2026-04-15T00:36:52.7555354Z [ok]: ACL LOG is able to log channel access violations and channel name (3 ms)\n2026-04-15T00:36:52.7718456Z [ok]: ACL LOG is able to log database access violations (16 ms)\n2026-04-15T00:36:52.7729879Z [ok]: ACL LOG RESET is able to flush the entries in the log (1 ms)\n2026-04-15T00:36:52.7794300Z [ok]: ACL LOG can distinguish the transaction context (1) (7 ms)\n2026-04-15T00:36:52.7940900Z [ok]: ACL LOG can distinguish the transaction context (2) (14 ms)\n2026-04-15T00:36:52.8942781Z [ok]: ACL can log errors in the context of Lua scripting (100 ms)\n2026-04-15T00:36:52.9012040Z [ok]: ACL LOG can accept a numerical argument to show less entries (6 ms)\n2026-04-15T00:36:52.9038119Z [ok]: ACL LOG can log failed auth attempts (2 ms)\n2026-04-15T00:36:52.9216601Z [ok]: ACLLOG - zero max length is correctly handled (18 ms)\n2026-04-15T00:36:52.9335930Z [ok]: ACL LOG entries are limited to a maximum amount (12 ms)\n2026-04-15T00:36:52.9362787Z [ok]: ACL LOG entries are still present on update of max len config (3 ms)\n2026-04-15T00:36:52.9410020Z [ok]: When default user is off, new connections are not authenticated (4 ms)\n2026-04-15T00:36:52.9519721Z [ok]: When default user has no command permission, hello command still works for other users (11 ms)\n2026-04-15T00:36:52.9570190Z [ok]: When an authentication chain is used in the HELLO cmd, the last auth cmd has precedence (5 ms)\n2026-04-15T00:36:52.9610663Z [ok]: When a setname chain is used in the HELLO cmd, the last setname cmd has precedence (4 ms)\n2026-04-15T00:36:52.9626926Z [ok]: When authentication fails in the HELLO cmd, the client setname should not be applied (2 ms)\n2026-04-15T00:36:52.9647625Z [ok]: ACL HELP should not have unexpected options (2 ms)\n2026-04-15T00:36:52.9675864Z [ok]: Delete a user that the client doesn't use (3 ms)\n2026-04-15T00:36:52.9718043Z [ok]: Delete a user that the client is using (4 ms)\n2026-04-15T00:36:52.9756798Z [ok]: ACL GENPASS command failed test (4 ms)\n2026-04-15T00:36:52.9764242Z [ok]: Default user can not be removed (1 ms)\n2026-04-15T00:36:52.9772583Z [ok]: ACL load non-existing configured ACL file (1 ms)\n2026-04-15T00:36:53.0099986Z [ok]: ACL-Metrics user AUTH failure (32 ms)\n2026-04-15T00:36:53.0346429Z [ok]: ACL-Metrics invalid command accesses (25 ms)\n2026-04-15T00:36:53.0594763Z [ok]: ACL-Metrics invalid key accesses (25 ms)\n2026-04-15T00:36:53.0858115Z [ok]: ACL-Metrics invalid channels accesses (26 ms)\n2026-04-15T00:36:55.4964274Z === (external:skip) Starting server on 127.0.0.1:21112 ok\n2026-04-15T00:36:55.5805537Z [ok]: default: load from include file, can access any channels (47 ms)\n2026-04-15T00:36:55.5978840Z [ok]: default: with config acl-pubsub-default allchannels after reset, can access any channels (17 ms)\n2026-04-15T00:36:55.6240144Z [ok]: default: with config acl-pubsub-default resetchannels after reset, can not access any channels (26 ms)\n2026-04-15T00:36:55.6544892Z [ok]: Alice: can execute all command (31 ms)\n2026-04-15T00:36:55.6783527Z [ok]: Bob: just execute @set and acl command (24 ms)\n2026-04-15T00:36:55.7133368Z [ok]: ACL LOAD only disconnects affected clients (35 ms)\n2026-04-15T00:36:55.7266179Z [ok]: ACL LOAD disconnects clients of deleted users (13 ms)\n2026-04-15T00:36:55.7751030Z [ok]: ACL load and save (48 ms)\n2026-04-15T00:36:55.7920493Z [ok]: ACL load and save with restricted channels (17 ms)\n2026-04-15T00:36:55.8085991Z [ok]: Validate a user can remove their own channel permissions (17 ms)\n2026-04-15T00:36:55.8235048Z [ok]: ACL LOAD does not crash server if current user is removed from ACL file (15 ms)\n2026-04-15T00:36:58.2382890Z === (external:skip) Starting server on 127.0.0.1:21113 ok\n2026-04-15T00:36:58.3055763Z [ok]: Default user has access to all channels irrespective of flag (31 ms)\n2026-04-15T00:36:58.3253309Z [ok]: Update acl-pubsub-default, existing users shouldn't get affected (20 ms)\n2026-04-15T00:36:58.3351697Z [ok]: Single channel is valid (9 ms)\n2026-04-15T00:36:58.3424486Z [ok]: Single channel is not valid with allchannels (7 ms)\n2026-04-15T00:37:00.8546629Z === (external:skip) Starting server on 127.0.0.1:21114 ok\n2026-04-15T00:37:00.9210057Z [ok]: Only default user has access to all channels irrespective of flag (30 ms)\n2026-04-15T00:37:03.3686226Z === (external:skip) Starting server on 127.0.0.1:21115 ok\n2026-04-15T00:37:03.4182227Z [ok]: default: load from config file, without channel permission default user can't access any channels (12 ms)\n2026-04-15T00:37:05.8784903Z === (external:skip) Starting server on 127.0.0.1:21116 ok\n2026-04-15T00:37:05.9635952Z [ok]: default: load from config file with all channels permissions (49 ms)\n2026-04-15T00:37:08.3898434Z === (external:skip) Starting server on 127.0.0.1:21117 ok\n2026-04-15T02:00:39.8010778Z [ok]: LREM remove all the occurrences - listpack (10 ms)\n2026-04-15T02:00:39.8024405Z [ok]: LREM remove the first occurrence - listpack (2 ms)\n2026-04-15T02:00:39.8036260Z [ok]: LREM remove non existing element - listpack (1 ms)\n2026-04-15T02:00:39.8139877Z [ok]: LREM starting from tail with negative count - listpack (10 ms)\n2026-04-15T02:00:39.8160137Z [ok]: LREM starting from tail with negative count (2) - listpack (2 ms)\n2026-04-15T02:00:39.8214569Z [ok]: LREM deleting objects that may be int encoded - listpack (6 ms)\n2026-04-15T02:00:39.8488008Z [ok]: Regression for bug 593 - chaining BRPOPLPUSH with other blocking cmds (27 ms)\n2026-04-15T02:00:39.9754840Z [ok]: BLPOP/BLMOVE should increase dirty (127 ms)\n2026-04-15T02:00:40.3106692Z [ok]: client unblock tests (335 ms)\n2026-04-15T02:00:40.6421564Z [ok]: client unblock tests (331 ms)\n2026-04-15T02:00:40.6751203Z [ok]: List listpack -> quicklist encoding conversion (32 ms)\n2026-04-15T02:00:40.8709067Z [ok]: List listpack -> quicklist encoding conversion (196 ms)\n2026-04-15T02:00:41.1213790Z [ok]: List quicklist -> listpack encoding conversion (251 ms)\n2026-04-15T02:00:41.1839181Z [ok]: List encoding conversion when RDB loading (62 ms)\n2026-04-15T02:00:41.2791493Z [ok]: List invalid list-max-listpack-size config (95 ms)\n2026-04-15T02:00:41.4184552Z [ok]: List of various encodings (140 ms)\n2026-04-15T02:00:41.4308903Z [ok]: List of various encodings - sanitize dump (12 ms)\n2026-04-15T02:00:41.4603267Z [ok]: Unblock fairness is kept while pipelining (30 ms)\n2026-04-15T02:00:41.5236512Z [ok]: Unblock fairness is kept during nested unblock (63 ms)\n2026-04-15T02:00:41.5594876Z [ok]: Blocking command accounted only once in commandstats (36 ms)\n2026-04-15T02:00:41.5827633Z [ok]: Blocking command accounted only once in commandstats after timeout (23 ms)\n2026-04-15T02:00:41.844476\n[truncated]",
+      "error_signature": "2026-04-10T00:22:53.5102741Z [ok]: Subscribers are killed when revoked of channel permission (20 ms)\n2026-04-10T00:22:53.5161756Z [ok]: Subscribers are killed when revoked of channel permission (5 ms)\n2026-04-10T00:22:53.5215118Z [ok]: Subscribers are killed when revoked of pattern permission (5 ms)\n2026-04-10T00:22:53.5268028Z [ok]: Subscribers are killed when revoked of allchannels permission (5 ms)\n2026-04-10T00:22:53.5361114Z [ok]: Subscribers are pardoned if literal permissions are retained and/or gaining allchannels (9 ms)\n2026-04-10T00:22:53.6377867Z [ok]: blocked command gets rejected when reprocessed after permission change (102 ms)\n2026-04-10T00:22:53.6392214Z [ok]: Users can be configured to authenticate with any password (2 ms)\n2026-04-10T00:22:53.6456755Z [ok]: ACLs can exclude single commands (6 ms)\n2026-04-10T00:22:53.6649284Z [ok]: ACLs can include or exclude whole classes of commands (19 ms)\n2026-04-10T00:22:53.6728349Z [ok]: ACLs can include single subcommands (8 ms)\n2026-04-10T00:22:53.6768820Z [ok]: ACLs can exclude single subcommands, case 1 (4 ms)\n2026-04-10T00:22:53.6823168Z [ok]: ACLs can exclude single subcommands, case 2 (6 ms)\n2026-04-10T00:22:53.6849812Z [ok]: ACLs cannot include a subcommand with a specific arg (2 ms)\n2026-04-10T00:22:53.6883743Z [ok]: ACLs cannot exclude or include a container commands with a specific arg (4 ms)\n2026-04-10T00:22:53.6920096Z [ok]: ACLs cannot exclude or include a container command with two args (3 ms)\n2026-04-10T00:22:53.7482387Z [ok]: ACLs including of a type includes also subcommands (57 ms)\n2026-04-10T00:22:53.7567269Z [ok]: ACLs can block SELECT of all but a specific DB (8 ms)\n2026-04-10T00:22:53.7737176Z [ok]: ACLs can block all DEBUG subcommands except one (17 ms)\n2026-04-10T00:22:53.7859577Z [ok]: ACLs set can include subcommands, if already full command exists (12 ms)\n2026-04-10T00:22:53.8189442Z [ok]: ACLs set can exclude subcommands, if already full command exists (33 ms)\n2026-04-10T00:22:53.8256292Z [ok]: ACL SETUSER RESET reverting to default newly created user (7 ms)\n2026-04-10T00:22:53.8370298Z [ok]: ACL GETUSER is able to translate back command permissions (11 ms)\n2026-04-10T00:22:54.0014507Z [ok]: ACL GETUSER provides reasonable results (165 ms)\n2026-04-10T00:22:54.0629652Z [ok]: ACL GETUSER provides correct results (61 ms)\n2026-04-10T00:22:54.0689649Z [ok]: ACL CAT with illegal arguments (6 ms)\n2026-04-10T00:22:54.0701620Z [ok]: ACL CAT without category - list all categories (1 ms)\n2026-04-10T00:22:54.0801715Z [ok]: ACL CAT category - list all commands/subcommands that belong to category (9 ms)\n2026-04-10T00:22:54.0855456Z [ok]: ACL requires explicit permission for scripting for EVAL_RO, EVALSHA_RO and FCALL_RO (5 ms)\n2026-04-10T00:22:54.0892163Z [ok]: ACL #5998 regression: memory leaks adding / removing subcommands (3 ms)\n2026-04-10T00:22:54.1128537Z [ok]: ACL LOG aggregates similar errors together and assigns unique entry-id to new errors (23 ms)\n2026-04-10T00:22:54.1193313Z [ok]: ACL LOG shows failed command executions at toplevel (7 ms)\n2026-04-10T00:22:54.1235198Z [ok]: ACL LOG shows failed subcommand executions at toplevel (4 ms)\n2026-04-10T00:22:54.1280277Z [ok]: ACL LOG is able to test similar events (4 ms)\n2026-04-10T00:22:54.1308742Z [ok]: ACL LOG is able to log keys access violations and key name (3 ms)\n2026-04-10T00:22:54.1341658Z [ok]: ACL LOG is able to log channel access violations and channel name (3 ms)\n2026-04-10T00:22:54.1498742Z [ok]: ACL LOG is able to log database access violations (15 ms)\n2026-04-10T00:22:54.1509388Z [ok]: ACL LOG RESET is able to flush the entries in the log (1 ms)\n2026-04-10T00:22:54.1575094Z [ok]: ACL LOG can distinguish the transaction context (1) (7 ms)\n2026-04-10T00:22:54.1719244Z [ok]: ACL LOG can distinguish the transaction context (2) (14 ms)\n2026-04-10T00:22:54.2718198Z [ok]: ACL can log errors in the context of Lua scripting (100 ms)\n2026-04-10T00:22:54.2784459Z [ok]: ACL LOG can accept a numerical argument to show less entries (7 ms)\n2026-04-10T00:22:54.2811559Z [ok]: ACL LOG can log failed auth attempts (2 ms)\n2026-04-10T00:22:54.2993706Z [ok]: ACLLOG - zero max length is correctly handled (18 ms)\n2026-04-10T00:22:54.3118875Z [ok]: ACL LOG entries are limited to a maximum amount (12 ms)\n2026-04-10T00:22:54.3143494Z [ok]: ACL LOG entries are still present on update of max len config (3 ms)\n2026-04-10T00:22:54.3187997Z [ok]: When default user is off, new connections are not authenticated (4 ms)\n2026-04-10T00:22:54.3299208Z [ok]: When default user has no command permission, hello command still works for other users (11 ms)\n2026-04-10T00:22:54.3350355Z [ok]: When an authentication chain is used in the HELLO cmd, the last auth cmd has precedence (5 ms)\n2026-04-10T00:22:54.3391331Z [ok]: When a setname chain is used in the HELLO cmd, the last setname cmd has precedence (4 ms)\n2026-04-10T00:22:54.3408439Z [ok]: When authentication fails in the HELLO cmd, the client setname should not be applied (2 ms)\n2026-04-10T00:22:54.3428204Z [ok]: ACL HELP should not have unexpected options (2 ms)\n2026-04-10T00:22:54.3457027Z [ok]: Delete a user that the client doesn't use (3 ms)\n2026-04-10T00:22:54.3496562Z [ok]: Delete a user that the client is using (4 ms)\n2026-04-10T00:22:54.3536105Z [ok]: ACL GENPASS command failed test (4 ms)\n2026-04-10T00:22:54.3544223Z [ok]: Default user can not be removed (1 ms)\n2026-04-10T00:22:54.3553048Z [ok]: ACL load non-existing configured ACL file (1 ms)\n2026-04-10T00:22:54.3864430Z [ok]: ACL-Metrics user AUTH failure (31 ms)\n2026-04-10T00:22:54.4107261Z [ok]: ACL-Metrics invalid command accesses (24 ms)\n2026-04-10T00:22:54.4357342Z [ok]: ACL-Metrics invalid key accesses (25 ms)\n2026-04-10T00:22:54.4610121Z [ok]: ACL-Metrics invalid channels accesses (25 ms)\n2026-04-10T00:22:56.8688243Z === (external:skip) Starting server on 127.0.0.1:21112 ok\n2026-04-10T00:22:56.9561328Z [ok]: default: load from include file, can access any channels (49 ms)\n2026-04-10T00:22:56.9733009Z [ok]: default: with config acl-pubsub-default allchannels after reset, can access any channels (18 ms)\n2026-04-10T00:22:56.9996271Z [ok]: default: with config acl-pubsub-default resetchannels after reset, can not access any channels (26 ms)\n2026-04-10T00:22:57.0297210Z [ok]: Alice: can execute all command (30 ms)\n2026-04-10T00:22:57.0541511Z [ok]: Bob: just execute @set and acl command (24 ms)\n2026-04-10T00:22:57.0908320Z [ok]: ACL LOAD only disconnects affected clients (36 ms)\n2026-04-10T00:22:57.1048748Z [ok]: ACL LOAD disconnects clients of deleted users (14 ms)\n2026-04-10T00:22:57.1541738Z [ok]: ACL load and save (49 ms)\n2026-04-10T00:22:57.1708251Z [ok]: ACL load and save with restricted channels (16 ms)\n2026-04-10T00:22:57.1866344Z [ok]: Validate a user can remove their own channel permissions (16 ms)\n2026-04-10T00:22:57.2015750Z [ok]: ACL LOAD does not crash server if current user is removed from ACL file (15 ms)\n2026-04-10T00:22:59.6374939Z === (external:skip) Starting server on 127.0.0.1:21113 ok\n2026-04-10T00:22:59.7052267Z [ok]: Default user has access to all channels irrespective of flag (31 ms)\n2026-04-10T00:22:59.7246706Z [ok]: Update acl-pubsub-default, existing users shouldn't get affected (19 ms)\n2026-04-10T00:22:59.7337189Z [ok]: Single channel is valid (9 ms)\n2026-04-10T00:22:59.7407500Z [ok]: Single channel is not valid with allchannels (7 ms)\n2026-04-10T00:23:02.2167780Z === (external:skip) Starting server on 127.0.0.1:21114 ok\n2026-04-10T00:23:02.2827428Z [ok]: Only default user has access to all channels irrespective of flag (30 ms)\n2026-04-10T00:23:04.7225117Z === (external:skip) Starting server on 127.0.0.1:21115 ok\n2026-04-10T00:23:04.7716032Z [ok]: default: load from config file, without channel permission default user can't access any channels (13 ms)\n2026-04-10T00:23:07.2226452Z === (external:skip) Starting server on 127.0.0.1:21116 ok\n2026-04-10T00:23:07.3068541Z [ok]: default: load from config file with all channels permissions (48 ms)\n2026-04-10T00:23:09.7255026Z === (external:skip) Starting server on 127.0.0.1:21117 ok\n2026-04-10T01:46:13.3270918Z [ok]: LREM starting from tail with negative count (2) - quicklist (1 ms)\n2026-04-10T01:46:13.3737144Z [ok]: LREM deleting objects that may be int encoded - quicklist (47 ms)\n2026-04-10T01:46:13.3836722Z [ok]: LREM remove all the occurrences - listpack (10 ms)\n2026-04-10T01:46:13.3853010Z [ok]: LREM remove the first occurrence - listpack (2 ms)\n2026-04-10T01:46:13.3865480Z [ok]: LREM remove non existing element - listpack (1 ms)\n2026-04-10T01:46:13.3974221Z [ok]: LREM starting from tail with negative count - listpack (11 ms)\n2026-04-10T01:46:13.3995917Z [ok]: LREM starting from tail with negative count (2) - listpack (2 ms)\n2026-04-10T01:46:13.4054254Z [ok]: LREM deleting objects that may be int encoded - listpack (6 ms)\n2026-04-10T01:46:13.4314133Z [ok]: Regression for bug 593 - chaining BRPOPLPUSH with other blocking cmds (26 ms)\n2026-04-10T01:46:13.5598079Z [ok]: BLPOP/BLMOVE should increase dirty (128 ms)\n2026-04-10T01:46:13.8936072Z [ok]: client unblock tests (334 ms)\n2026-04-10T01:46:14.2260849Z [ok]: client unblock tests (332 ms)\n2026-04-10T01:46:14.2585336Z [ok]: List listpack -> quicklist encoding conversion (32 ms)\n2026-04-10T01:46:14.4537661Z [ok]: List listpack -> quicklist encoding conversion (195 ms)\n2026-04-10T01:46:14.7049598Z [ok]: List quicklist -> listpack encoding conversion (251 ms)\n2026-04-10T01:46:14.7661683Z [ok]: List encoding conversion when RDB loading (61 ms)\n2026-04-10T01:46:14.8614986Z [ok]: List invalid list-max-listpack-size config (95 ms)\n2026-04-10T01:46:15.0019696Z [ok]: List of various encodings (140 ms)\n2026-04-10T01:46:15.0143591Z [ok]: List of various encodings - sanitize dump (13 ms)\n2026-04-10T01:46:15.0437884Z [ok]: Unblock fairness is kept while pipelining (29 ms)\n2026-04-10T01:46:15.1065292Z [ok]: Unblock fairness is kept during nested unblock (63 ms)\n2026-04-10T01:46:15.1423233Z [\n[truncated]",
       "file_path": "",
       "pr_url": null,
       "status": "processing",
       "created_at": "2026-04-03T05:52:14.718128+00:00",
-      "updated_at": "2026-04-15T03:46:20.075613+00:00",
+      "updated_at": "2026-04-10T03:44:40.475672+00:00",
       "queued_pr_payload": null,
       "campaign_status": null,
       "incident_observations": [
@@ -981,22 +965,6 @@
           "file_path": "",
           "fingerprint": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3",
           "incident_key": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3"
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:46:20.075695+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-valgrind-no-malloc-usable-size-test",
-          "matrix_params": {},
-          "failure_identifier": "test-valgrind-no-malloc-usable-size-test",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:36:52.1193068Z [ok]: Subscribers are killed when revoked of channel permission (21 ms)\n2026-04-15T00:36:52.1247913Z [ok]: Subscribers are killed when revoked of channel permission (5 ms)\n2026-04-15T00:36:52.1302918Z [ok]: Subscribers are killed when revoked of pattern permission (6 ms)\n2026-04-15T00:36:52.1356156Z [ok]: Subscribers are killed when revoked of allchannels permission (5 ms)\n2026-04-15T00:36:52.1449644Z [ok]: Subscribers are pardoned if literal permissions are retained and/or gaining allchannels (9 ms)\n2026-04-15T00:36:52.2462642Z [ok]: blocked command gets rejected when reprocessed after permission change (101 ms)\n2026-04-15T00:36:52.2477134Z [ok]: Users can be configured to authenticate with any password (1 ms)\n2026-04-15T00:36:52.2543168Z [ok]: ACLs can exclude single commands (7 ms)\n2026-04-15T00:36:52.2742772Z [ok]: ACLs can include or exclude whole classes of commands (20 ms)\n2026-04-15T00:36:52.2825308Z [ok]: ACLs can include single subcommands (8 ms)\n2026-04-15T00:36:52.2868706Z [ok]: ACLs can exclude single subcommands, case 1 (4 ms)\n2026-04-15T00:36:52.2924857Z [ok]: ACLs can exclude single subcommands, case 2 (6 ms)\n2026-04-15T00:36:52.2951850Z [ok]: ACLs cannot include a subcommand with a specific arg (2 ms)\n2026-04-15T00:36:52.2986473Z [ok]: ACLs cannot exclude or include a container commands with a specific arg (3 ms)\n2026-04-15T00:36:52.3022747Z [ok]: ACLs cannot exclude or include a container command with two args (4 ms)\n2026-04-15T00:36:52.3584942Z [ok]: ACLs including of a type includes also subcommands (56 ms)\n2026-04-15T00:36:52.3672089Z [ok]: ACLs can block SELECT of all but a specific DB (9 ms)\n2026-04-15T00:36:52.3848181Z [ok]: ACLs can block all DEBUG subcommands except one (17 ms)\n2026-04-15T00:36:52.3975348Z [ok]: ACLs set can include subcommands, if already full command exists (13 ms)\n2026-04-15T00:36:52.4312879Z [ok]: ACLs set can exclude subcommands, if already full command exists (34 ms)\n2026-04-15T00:36:52.4383302Z [ok]: ACL SETUSER RESET reverting to default newly created user (7 ms)\n2026-04-15T00:36:52.4500402Z [ok]: ACL GETUSER is able to translate back command permissions (11 ms)\n2026-04-15T00:36:52.6215245Z [ok]: ACL GETUSER provides reasonable results (172 ms)\n2026-04-15T00:36:52.6825515Z [ok]: ACL GETUSER provides correct results (61 ms)\n2026-04-15T00:36:52.6886182Z [ok]: ACL CAT with illegal arguments (6 ms)\n2026-04-15T00:36:52.6896686Z [ok]: ACL CAT without category - list all categories (1 ms)\n2026-04-15T00:36:52.6997850Z [ok]: ACL CAT category - list all commands/subcommands that belong to category (10 ms)\n2026-04-15T00:36:52.7053571Z [ok]: ACL requires explicit permission for scripting for EVAL_RO, EVALSHA_RO and FCALL_RO (6 ms)\n2026-04-15T00:36:52.7091554Z [ok]: ACL #5998 regression: memory leaks adding / removing subcommands (3 ms)\n2026-04-15T00:36:52.7325881Z [ok]: ACL LOG aggregates similar errors together and assigns unique entry-id to new errors (23 ms)\n2026-04-15T00:36:52.7394851Z [ok]: ACL LOG shows failed command executions at toplevel (7 ms)\n2026-04-15T00:36:52.7440951Z [ok]: ACL LOG shows failed subcommand executions at toplevel (4 ms)\n2026-04-15T00:36:52.7490047Z [ok]: ACL LOG is able to test similar events (5 ms)\n2026-04-15T00:36:52.7521588Z [ok]: ACL LOG is able to log keys access violations and key name (3 ms)\n2026-04-15T00:36:52.7555354Z [ok]: ACL LOG is able to log channel access violations and channel name (3 ms)\n2026-04-15T00:36:52.7718456Z [ok]: ACL LOG is able to log database access violations (16 ms)\n2026-04-15T00:36:52.7729879Z [ok]: ACL LOG RESET is able to flush the entries in the log (1 ms)\n2026-04-15T00:36:52.7794300Z [ok]: ACL LOG can distinguish the transaction context (1) (7 ms)\n2026-04-15T00:36:52.7940900Z [ok]: ACL LOG can distinguish the transaction context (2) (14 ms)\n2026-04-15T00:36:52.8942781Z [ok]: ACL can log errors in the context of Lua scripting (100 ms)\n2026-04-15T00:36:52.9012040Z [ok]: ACL LOG can accept a numerical argument to show less entries (6 ms)\n2026-04-15T00:36:52.9038119Z [ok]: ACL LOG can log failed auth attempts (2 ms)\n2026-04-15T00:36:52.9216601Z [ok]: ACLLOG - zero max length is correctly handled (18 ms)\n2026-04-15T00:36:52.9335930Z [ok]: ACL LOG entries are limited to a maximum amount (12 ms)\n2026-04-15T00:36:52.9362787Z [ok]: ACL LOG entries are still present on update of max len config (3 ms)\n2026-04-15T00:36:52.9410020Z [ok]: When default user is off, new connections are not authenticated (4 ms)\n2026-04-15T00:36:52.9519721Z [ok]: When default user has no command permission, hello command still works for other users (11 ms)\n2026-04-15T00:36:52.9570190Z [ok]: When an authentication chain is used in the HELLO cmd, the last auth cmd has precedence (5 ms)\n2026-04-15T00:36:52.9610663Z [ok]: When a setname chain is used in the HELLO cmd, the last setname cmd has precedence (4 ms)\n2026-04-15T00:36:52.9626926Z [ok]: When authentication fails in the HELLO cmd, the client setname should not be applied (2 ms)\n2026-04-15T00:36:52.9647625Z [ok]: ACL HELP should not have unexpected options (2 ms)\n2026-04-15T00:36:52.9675864Z [ok]: Delete a user that the client doesn't use (3 ms)\n2026-04-15T00:36:52.9718043Z [ok]: Delete a user that the client is using (4 ms)\n2026-04-15T00:36:52.9756798Z [ok]: ACL GENPASS command failed test (4 ms)\n2026-04-15T00:36:52.9764242Z [ok]: Default user can not be removed (1 ms)\n2026-04-15T00:36:52.9772583Z [ok]: ACL load non-existing configured ACL file (1 ms)\n2026-04-15T00:36:53.0099986Z [ok]: ACL-Metrics user AUTH failure (32 ms)\n2026-04-15T00:36:53.0346429Z [ok]: ACL-Metrics invalid command accesses (25 ms)\n2026-04-15T00:36:53.0594763Z [ok]: ACL-Metrics invalid key accesses (25 ms)\n2026-04-15T00:36:53.0858115Z [ok]: ACL-Metrics invalid channels accesses (26 ms)\n2026-04-15T00:36:55.4964274Z === (external:skip) Starting server on 127.0.0.1:21112 ok\n2026-04-15T00:36:55.5805537Z [ok]: default: load from include file, can access any channels (47 ms)\n2026-04-15T00:36:55.5978840Z [ok]: default: with config acl-pubsub-default allchannels after reset, can access any channels (17 ms)\n2026-04-15T00:36:55.6240144Z [ok]: default: with config acl-pubsub-default resetchannels after reset, can not access any channels (26 ms)\n2026-04-15T00:36:55.6544892Z [ok]: Alice: can execute all command (31 ms)\n2026-04-15T00:36:55.6783527Z [ok]: Bob: just execute @set and acl command (24 ms)\n2026-04-15T00:36:55.7133368Z [ok]: ACL LOAD only disconnects affected clients (35 ms)\n2026-04-15T00:36:55.7266179Z [ok]: ACL LOAD disconnects clients of deleted users (13 ms)\n2026-04-15T00:36:55.7751030Z [ok]: ACL load and save (48 ms)\n2026-04-15T00:36:55.7920493Z [ok]: ACL load and save with restricted channels (17 ms)\n2026-04-15T00:36:55.8085991Z [ok]: Validate a user can remove their own channel permissions (17 ms)\n2026-04-15T00:36:55.8235048Z [ok]: ACL LOAD does not crash server if current user is removed from ACL file (15 ms)\n2026-04-15T00:36:58.2382890Z === (external:skip) Starting server on 127.0.0.1:21113 ok\n2026-04-15T00:36:58.3055763Z [ok]: Default user has access to all channels irrespective of flag (31 ms)\n2026-04-15T00:36:58.3253309Z [ok]: Update acl-pubsub-default, existing users shouldn't get affected (20 ms)\n2026-04-15T00:36:58.3351697Z [ok]: Single channel is valid (9 ms)\n2026-04-15T00:36:58.3424486Z [ok]: Single channel is not valid with allchannels (7 ms)\n2026-04-15T00:37:00.8546629Z === (external:skip) Starting server on 127.0.0.1:21114 ok\n2026-04-15T00:37:00.9210057Z [ok]: Only default user has access to all channels irrespective of flag (30 ms)\n2026-04-15T00:37:03.3686226Z === (external:skip) Starting server on 127.0.0.1:21115 ok\n2026-04-15T00:37:03.4182227Z [ok]: default: load from config file, without channel permission default user can't access any channels (12 ms)\n2026-04-15T00:37:05.8784903Z === (external:skip) Starting server on 127.0.0.1:21116 ok\n2026-04-15T00:37:05.9635952Z [ok]: default: load from config file with all channels permissions (49 ms)\n2026-04-15T00:37:08.3898434Z === (external:skip) Starting server on 127.0.0.1:21117 ok\n2026-04-15T02:00:39.8010778Z [ok]: LREM remove all the occurrences - listpack (10 ms)\n2026-04-15T02:00:39.8024405Z [ok]: LREM remove the first occurrence - listpack (2 ms)\n2026-04-15T02:00:39.8036260Z [ok]: LREM remove non existing element - listpack (1 ms)\n2026-04-15T02:00:39.8139877Z [ok]: LREM starting from tail with negative count - listpack (10 ms)\n2026-04-15T02:00:39.8160137Z [ok]: LREM starting from tail with negative count (2) - listpack (2 ms)\n2026-04-15T02:00:39.8214569Z [ok]: LREM deleting objects that may be int encoded - listpack (6 ms)\n2026-04-15T02:00:39.8488008Z [ok]: Regression for bug 593 - chaining BRPOPLPUSH with other blocking cmds (27 ms)\n2026-04-15T02:00:39.9754840Z [ok]: BLPOP/BLMOVE should increase dirty (127 ms)\n2026-04-15T02:00:40.3106692Z [ok]: client unblock tests (335 ms)\n2026-04-15T02:00:40.6421564Z [ok]: client unblock tests (331 ms)\n2026-04-15T02:00:40.6751203Z [ok]: List listpack -> quicklist encoding conversion (32 ms)\n2026-04-15T02:00:40.8709067Z [ok]: List listpack -> quicklist encoding conversion (196 ms)\n2026-04-15T02:00:41.1213790Z [ok]: List quicklist -> listpack encoding conversion (251 ms)\n2026-04-15T02:00:41.1839181Z [ok]: List encoding conversion when RDB loading (62 ms)\n2026-04-15T02:00:41.2791493Z [ok]: List invalid list-max-listpack-size config (95 ms)\n2026-04-15T02:00:41.4184552Z [ok]: List of various encodings (140 ms)\n2026-04-15T02:00:41.4308903Z [ok]: List of various encodings - sanitize dump (12 ms)\n2026-04-15T02:00:41.4603267Z [ok]: Unblock fairness is kept while pipelining (30 ms)\n2026-04-15T02:00:41.5236512Z [ok]: Unblock fairness is kept during nested unblock (63 ms)\n2026-04-15T02:00:41.5594876Z [ok]: Blocking command accounted only once in commandstats (36 ms)\n2026-04-15T02:00:41.5827633Z [ok]: Blocking command accounted only once in commandstats after timeout (23 ms)\n2026-04-15T02:00:41.844476",
-          "file_path": "",
-          "fingerprint": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3",
-          "incident_key": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3"
         }
       ]
     },
@@ -1005,12 +973,12 @@
       "failure_identifier": "test-valgrind-test",
       "test_name": null,
       "incident_key": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8",
-      "error_signature": "2026-04-15T00:29:43.2558093Z [ok]: Subscribers are killed when revoked of channel permission (20 ms)\n2026-04-15T00:29:43.2616802Z [ok]: Subscribers are killed when revoked of channel permission (6 ms)\n2026-04-15T00:29:43.2671557Z [ok]: Subscribers are killed when revoked of pattern permission (5 ms)\n2026-04-15T00:29:43.2726645Z [ok]: Subscribers are killed when revoked of allchannels permission (5 ms)\n2026-04-15T00:29:43.2826473Z [ok]: Subscribers are pardoned if literal permissions are retained and/or gaining allchannels (10 ms)\n2026-04-15T00:29:43.3845777Z [ok]: blocked command gets rejected when reprocessed after permission change (102 ms)\n2026-04-15T00:29:43.3859709Z [ok]: Users can be configured to authenticate with any password (1 ms)\n2026-04-15T00:29:43.3924409Z [ok]: ACLs can exclude single commands (7 ms)\n2026-04-15T00:29:43.4123555Z [ok]: ACLs can include or exclude whole classes of commands (20 ms)\n2026-04-15T00:29:43.4204234Z [ok]: ACLs can include single subcommands (8 ms)\n2026-04-15T00:29:43.4244904Z [ok]: ACLs can exclude single subcommands, case 1 (4 ms)\n2026-04-15T00:29:43.4298988Z [ok]: ACLs can exclude single subcommands, case 2 (5 ms)\n2026-04-15T00:29:43.4325362Z [ok]: ACLs cannot include a subcommand with a specific arg (3 ms)\n2026-04-15T00:29:43.4360475Z [ok]: ACLs cannot exclude or include a container commands with a specific arg (3 ms)\n2026-04-15T00:29:43.4395550Z [ok]: ACLs cannot exclude or include a container command with two args (4 ms)\n2026-04-15T00:29:43.4950604Z [ok]: ACLs including of a type includes also subcommands (55 ms)\n2026-04-15T00:29:43.5035980Z [ok]: ACLs can block SELECT of all but a specific DB (9 ms)\n2026-04-15T00:29:43.5211010Z [ok]: ACLs can block all DEBUG subcommands except one (17 ms)\n2026-04-15T00:29:43.5341969Z [ok]: ACLs set can include subcommands, if already full command exists (13 ms)\n2026-04-15T00:29:43.5668497Z [ok]: ACLs set can exclude subcommands, if already full command exists (32 ms)\n2026-04-15T00:29:43.5740332Z [ok]: ACL SETUSER RESET reverting to default newly created user (7 ms)\n2026-04-15T00:29:43.5857722Z [ok]: ACL GETUSER is able to translate back command permissions (12 ms)\n2026-04-15T00:29:43.7542884Z [ok]: ACL GETUSER provides reasonable results (169 ms)\n2026-04-15T00:29:43.8157576Z [ok]: ACL GETUSER provides correct results (61 ms)\n2026-04-15T00:29:43.8217405Z [ok]: ACL CAT with illegal arguments (6 ms)\n2026-04-15T00:29:43.8227536Z [ok]: ACL CAT without category - list all categories (1 ms)\n2026-04-15T00:29:43.8329648Z [ok]: ACL CAT category - list all commands/subcommands that belong to category (10 ms)\n2026-04-15T00:29:43.8383389Z [ok]: ACL requires explicit permission for scripting for EVAL_RO, EVALSHA_RO and FCALL_RO (6 ms)\n2026-04-15T00:29:43.8421760Z [ok]: ACL #5998 regression: memory leaks adding / removing subcommands (4 ms)\n2026-04-15T00:29:43.8672385Z [ok]: ACL LOG aggregates similar errors together and assigns unique entry-id to new errors (25 ms)\n2026-04-15T00:29:43.8741885Z [ok]: ACL LOG shows failed command executions at toplevel (6 ms)\n2026-04-15T00:29:43.8788147Z [ok]: ACL LOG shows failed subcommand executions at toplevel (4 ms)\n2026-04-15T00:29:43.8837685Z [ok]: ACL LOG is able to test similar events (5 ms)\n2026-04-15T00:29:43.8868473Z [ok]: ACL LOG is able to log keys access violations and key name (3 ms)\n2026-04-15T00:29:43.8901877Z [ok]: ACL LOG is able to log channel access violations and channel name (3 ms)\n2026-04-15T00:29:43.9060162Z [ok]: ACL LOG is able to log database access violations (15 ms)\n2026-04-15T00:29:43.9070947Z [ok]: ACL LOG RESET is able to flush the entries in the log (1 ms)\n2026-04-15T00:29:43.9137144Z [ok]: ACL LOG can distinguish the transaction context (1) (6 ms)\n2026-04-15T00:29:43.9281029Z [ok]: ACL LOG can distinguish the transaction context (2) (14 ms)\n2026-04-15T00:29:44.0270518Z [ok]: ACL can log errors in the context of Lua scripting (98 ms)\n2026-04-15T00:29:44.0344895Z [ok]: ACL LOG can accept a numerical argument to show less entries (8 ms)\n2026-04-15T00:29:44.0369590Z [ok]: ACL LOG can log failed auth attempts (2 ms)\n2026-04-15T00:29:44.0549062Z [ok]: ACLLOG - zero max length is correctly handled (18 ms)\n2026-04-15T00:29:44.0666344Z [ok]: ACL LOG entries are limited to a maximum amount (12 ms)\n2026-04-15T00:29:44.0690236Z [ok]: ACL LOG entries are still present on update of max len config (2 ms)\n2026-04-15T00:29:44.0735448Z [ok]: When default user is off, new connections are not authenticated (5 ms)\n2026-04-15T00:29:44.0844601Z [ok]: When default user has no command permission, hello command still works for other users (11 ms)\n2026-04-15T00:29:44.0894483Z [ok]: When an authentication chain is used in the HELLO cmd, the last auth cmd has precedence (5 ms)\n2026-04-15T00:29:44.0933642Z [ok]: When a setname chain is used in the HELLO cmd, the last setname cmd has precedence (4 ms)\n2026-04-15T00:29:44.0950663Z [ok]: When authentication fails in the HELLO cmd, the client setname should not be applied (1 ms)\n2026-04-15T00:29:44.0971287Z [ok]: ACL HELP should not have unexpected options (2 ms)\n2026-04-15T00:29:44.0999822Z [ok]: Delete a user that the client doesn't use (3 ms)\n2026-04-15T00:29:44.1039400Z [ok]: Delete a user that the client is using (4 ms)\n2026-04-15T00:29:44.1078222Z [ok]: ACL GENPASS command failed test (4 ms)\n2026-04-15T00:29:44.1085454Z [ok]: Default user can not be removed (1 ms)\n2026-04-15T00:29:44.1093661Z [ok]: ACL load non-existing configured ACL file (1 ms)\n2026-04-15T00:29:44.1419341Z [ok]: ACL-Metrics user AUTH failure (32 ms)\n2026-04-15T00:29:44.1662004Z [ok]: ACL-Metrics invalid command accesses (24 ms)\n2026-04-15T00:29:44.1904250Z [ok]: ACL-Metrics invalid key accesses (24 ms)\n2026-04-15T00:29:44.2152901Z [ok]: ACL-Metrics invalid channels accesses (25 ms)\n2026-04-15T00:29:46.6307573Z === (external:skip) Starting server on 127.0.0.1:21112 ok\n2026-04-15T00:29:46.7142047Z [ok]: default: load from include file, can access any channels (46 ms)\n2026-04-15T00:29:46.7310470Z [ok]: default: with config acl-pubsub-default allchannels after reset, can access any channels (16 ms)\n2026-04-15T00:29:46.7563269Z [ok]: default: with config acl-pubsub-default resetchannels after reset, can not access any channels (26 ms)\n2026-04-15T00:29:46.7865869Z [ok]: Alice: can execute all command (30 ms)\n2026-04-15T00:29:46.8104225Z [ok]: Bob: just execute @set and acl command (24 ms)\n2026-04-15T00:29:46.8445746Z [ok]: ACL LOAD only disconnects affected clients (34 ms)\n2026-04-15T00:29:46.8579764Z [ok]: ACL LOAD disconnects clients of deleted users (13 ms)\n2026-04-15T00:29:46.9064330Z [ok]: ACL load and save (49 ms)\n2026-04-15T00:29:46.9230383Z [ok]: ACL load and save with restricted channels (16 ms)\n2026-04-15T00:29:46.9388535Z [ok]: Validate a user can remove their own channel permissions (16 ms)\n2026-04-15T00:29:46.9537710Z [ok]: ACL LOAD does not crash server if current user is removed from ACL file (15 ms)\n2026-04-15T00:29:49.3496388Z === (external:skip) Starting server on 127.0.0.1:21113 ok\n2026-04-15T00:29:49.4151778Z [ok]: Default user has access to all channels irrespective of flag (29 ms)\n2026-04-15T00:29:49.4349372Z [ok]: Update acl-pubsub-default, existing users shouldn't get affected (19 ms)\n2026-04-15T00:29:49.4440549Z [ok]: Single channel is valid (9 ms)\n2026-04-15T00:29:49.4517257Z [ok]: Single channel is not valid with allchannels (8 ms)\n2026-04-15T00:29:51.9558779Z === (external:skip) Starting server on 127.0.0.1:21114 ok\n2026-04-15T00:29:52.0217436Z [ok]: Only default user has access to all channels irrespective of flag (30 ms)\n2026-04-15T00:29:54.4583829Z === (external:skip) Starting server on 127.0.0.1:21115 ok\n2026-04-15T00:29:54.5076295Z [ok]: default: load from config file, without channel permission default user can't access any channels (13 ms)\n2026-04-15T00:29:56.9566563Z === (external:skip) Starting server on 127.0.0.1:21116 ok\n2026-04-15T00:29:57.0407299Z [ok]: default: load from config file with all channels permissions (48 ms)\n2026-04-15T00:29:59.4483906Z === (external:skip) Starting server on 127.0.0.1:21117 ok\n2026-04-15T03:02:12.1683113Z Set as importing in: 127.0.0.1:21551\n2026-04-15T03:02:12.1683381Z >>> Case 1: Moving slot 708 from 127.0.0.1:21555 to 127.0.0.1:21551\n2026-04-15T03:02:12.1683907Z Moving slot 708 from 127.0.0.1:21555 to 127.0.0.1:21551....\n2026-04-15T03:02:12.1684578Z >>> Fixing open slot 890\n2026-04-15T03:02:12.1684782Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1685004Z Set as importing in: 127.0.0.1:21547\n2026-04-15T03:02:12.1685271Z >>> Case 1: Moving slot 890 from 127.0.0.1:21555 to 127.0.0.1:21547\n2026-04-15T03:02:12.1685599Z Moving slot 890 from 127.0.0.1:21555 to 127.0.0.1:21547...\n2026-04-15T03:02:12.1685865Z >>> Fixing open slot 898\n2026-04-15T03:02:12.1686052Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1686272Z Set as importing in: 127.0.0.1:21550\n2026-04-15T03:02:12.1686534Z >>> Case 1: Moving slot 898 from 127.0.0.1:21555 to 127.0.0.1:21550\n2026-04-15T03:02:12.1687004Z Moving slot 898 from 127.0.0.1:21555 to 127.0.0.1:21550....\n2026-04-15T03:02:12.1687270Z >>> Fixing open slot 915\n2026-04-15T03:02:12.1687461Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1687673Z Set as importing in: 127.0.0.1:21550\n2026-04-15T03:02:12.1687951Z >>> Case 1: Moving slot 915 from 127.0.0.1:21555 to 127.0.0.1:21550\n2026-04-15T03:02:12.1688267Z Moving slot 915 from 127.0.0.1:21555 to 127.0.0.1:21550\n2026-04-15T03:02:12.1688522Z >>> Fixing open slot 127\n2026-04-15T03:02:12.1688714Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1688926Z Set as importing in: 127.0.0.1:21547\n2026-04-15T03:02:12.1689189Z >>> Case 1: Moving slot 127 from 127.0.0.1:21555 to 127.0.0.1:21547\n2026-04-15T03:02:12.1689507Z Moving slot 127 from 127.0.0.1:21555 to 127.0.0.1:21547..\n2026-04-15T03:02:12.1689777Z >>> Fixing open slot 639\n2026-04-15T03:02:12.1689968Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1690196Z S\n[truncated]",
+      "error_signature": "2026-04-10T00:22:47.8101900Z [ok]: Subscribers are killed when revoked of channel permission (20 ms)\n2026-04-10T00:22:47.8157197Z [ok]: Subscribers are killed when revoked of channel permission (5 ms)\n2026-04-10T00:22:47.8211406Z [ok]: Subscribers are killed when revoked of pattern permission (5 ms)\n2026-04-10T00:22:47.8264851Z [ok]: Subscribers are killed when revoked of allchannels permission (6 ms)\n2026-04-10T00:22:47.8358226Z [ok]: Subscribers are pardoned if literal permissions are retained and/or gaining allchannels (9 ms)\n2026-04-10T00:22:47.9370244Z [ok]: blocked command gets rejected when reprocessed after permission change (101 ms)\n2026-04-10T00:22:47.9384756Z [ok]: Users can be configured to authenticate with any password (2 ms)\n2026-04-10T00:22:47.9451237Z [ok]: ACLs can exclude single commands (6 ms)\n2026-04-10T00:22:47.9646515Z [ok]: ACLs can include or exclude whole classes of commands (19 ms)\n2026-04-10T00:22:47.9728128Z [ok]: ACLs can include single subcommands (8 ms)\n2026-04-10T00:22:47.9771068Z [ok]: ACLs can exclude single subcommands, case 1 (4 ms)\n2026-04-10T00:22:47.9825818Z [ok]: ACLs can exclude single subcommands, case 2 (5 ms)\n2026-04-10T00:22:47.9851729Z [ok]: ACLs cannot include a subcommand with a specific arg (2 ms)\n2026-04-10T00:22:47.9886288Z [ok]: ACLs cannot exclude or include a container commands with a specific arg (3 ms)\n2026-04-10T00:22:47.9920900Z [ok]: ACLs cannot exclude or include a container command with two args (3 ms)\n2026-04-10T00:22:48.0478037Z [ok]: ACLs including of a type includes also subcommands (56 ms)\n2026-04-10T00:22:48.0565164Z [ok]: ACLs can block SELECT of all but a specific DB (9 ms)\n2026-04-10T00:22:48.0737502Z [ok]: ACLs can block all DEBUG subcommands except one (17 ms)\n2026-04-10T00:22:48.0860793Z [ok]: ACLs set can include subcommands, if already full command exists (12 ms)\n2026-04-10T00:22:48.1196661Z [ok]: ACLs set can exclude subcommands, if already full command exists (34 ms)\n2026-04-10T00:22:48.1266204Z [ok]: ACL SETUSER RESET reverting to default newly created user (7 ms)\n2026-04-10T00:22:48.1383978Z [ok]: ACL GETUSER is able to translate back command permissions (12 ms)\n2026-04-10T00:22:48.3089219Z [ok]: ACL GETUSER provides reasonable results (170 ms)\n2026-04-10T00:22:48.3699020Z [ok]: ACL GETUSER provides correct results (61 ms)\n2026-04-10T00:22:48.3759520Z [ok]: ACL CAT with illegal arguments (6 ms)\n2026-04-10T00:22:48.3769899Z [ok]: ACL CAT without category - list all categories (1 ms)\n2026-04-10T00:22:48.3870286Z [ok]: ACL CAT category - list all commands/subcommands that belong to category (10 ms)\n2026-04-10T00:22:48.3923751Z [ok]: ACL requires explicit permission for scripting for EVAL_RO, EVALSHA_RO and FCALL_RO (6 ms)\n2026-04-10T00:22:48.3960265Z [ok]: ACL #5998 regression: memory leaks adding / removing subcommands (3 ms)\n2026-04-10T00:22:48.4201301Z [ok]: ACL LOG aggregates similar errors together and assigns unique entry-id to new errors (24 ms)\n2026-04-10T00:22:48.4269363Z [ok]: ACL LOG shows failed command executions at toplevel (7 ms)\n2026-04-10T00:22:48.4315745Z [ok]: ACL LOG shows failed subcommand executions at toplevel (5 ms)\n2026-04-10T00:22:48.4362282Z [ok]: ACL LOG is able to test similar events (5 ms)\n2026-04-10T00:22:48.4391018Z [ok]: ACL LOG is able to log keys access violations and key name (2 ms)\n2026-04-10T00:22:48.4423583Z [ok]: ACL LOG is able to log channel access violations and channel name (4 ms)\n2026-04-10T00:22:48.4578303Z [ok]: ACL LOG is able to log database access violations (15 ms)\n2026-04-10T00:22:48.4588777Z [ok]: ACL LOG RESET is able to flush the entries in the log (1 ms)\n2026-04-10T00:22:48.4649471Z [ok]: ACL LOG can distinguish the transaction context (1) (6 ms)\n2026-04-10T00:22:48.4789523Z [ok]: ACL LOG can distinguish the transaction context (2) (14 ms)\n2026-04-10T00:22:48.5782894Z [ok]: ACL can log errors in the context of Lua scripting (100 ms)\n2026-04-10T00:22:48.5850091Z [ok]: ACL LOG can accept a numerical argument to show less entries (6 ms)\n2026-04-10T00:22:48.5874567Z [ok]: ACL LOG can log failed auth attempts (3 ms)\n2026-04-10T00:22:48.6053601Z [ok]: ACLLOG - zero max length is correctly handled (18 ms)\n2026-04-10T00:22:48.6178661Z [ok]: ACL LOG entries are limited to a maximum amount (12 ms)\n2026-04-10T00:22:48.6204257Z [ok]: ACL LOG entries are still present on update of max len config (3 ms)\n2026-04-10T00:22:48.6251224Z [ok]: When default user is off, new connections are not authenticated (4 ms)\n2026-04-10T00:22:48.6362309Z [ok]: When default user has no command permission, hello command still works for other users (11 ms)\n2026-04-10T00:22:48.6412101Z [ok]: When an authentication chain is used in the HELLO cmd, the last auth cmd has precedence (4 ms)\n2026-04-10T00:22:48.6451809Z [ok]: When a setname chain is used in the HELLO cmd, the last setname cmd has precedence (3 ms)\n2026-04-10T00:22:48.6468756Z [ok]: When authentication fails in the HELLO cmd, the client setname should not be applied (1 ms)\n2026-04-10T00:22:48.6488796Z [ok]: ACL HELP should not have unexpected options (2 ms)\n2026-04-10T00:22:48.6517587Z [ok]: Delete a user that the client doesn't use (3 ms)\n2026-04-10T00:22:48.6556328Z [ok]: Delete a user that the client is using (4 ms)\n2026-04-10T00:22:48.6595662Z [ok]: ACL GENPASS command failed test (4 ms)\n2026-04-10T00:22:48.6602885Z [ok]: Default user can not be removed (1 ms)\n2026-04-10T00:22:48.6610819Z [ok]: ACL load non-existing configured ACL file (0 ms)\n2026-04-10T00:22:48.6933724Z [ok]: ACL-Metrics user AUTH failure (33 ms)\n2026-04-10T00:22:48.7175384Z [ok]: ACL-Metrics invalid command accesses (24 ms)\n2026-04-10T00:22:48.7419375Z [ok]: ACL-Metrics invalid key accesses (24 ms)\n2026-04-10T00:22:48.7661478Z [ok]: ACL-Metrics invalid channels accesses (24 ms)\n2026-04-10T00:22:51.1741164Z === (external:skip) Starting server on 127.0.0.1:21112 ok\n2026-04-10T00:22:51.2574794Z [ok]: default: load from include file, can access any channels (46 ms)\n2026-04-10T00:22:51.2740567Z [ok]: default: with config acl-pubsub-default allchannels after reset, can access any channels (16 ms)\n2026-04-10T00:22:51.2992520Z [ok]: default: with config acl-pubsub-default resetchannels after reset, can not access any channels (26 ms)\n2026-04-10T00:22:51.3295747Z [ok]: Alice: can execute all command (30 ms)\n2026-04-10T00:22:51.3534547Z [ok]: Bob: just execute @set and acl command (24 ms)\n2026-04-10T00:22:51.3876342Z [ok]: ACL LOAD only disconnects affected clients (34 ms)\n2026-04-10T00:22:51.4002023Z [ok]: ACL LOAD disconnects clients of deleted users (12 ms)\n2026-04-10T00:22:51.4493273Z [ok]: ACL load and save (49 ms)\n2026-04-10T00:22:51.4662915Z [ok]: ACL load and save with restricted channels (17 ms)\n2026-04-10T00:22:51.4820402Z [ok]: Validate a user can remove their own channel permissions (15 ms)\n2026-04-10T00:22:51.4968517Z [ok]: ACL LOAD does not crash server if current user is removed from ACL file (15 ms)\n2026-04-10T00:22:53.9275998Z === (external:skip) Starting server on 127.0.0.1:21113 ok\n2026-04-10T00:22:53.9944473Z [ok]: Default user has access to all channels irrespective of flag (31 ms)\n2026-04-10T00:22:54.0141805Z [ok]: Update acl-pubsub-default, existing users shouldn't get affected (19 ms)\n2026-04-10T00:22:54.0235996Z [ok]: Single channel is valid (9 ms)\n2026-04-10T00:22:54.0312105Z [ok]: Single channel is not valid with allchannels (8 ms)\n2026-04-10T00:22:56.5274010Z === (external:skip) Starting server on 127.0.0.1:21114 ok\n2026-04-10T00:22:56.5930126Z [ok]: Only default user has access to all channels irrespective of flag (29 ms)\n2026-04-10T00:22:59.0319721Z === (external:skip) Starting server on 127.0.0.1:21115 ok\n2026-04-10T00:22:59.0811013Z [ok]: default: load from config file, without channel permission default user can't access any channels (12 ms)\n2026-04-10T00:23:01.5331678Z === (external:skip) Starting server on 127.0.0.1:21116 ok\n2026-04-10T00:23:01.6179907Z [ok]: default: load from config file with all channels permissions (48 ms)\n2026-04-10T00:23:04.0364982Z === (external:skip) Starting server on 127.0.0.1:21117 ok\n2026-04-10T01:49:13.7707171Z [ok]: LREM starting from tail with negative count (2) - quicklist (2 ms)\n2026-04-10T01:49:13.8177154Z [ok]: LREM deleting objects that may be int encoded - quicklist (47 ms)\n2026-04-10T01:49:13.8284577Z [ok]: LREM remove all the occurrences - listpack (11 ms)\n2026-04-10T01:49:13.8300214Z [ok]: LREM remove the first occurrence - listpack (1 ms)\n2026-04-10T01:49:13.8313124Z [ok]: LREM remove non existing element - listpack (2 ms)\n2026-04-10T01:49:13.8424237Z [ok]: LREM starting from tail with negative count - listpack (11 ms)\n2026-04-10T01:49:13.8448534Z [ok]: LREM starting from tail with negative count (2) - listpack (2 ms)\n2026-04-10T01:49:13.8504680Z [ok]: LREM deleting objects that may be int encoded - listpack (6 ms)\n2026-04-10T01:49:13.8774788Z [ok]: Regression for bug 593 - chaining BRPOPLPUSH with other blocking cmds (27 ms)\n2026-04-10T01:49:14.0044693Z [ok]: BLPOP/BLMOVE should increase dirty (127 ms)\n2026-04-10T01:49:14.3378450Z [ok]: client unblock tests (333 ms)\n2026-04-10T01:49:14.6694435Z [ok]: client unblock tests (332 ms)\n2026-04-10T01:49:14.7026336Z [ok]: List listpack -> quicklist encoding conversion (33 ms)\n2026-04-10T01:49:14.8963615Z [ok]: List listpack -> quicklist encoding conversion (194 ms)\n2026-04-10T01:49:15.1469909Z [ok]: List quicklist -> listpack encoding conversion (250 ms)\n2026-04-10T01:49:15.2089241Z [ok]: List encoding conversion when RDB loading (62 ms)\n2026-04-10T01:49:15.3039817Z [ok]: List invalid list-max-listpack-size config (95 ms)\n2026-04-10T01:49:15.4425684Z [ok]: List of various encodings (139 ms)\n2026-04-10T01:49:15.4561588Z [ok]: List of various encodings - sanitize dump (13 ms)\n2026-04-10T01:49:15.4903417Z [ok]: Unblock fairness is kept while pipelining (34 ms)\n2026-04-10T01:49:15.5529366Z [ok]: Unblock fairness is kept during nested unblock (62 ms)\n2026-04-10T01:49:15.5898777Z \n[truncated]",
       "file_path": "",
       "pr_url": null,
       "status": "processing",
       "created_at": "2026-04-03T05:52:20.421727+00:00",
-      "updated_at": "2026-04-15T03:46:27.320174+00:00",
+      "updated_at": "2026-04-10T03:44:47.450501+00:00",
       "queued_pr_payload": null,
       "campaign_status": null,
       "incident_observations": [
@@ -1141,22 +1109,6 @@
           "file_path": "",
           "fingerprint": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8",
           "incident_key": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8"
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:46:27.320243+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-valgrind-test",
-          "matrix_params": {},
-          "failure_identifier": "test-valgrind-test",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:29:43.2558093Z [ok]: Subscribers are killed when revoked of channel permission (20 ms)\n2026-04-15T00:29:43.2616802Z [ok]: Subscribers are killed when revoked of channel permission (6 ms)\n2026-04-15T00:29:43.2671557Z [ok]: Subscribers are killed when revoked of pattern permission (5 ms)\n2026-04-15T00:29:43.2726645Z [ok]: Subscribers are killed when revoked of allchannels permission (5 ms)\n2026-04-15T00:29:43.2826473Z [ok]: Subscribers are pardoned if literal permissions are retained and/or gaining allchannels (10 ms)\n2026-04-15T00:29:43.3845777Z [ok]: blocked command gets rejected when reprocessed after permission change (102 ms)\n2026-04-15T00:29:43.3859709Z [ok]: Users can be configured to authenticate with any password (1 ms)\n2026-04-15T00:29:43.3924409Z [ok]: ACLs can exclude single commands (7 ms)\n2026-04-15T00:29:43.4123555Z [ok]: ACLs can include or exclude whole classes of commands (20 ms)\n2026-04-15T00:29:43.4204234Z [ok]: ACLs can include single subcommands (8 ms)\n2026-04-15T00:29:43.4244904Z [ok]: ACLs can exclude single subcommands, case 1 (4 ms)\n2026-04-15T00:29:43.4298988Z [ok]: ACLs can exclude single subcommands, case 2 (5 ms)\n2026-04-15T00:29:43.4325362Z [ok]: ACLs cannot include a subcommand with a specific arg (3 ms)\n2026-04-15T00:29:43.4360475Z [ok]: ACLs cannot exclude or include a container commands with a specific arg (3 ms)\n2026-04-15T00:29:43.4395550Z [ok]: ACLs cannot exclude or include a container command with two args (4 ms)\n2026-04-15T00:29:43.4950604Z [ok]: ACLs including of a type includes also subcommands (55 ms)\n2026-04-15T00:29:43.5035980Z [ok]: ACLs can block SELECT of all but a specific DB (9 ms)\n2026-04-15T00:29:43.5211010Z [ok]: ACLs can block all DEBUG subcommands except one (17 ms)\n2026-04-15T00:29:43.5341969Z [ok]: ACLs set can include subcommands, if already full command exists (13 ms)\n2026-04-15T00:29:43.5668497Z [ok]: ACLs set can exclude subcommands, if already full command exists (32 ms)\n2026-04-15T00:29:43.5740332Z [ok]: ACL SETUSER RESET reverting to default newly created user (7 ms)\n2026-04-15T00:29:43.5857722Z [ok]: ACL GETUSER is able to translate back command permissions (12 ms)\n2026-04-15T00:29:43.7542884Z [ok]: ACL GETUSER provides reasonable results (169 ms)\n2026-04-15T00:29:43.8157576Z [ok]: ACL GETUSER provides correct results (61 ms)\n2026-04-15T00:29:43.8217405Z [ok]: ACL CAT with illegal arguments (6 ms)\n2026-04-15T00:29:43.8227536Z [ok]: ACL CAT without category - list all categories (1 ms)\n2026-04-15T00:29:43.8329648Z [ok]: ACL CAT category - list all commands/subcommands that belong to category (10 ms)\n2026-04-15T00:29:43.8383389Z [ok]: ACL requires explicit permission for scripting for EVAL_RO, EVALSHA_RO and FCALL_RO (6 ms)\n2026-04-15T00:29:43.8421760Z [ok]: ACL #5998 regression: memory leaks adding / removing subcommands (4 ms)\n2026-04-15T00:29:43.8672385Z [ok]: ACL LOG aggregates similar errors together and assigns unique entry-id to new errors (25 ms)\n2026-04-15T00:29:43.8741885Z [ok]: ACL LOG shows failed command executions at toplevel (6 ms)\n2026-04-15T00:29:43.8788147Z [ok]: ACL LOG shows failed subcommand executions at toplevel (4 ms)\n2026-04-15T00:29:43.8837685Z [ok]: ACL LOG is able to test similar events (5 ms)\n2026-04-15T00:29:43.8868473Z [ok]: ACL LOG is able to log keys access violations and key name (3 ms)\n2026-04-15T00:29:43.8901877Z [ok]: ACL LOG is able to log channel access violations and channel name (3 ms)\n2026-04-15T00:29:43.9060162Z [ok]: ACL LOG is able to log database access violations (15 ms)\n2026-04-15T00:29:43.9070947Z [ok]: ACL LOG RESET is able to flush the entries in the log (1 ms)\n2026-04-15T00:29:43.9137144Z [ok]: ACL LOG can distinguish the transaction context (1) (6 ms)\n2026-04-15T00:29:43.9281029Z [ok]: ACL LOG can distinguish the transaction context (2) (14 ms)\n2026-04-15T00:29:44.0270518Z [ok]: ACL can log errors in the context of Lua scripting (98 ms)\n2026-04-15T00:29:44.0344895Z [ok]: ACL LOG can accept a numerical argument to show less entries (8 ms)\n2026-04-15T00:29:44.0369590Z [ok]: ACL LOG can log failed auth attempts (2 ms)\n2026-04-15T00:29:44.0549062Z [ok]: ACLLOG - zero max length is correctly handled (18 ms)\n2026-04-15T00:29:44.0666344Z [ok]: ACL LOG entries are limited to a maximum amount (12 ms)\n2026-04-15T00:29:44.0690236Z [ok]: ACL LOG entries are still present on update of max len config (2 ms)\n2026-04-15T00:29:44.0735448Z [ok]: When default user is off, new connections are not authenticated (5 ms)\n2026-04-15T00:29:44.0844601Z [ok]: When default user has no command permission, hello command still works for other users (11 ms)\n2026-04-15T00:29:44.0894483Z [ok]: When an authentication chain is used in the HELLO cmd, the last auth cmd has precedence (5 ms)\n2026-04-15T00:29:44.0933642Z [ok]: When a setname chain is used in the HELLO cmd, the last setname cmd has precedence (4 ms)\n2026-04-15T00:29:44.0950663Z [ok]: When authentication fails in the HELLO cmd, the client setname should not be applied (1 ms)\n2026-04-15T00:29:44.0971287Z [ok]: ACL HELP should not have unexpected options (2 ms)\n2026-04-15T00:29:44.0999822Z [ok]: Delete a user that the client doesn't use (3 ms)\n2026-04-15T00:29:44.1039400Z [ok]: Delete a user that the client is using (4 ms)\n2026-04-15T00:29:44.1078222Z [ok]: ACL GENPASS command failed test (4 ms)\n2026-04-15T00:29:44.1085454Z [ok]: Default user can not be removed (1 ms)\n2026-04-15T00:29:44.1093661Z [ok]: ACL load non-existing configured ACL file (1 ms)\n2026-04-15T00:29:44.1419341Z [ok]: ACL-Metrics user AUTH failure (32 ms)\n2026-04-15T00:29:44.1662004Z [ok]: ACL-Metrics invalid command accesses (24 ms)\n2026-04-15T00:29:44.1904250Z [ok]: ACL-Metrics invalid key accesses (24 ms)\n2026-04-15T00:29:44.2152901Z [ok]: ACL-Metrics invalid channels accesses (25 ms)\n2026-04-15T00:29:46.6307573Z === (external:skip) Starting server on 127.0.0.1:21112 ok\n2026-04-15T00:29:46.7142047Z [ok]: default: load from include file, can access any channels (46 ms)\n2026-04-15T00:29:46.7310470Z [ok]: default: with config acl-pubsub-default allchannels after reset, can access any channels (16 ms)\n2026-04-15T00:29:46.7563269Z [ok]: default: with config acl-pubsub-default resetchannels after reset, can not access any channels (26 ms)\n2026-04-15T00:29:46.7865869Z [ok]: Alice: can execute all command (30 ms)\n2026-04-15T00:29:46.8104225Z [ok]: Bob: just execute @set and acl command (24 ms)\n2026-04-15T00:29:46.8445746Z [ok]: ACL LOAD only disconnects affected clients (34 ms)\n2026-04-15T00:29:46.8579764Z [ok]: ACL LOAD disconnects clients of deleted users (13 ms)\n2026-04-15T00:29:46.9064330Z [ok]: ACL load and save (49 ms)\n2026-04-15T00:29:46.9230383Z [ok]: ACL load and save with restricted channels (16 ms)\n2026-04-15T00:29:46.9388535Z [ok]: Validate a user can remove their own channel permissions (16 ms)\n2026-04-15T00:29:46.9537710Z [ok]: ACL LOAD does not crash server if current user is removed from ACL file (15 ms)\n2026-04-15T00:29:49.3496388Z === (external:skip) Starting server on 127.0.0.1:21113 ok\n2026-04-15T00:29:49.4151778Z [ok]: Default user has access to all channels irrespective of flag (29 ms)\n2026-04-15T00:29:49.4349372Z [ok]: Update acl-pubsub-default, existing users shouldn't get affected (19 ms)\n2026-04-15T00:29:49.4440549Z [ok]: Single channel is valid (9 ms)\n2026-04-15T00:29:49.4517257Z [ok]: Single channel is not valid with allchannels (8 ms)\n2026-04-15T00:29:51.9558779Z === (external:skip) Starting server on 127.0.0.1:21114 ok\n2026-04-15T00:29:52.0217436Z [ok]: Only default user has access to all channels irrespective of flag (30 ms)\n2026-04-15T00:29:54.4583829Z === (external:skip) Starting server on 127.0.0.1:21115 ok\n2026-04-15T00:29:54.5076295Z [ok]: default: load from config file, without channel permission default user can't access any channels (13 ms)\n2026-04-15T00:29:56.9566563Z === (external:skip) Starting server on 127.0.0.1:21116 ok\n2026-04-15T00:29:57.0407299Z [ok]: default: load from config file with all channels permissions (48 ms)\n2026-04-15T00:29:59.4483906Z === (external:skip) Starting server on 127.0.0.1:21117 ok\n2026-04-15T03:02:12.1683113Z Set as importing in: 127.0.0.1:21551\n2026-04-15T03:02:12.1683381Z >>> Case 1: Moving slot 708 from 127.0.0.1:21555 to 127.0.0.1:21551\n2026-04-15T03:02:12.1683907Z Moving slot 708 from 127.0.0.1:21555 to 127.0.0.1:21551....\n2026-04-15T03:02:12.1684578Z >>> Fixing open slot 890\n2026-04-15T03:02:12.1684782Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1685004Z Set as importing in: 127.0.0.1:21547\n2026-04-15T03:02:12.1685271Z >>> Case 1: Moving slot 890 from 127.0.0.1:21555 to 127.0.0.1:21547\n2026-04-15T03:02:12.1685599Z Moving slot 890 from 127.0.0.1:21555 to 127.0.0.1:21547...\n2026-04-15T03:02:12.1685865Z >>> Fixing open slot 898\n2026-04-15T03:02:12.1686052Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1686272Z Set as importing in: 127.0.0.1:21550\n2026-04-15T03:02:12.1686534Z >>> Case 1: Moving slot 898 from 127.0.0.1:21555 to 127.0.0.1:21550\n2026-04-15T03:02:12.1687004Z Moving slot 898 from 127.0.0.1:21555 to 127.0.0.1:21550....\n2026-04-15T03:02:12.1687270Z >>> Fixing open slot 915\n2026-04-15T03:02:12.1687461Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1687673Z Set as importing in: 127.0.0.1:21550\n2026-04-15T03:02:12.1687951Z >>> Case 1: Moving slot 915 from 127.0.0.1:21555 to 127.0.0.1:21550\n2026-04-15T03:02:12.1688267Z Moving slot 915 from 127.0.0.1:21555 to 127.0.0.1:21550\n2026-04-15T03:02:12.1688522Z >>> Fixing open slot 127\n2026-04-15T03:02:12.1688714Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1688926Z Set as importing in: 127.0.0.1:21547\n2026-04-15T03:02:12.1689189Z >>> Case 1: Moving slot 127 from 127.0.0.1:21555 to 127.0.0.1:21547\n2026-04-15T03:02:12.1689507Z Moving slot 127 from 127.0.0.1:21555 to 127.0.0.1:21547..\n2026-04-15T03:02:12.1689777Z >>> Fixing open slot 639\n2026-04-15T03:02:12.1689968Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1690196Z S",
-          "file_path": "",
-          "fingerprint": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8",
-          "incident_key": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8"
         }
       ]
     },
@@ -1245,12 +1197,12 @@
       "failure_identifier": "test-sanitizer-undefined (gcc)",
       "test_name": null,
       "incident_key": "0646a8bd1a34854b79a8dfae9d1648b4299223dd4881dfe4ddbfe97f61e18916",
-      "error_signature": "2026-04-15T00:27:22.1320000Z Evaluating test-sanitizer-undefined.if\n2026-04-15T00:27:22.1320000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-15T00:27:22.1320000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-15T00:27:22.1320000Z Result: true\n2026-04-15T00:27:22.4060000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.4060000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.4060000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.7870000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-15T00:28:56.3020000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:28:56.3030000Z Job is about to start running on the hosted runner: GitHub Actions 1000652242",
+      "error_signature": "2026-04-04T00:20:21.6880000Z Evaluating test-sanitizer-undefined.if\n2026-04-04T00:20:21.6880000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-04T00:20:21.6880000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-04T00:20:21.6880000Z Result: true\n2026-04-04T00:20:21.9370000Z Requested labels: ubuntu-latest\n2026-04-04T00:20:21.9370000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-04T00:20:21.9370000Z Waiting for a runner to pick up this job...\n2026-04-04T00:20:21.9520000Z Job is waiting for a hosted runner to come online.\n2026-04-04T00:20:21.9520000Z Job is about to start running on the hosted runner: GitHub Actions 1000628050",
       "file_path": "",
       "pr_url": null,
       "status": "processing",
       "created_at": "2026-04-04T05:04:16.943235+00:00",
-      "updated_at": "2026-04-15T03:45:48.492663+00:00",
+      "updated_at": "2026-04-04T05:04:16.943235+00:00",
       "queued_pr_payload": null,
       "campaign_status": null,
       "incident_observations": [
@@ -1268,24 +1220,6 @@
           "failure_identifier": "test-sanitizer-undefined (gcc)",
           "test_name": null,
           "error_signature": "2026-04-04T00:20:21.6880000Z Evaluating test-sanitizer-undefined.if\n2026-04-04T00:20:21.6880000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-04T00:20:21.6880000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-04T00:20:21.6880000Z Result: true\n2026-04-04T00:20:21.9370000Z Requested labels: ubuntu-latest\n2026-04-04T00:20:21.9370000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-04T00:20:21.9370000Z Waiting for a runner to pick up this job...\n2026-04-04T00:20:21.9520000Z Job is waiting for a hosted runner to come online.\n2026-04-04T00:20:21.9520000Z Job is about to start running on the hosted runner: GitHub Actions 1000628050",
-          "file_path": "",
-          "fingerprint": "0646a8bd1a34854b79a8dfae9d1648b4299223dd4881dfe4ddbfe97f61e18916",
-          "incident_key": "0646a8bd1a34854b79a8dfae9d1648b4299223dd4881dfe4ddbfe97f61e18916"
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:48.492752+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-sanitizer-undefined (gcc)",
-          "matrix_params": {
-            "param_0": "gcc"
-          },
-          "failure_identifier": "test-sanitizer-undefined (gcc)",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.1320000Z Evaluating test-sanitizer-undefined.if\n2026-04-15T00:27:22.1320000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-15T00:27:22.1320000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-15T00:27:22.1320000Z Result: true\n2026-04-15T00:27:22.4060000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.4060000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.4060000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.7870000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-15T00:28:56.3020000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:28:56.3030000Z Job is about to start running on the hosted runner: GitHub Actions 1000652242",
           "file_path": "",
           "fingerprint": "0646a8bd1a34854b79a8dfae9d1648b4299223dd4881dfe4ddbfe97f61e18916",
           "incident_key": "0646a8bd1a34854b79a8dfae9d1648b4299223dd4881dfe4ddbfe97f61e18916"
@@ -1329,12 +1263,12 @@
       "failure_identifier": "test-fedorarawhide-jemalloc",
       "test_name": null,
       "incident_key": "4e682f57c4fd6acc20087fdace807cb9583581a73a662a6e6105b26d38ce399f",
-      "error_signature": "2026-04-15T00:27:22.1330000Z Evaluating test-rpm-distros-jemalloc.if\n2026-04-15T00:27:22.1330000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-04-15T00:27:22.1330000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-04-15T00:27:22.1330000Z Result: true\n2026-04-15T00:27:22.3900000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.3900000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.3900000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.7840000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-15T00:28:38.4200000Z Job is about to start running on the hosted runner: GitHub Actions 1000652224\n2026-04-15T00:28:38.4190000Z Job is waiting for a hosted runner to come online.",
+      "error_signature": "2026-04-10T00:21:53.3650000Z Evaluating test-rpm-distros-jemalloc.if\n2026-04-10T00:21:53.3650000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-04-10T00:21:53.3650000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-04-10T00:21:53.3650000Z Result: true\n2026-04-10T00:21:53.3830000Z Requested labels: ubuntu-latest\n2026-04-10T00:21:53.3830000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-10T00:21:53.3830000Z Waiting for a runner to pick up this job...\n2026-04-10T00:41:06.7010000Z Job is about to start running on the hosted runner: GitHub Actions 1000641941\n2026-04-10T00:41:06.7000000Z Job is waiting for a hosted runner to come online.",
       "file_path": "",
       "pr_url": null,
       "status": "processing",
       "created_at": "2026-04-05T03:40:18.437894+00:00",
-      "updated_at": "2026-04-15T03:45:16.543441+00:00",
+      "updated_at": "2026-04-10T03:44:16.616093+00:00",
       "queued_pr_payload": null,
       "campaign_status": null,
       "incident_observations": [
@@ -1382,22 +1316,6 @@
           "failure_identifier": "test-fedorarawhide-jemalloc",
           "test_name": null,
           "error_signature": "2026-04-10T00:21:53.3650000Z Evaluating test-rpm-distros-jemalloc.if\n2026-04-10T00:21:53.3650000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-04-10T00:21:53.3650000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-04-10T00:21:53.3650000Z Result: true\n2026-04-10T00:21:53.3830000Z Requested labels: ubuntu-latest\n2026-04-10T00:21:53.3830000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-10T00:21:53.3830000Z Waiting for a runner to pick up this job...\n2026-04-10T00:41:06.7010000Z Job is about to start running on the hosted runner: GitHub Actions 1000641941\n2026-04-10T00:41:06.7000000Z Job is waiting for a hosted runner to come online.",
-          "file_path": "",
-          "fingerprint": "4e682f57c4fd6acc20087fdace807cb9583581a73a662a6e6105b26d38ce399f",
-          "incident_key": "4e682f57c4fd6acc20087fdace807cb9583581a73a662a6e6105b26d38ce399f"
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:16.543511+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-fedorarawhide-jemalloc",
-          "matrix_params": {},
-          "failure_identifier": "test-fedorarawhide-jemalloc",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.1330000Z Evaluating test-rpm-distros-jemalloc.if\n2026-04-15T00:27:22.1330000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-04-15T00:27:22.1330000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-04-15T00:27:22.1330000Z Result: true\n2026-04-15T00:27:22.3900000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.3900000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.3900000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.7840000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-15T00:28:38.4200000Z Job is about to start running on the hosted runner: GitHub Actions 1000652224\n2026-04-15T00:28:38.4190000Z Job is waiting for a hosted runner to come online.",
           "file_path": "",
           "fingerprint": "4e682f57c4fd6acc20087fdace807cb9583581a73a662a6e6105b26d38ce399f",
           "incident_key": "4e682f57c4fd6acc20087fdace807cb9583581a73a662a6e6105b26d38ce399f"
@@ -1667,12 +1585,12 @@
       "failure_identifier": "test-sanitizer-undefined (clang)",
       "test_name": null,
       "incident_key": "979aaa4fd37c41903d76452414855c8b507cfc6dce16fa15d2e83e886c091426",
-      "error_signature": "2026-04-15T00:27:22.1300000Z Evaluating test-sanitizer-undefined.if\n2026-04-15T00:27:22.1300000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-15T00:27:22.1300000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-15T00:27:22.1300000Z Result: true\n2026-04-15T00:27:22.4060000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.4060000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.4060000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.7870000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-15T00:28:51.2570000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:28:51.2570000Z Job is about to start running on the hosted runner: GitHub Actions 1000652241",
+      "error_signature": "2026-04-08T00:23:10.1180000Z Evaluating test-sanitizer-undefined.if\n2026-04-08T00:23:10.1180000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-08T00:23:10.1180000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-08T00:23:10.1180000Z Result: true\n2026-04-08T00:23:10.3820000Z Requested labels: ubuntu-latest\n2026-04-08T00:23:10.3820000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-08T00:23:10.3820000Z Waiting for a runner to pick up this job...\n2026-04-08T00:23:10.5040000Z Job is about to start running on the hosted runner: GitHub Actions 1000635200\n2026-04-08T00:23:10.5040000Z Job is waiting for a hosted runner to come online.",
       "file_path": "",
       "pr_url": null,
       "status": "processing",
       "created_at": "2026-04-08T07:55:25.499222+00:00",
-      "updated_at": "2026-04-15T03:45:41.834409+00:00",
+      "updated_at": "2026-04-08T07:55:25.499222+00:00",
       "queued_pr_payload": null,
       "campaign_status": null,
       "incident_observations": [
@@ -1690,24 +1608,6 @@
           "failure_identifier": "test-sanitizer-undefined (clang)",
           "test_name": null,
           "error_signature": "2026-04-08T00:23:10.1180000Z Evaluating test-sanitizer-undefined.if\n2026-04-08T00:23:10.1180000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-08T00:23:10.1180000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-08T00:23:10.1180000Z Result: true\n2026-04-08T00:23:10.3820000Z Requested labels: ubuntu-latest\n2026-04-08T00:23:10.3820000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-08T00:23:10.3820000Z Waiting for a runner to pick up this job...\n2026-04-08T00:23:10.5040000Z Job is about to start running on the hosted runner: GitHub Actions 1000635200\n2026-04-08T00:23:10.5040000Z Job is waiting for a hosted runner to come online.",
-          "file_path": "",
-          "fingerprint": "979aaa4fd37c41903d76452414855c8b507cfc6dce16fa15d2e83e886c091426",
-          "incident_key": "979aaa4fd37c41903d76452414855c8b507cfc6dce16fa15d2e83e886c091426"
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:41.834479+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-sanitizer-undefined (clang)",
-          "matrix_params": {
-            "param_0": "clang"
-          },
-          "failure_identifier": "test-sanitizer-undefined (clang)",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.1300000Z Evaluating test-sanitizer-undefined.if\n2026-04-15T00:27:22.1300000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-15T00:27:22.1300000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-15T00:27:22.1300000Z Result: true\n2026-04-15T00:27:22.4060000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.4060000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.4060000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.7870000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-15T00:28:51.2570000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:28:51.2570000Z Job is about to start running on the hosted runner: GitHub Actions 1000652241",
           "file_path": "",
           "fingerprint": "979aaa4fd37c41903d76452414855c8b507cfc6dce16fa15d2e83e886c091426",
           "incident_key": "979aaa4fd37c41903d76452414855c8b507cfc6dce16fa15d2e83e886c091426"
@@ -1871,138 +1771,6 @@
           "file_path": "",
           "fingerprint": "3b7a42fe123edba45b5465d47a6402d7aa197aefc7ff4c05f555182b0611037e",
           "incident_key": "3b7a42fe123edba45b5465d47a6402d7aa197aefc7ff4c05f555182b0611037e"
-        }
-      ]
-    },
-    "52646174bc61d740f7df14e8e28c52062b10b82578d8de3843aec0614865eb57": {
-      "fingerprint": "52646174bc61d740f7df14e8e28c52062b10b82578d8de3843aec0614865eb57",
-      "failure_identifier": "test-almalinux8-tls-module-no-tls",
-      "test_name": null,
-      "incident_key": "52646174bc61d740f7df14e8e28c52062b10b82578d8de3843aec0614865eb57",
-      "error_signature": "2026-04-15T00:27:22.1330000Z Evaluating test-rpm-distros-tls-module-no-tls.if\n2026-04-15T00:27:22.1330000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-15T00:27:22.1330000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'tls')))\n2026-04-15T00:27:22.1330000Z Result: true\n2026-04-15T00:27:22.4010000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.4010000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.4010000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.7860000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-15T00:28:49.6230000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:28:49.6230000Z Job is about to start running on the hosted runner: GitHub Actions 1000652232",
-      "file_path": "",
-      "pr_url": null,
-      "status": "processing",
-      "created_at": "2026-04-15T03:45:01.106570+00:00",
-      "updated_at": "2026-04-15T03:45:01.106570+00:00",
-      "queued_pr_payload": null,
-      "campaign_status": null,
-      "incident_observations": [
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:01.106667+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-almalinux8-tls-module-no-tls",
-          "matrix_params": {},
-          "failure_identifier": "test-almalinux8-tls-module-no-tls",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.1330000Z Evaluating test-rpm-distros-tls-module-no-tls.if\n2026-04-15T00:27:22.1330000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-15T00:27:22.1330000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'tls')))\n2026-04-15T00:27:22.1330000Z Result: true\n2026-04-15T00:27:22.4010000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.4010000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.4010000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.7860000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-15T00:28:49.6230000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:28:49.6230000Z Job is about to start running on the hosted runner: GitHub Actions 1000652232",
-          "file_path": "",
-          "fingerprint": "52646174bc61d740f7df14e8e28c52062b10b82578d8de3843aec0614865eb57",
-          "incident_key": "52646174bc61d740f7df14e8e28c52062b10b82578d8de3843aec0614865eb57"
-        }
-      ]
-    },
-    "ea054375da5407a071eaed1f7be927342d0a9156131f3ea0d9d650260e70cfe5": {
-      "fingerprint": "ea054375da5407a071eaed1f7be927342d0a9156131f3ea0d9d650260e70cfe5",
-      "failure_identifier": "test-macos-latest",
-      "test_name": null,
-      "incident_key": "ea054375da5407a071eaed1f7be927342d0a9156131f3ea0d9d650260e70cfe5",
-      "error_signature": "2026-04-15T00:27:22.1320000Z Evaluating test-macos-latest.if\n2026-04-15T00:27:22.1320000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'macos') && !((contains(github.event.inputs.skiptests, 'valkey') && contains(github.event.inputs.skiptests, 'modules'))))))\n2026-04-15T00:27:22.1320000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'macos') && !(contains(null, 'valkey') && contains(github.event.inputs.skiptests, 'modules'))))\n2026-04-15T00:27:22.1320000Z Result: true\n2026-04-15T00:27:22.4080000Z Requested labels: macos-latest\n2026-04-15T00:27:22.4080000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.4080000Z Waiting for a runner to pick up this job...\n2026-04-15T00:28:45.9300000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:28:45.9280000Z Job is about to start running on the hosted runner: GitHub Actions 1000652228",
-      "file_path": "",
-      "pr_url": null,
-      "status": "processing",
-      "created_at": "2026-04-15T03:45:23.427774+00:00",
-      "updated_at": "2026-04-15T03:45:23.427774+00:00",
-      "queued_pr_payload": null,
-      "campaign_status": null,
-      "incident_observations": [
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:23.427859+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-macos-latest",
-          "matrix_params": {},
-          "failure_identifier": "test-macos-latest",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.1320000Z Evaluating test-macos-latest.if\n2026-04-15T00:27:22.1320000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'macos') && !((contains(github.event.inputs.skiptests, 'valkey') && contains(github.event.inputs.skiptests, 'modules'))))))\n2026-04-15T00:27:22.1320000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'macos') && !(contains(null, 'valkey') && contains(github.event.inputs.skiptests, 'modules'))))\n2026-04-15T00:27:22.1320000Z Result: true\n2026-04-15T00:27:22.4080000Z Requested labels: macos-latest\n2026-04-15T00:27:22.4080000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.4080000Z Waiting for a runner to pick up this job...\n2026-04-15T00:28:45.9300000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:28:45.9280000Z Job is about to start running on the hosted runner: GitHub Actions 1000652228",
-          "file_path": "",
-          "fingerprint": "ea054375da5407a071eaed1f7be927342d0a9156131f3ea0d9d650260e70cfe5",
-          "incident_key": "ea054375da5407a071eaed1f7be927342d0a9156131f3ea0d9d650260e70cfe5"
-        }
-      ]
-    },
-    "b724b9436eff38ff95678d97a07c832835d7da44977cd923b709fbfda465d5f9": {
-      "fingerprint": "b724b9436eff38ff95678d97a07c832835d7da44977cd923b709fbfda465d5f9",
-      "failure_identifier": "test-sanitizer-undefined-large-memory (clang)",
-      "test_name": null,
-      "incident_key": "b724b9436eff38ff95678d97a07c832835d7da44977cd923b709fbfda465d5f9",
-      "error_signature": "2026-04-15T00:27:22.0170000Z Evaluating test-sanitizer-undefined-large-memory.if\n2026-04-15T00:27:22.0170000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer') && !contains(github.event.inputs.skiptests, 'large-memory'))))\n2026-04-15T00:27:22.0170000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer') && !contains(null, 'large-memory')))\n2026-04-15T00:27:22.0170000Z Result: true\n2026-04-15T00:27:22.0200000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.0200000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.0200000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.3920000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:27:22.3920000Z Job is about to start running on the hosted runner: GitHub Actions 1000652201",
-      "file_path": "",
-      "pr_url": null,
-      "status": "processing",
-      "created_at": "2026-04-15T03:45:55.501645+00:00",
-      "updated_at": "2026-04-15T03:45:55.501645+00:00",
-      "queued_pr_payload": null,
-      "campaign_status": null,
-      "incident_observations": [
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:55.501711+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-sanitizer-undefined-large-memory (clang)",
-          "matrix_params": {
-            "param_0": "clang"
-          },
-          "failure_identifier": "test-sanitizer-undefined-large-memory (clang)",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.0170000Z Evaluating test-sanitizer-undefined-large-memory.if\n2026-04-15T00:27:22.0170000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer') && !contains(github.event.inputs.skiptests, 'large-memory'))))\n2026-04-15T00:27:22.0170000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer') && !contains(null, 'large-memory')))\n2026-04-15T00:27:22.0170000Z Result: true\n2026-04-15T00:27:22.0200000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.0200000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.0200000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.3920000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:27:22.3920000Z Job is about to start running on the hosted runner: GitHub Actions 1000652201",
-          "file_path": "",
-          "fingerprint": "b724b9436eff38ff95678d97a07c832835d7da44977cd923b709fbfda465d5f9",
-          "incident_key": "b724b9436eff38ff95678d97a07c832835d7da44977cd923b709fbfda465d5f9"
-        }
-      ]
-    },
-    "98684c77a8b810e6713665ef417091a4bfde787c78683195155d0bea98b92d77": {
-      "fingerprint": "98684c77a8b810e6713665ef417091a4bfde787c78683195155d0bea98b92d77",
-      "failure_identifier": "test-sanitizer-undefined-large-memory (gcc)",
-      "test_name": null,
-      "incident_key": "98684c77a8b810e6713665ef417091a4bfde787c78683195155d0bea98b92d77",
-      "error_signature": "2026-04-15T00:27:22.0210000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.0210000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.0210000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.0160000Z Evaluating test-sanitizer-undefined-large-memory.if\n2026-04-15T00:27:22.0160000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer') && !contains(github.event.inputs.skiptests, 'large-memory'))))\n2026-04-15T00:27:22.0160000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer') && !contains(null, 'large-memory')))\n2026-04-15T00:27:22.0160000Z Result: true\n2026-04-15T00:27:22.3940000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:27:22.3940000Z Job is about to start running on the hosted runner: GitHub Actions 1000652204",
-      "file_path": "",
-      "pr_url": null,
-      "status": "processing",
-      "created_at": "2026-04-15T03:46:02.353263+00:00",
-      "updated_at": "2026-04-15T03:46:02.353263+00:00",
-      "queued_pr_payload": null,
-      "campaign_status": null,
-      "incident_observations": [
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:46:02.353363+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-sanitizer-undefined-large-memory (gcc)",
-          "matrix_params": {
-            "param_0": "gcc"
-          },
-          "failure_identifier": "test-sanitizer-undefined-large-memory (gcc)",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.0210000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.0210000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.0210000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.0160000Z Evaluating test-sanitizer-undefined-large-memory.if\n2026-04-15T00:27:22.0160000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer') && !contains(github.event.inputs.skiptests, 'large-memory'))))\n2026-04-15T00:27:22.0160000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer') && !contains(null, 'large-memory')))\n2026-04-15T00:27:22.0160000Z Result: true\n2026-04-15T00:27:22.3940000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:27:22.3940000Z Job is about to start running on the hosted runner: GitHub Actions 1000652204",
-          "file_path": "",
-          "fingerprint": "98684c77a8b810e6713665ef417091a4bfde787c78683195155d0bea98b92d77",
-          "incident_key": "98684c77a8b810e6713665ef417091a4bfde787c78683195155d0bea98b92d77"
         }
       ]
     }
@@ -2389,22 +2157,6 @@
           "observed_at": "2026-04-15T03:44:10.597355+00:00",
           "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
           "workflow_run_id": 24425999685,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-fedorarawhide-tls-module-no-tls",
-          "matrix_params": {},
-          "failure_identifier": "test-fedorarawhide-tls-module-no-tls",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:33.729450+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-fedorarawhide-tls-module-no-tls",
@@ -2841,22 +2593,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.263978+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-ubuntu-32bit",
-          "matrix_params": {},
-          "failure_identifier": "test-ubuntu-32bit",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -3177,22 +2913,6 @@
           "observed_at": "2026-04-14T15:43:30.667261+00:00",
           "commit_sha": "17c01284c1c1e4c0aff418b20495978cc924c7c2",
           "workflow_run_id": 24400473903,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-alpine-jemalloc",
-          "matrix_params": {},
-          "failure_identifier": "test-alpine-jemalloc",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.264027+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-alpine-jemalloc",
@@ -3533,22 +3253,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.264052+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-fedorarawhide-tls-module",
-          "matrix_params": {},
-          "failure_identifier": "test-fedorarawhide-tls-module",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -3831,22 +3535,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.263954+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-ubuntu-jemalloc",
-          "matrix_params": {},
-          "failure_identifier": "test-ubuntu-jemalloc",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -4046,22 +3734,6 @@
           "failure_identifier": "test-valgrind-no-malloc-usable-size-test",
           "test_name": null,
           "error_signature": "2026-04-10T00:22:53.5102741Z [ok]: Subscribers are killed when revoked of channel permission (20 ms)\n2026-04-10T00:22:53.5161756Z [ok]: Subscribers are killed when revoked of channel permission (5 ms)\n2026-04-10T00:22:53.5215118Z [ok]: Subscribers are killed when revoked of pattern permission (5 ms)\n2026-04-10T00:22:53.5268028Z [ok]: Subscribers are killed when revoked of allchannels permission (5 ms)\n2026-04-10T00:22:53.5361114Z [ok]: Subscribers are pardoned if literal permissions are retained and/or gaining allchannels (9 ms)\n2026-04-10T00:22:53.6377867Z [ok]: blocked command gets rejected when reprocessed after permission change (102 ms)\n2026-04-10T00:22:53.6392214Z [ok]: Users can be configured to authenticate with any password (2 ms)\n2026-04-10T00:22:53.6456755Z [ok]: ACLs can exclude single commands (6 ms)\n2026-04-10T00:22:53.6649284Z [ok]: ACLs can include or exclude whole classes of commands (19 ms)\n2026-04-10T00:22:53.6728349Z [ok]: ACLs can include single subcommands (8 ms)\n2026-04-10T00:22:53.6768820Z [ok]: ACLs can exclude single subcommands, case 1 (4 ms)\n2026-04-10T00:22:53.6823168Z [ok]: ACLs can exclude single subcommands, case 2 (6 ms)\n2026-04-10T00:22:53.6849812Z [ok]: ACLs cannot include a subcommand with a specific arg (2 ms)\n2026-04-10T00:22:53.6883743Z [ok]: ACLs cannot exclude or include a container commands with a specific arg (4 ms)\n2026-04-10T00:22:53.6920096Z [ok]: ACLs cannot exclude or include a container command with two args (3 ms)\n2026-04-10T00:22:53.7482387Z [ok]: ACLs including of a type includes also subcommands (57 ms)\n2026-04-10T00:22:53.7567269Z [ok]: ACLs can block SELECT of all but a specific DB (8 ms)\n2026-04-10T00:22:53.7737176Z [ok]: ACLs can block all DEBUG subcommands except one (17 ms)\n2026-04-10T00:22:53.7859577Z [ok]: ACLs set can include subcommands, if already full command exists (12 ms)\n2026-04-10T00:22:53.8189442Z [ok]: ACLs set can exclude subcommands, if already full command exists (33 ms)\n2026-04-10T00:22:53.8256292Z [ok]: ACL SETUSER RESET reverting to default newly created user (7 ms)\n2026-04-10T00:22:53.8370298Z [ok]: ACL GETUSER is able to translate back command permissions (11 ms)\n2026-04-10T00:22:54.0014507Z [ok]: ACL GETUSER provides reasonable results (165 ms)\n2026-04-10T00:22:54.0629652Z [ok]: ACL GETUSER provides correct results (61 ms)\n2026-04-10T00:22:54.0689649Z [ok]: ACL CAT with illegal arguments (6 ms)\n2026-04-10T00:22:54.0701620Z [ok]: ACL CAT without category - list all categories (1 ms)\n2026-04-10T00:22:54.0801715Z [ok]: ACL CAT category - list all commands/subcommands that belong to category (9 ms)\n2026-04-10T00:22:54.0855456Z [ok]: ACL requires explicit permission for scripting for EVAL_RO, EVALSHA_RO and FCALL_RO (5 ms)\n2026-04-10T00:22:54.0892163Z [ok]: ACL #5998 regression: memory leaks adding / removing subcommands (3 ms)\n2026-04-10T00:22:54.1128537Z [ok]: ACL LOG aggregates similar errors together and assigns unique entry-id to new errors (23 ms)\n2026-04-10T00:22:54.1193313Z [ok]: ACL LOG shows failed command executions at toplevel (7 ms)\n2026-04-10T00:22:54.1235198Z [ok]: ACL LOG shows failed subcommand executions at toplevel (4 ms)\n2026-04-10T00:22:54.1280277Z [ok]: ACL LOG is able to test similar events (4 ms)\n2026-04-10T00:22:54.1308742Z [ok]: ACL LOG is able to log keys access violations and key name (3 ms)\n2026-04-10T00:22:54.1341658Z [ok]: ACL LOG is able to log channel access violations and channel name (3 ms)\n2026-04-10T00:22:54.1498742Z [ok]: ACL LOG is able to log database access violations (15 ms)\n2026-04-10T00:22:54.1509388Z [ok]: ACL LOG RESET is able to flush the entries in the log (1 ms)\n2026-04-10T00:22:54.1575094Z [ok]: ACL LOG can distinguish the transaction context (1) (7 ms)\n2026-04-10T00:22:54.1719244Z [ok]: ACL LOG can distinguish the transaction context (2) (14 ms)\n2026-04-10T00:22:54.2718198Z [ok]: ACL can log errors in the context of Lua scripting (100 ms)\n2026-04-10T00:22:54.2784459Z [ok]: ACL LOG can accept a numerical argument to show less entries (7 ms)\n2026-04-10T00:22:54.2811559Z [ok]: ACL LOG can log failed auth attempts (2 ms)\n2026-04-10T00:22:54.2993706Z [ok]: ACLLOG - zero max length is correctly handled (18 ms)\n2026-04-10T00:22:54.3118875Z [ok]: ACL LOG entries are limited to a maximum amount (12 ms)\n2026-04-10T00:22:54.3143494Z [ok]: ACL LOG entries are still present on update of max len config (3 ms)\n2026-04-10T00:22:54.3187997Z [ok]: When default user is off, new connections are not authenticated (4 ms)\n2026-04-10T00:22:54.3299208Z [ok]: When default user has no command permission, hello command still works for other users (11 ms)\n2026-04-10T00:22:54.3350355Z [ok]: When an authentication chain is used in the HELLO cmd, the last auth cmd has precedence (5 ms)\n2026-04-10T00:22:54.3391331Z [ok]: When a setname chain is used in the HELLO cmd, the last setname cmd has precedence (4 ms)\n2026-04-10T00:22:54.3408439Z [ok]: When authentication fails in the HELLO cmd, the client setname should not be applied (2 ms)\n2026-04-10T00:22:54.3428204Z [ok]: ACL HELP should not have unexpected options (2 ms)\n2026-04-10T00:22:54.3457027Z [ok]: Delete a user that the client doesn't use (3 ms)\n2026-04-10T00:22:54.3496562Z [ok]: Delete a user that the client is using (4 ms)\n2026-04-10T00:22:54.3536105Z [ok]: ACL GENPASS command failed test (4 ms)\n2026-04-10T00:22:54.3544223Z [ok]: Default user can not be removed (1 ms)\n2026-04-10T00:22:54.3553048Z [ok]: ACL load non-existing configured ACL file (1 ms)\n2026-04-10T00:22:54.3864430Z [ok]: ACL-Metrics user AUTH failure (31 ms)\n2026-04-10T00:22:54.4107261Z [ok]: ACL-Metrics invalid command accesses (24 ms)\n2026-04-10T00:22:54.4357342Z [ok]: ACL-Metrics invalid key accesses (25 ms)\n2026-04-10T00:22:54.4610121Z [ok]: ACL-Metrics invalid channels accesses (25 ms)\n2026-04-10T00:22:56.8688243Z === (external:skip) Starting server on 127.0.0.1:21112 ok\n2026-04-10T00:22:56.9561328Z [ok]: default: load from include file, can access any channels (49 ms)\n2026-04-10T00:22:56.9733009Z [ok]: default: with config acl-pubsub-default allchannels after reset, can access any channels (18 ms)\n2026-04-10T00:22:56.9996271Z [ok]: default: with config acl-pubsub-default resetchannels after reset, can not access any channels (26 ms)\n2026-04-10T00:22:57.0297210Z [ok]: Alice: can execute all command (30 ms)\n2026-04-10T00:22:57.0541511Z [ok]: Bob: just execute @set and acl command (24 ms)\n2026-04-10T00:22:57.0908320Z [ok]: ACL LOAD only disconnects affected clients (36 ms)\n2026-04-10T00:22:57.1048748Z [ok]: ACL LOAD disconnects clients of deleted users (14 ms)\n2026-04-10T00:22:57.1541738Z [ok]: ACL load and save (49 ms)\n2026-04-10T00:22:57.1708251Z [ok]: ACL load and save with restricted channels (16 ms)\n2026-04-10T00:22:57.1866344Z [ok]: Validate a user can remove their own channel permissions (16 ms)\n2026-04-10T00:22:57.2015750Z [ok]: ACL LOAD does not crash server if current user is removed from ACL file (15 ms)\n2026-04-10T00:22:59.6374939Z === (external:skip) Starting server on 127.0.0.1:21113 ok\n2026-04-10T00:22:59.7052267Z [ok]: Default user has access to all channels irrespective of flag (31 ms)\n2026-04-10T00:22:59.7246706Z [ok]: Update acl-pubsub-default, existing users shouldn't get affected (19 ms)\n2026-04-10T00:22:59.7337189Z [ok]: Single channel is valid (9 ms)\n2026-04-10T00:22:59.7407500Z [ok]: Single channel is not valid with allchannels (7 ms)\n2026-04-10T00:23:02.2167780Z === (external:skip) Starting server on 127.0.0.1:21114 ok\n2026-04-10T00:23:02.2827428Z [ok]: Only default user has access to all channels irrespective of flag (30 ms)\n2026-04-10T00:23:04.7225117Z === (external:skip) Starting server on 127.0.0.1:21115 ok\n2026-04-10T00:23:04.7716032Z [ok]: default: load from config file, without channel permission default user can't access any channels (13 ms)\n2026-04-10T00:23:07.2226452Z === (external:skip) Starting server on 127.0.0.1:21116 ok\n2026-04-10T00:23:07.3068541Z [ok]: default: load from config file with all channels permissions (48 ms)\n2026-04-10T00:23:09.7255026Z === (external:skip) Starting server on 127.0.0.1:21117 ok\n2026-04-10T01:46:13.3270918Z [ok]: LREM starting from tail with negative count (2) - quicklist (1 ms)\n2026-04-10T01:46:13.3737144Z [ok]: LREM deleting objects that may be int encoded - quicklist (47 ms)\n2026-04-10T01:46:13.3836722Z [ok]: LREM remove all the occurrences - listpack (10 ms)\n2026-04-10T01:46:13.3853010Z [ok]: LREM remove the first occurrence - listpack (2 ms)\n2026-04-10T01:46:13.3865480Z [ok]: LREM remove non existing element - listpack (1 ms)\n2026-04-10T01:46:13.3974221Z [ok]: LREM starting from tail with negative count - listpack (11 ms)\n2026-04-10T01:46:13.3995917Z [ok]: LREM starting from tail with negative count (2) - listpack (2 ms)\n2026-04-10T01:46:13.4054254Z [ok]: LREM deleting objects that may be int encoded - listpack (6 ms)\n2026-04-10T01:46:13.4314133Z [ok]: Regression for bug 593 - chaining BRPOPLPUSH with other blocking cmds (26 ms)\n2026-04-10T01:46:13.5598079Z [ok]: BLPOP/BLMOVE should increase dirty (128 ms)\n2026-04-10T01:46:13.8936072Z [ok]: client unblock tests (334 ms)\n2026-04-10T01:46:14.2260849Z [ok]: client unblock tests (332 ms)\n2026-04-10T01:46:14.2585336Z [ok]: List listpack -> quicklist encoding conversion (32 ms)\n2026-04-10T01:46:14.4537661Z [ok]: List listpack -> quicklist encoding conversion (195 ms)\n2026-04-10T01:46:14.7049598Z [ok]: List quicklist -> listpack encoding conversion (251 ms)\n2026-04-10T01:46:14.7661683Z [ok]: List encoding conversion when RDB loading (61 ms)\n2026-04-10T01:46:14.8614986Z [ok]: List invalid list-max-listpack-size config (95 ms)\n2026-04-10T01:46:15.0019696Z [ok]: List of various encodings (140 ms)\n2026-04-10T01:46:15.0143591Z [ok]: List of various encodings - sanitize dump (13 ms)\n2026-04-10T01:46:15.0437884Z [ok]: Unblock fairness is kept while pipelining (29 ms)\n2026-04-10T01:46:15.1065292Z [ok]: Unblock fairness is kept during nested unblock (63 ms)\n2026-04-10T01:46:15.1423233Z [",
-          "file_path": "",
-          "fingerprint": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3",
-          "incident_key": null
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:46:20.075731+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-valgrind-no-malloc-usable-size-test",
-          "matrix_params": {},
-          "failure_identifier": "test-valgrind-no-malloc-usable-size-test",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:36:52.1193068Z [ok]: Subscribers are killed when revoked of channel permission (21 ms)\n2026-04-15T00:36:52.1247913Z [ok]: Subscribers are killed when revoked of channel permission (5 ms)\n2026-04-15T00:36:52.1302918Z [ok]: Subscribers are killed when revoked of pattern permission (6 ms)\n2026-04-15T00:36:52.1356156Z [ok]: Subscribers are killed when revoked of allchannels permission (5 ms)\n2026-04-15T00:36:52.1449644Z [ok]: Subscribers are pardoned if literal permissions are retained and/or gaining allchannels (9 ms)\n2026-04-15T00:36:52.2462642Z [ok]: blocked command gets rejected when reprocessed after permission change (101 ms)\n2026-04-15T00:36:52.2477134Z [ok]: Users can be configured to authenticate with any password (1 ms)\n2026-04-15T00:36:52.2543168Z [ok]: ACLs can exclude single commands (7 ms)\n2026-04-15T00:36:52.2742772Z [ok]: ACLs can include or exclude whole classes of commands (20 ms)\n2026-04-15T00:36:52.2825308Z [ok]: ACLs can include single subcommands (8 ms)\n2026-04-15T00:36:52.2868706Z [ok]: ACLs can exclude single subcommands, case 1 (4 ms)\n2026-04-15T00:36:52.2924857Z [ok]: ACLs can exclude single subcommands, case 2 (6 ms)\n2026-04-15T00:36:52.2951850Z [ok]: ACLs cannot include a subcommand with a specific arg (2 ms)\n2026-04-15T00:36:52.2986473Z [ok]: ACLs cannot exclude or include a container commands with a specific arg (3 ms)\n2026-04-15T00:36:52.3022747Z [ok]: ACLs cannot exclude or include a container command with two args (4 ms)\n2026-04-15T00:36:52.3584942Z [ok]: ACLs including of a type includes also subcommands (56 ms)\n2026-04-15T00:36:52.3672089Z [ok]: ACLs can block SELECT of all but a specific DB (9 ms)\n2026-04-15T00:36:52.3848181Z [ok]: ACLs can block all DEBUG subcommands except one (17 ms)\n2026-04-15T00:36:52.3975348Z [ok]: ACLs set can include subcommands, if already full command exists (13 ms)\n2026-04-15T00:36:52.4312879Z [ok]: ACLs set can exclude subcommands, if already full command exists (34 ms)\n2026-04-15T00:36:52.4383302Z [ok]: ACL SETUSER RESET reverting to default newly created user (7 ms)\n2026-04-15T00:36:52.4500402Z [ok]: ACL GETUSER is able to translate back command permissions (11 ms)\n2026-04-15T00:36:52.6215245Z [ok]: ACL GETUSER provides reasonable results (172 ms)\n2026-04-15T00:36:52.6825515Z [ok]: ACL GETUSER provides correct results (61 ms)\n2026-04-15T00:36:52.6886182Z [ok]: ACL CAT with illegal arguments (6 ms)\n2026-04-15T00:36:52.6896686Z [ok]: ACL CAT without category - list all categories (1 ms)\n2026-04-15T00:36:52.6997850Z [ok]: ACL CAT category - list all commands/subcommands that belong to category (10 ms)\n2026-04-15T00:36:52.7053571Z [ok]: ACL requires explicit permission for scripting for EVAL_RO, EVALSHA_RO and FCALL_RO (6 ms)\n2026-04-15T00:36:52.7091554Z [ok]: ACL #5998 regression: memory leaks adding / removing subcommands (3 ms)\n2026-04-15T00:36:52.7325881Z [ok]: ACL LOG aggregates similar errors together and assigns unique entry-id to new errors (23 ms)\n2026-04-15T00:36:52.7394851Z [ok]: ACL LOG shows failed command executions at toplevel (7 ms)\n2026-04-15T00:36:52.7440951Z [ok]: ACL LOG shows failed subcommand executions at toplevel (4 ms)\n2026-04-15T00:36:52.7490047Z [ok]: ACL LOG is able to test similar events (5 ms)\n2026-04-15T00:36:52.7521588Z [ok]: ACL LOG is able to log keys access violations and key name (3 ms)\n2026-04-15T00:36:52.7555354Z [ok]: ACL LOG is able to log channel access violations and channel name (3 ms)\n2026-04-15T00:36:52.7718456Z [ok]: ACL LOG is able to log database access violations (16 ms)\n2026-04-15T00:36:52.7729879Z [ok]: ACL LOG RESET is able to flush the entries in the log (1 ms)\n2026-04-15T00:36:52.7794300Z [ok]: ACL LOG can distinguish the transaction context (1) (7 ms)\n2026-04-15T00:36:52.7940900Z [ok]: ACL LOG can distinguish the transaction context (2) (14 ms)\n2026-04-15T00:36:52.8942781Z [ok]: ACL can log errors in the context of Lua scripting (100 ms)\n2026-04-15T00:36:52.9012040Z [ok]: ACL LOG can accept a numerical argument to show less entries (6 ms)\n2026-04-15T00:36:52.9038119Z [ok]: ACL LOG can log failed auth attempts (2 ms)\n2026-04-15T00:36:52.9216601Z [ok]: ACLLOG - zero max length is correctly handled (18 ms)\n2026-04-15T00:36:52.9335930Z [ok]: ACL LOG entries are limited to a maximum amount (12 ms)\n2026-04-15T00:36:52.9362787Z [ok]: ACL LOG entries are still present on update of max len config (3 ms)\n2026-04-15T00:36:52.9410020Z [ok]: When default user is off, new connections are not authenticated (4 ms)\n2026-04-15T00:36:52.9519721Z [ok]: When default user has no command permission, hello command still works for other users (11 ms)\n2026-04-15T00:36:52.9570190Z [ok]: When an authentication chain is used in the HELLO cmd, the last auth cmd has precedence (5 ms)\n2026-04-15T00:36:52.9610663Z [ok]: When a setname chain is used in the HELLO cmd, the last setname cmd has precedence (4 ms)\n2026-04-15T00:36:52.9626926Z [ok]: When authentication fails in the HELLO cmd, the client setname should not be applied (2 ms)\n2026-04-15T00:36:52.9647625Z [ok]: ACL HELP should not have unexpected options (2 ms)\n2026-04-15T00:36:52.9675864Z [ok]: Delete a user that the client doesn't use (3 ms)\n2026-04-15T00:36:52.9718043Z [ok]: Delete a user that the client is using (4 ms)\n2026-04-15T00:36:52.9756798Z [ok]: ACL GENPASS command failed test (4 ms)\n2026-04-15T00:36:52.9764242Z [ok]: Default user can not be removed (1 ms)\n2026-04-15T00:36:52.9772583Z [ok]: ACL load non-existing configured ACL file (1 ms)\n2026-04-15T00:36:53.0099986Z [ok]: ACL-Metrics user AUTH failure (32 ms)\n2026-04-15T00:36:53.0346429Z [ok]: ACL-Metrics invalid command accesses (25 ms)\n2026-04-15T00:36:53.0594763Z [ok]: ACL-Metrics invalid key accesses (25 ms)\n2026-04-15T00:36:53.0858115Z [ok]: ACL-Metrics invalid channels accesses (26 ms)\n2026-04-15T00:36:55.4964274Z === (external:skip) Starting server on 127.0.0.1:21112 ok\n2026-04-15T00:36:55.5805537Z [ok]: default: load from include file, can access any channels (47 ms)\n2026-04-15T00:36:55.5978840Z [ok]: default: with config acl-pubsub-default allchannels after reset, can access any channels (17 ms)\n2026-04-15T00:36:55.6240144Z [ok]: default: with config acl-pubsub-default resetchannels after reset, can not access any channels (26 ms)\n2026-04-15T00:36:55.6544892Z [ok]: Alice: can execute all command (31 ms)\n2026-04-15T00:36:55.6783527Z [ok]: Bob: just execute @set and acl command (24 ms)\n2026-04-15T00:36:55.7133368Z [ok]: ACL LOAD only disconnects affected clients (35 ms)\n2026-04-15T00:36:55.7266179Z [ok]: ACL LOAD disconnects clients of deleted users (13 ms)\n2026-04-15T00:36:55.7751030Z [ok]: ACL load and save (48 ms)\n2026-04-15T00:36:55.7920493Z [ok]: ACL load and save with restricted channels (17 ms)\n2026-04-15T00:36:55.8085991Z [ok]: Validate a user can remove their own channel permissions (17 ms)\n2026-04-15T00:36:55.8235048Z [ok]: ACL LOAD does not crash server if current user is removed from ACL file (15 ms)\n2026-04-15T00:36:58.2382890Z === (external:skip) Starting server on 127.0.0.1:21113 ok\n2026-04-15T00:36:58.3055763Z [ok]: Default user has access to all channels irrespective of flag (31 ms)\n2026-04-15T00:36:58.3253309Z [ok]: Update acl-pubsub-default, existing users shouldn't get affected (20 ms)\n2026-04-15T00:36:58.3351697Z [ok]: Single channel is valid (9 ms)\n2026-04-15T00:36:58.3424486Z [ok]: Single channel is not valid with allchannels (7 ms)\n2026-04-15T00:37:00.8546629Z === (external:skip) Starting server on 127.0.0.1:21114 ok\n2026-04-15T00:37:00.9210057Z [ok]: Only default user has access to all channels irrespective of flag (30 ms)\n2026-04-15T00:37:03.3686226Z === (external:skip) Starting server on 127.0.0.1:21115 ok\n2026-04-15T00:37:03.4182227Z [ok]: default: load from config file, without channel permission default user can't access any channels (12 ms)\n2026-04-15T00:37:05.8784903Z === (external:skip) Starting server on 127.0.0.1:21116 ok\n2026-04-15T00:37:05.9635952Z [ok]: default: load from config file with all channels permissions (49 ms)\n2026-04-15T00:37:08.3898434Z === (external:skip) Starting server on 127.0.0.1:21117 ok\n2026-04-15T02:00:39.8010778Z [ok]: LREM remove all the occurrences - listpack (10 ms)\n2026-04-15T02:00:39.8024405Z [ok]: LREM remove the first occurrence - listpack (2 ms)\n2026-04-15T02:00:39.8036260Z [ok]: LREM remove non existing element - listpack (1 ms)\n2026-04-15T02:00:39.8139877Z [ok]: LREM starting from tail with negative count - listpack (10 ms)\n2026-04-15T02:00:39.8160137Z [ok]: LREM starting from tail with negative count (2) - listpack (2 ms)\n2026-04-15T02:00:39.8214569Z [ok]: LREM deleting objects that may be int encoded - listpack (6 ms)\n2026-04-15T02:00:39.8488008Z [ok]: Regression for bug 593 - chaining BRPOPLPUSH with other blocking cmds (27 ms)\n2026-04-15T02:00:39.9754840Z [ok]: BLPOP/BLMOVE should increase dirty (127 ms)\n2026-04-15T02:00:40.3106692Z [ok]: client unblock tests (335 ms)\n2026-04-15T02:00:40.6421564Z [ok]: client unblock tests (331 ms)\n2026-04-15T02:00:40.6751203Z [ok]: List listpack -> quicklist encoding conversion (32 ms)\n2026-04-15T02:00:40.8709067Z [ok]: List listpack -> quicklist encoding conversion (196 ms)\n2026-04-15T02:00:41.1213790Z [ok]: List quicklist -> listpack encoding conversion (251 ms)\n2026-04-15T02:00:41.1839181Z [ok]: List encoding conversion when RDB loading (62 ms)\n2026-04-15T02:00:41.2791493Z [ok]: List invalid list-max-listpack-size config (95 ms)\n2026-04-15T02:00:41.4184552Z [ok]: List of various encodings (140 ms)\n2026-04-15T02:00:41.4308903Z [ok]: List of various encodings - sanitize dump (12 ms)\n2026-04-15T02:00:41.4603267Z [ok]: Unblock fairness is kept while pipelining (30 ms)\n2026-04-15T02:00:41.5236512Z [ok]: Unblock fairness is kept during nested unblock (63 ms)\n2026-04-15T02:00:41.5594876Z [ok]: Blocking command accounted only once in commandstats (36 ms)\n2026-04-15T02:00:41.5827633Z [ok]: Blocking command accounted only once in commandstats after timeout (23 ms)\n2026-04-15T02:00:41.844476",
           "file_path": "",
           "fingerprint": "5f87be31f247383facbebeb661d2fd4981f1ec125ad08911cb144556d20ebcd3",
           "incident_key": null
@@ -4395,22 +4067,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.263962+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-ubuntu-arm",
-          "matrix_params": {},
-          "failure_identifier": "test-ubuntu-arm",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -4677,22 +4333,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:09.118534+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-almalinux9-jemalloc",
-          "matrix_params": {},
-          "failure_identifier": "test-almalinux9-jemalloc",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.0180000Z Evaluating test-rpm-distros-jemalloc.if\n2026-04-15T00:27:22.0180000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-04-15T00:27:22.0180000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-04-15T00:27:22.0180000Z Result: true\n2026-04-15T00:27:22.1300000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.1300000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.1300000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.3970000Z Job is about to start running on the hosted runner: GitHub Actions 1000652208\n2026-04-15T00:27:22.3960000Z Job is waiting for a hosted runner to come online.",
-          "file_path": "",
-          "fingerprint": "acb22ca6c75bf28b0facd1b9730ce80945d38d0549fb837ebf11ef2eeed529b5",
-          "incident_key": null
         }
       ]
     },
@@ -4895,22 +4535,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:33.729409+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-almalinux9-tls-module-no-tls",
-          "matrix_params": {},
-          "failure_identifier": "test-almalinux9-tls-module-no-tls",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -5080,22 +4704,6 @@
           "error_signature": "2026-04-10T00:21:53.3220000Z Evaluating test-rpm-distros-tls-module-no-tls.if\n2026-04-10T00:21:53.3220000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-10T00:21:53.3220000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'tls')))\n2026-04-10T00:21:53.3220000Z Result: true\n2026-04-10T00:21:53.3760000Z Requested labels: ubuntu-latest\n2026-04-10T00:21:53.3760000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-10T00:21:53.3760000Z Waiting for a runner to pick up this job...\n2026-04-10T00:33:44.7580000Z Job is waiting for a hosted runner to come online.\n2026-04-10T00:33:44.7580000Z Job is about to start running on the hosted runner: GitHub Actions 1000641912",
           "file_path": "",
           "fingerprint": "376f5e25e940abcc0f0d1c7e4bb3a3b1c6b354db0c248525966d2639b51faa1c",
-          "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:33.729431+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-centosstream9-tls-module-no-tls",
-          "matrix_params": {},
-          "failure_identifier": "test-centosstream9-tls-module-no-tls",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
           "incident_key": null
         }
       ]
@@ -5282,22 +4890,6 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null,
-          "incident_key": null
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:16.543552+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-fedorarawhide-jemalloc",
-          "matrix_params": {},
-          "failure_identifier": "test-fedorarawhide-jemalloc",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.1330000Z Evaluating test-rpm-distros-jemalloc.if\n2026-04-15T00:27:22.1330000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'rpm-distros'))))\n2026-04-15T00:27:22.1330000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'rpm-distros')))\n2026-04-15T00:27:22.1330000Z Result: true\n2026-04-15T00:27:22.3900000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.3900000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.3900000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.7840000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-15T00:28:38.4200000Z Job is about to start running on the hosted runner: GitHub Actions 1000652224\n2026-04-15T00:28:38.4190000Z Job is waiting for a hosted runner to come online.",
-          "file_path": "",
-          "fingerprint": "4e682f57c4fd6acc20087fdace807cb9583581a73a662a6e6105b26d38ce399f",
           "incident_key": null
         }
       ]
@@ -5490,24 +5082,6 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null,
-          "incident_key": null
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:41.834521+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-sanitizer-undefined (clang)",
-          "matrix_params": {
-            "param_0": "clang"
-          },
-          "failure_identifier": "test-sanitizer-undefined (clang)",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.1300000Z Evaluating test-sanitizer-undefined.if\n2026-04-15T00:27:22.1300000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-15T00:27:22.1300000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-15T00:27:22.1300000Z Result: true\n2026-04-15T00:27:22.4060000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.4060000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.4060000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.7870000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-15T00:28:51.2570000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:28:51.2570000Z Job is about to start running on the hosted runner: GitHub Actions 1000652241",
-          "file_path": "",
-          "fingerprint": "979aaa4fd37c41903d76452414855c8b507cfc6dce16fa15d2e83e886c091426",
           "incident_key": null
         }
       ]
@@ -5749,22 +5323,6 @@
           "observed_at": "2026-04-14T15:43:30.667254+00:00",
           "commit_sha": "17c01284c1c1e4c0aff418b20495978cc924c7c2",
           "workflow_run_id": 24400473903,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-almalinux8-tls-module",
-          "matrix_params": {},
-          "failure_identifier": "test-almalinux8-tls-module",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.264072+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-almalinux8-tls-module",
@@ -6025,22 +5583,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:01.106706+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-almalinux8-tls-module-no-tls",
-          "matrix_params": {},
-          "failure_identifier": "test-almalinux8-tls-module-no-tls",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.1330000Z Evaluating test-rpm-distros-tls-module-no-tls.if\n2026-04-15T00:27:22.1330000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'tls'))))\n2026-04-15T00:27:22.1330000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'tls')))\n2026-04-15T00:27:22.1330000Z Result: true\n2026-04-15T00:27:22.4010000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.4010000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.4010000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.7860000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-15T00:28:49.6230000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:28:49.6230000Z Job is about to start running on the hosted runner: GitHub Actions 1000652232",
-          "file_path": "",
-          "fingerprint": "52646174bc61d740f7df14e8e28c52062b10b82578d8de3843aec0614865eb57",
-          "incident_key": null
         }
       ]
     },
@@ -6265,22 +5807,6 @@
           "observed_at": "2026-04-15T03:44:11.858203+00:00",
           "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
           "workflow_run_id": 24425999685,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-almalinux9-tls-module",
-          "matrix_params": {},
-          "failure_identifier": "test-almalinux9-tls-module",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.264060+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-almalinux9-tls-module",
@@ -6541,22 +6067,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.264036+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-almalinux8-jemalloc",
-          "matrix_params": {},
-          "failure_identifier": "test-almalinux8-jemalloc",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -6791,22 +6301,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:33.729419+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "reply-schemas-validator",
-          "matrix_params": {},
-          "failure_identifier": "reply-schemas-validator",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -6993,22 +6487,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.264044+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-fedoralatest-jemalloc",
-          "matrix_params": {},
-          "failure_identifier": "test-fedoralatest-jemalloc",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -7144,22 +6622,6 @@
           "failure_identifier": "test-valgrind-test",
           "test_name": null,
           "error_signature": "2026-04-10T00:22:47.8101900Z [ok]: Subscribers are killed when revoked of channel permission (20 ms)\n2026-04-10T00:22:47.8157197Z [ok]: Subscribers are killed when revoked of channel permission (5 ms)\n2026-04-10T00:22:47.8211406Z [ok]: Subscribers are killed when revoked of pattern permission (5 ms)\n2026-04-10T00:22:47.8264851Z [ok]: Subscribers are killed when revoked of allchannels permission (6 ms)\n2026-04-10T00:22:47.8358226Z [ok]: Subscribers are pardoned if literal permissions are retained and/or gaining allchannels (9 ms)\n2026-04-10T00:22:47.9370244Z [ok]: blocked command gets rejected when reprocessed after permission change (101 ms)\n2026-04-10T00:22:47.9384756Z [ok]: Users can be configured to authenticate with any password (2 ms)\n2026-04-10T00:22:47.9451237Z [ok]: ACLs can exclude single commands (6 ms)\n2026-04-10T00:22:47.9646515Z [ok]: ACLs can include or exclude whole classes of commands (19 ms)\n2026-04-10T00:22:47.9728128Z [ok]: ACLs can include single subcommands (8 ms)\n2026-04-10T00:22:47.9771068Z [ok]: ACLs can exclude single subcommands, case 1 (4 ms)\n2026-04-10T00:22:47.9825818Z [ok]: ACLs can exclude single subcommands, case 2 (5 ms)\n2026-04-10T00:22:47.9851729Z [ok]: ACLs cannot include a subcommand with a specific arg (2 ms)\n2026-04-10T00:22:47.9886288Z [ok]: ACLs cannot exclude or include a container commands with a specific arg (3 ms)\n2026-04-10T00:22:47.9920900Z [ok]: ACLs cannot exclude or include a container command with two args (3 ms)\n2026-04-10T00:22:48.0478037Z [ok]: ACLs including of a type includes also subcommands (56 ms)\n2026-04-10T00:22:48.0565164Z [ok]: ACLs can block SELECT of all but a specific DB (9 ms)\n2026-04-10T00:22:48.0737502Z [ok]: ACLs can block all DEBUG subcommands except one (17 ms)\n2026-04-10T00:22:48.0860793Z [ok]: ACLs set can include subcommands, if already full command exists (12 ms)\n2026-04-10T00:22:48.1196661Z [ok]: ACLs set can exclude subcommands, if already full command exists (34 ms)\n2026-04-10T00:22:48.1266204Z [ok]: ACL SETUSER RESET reverting to default newly created user (7 ms)\n2026-04-10T00:22:48.1383978Z [ok]: ACL GETUSER is able to translate back command permissions (12 ms)\n2026-04-10T00:22:48.3089219Z [ok]: ACL GETUSER provides reasonable results (170 ms)\n2026-04-10T00:22:48.3699020Z [ok]: ACL GETUSER provides correct results (61 ms)\n2026-04-10T00:22:48.3759520Z [ok]: ACL CAT with illegal arguments (6 ms)\n2026-04-10T00:22:48.3769899Z [ok]: ACL CAT without category - list all categories (1 ms)\n2026-04-10T00:22:48.3870286Z [ok]: ACL CAT category - list all commands/subcommands that belong to category (10 ms)\n2026-04-10T00:22:48.3923751Z [ok]: ACL requires explicit permission for scripting for EVAL_RO, EVALSHA_RO and FCALL_RO (6 ms)\n2026-04-10T00:22:48.3960265Z [ok]: ACL #5998 regression: memory leaks adding / removing subcommands (3 ms)\n2026-04-10T00:22:48.4201301Z [ok]: ACL LOG aggregates similar errors together and assigns unique entry-id to new errors (24 ms)\n2026-04-10T00:22:48.4269363Z [ok]: ACL LOG shows failed command executions at toplevel (7 ms)\n2026-04-10T00:22:48.4315745Z [ok]: ACL LOG shows failed subcommand executions at toplevel (5 ms)\n2026-04-10T00:22:48.4362282Z [ok]: ACL LOG is able to test similar events (5 ms)\n2026-04-10T00:22:48.4391018Z [ok]: ACL LOG is able to log keys access violations and key name (2 ms)\n2026-04-10T00:22:48.4423583Z [ok]: ACL LOG is able to log channel access violations and channel name (4 ms)\n2026-04-10T00:22:48.4578303Z [ok]: ACL LOG is able to log database access violations (15 ms)\n2026-04-10T00:22:48.4588777Z [ok]: ACL LOG RESET is able to flush the entries in the log (1 ms)\n2026-04-10T00:22:48.4649471Z [ok]: ACL LOG can distinguish the transaction context (1) (6 ms)\n2026-04-10T00:22:48.4789523Z [ok]: ACL LOG can distinguish the transaction context (2) (14 ms)\n2026-04-10T00:22:48.5782894Z [ok]: ACL can log errors in the context of Lua scripting (100 ms)\n2026-04-10T00:22:48.5850091Z [ok]: ACL LOG can accept a numerical argument to show less entries (6 ms)\n2026-04-10T00:22:48.5874567Z [ok]: ACL LOG can log failed auth attempts (3 ms)\n2026-04-10T00:22:48.6053601Z [ok]: ACLLOG - zero max length is correctly handled (18 ms)\n2026-04-10T00:22:48.6178661Z [ok]: ACL LOG entries are limited to a maximum amount (12 ms)\n2026-04-10T00:22:48.6204257Z [ok]: ACL LOG entries are still present on update of max len config (3 ms)\n2026-04-10T00:22:48.6251224Z [ok]: When default user is off, new connections are not authenticated (4 ms)\n2026-04-10T00:22:48.6362309Z [ok]: When default user has no command permission, hello command still works for other users (11 ms)\n2026-04-10T00:22:48.6412101Z [ok]: When an authentication chain is used in the HELLO cmd, the last auth cmd has precedence (4 ms)\n2026-04-10T00:22:48.6451809Z [ok]: When a setname chain is used in the HELLO cmd, the last setname cmd has precedence (3 ms)\n2026-04-10T00:22:48.6468756Z [ok]: When authentication fails in the HELLO cmd, the client setname should not be applied (1 ms)\n2026-04-10T00:22:48.6488796Z [ok]: ACL HELP should not have unexpected options (2 ms)\n2026-04-10T00:22:48.6517587Z [ok]: Delete a user that the client doesn't use (3 ms)\n2026-04-10T00:22:48.6556328Z [ok]: Delete a user that the client is using (4 ms)\n2026-04-10T00:22:48.6595662Z [ok]: ACL GENPASS command failed test (4 ms)\n2026-04-10T00:22:48.6602885Z [ok]: Default user can not be removed (1 ms)\n2026-04-10T00:22:48.6610819Z [ok]: ACL load non-existing configured ACL file (0 ms)\n2026-04-10T00:22:48.6933724Z [ok]: ACL-Metrics user AUTH failure (33 ms)\n2026-04-10T00:22:48.7175384Z [ok]: ACL-Metrics invalid command accesses (24 ms)\n2026-04-10T00:22:48.7419375Z [ok]: ACL-Metrics invalid key accesses (24 ms)\n2026-04-10T00:22:48.7661478Z [ok]: ACL-Metrics invalid channels accesses (24 ms)\n2026-04-10T00:22:51.1741164Z === (external:skip) Starting server on 127.0.0.1:21112 ok\n2026-04-10T00:22:51.2574794Z [ok]: default: load from include file, can access any channels (46 ms)\n2026-04-10T00:22:51.2740567Z [ok]: default: with config acl-pubsub-default allchannels after reset, can access any channels (16 ms)\n2026-04-10T00:22:51.2992520Z [ok]: default: with config acl-pubsub-default resetchannels after reset, can not access any channels (26 ms)\n2026-04-10T00:22:51.3295747Z [ok]: Alice: can execute all command (30 ms)\n2026-04-10T00:22:51.3534547Z [ok]: Bob: just execute @set and acl command (24 ms)\n2026-04-10T00:22:51.3876342Z [ok]: ACL LOAD only disconnects affected clients (34 ms)\n2026-04-10T00:22:51.4002023Z [ok]: ACL LOAD disconnects clients of deleted users (12 ms)\n2026-04-10T00:22:51.4493273Z [ok]: ACL load and save (49 ms)\n2026-04-10T00:22:51.4662915Z [ok]: ACL load and save with restricted channels (17 ms)\n2026-04-10T00:22:51.4820402Z [ok]: Validate a user can remove their own channel permissions (15 ms)\n2026-04-10T00:22:51.4968517Z [ok]: ACL LOAD does not crash server if current user is removed from ACL file (15 ms)\n2026-04-10T00:22:53.9275998Z === (external:skip) Starting server on 127.0.0.1:21113 ok\n2026-04-10T00:22:53.9944473Z [ok]: Default user has access to all channels irrespective of flag (31 ms)\n2026-04-10T00:22:54.0141805Z [ok]: Update acl-pubsub-default, existing users shouldn't get affected (19 ms)\n2026-04-10T00:22:54.0235996Z [ok]: Single channel is valid (9 ms)\n2026-04-10T00:22:54.0312105Z [ok]: Single channel is not valid with allchannels (8 ms)\n2026-04-10T00:22:56.5274010Z === (external:skip) Starting server on 127.0.0.1:21114 ok\n2026-04-10T00:22:56.5930126Z [ok]: Only default user has access to all channels irrespective of flag (29 ms)\n2026-04-10T00:22:59.0319721Z === (external:skip) Starting server on 127.0.0.1:21115 ok\n2026-04-10T00:22:59.0811013Z [ok]: default: load from config file, without channel permission default user can't access any channels (12 ms)\n2026-04-10T00:23:01.5331678Z === (external:skip) Starting server on 127.0.0.1:21116 ok\n2026-04-10T00:23:01.6179907Z [ok]: default: load from config file with all channels permissions (48 ms)\n2026-04-10T00:23:04.0364982Z === (external:skip) Starting server on 127.0.0.1:21117 ok\n2026-04-10T01:49:13.7707171Z [ok]: LREM starting from tail with negative count (2) - quicklist (2 ms)\n2026-04-10T01:49:13.8177154Z [ok]: LREM deleting objects that may be int encoded - quicklist (47 ms)\n2026-04-10T01:49:13.8284577Z [ok]: LREM remove all the occurrences - listpack (11 ms)\n2026-04-10T01:49:13.8300214Z [ok]: LREM remove the first occurrence - listpack (1 ms)\n2026-04-10T01:49:13.8313124Z [ok]: LREM remove non existing element - listpack (2 ms)\n2026-04-10T01:49:13.8424237Z [ok]: LREM starting from tail with negative count - listpack (11 ms)\n2026-04-10T01:49:13.8448534Z [ok]: LREM starting from tail with negative count (2) - listpack (2 ms)\n2026-04-10T01:49:13.8504680Z [ok]: LREM deleting objects that may be int encoded - listpack (6 ms)\n2026-04-10T01:49:13.8774788Z [ok]: Regression for bug 593 - chaining BRPOPLPUSH with other blocking cmds (27 ms)\n2026-04-10T01:49:14.0044693Z [ok]: BLPOP/BLMOVE should increase dirty (127 ms)\n2026-04-10T01:49:14.3378450Z [ok]: client unblock tests (333 ms)\n2026-04-10T01:49:14.6694435Z [ok]: client unblock tests (332 ms)\n2026-04-10T01:49:14.7026336Z [ok]: List listpack -> quicklist encoding conversion (33 ms)\n2026-04-10T01:49:14.8963615Z [ok]: List listpack -> quicklist encoding conversion (194 ms)\n2026-04-10T01:49:15.1469909Z [ok]: List quicklist -> listpack encoding conversion (250 ms)\n2026-04-10T01:49:15.2089241Z [ok]: List encoding conversion when RDB loading (62 ms)\n2026-04-10T01:49:15.3039817Z [ok]: List invalid list-max-listpack-size config (95 ms)\n2026-04-10T01:49:15.4425684Z [ok]: List of various encodings (139 ms)\n2026-04-10T01:49:15.4561588Z [ok]: List of various encodings - sanitize dump (13 ms)\n2026-04-10T01:49:15.4903417Z [ok]: Unblock fairness is kept while pipelining (34 ms)\n2026-04-10T01:49:15.5529366Z [ok]: Unblock fairness is kept during nested unblock (62 ms)\n2026-04-10T01:49:15.5898777Z ",
-          "file_path": "",
-          "fingerprint": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8",
-          "incident_key": null
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:46:27.320278+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-valgrind-test",
-          "matrix_params": {},
-          "failure_identifier": "test-valgrind-test",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:29:43.2558093Z [ok]: Subscribers are killed when revoked of channel permission (20 ms)\n2026-04-15T00:29:43.2616802Z [ok]: Subscribers are killed when revoked of channel permission (6 ms)\n2026-04-15T00:29:43.2671557Z [ok]: Subscribers are killed when revoked of pattern permission (5 ms)\n2026-04-15T00:29:43.2726645Z [ok]: Subscribers are killed when revoked of allchannels permission (5 ms)\n2026-04-15T00:29:43.2826473Z [ok]: Subscribers are pardoned if literal permissions are retained and/or gaining allchannels (10 ms)\n2026-04-15T00:29:43.3845777Z [ok]: blocked command gets rejected when reprocessed after permission change (102 ms)\n2026-04-15T00:29:43.3859709Z [ok]: Users can be configured to authenticate with any password (1 ms)\n2026-04-15T00:29:43.3924409Z [ok]: ACLs can exclude single commands (7 ms)\n2026-04-15T00:29:43.4123555Z [ok]: ACLs can include or exclude whole classes of commands (20 ms)\n2026-04-15T00:29:43.4204234Z [ok]: ACLs can include single subcommands (8 ms)\n2026-04-15T00:29:43.4244904Z [ok]: ACLs can exclude single subcommands, case 1 (4 ms)\n2026-04-15T00:29:43.4298988Z [ok]: ACLs can exclude single subcommands, case 2 (5 ms)\n2026-04-15T00:29:43.4325362Z [ok]: ACLs cannot include a subcommand with a specific arg (3 ms)\n2026-04-15T00:29:43.4360475Z [ok]: ACLs cannot exclude or include a container commands with a specific arg (3 ms)\n2026-04-15T00:29:43.4395550Z [ok]: ACLs cannot exclude or include a container command with two args (4 ms)\n2026-04-15T00:29:43.4950604Z [ok]: ACLs including of a type includes also subcommands (55 ms)\n2026-04-15T00:29:43.5035980Z [ok]: ACLs can block SELECT of all but a specific DB (9 ms)\n2026-04-15T00:29:43.5211010Z [ok]: ACLs can block all DEBUG subcommands except one (17 ms)\n2026-04-15T00:29:43.5341969Z [ok]: ACLs set can include subcommands, if already full command exists (13 ms)\n2026-04-15T00:29:43.5668497Z [ok]: ACLs set can exclude subcommands, if already full command exists (32 ms)\n2026-04-15T00:29:43.5740332Z [ok]: ACL SETUSER RESET reverting to default newly created user (7 ms)\n2026-04-15T00:29:43.5857722Z [ok]: ACL GETUSER is able to translate back command permissions (12 ms)\n2026-04-15T00:29:43.7542884Z [ok]: ACL GETUSER provides reasonable results (169 ms)\n2026-04-15T00:29:43.8157576Z [ok]: ACL GETUSER provides correct results (61 ms)\n2026-04-15T00:29:43.8217405Z [ok]: ACL CAT with illegal arguments (6 ms)\n2026-04-15T00:29:43.8227536Z [ok]: ACL CAT without category - list all categories (1 ms)\n2026-04-15T00:29:43.8329648Z [ok]: ACL CAT category - list all commands/subcommands that belong to category (10 ms)\n2026-04-15T00:29:43.8383389Z [ok]: ACL requires explicit permission for scripting for EVAL_RO, EVALSHA_RO and FCALL_RO (6 ms)\n2026-04-15T00:29:43.8421760Z [ok]: ACL #5998 regression: memory leaks adding / removing subcommands (4 ms)\n2026-04-15T00:29:43.8672385Z [ok]: ACL LOG aggregates similar errors together and assigns unique entry-id to new errors (25 ms)\n2026-04-15T00:29:43.8741885Z [ok]: ACL LOG shows failed command executions at toplevel (6 ms)\n2026-04-15T00:29:43.8788147Z [ok]: ACL LOG shows failed subcommand executions at toplevel (4 ms)\n2026-04-15T00:29:43.8837685Z [ok]: ACL LOG is able to test similar events (5 ms)\n2026-04-15T00:29:43.8868473Z [ok]: ACL LOG is able to log keys access violations and key name (3 ms)\n2026-04-15T00:29:43.8901877Z [ok]: ACL LOG is able to log channel access violations and channel name (3 ms)\n2026-04-15T00:29:43.9060162Z [ok]: ACL LOG is able to log database access violations (15 ms)\n2026-04-15T00:29:43.9070947Z [ok]: ACL LOG RESET is able to flush the entries in the log (1 ms)\n2026-04-15T00:29:43.9137144Z [ok]: ACL LOG can distinguish the transaction context (1) (6 ms)\n2026-04-15T00:29:43.9281029Z [ok]: ACL LOG can distinguish the transaction context (2) (14 ms)\n2026-04-15T00:29:44.0270518Z [ok]: ACL can log errors in the context of Lua scripting (98 ms)\n2026-04-15T00:29:44.0344895Z [ok]: ACL LOG can accept a numerical argument to show less entries (8 ms)\n2026-04-15T00:29:44.0369590Z [ok]: ACL LOG can log failed auth attempts (2 ms)\n2026-04-15T00:29:44.0549062Z [ok]: ACLLOG - zero max length is correctly handled (18 ms)\n2026-04-15T00:29:44.0666344Z [ok]: ACL LOG entries are limited to a maximum amount (12 ms)\n2026-04-15T00:29:44.0690236Z [ok]: ACL LOG entries are still present on update of max len config (2 ms)\n2026-04-15T00:29:44.0735448Z [ok]: When default user is off, new connections are not authenticated (5 ms)\n2026-04-15T00:29:44.0844601Z [ok]: When default user has no command permission, hello command still works for other users (11 ms)\n2026-04-15T00:29:44.0894483Z [ok]: When an authentication chain is used in the HELLO cmd, the last auth cmd has precedence (5 ms)\n2026-04-15T00:29:44.0933642Z [ok]: When a setname chain is used in the HELLO cmd, the last setname cmd has precedence (4 ms)\n2026-04-15T00:29:44.0950663Z [ok]: When authentication fails in the HELLO cmd, the client setname should not be applied (1 ms)\n2026-04-15T00:29:44.0971287Z [ok]: ACL HELP should not have unexpected options (2 ms)\n2026-04-15T00:29:44.0999822Z [ok]: Delete a user that the client doesn't use (3 ms)\n2026-04-15T00:29:44.1039400Z [ok]: Delete a user that the client is using (4 ms)\n2026-04-15T00:29:44.1078222Z [ok]: ACL GENPASS command failed test (4 ms)\n2026-04-15T00:29:44.1085454Z [ok]: Default user can not be removed (1 ms)\n2026-04-15T00:29:44.1093661Z [ok]: ACL load non-existing configured ACL file (1 ms)\n2026-04-15T00:29:44.1419341Z [ok]: ACL-Metrics user AUTH failure (32 ms)\n2026-04-15T00:29:44.1662004Z [ok]: ACL-Metrics invalid command accesses (24 ms)\n2026-04-15T00:29:44.1904250Z [ok]: ACL-Metrics invalid key accesses (24 ms)\n2026-04-15T00:29:44.2152901Z [ok]: ACL-Metrics invalid channels accesses (25 ms)\n2026-04-15T00:29:46.6307573Z === (external:skip) Starting server on 127.0.0.1:21112 ok\n2026-04-15T00:29:46.7142047Z [ok]: default: load from include file, can access any channels (46 ms)\n2026-04-15T00:29:46.7310470Z [ok]: default: with config acl-pubsub-default allchannels after reset, can access any channels (16 ms)\n2026-04-15T00:29:46.7563269Z [ok]: default: with config acl-pubsub-default resetchannels after reset, can not access any channels (26 ms)\n2026-04-15T00:29:46.7865869Z [ok]: Alice: can execute all command (30 ms)\n2026-04-15T00:29:46.8104225Z [ok]: Bob: just execute @set and acl command (24 ms)\n2026-04-15T00:29:46.8445746Z [ok]: ACL LOAD only disconnects affected clients (34 ms)\n2026-04-15T00:29:46.8579764Z [ok]: ACL LOAD disconnects clients of deleted users (13 ms)\n2026-04-15T00:29:46.9064330Z [ok]: ACL load and save (49 ms)\n2026-04-15T00:29:46.9230383Z [ok]: ACL load and save with restricted channels (16 ms)\n2026-04-15T00:29:46.9388535Z [ok]: Validate a user can remove their own channel permissions (16 ms)\n2026-04-15T00:29:46.9537710Z [ok]: ACL LOAD does not crash server if current user is removed from ACL file (15 ms)\n2026-04-15T00:29:49.3496388Z === (external:skip) Starting server on 127.0.0.1:21113 ok\n2026-04-15T00:29:49.4151778Z [ok]: Default user has access to all channels irrespective of flag (29 ms)\n2026-04-15T00:29:49.4349372Z [ok]: Update acl-pubsub-default, existing users shouldn't get affected (19 ms)\n2026-04-15T00:29:49.4440549Z [ok]: Single channel is valid (9 ms)\n2026-04-15T00:29:49.4517257Z [ok]: Single channel is not valid with allchannels (8 ms)\n2026-04-15T00:29:51.9558779Z === (external:skip) Starting server on 127.0.0.1:21114 ok\n2026-04-15T00:29:52.0217436Z [ok]: Only default user has access to all channels irrespective of flag (30 ms)\n2026-04-15T00:29:54.4583829Z === (external:skip) Starting server on 127.0.0.1:21115 ok\n2026-04-15T00:29:54.5076295Z [ok]: default: load from config file, without channel permission default user can't access any channels (13 ms)\n2026-04-15T00:29:56.9566563Z === (external:skip) Starting server on 127.0.0.1:21116 ok\n2026-04-15T00:29:57.0407299Z [ok]: default: load from config file with all channels permissions (48 ms)\n2026-04-15T00:29:59.4483906Z === (external:skip) Starting server on 127.0.0.1:21117 ok\n2026-04-15T03:02:12.1683113Z Set as importing in: 127.0.0.1:21551\n2026-04-15T03:02:12.1683381Z >>> Case 1: Moving slot 708 from 127.0.0.1:21555 to 127.0.0.1:21551\n2026-04-15T03:02:12.1683907Z Moving slot 708 from 127.0.0.1:21555 to 127.0.0.1:21551....\n2026-04-15T03:02:12.1684578Z >>> Fixing open slot 890\n2026-04-15T03:02:12.1684782Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1685004Z Set as importing in: 127.0.0.1:21547\n2026-04-15T03:02:12.1685271Z >>> Case 1: Moving slot 890 from 127.0.0.1:21555 to 127.0.0.1:21547\n2026-04-15T03:02:12.1685599Z Moving slot 890 from 127.0.0.1:21555 to 127.0.0.1:21547...\n2026-04-15T03:02:12.1685865Z >>> Fixing open slot 898\n2026-04-15T03:02:12.1686052Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1686272Z Set as importing in: 127.0.0.1:21550\n2026-04-15T03:02:12.1686534Z >>> Case 1: Moving slot 898 from 127.0.0.1:21555 to 127.0.0.1:21550\n2026-04-15T03:02:12.1687004Z Moving slot 898 from 127.0.0.1:21555 to 127.0.0.1:21550....\n2026-04-15T03:02:12.1687270Z >>> Fixing open slot 915\n2026-04-15T03:02:12.1687461Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1687673Z Set as importing in: 127.0.0.1:21550\n2026-04-15T03:02:12.1687951Z >>> Case 1: Moving slot 915 from 127.0.0.1:21555 to 127.0.0.1:21550\n2026-04-15T03:02:12.1688267Z Moving slot 915 from 127.0.0.1:21555 to 127.0.0.1:21550\n2026-04-15T03:02:12.1688522Z >>> Fixing open slot 127\n2026-04-15T03:02:12.1688714Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1688926Z Set as importing in: 127.0.0.1:21547\n2026-04-15T03:02:12.1689189Z >>> Case 1: Moving slot 127 from 127.0.0.1:21555 to 127.0.0.1:21547\n2026-04-15T03:02:12.1689507Z Moving slot 127 from 127.0.0.1:21555 to 127.0.0.1:21547..\n2026-04-15T03:02:12.1689777Z >>> Fixing open slot 639\n2026-04-15T03:02:12.1689968Z Set as migrating in: 127.0.0.1:21555\n2026-04-15T03:02:12.1690196Z S",
           "file_path": "",
           "fingerprint": "72a6e4fb6039def7bc0c8f3010ea6300e4a27a397337ab340e389ce0b02a14b8",
           "incident_key": null
@@ -7300,24 +6762,6 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null,
-          "incident_key": null
-        },
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:48.492791+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-sanitizer-undefined (gcc)",
-          "matrix_params": {
-            "param_0": "gcc"
-          },
-          "failure_identifier": "test-sanitizer-undefined (gcc)",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.1320000Z Evaluating test-sanitizer-undefined.if\n2026-04-15T00:27:22.1320000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer'))))\n2026-04-15T00:27:22.1320000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer')))\n2026-04-15T00:27:22.1320000Z Result: true\n2026-04-15T00:27:22.4060000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.4060000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.4060000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.7870000Z All GitHub-hosted runners with label [ubuntu-latest] are busy. For more information, see https://gh.io/job-concurrency-limits\n2026-04-15T00:28:56.3020000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:28:56.3030000Z Job is about to start running on the hosted runner: GitHub Actions 1000652242",
-          "file_path": "",
-          "fingerprint": "0646a8bd1a34854b79a8dfae9d1648b4299223dd4881dfe4ddbfe97f61e18916",
           "incident_key": null
         }
       ]
@@ -7489,22 +6933,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.263945+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-ubuntu-libc-malloc",
-          "matrix_params": {},
-          "failure_identifier": "test-ubuntu-libc-malloc",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -7661,24 +7089,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:33.729441+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-sanitizer-address (gcc)",
-          "matrix_params": {
-            "param_0": "gcc"
-          },
-          "failure_identifier": "test-sanitizer-address (gcc)",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -7801,22 +7211,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:33.729335+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-sanitizer-force-defrag",
-          "matrix_params": {},
-          "failure_identifier": "test-sanitizer-force-defrag",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -7929,22 +7323,6 @@
           "observed_at": "2026-04-15T03:44:10.597301+00:00",
           "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
           "workflow_run_id": 24425999685,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-ubuntu-lttng",
-          "matrix_params": {},
-          "failure_identifier": "test-ubuntu-lttng",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.264092+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-ubuntu-lttng",
@@ -8093,22 +7471,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.263901+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-ubuntu-no-malloc-usable-size",
-          "matrix_params": {},
-          "failure_identifier": "test-ubuntu-no-malloc-usable-size",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -8247,22 +7609,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.264001+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-ubuntu-reclaim-cache",
-          "matrix_params": {},
-          "failure_identifier": "test-ubuntu-reclaim-cache",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -8353,22 +7699,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.264019+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-alpine-libc-malloc",
-          "matrix_params": {},
-          "failure_identifier": "test-alpine-libc-malloc",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -8427,22 +7757,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.264079+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-centosstream9-jemalloc",
-          "matrix_params": {},
-          "failure_identifier": "test-centosstream9-jemalloc",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -8475,22 +7789,6 @@
           "observed_at": "2026-04-15T03:44:10.597319+00:00",
           "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
           "workflow_run_id": 24425999685,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-ubuntu-tls",
-          "matrix_params": {},
-          "failure_identifier": "test-ubuntu-tls",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:32.263933+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
           "workflow_name": "Daily",
           "workflow_file": "daily.yml",
           "job_name": "test-ubuntu-tls",
@@ -8895,22 +8193,6 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
-        },
-        {
-          "outcome": "pass",
-          "observed_at": "2026-04-15T03:44:38.491795+00:00",
-          "commit_sha": "7fd39fd921ba093c8c94652c0f415da91ba1d790",
-          "workflow_run_id": 24430502830,
-          "workflow_name": "CI",
-          "workflow_file": "ci.yml",
-          "job_name": "test-sanitizer-address",
-          "matrix_params": {},
-          "failure_identifier": "test-sanitizer-address",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
         }
       ]
     },
@@ -9240,92 +8522,6 @@
           "error_signature": "",
           "file_path": "",
           "fingerprint": null,
-          "incident_key": null
-        }
-      ]
-    },
-    "ebd950ddf6cbcbf595f74e10d5c81cde4a7b530b4db939660c3c0555cbf5d1b6": {
-      "key": "ebd950ddf6cbcbf595f74e10d5c81cde4a7b530b4db939660c3c0555cbf5d1b6",
-      "workflow_file": "daily.yml",
-      "job_name": "test-macos-latest",
-      "matrix_params": {},
-      "failure_identifier": "test-macos-latest",
-      "test_name": null,
-      "observations": [
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:23.427900+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-macos-latest",
-          "matrix_params": {},
-          "failure_identifier": "test-macos-latest",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.1320000Z Evaluating test-macos-latest.if\n2026-04-15T00:27:22.1320000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests'))) && (((github.event.action != 'labeled') || (((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))))))) && !contains(github.event.inputs.skipjobs, 'macos') && !((contains(github.event.inputs.skiptests, 'valkey') && contains(github.event.inputs.skiptests, 'modules'))))))\n2026-04-15T00:27:22.1320000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && ((github.event.pull_request.base.ref != 'unstable') || contains(github.event.pull_request.labels.*.name, 'run-extra-tests')) && ((github.event.action != 'labeled') || ((github.event.pull_request.base.ref == 'unstable') && (github.event.label.name == 'run-extra-tests'))))) && !contains(null, 'macos') && !(contains(null, 'valkey') && contains(github.event.inputs.skiptests, 'modules'))))\n2026-04-15T00:27:22.1320000Z Result: true\n2026-04-15T00:27:22.4080000Z Requested labels: macos-latest\n2026-04-15T00:27:22.4080000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.4080000Z Waiting for a runner to pick up this job...\n2026-04-15T00:28:45.9300000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:28:45.9280000Z Job is about to start running on the hosted runner: GitHub Actions 1000652228",
-          "file_path": "",
-          "fingerprint": "ea054375da5407a071eaed1f7be927342d0a9156131f3ea0d9d650260e70cfe5",
-          "incident_key": null
-        }
-      ]
-    },
-    "418a6515af53ca38f9c16d7fbe8e9db47dc2731db4f5eb15d417d0c4b6477d29": {
-      "key": "418a6515af53ca38f9c16d7fbe8e9db47dc2731db4f5eb15d417d0c4b6477d29",
-      "workflow_file": "daily.yml",
-      "job_name": "test-sanitizer-undefined-large-memory (clang)",
-      "matrix_params": {
-        "param_0": "clang"
-      },
-      "failure_identifier": "test-sanitizer-undefined-large-memory (clang)",
-      "test_name": null,
-      "observations": [
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:45:55.501751+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-sanitizer-undefined-large-memory (clang)",
-          "matrix_params": {
-            "param_0": "clang"
-          },
-          "failure_identifier": "test-sanitizer-undefined-large-memory (clang)",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.0170000Z Evaluating test-sanitizer-undefined-large-memory.if\n2026-04-15T00:27:22.0170000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer') && !contains(github.event.inputs.skiptests, 'large-memory'))))\n2026-04-15T00:27:22.0170000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer') && !contains(null, 'large-memory')))\n2026-04-15T00:27:22.0170000Z Result: true\n2026-04-15T00:27:22.0200000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.0200000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.0200000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.3920000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:27:22.3920000Z Job is about to start running on the hosted runner: GitHub Actions 1000652201",
-          "file_path": "",
-          "fingerprint": "b724b9436eff38ff95678d97a07c832835d7da44977cd923b709fbfda465d5f9",
-          "incident_key": null
-        }
-      ]
-    },
-    "d3f19d3581f0fde453e4c6f380311b6804c09bc68533dafef513bb4f1b4e2272": {
-      "key": "d3f19d3581f0fde453e4c6f380311b6804c09bc68533dafef513bb4f1b4e2272",
-      "workflow_file": "daily.yml",
-      "job_name": "test-sanitizer-undefined-large-memory (gcc)",
-      "matrix_params": {
-        "param_0": "gcc"
-      },
-      "failure_identifier": "test-sanitizer-undefined-large-memory (gcc)",
-      "test_name": null,
-      "observations": [
-        {
-          "outcome": "fail",
-          "observed_at": "2026-04-15T03:46:02.353405+00:00",
-          "commit_sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6",
-          "workflow_run_id": 24429896230,
-          "workflow_name": "Daily",
-          "workflow_file": "daily.yml",
-          "job_name": "test-sanitizer-undefined-large-memory (gcc)",
-          "matrix_params": {
-            "param_0": "gcc"
-          },
-          "failure_identifier": "test-sanitizer-undefined-large-memory (gcc)",
-          "test_name": null,
-          "error_signature": "2026-04-15T00:27:22.0210000Z Requested labels: ubuntu-latest\n2026-04-15T00:27:22.0210000Z Job defined at: valkey-io/valkey/.github/workflows/daily.yml@refs/heads/unstable\n2026-04-15T00:27:22.0210000Z Waiting for a runner to pick up this job...\n2026-04-15T00:27:22.0160000Z Evaluating test-sanitizer-undefined-large-memory.if\n2026-04-15T00:27:22.0160000Z Evaluating: (success() && (((((github.event_name == 'workflow_call') || (github.event_name == 'workflow_dispatch') || (((github.event_name == 'schedule') && (github.repository == 'valkey-io/valkey'))) || (((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))))) && !contains(github.event.inputs.skipjobs, 'sanitizer') && !contains(github.event.inputs.skiptests, 'large-memory'))))\n2026-04-15T00:27:22.0160000Z Expanded: (true && ((('schedule' == 'workflow_call') || ('schedule' == 'workflow_dispatch') || (('schedule' == 'schedule') && ('valkey-io/valkey' == 'valkey-io/valkey')) || ((github.event_name == 'pull_request') && (github.event.pull_request.base.ref != 'unstable') && (github.event.action != 'labeled'))) && !contains(null, 'sanitizer') && !contains(null, 'large-memory')))\n2026-04-15T00:27:22.0160000Z Result: true\n2026-04-15T00:27:22.3940000Z Job is waiting for a hosted runner to come online.\n2026-04-15T00:27:22.3940000Z Job is about to start running on the hosted runner: GitHub Actions 1000652204",
-          "file_path": "",
-          "fingerprint": "98684c77a8b810e6713665ef417091a4bfde787c78683195155d0bea98b92d77",
           "incident_key": null
         }
       ]
