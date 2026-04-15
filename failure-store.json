@@ -8102,22 +8102,6 @@
       "observations": [
         {
           "outcome": "pass",
-          "observed_at": "2026-04-13T06:28:56.715873+00:00",
-          "commit_sha": "c35dbdfc83b7860a66d2b88685b1d31739ceb962",
-          "workflow_run_id": 24114420056,
-          "workflow_name": "CI",
-          "workflow_file": "ci.yml",
-          "job_name": "test-sanitizer-address",
-          "matrix_params": {},
-          "failure_identifier": "test-sanitizer-address",
-          "test_name": null,
-          "error_signature": "",
-          "file_path": "",
-          "fingerprint": null,
-          "incident_key": null
-        },
-        {
-          "outcome": "pass",
           "observed_at": "2026-04-13T06:29:00.713718+00:00",
           "commit_sha": "e6bbd4e0d22399a24135419c0a20e52e459a2240",
           "workflow_run_id": 24122516707,
@@ -8579,6 +8563,22 @@
           "file_path": "",
           "fingerprint": null,
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-15T22:06:27.816804+00:00",
+          "commit_sha": "b2e0f6322d288bfdb5076e01791402fe790f0892",
+          "workflow_run_id": 24477903433,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-sanitizer-address",
+          "matrix_params": {},
+          "failure_identifier": "test-sanitizer-address",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -9027,6 +9027,22 @@
           "observed_at": "2026-04-15T22:06:23.868440+00:00",
           "commit_sha": "b2e0f6322d288bfdb5076e01791402fe790f0892",
           "workflow_run_id": 24477899464,
+          "workflow_name": "CI",
+          "workflow_file": "ci.yml",
+          "job_name": "test-ubuntu-latest",
+          "matrix_params": {},
+          "failure_identifier": "test-ubuntu-latest",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-15T22:06:27.816856+00:00",
+          "commit_sha": "b2e0f6322d288bfdb5076e01791402fe790f0892",
+          "workflow_run_id": 24477903433,
           "workflow_name": "CI",
           "workflow_file": "ci.yml",
           "job_name": "test-ubuntu-latest",
