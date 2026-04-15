@@ -89,14 +89,23 @@ def _issue_marker(fingerprint: str) -> str:
     return f"{_ISSUE_MARKER_PREFIX}{fingerprint} -->"
 
 
+def _format_root_cause_title(category: str) -> str:
+    """Convert a stable root-cause slug into a maintainer-facing title."""
+    cleaned = re.sub(r"[-_]+", " ", category.strip())
+    if not cleaned:
+        return ""
+    return cleaned.title()
+
+
 def _issue_title(analysis: FuzzerRunAnalysis) -> str:
+    if analysis.root_cause_category:
+        formatted = _format_root_cause_title(analysis.root_cause_category)
+        if formatted:
+            return f"[fuzzer-run] {formatted}"
     titles = _stable_titles(analysis.anomalies)
     if not titles:
         return "[fuzzer-run] Anomalous Valkey fuzzer behavior detected"
-    primary = titles[0]
-    if len(titles) == 1:
-        return f"[fuzzer-run] {primary}"
-    return f"[fuzzer-run] {primary} (+{len(titles) - 1} more)"
+    return f"[fuzzer-run] {titles[0]}"
 
 
 def _extract_occurrence_count(body: str | None) -> int:
@@ -313,6 +322,7 @@ class FuzzerIssuePublisher:
         labels_to_apply = self._resolve_labels(repo, analysis.suggested_labels)
         fingerprint = _fingerprint_for_analysis(analysis)
         marker = _issue_marker(fingerprint)
+        issue_title = _issue_title(analysis)
         existing = None
         for issue in retry_github_call(
             lambda: list(repo.get_issues(state="open")),
@@ -329,7 +339,7 @@ class FuzzerIssuePublisher:
             body = _render_issue_body(analysis, fingerprint=fingerprint, occurrences=1)
             issue = retry_github_call(
                 lambda: repo.create_issue(
-                    title=_issue_title(analysis),
+                    title=issue_title,
                     body=body,
                 ),
                 retries=self._retries,
@@ -346,8 +356,12 @@ class FuzzerIssuePublisher:
         # Bump occurrence counter in the original issue body.
         occurrences = _extract_occurrence_count(existing.body) + 1
         updated_body = _bump_occurrence_count(existing.body, occurrences)
+        edit_kwargs = {"body": updated_body}
+        current_title = getattr(existing, "title", None)
+        if not isinstance(current_title, str) or current_title != issue_title:
+            edit_kwargs["title"] = issue_title
         retry_github_call(
-            lambda: existing.edit(body=updated_body),
+            lambda: existing.edit(**edit_kwargs),
             retries=self._retries,
             description=f"bump occurrence count on issue #{existing.number}",
         )

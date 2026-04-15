@@ -9,6 +9,7 @@ from scripts.fuzzer_issue_publisher import (
     _bump_occurrence_count,
     _fingerprint_for_analysis,
     _issue_marker,
+    _issue_title,
     _render_issue_body,
     _render_occurrence_comment,
 )
@@ -42,6 +43,7 @@ def _analysis() -> FuzzerRunAnalysis:
         normal_signals=["Failover election won."],
         reproduction_hint="valkey-fuzzer cluster --seed 839534793",
         raw_log_fallback_used=True,
+        root_cause_category="split-brain",
         triage_verdict="possible-core-valkey-bug",
         suggested_labels=["possible-valkey-bug"],
     )
@@ -64,6 +66,7 @@ def test_upsert_issue_creates_new_issue_when_no_match_exists() -> None:
     assert action == "created"
     assert url.endswith("/7")
     repo.create_issue.assert_called_once()
+    assert repo.create_issue.call_args.kwargs["title"] == "[fuzzer-run] Split Brain"
     repo.get_label.assert_called_once_with("possible-valkey-bug")
     issue.add_to_labels.assert_called_once_with("possible-valkey-bug")
     body = repo.create_issue.call_args.kwargs["body"]
@@ -81,6 +84,7 @@ def test_upsert_issue_updates_existing_open_issue() -> None:
     existing.pull_request = None
     existing.number = 8
     existing.html_url = "https://github.com/valkey-io/valkey-fuzzer/issues/8"
+    existing.title = "[fuzzer-run] Split-brain or slot loss (+1 more)"
     existing.get_labels.return_value = []
     analysis = _analysis()
     existing.body = (
@@ -98,6 +102,7 @@ def test_upsert_issue_updates_existing_open_issue() -> None:
 
     # Issue body should only bump the counter, not replace content.
     existing.edit.assert_called_once()
+    assert existing.edit.call_args.kwargs["title"] == "[fuzzer-run] Split Brain"
     updated_body = existing.edit.call_args.kwargs["body"]
     assert "<!-- valkey-ci-agent:occurrences:3 -->" in updated_body
     assert "Original content here." in updated_body
@@ -147,3 +152,10 @@ def test_bump_occurrence_count_replaces_marker() -> None:
     assert "<!-- valkey-ci-agent:occurrences:6 -->" in updated
     assert "<!-- valkey-ci-agent:occurrences:5 -->" not in updated
     assert "## Fuzzer Run Summary" in updated
+
+
+def test_issue_title_falls_back_to_primary_anomaly_without_more_suffix() -> None:
+    analysis = _analysis()
+    analysis.root_cause_category = None
+
+    assert _issue_title(analysis) == "[fuzzer-run] Split-brain or slot loss"
