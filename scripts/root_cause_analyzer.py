@@ -328,7 +328,7 @@ class RootCauseAnalyzer:
         1. Identify relevant source files from parsed failures.
         2. Retrieve file contents at the commit SHA via GitHub API.
         3. Detect flaky-test indicators locally.
-        4. Send structured prompt to Bedrock.
+        4. Try agentic analysis first, fall back to single-shot.
         5. Parse the model response into a RootCauseReport.
 
         On Bedrock errors or unparseable responses, returns a special
@@ -358,7 +358,7 @@ class RootCauseAnalyzer:
             all_flaky_indicators.extend(_detect_flaky_indicators(pf))
         all_flaky_indicators = list(dict.fromkeys(all_flaky_indicators))
 
-        # 4. Build prompt and call Bedrock
+        # 4. Build retrieved context (shared by both paths)
         retrieved_context = ""
         if self._retriever is not None:
             retrieved_context = self._retriever.render_for_prompt(
@@ -367,27 +367,17 @@ class RootCauseAnalyzer:
                 section_title="Retrieved Valkey Context",
             )
 
-        user_prompt = _build_user_prompt(
-            failure_report,
-            source_contents,
-            retrieved_context,
-            self._domain_context,
+        # 5. Try agentic analysis first, fall back to single-shot
+        report = self._analyze_agentic(
+            failure_report, source_contents, retrieved_context,
         )
-
-        try:
-            raw_response = self._invoke_model(user_prompt)
-        except BedrockError as exc:
-            logger.error("Bedrock error during root cause analysis: %s", exc)
-            return self._analysis_failed_report(str(exc))
-
-        # 5. Parse response
-        try:
-            report = _parse_bedrock_response(raw_response)
-        except (json.JSONDecodeError, ValueError, KeyError, TypeError, AttributeError) as exc:
-            logger.error("Failed to parse Bedrock response: %s", exc)
-            return self._analysis_failed_report(
-                f"Unparseable model response: {exc}"
+        if report is None:
+            report = self._analyze_single_shot(
+                failure_report, source_contents, retrieved_context,
             )
+
+        if report is None:
+            return self._analysis_failed_report("All analysis paths failed.")
 
         # Merge locally-detected flaky indicators with model's assessment
         if all_flaky_indicators:
@@ -403,6 +393,123 @@ class RootCauseAnalyzer:
             report.files_to_change,
         )
         return report
+
+    def _analyze_single_shot(
+        self,
+        failure_report: FailureReport,
+        source_contents: dict[str, str],
+        retrieved_context: str,
+    ) -> RootCauseReport | None:
+        """Run single-shot (non-agentic) root cause analysis."""
+        user_prompt = _build_user_prompt(
+            failure_report,
+            source_contents,
+            retrieved_context,
+            self._domain_context,
+        )
+
+        try:
+            raw_response = self._invoke_model(user_prompt)
+        except BedrockError as exc:
+            logger.error("Bedrock error during root cause analysis: %s", exc)
+            return self._analysis_failed_report(str(exc))
+
+        try:
+            return _parse_bedrock_response(raw_response)
+        except (json.JSONDecodeError, ValueError, KeyError, TypeError, AttributeError) as exc:
+            logger.error("Failed to parse Bedrock response: %s", exc)
+            return self._analysis_failed_report(
+                f"Unparseable model response: {exc}"
+            )
+
+    def _analyze_agentic(
+        self,
+        failure_report: FailureReport,
+        source_contents: dict[str, str],
+        retrieved_context: str,
+    ) -> RootCauseReport | None:
+        """Try agentic tool-use loop for root cause analysis.
+
+        Returns a RootCauseReport on success, or None to fall back.
+        """
+        repo_name = self._infer_repo_name(failure_report)
+        if not repo_name:
+            return None
+
+        from scripts.code_reviewer import (
+            ReviewToolHandler,
+            _GET_FILE_TOOL,
+            _LIST_FILES_TOOL,
+            _SEARCH_CODE_TOOL,
+        )
+
+        converse_fn = getattr(self._bedrock, "converse_with_tools", None)
+        if not callable(converse_fn):
+            return None
+
+        _SUBMIT_ROOT_CAUSE_TOOL: dict = {
+            "toolSpec": {
+                "name": "submit_root_cause_analysis",
+                "description": (
+                    "Submit the structured root-cause analysis for this "
+                    "CI failure."
+                ),
+                "inputSchema": {
+                    "json": _ROOT_CAUSE_SCHEMA,
+                },
+            },
+        }
+
+        user_prompt = _build_user_prompt(
+            failure_report,
+            source_contents,
+            retrieved_context,
+            self._domain_context,
+        )
+        user_prompt += (
+            "\n\nYou have tools to fetch additional files from the repository "
+            "if you need more context to diagnose the root cause. Use get_file "
+            "to read source files, headers, tests, or configs. Use search_code "
+            "to find function definitions, callers, or usages. When ready, "
+            "call submit_root_cause_analysis with your structured diagnosis."
+        )
+
+        tool_handler = ReviewToolHandler(
+            github_client=self._github,
+            repo_name=repo_name,
+            head_sha=failure_report.commit_sha,
+            max_fetches=8,
+        )
+
+        tools = [_GET_FILE_TOOL, _LIST_FILES_TOOL, _SEARCH_CODE_TOOL, _SUBMIT_ROOT_CAUSE_TOOL]
+
+        try:
+            response = converse_fn(
+                _SYSTEM_PROMPT,
+                user_prompt,
+                tools=tools,
+                tool_handler=tool_handler,
+                terminal_tool="submit_root_cause_analysis",
+                max_turns=20,
+                temperature=0.0,
+                thinking_budget=self._thinking_budget,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Agentic root cause analysis failed: %s. Falling back.", exc,
+            )
+            return None
+
+        try:
+            return _parse_bedrock_response(
+                response if isinstance(response, str) else json.dumps(response),
+            )
+        except (json.JSONDecodeError, ValueError, KeyError, TypeError, AttributeError) as exc:
+            logger.warning(
+                "Failed to parse agentic root cause response: %s. Falling back.",
+                exc,
+            )
+            return None
 
     def _invoke_model(self, user_prompt: str) -> str:
         """Invoke the model, preferring native schema output when available."""

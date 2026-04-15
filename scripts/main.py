@@ -1172,6 +1172,10 @@ def run_pipeline(
         prepared_candidates = prepared_candidates[: config.max_failures_per_run]
 
     # Process each selected structured failure through Analyze → Fix → Validate → PR
+    # Cache root cause results so correlated failures (same commit + error
+    # signature) share a single analysis instead of redundant Bedrock calls.
+    _root_cause_cache: dict[str, tuple[RootCauseReport | None, str]] = {}
+
     for candidate in prepared_candidates:
         job = candidate.job
         report = candidate.report
@@ -1209,19 +1213,64 @@ def run_pipeline(
             root_cause_analyzer.with_domain_context(domain_context)
             fix_generator.with_domain_context(domain_context)
 
-            # Analyze → Fix
-            root_cause, diff = _analyze_and_fix(
-                report,
-                root_cause_analyzer,
-                fix_generator,
-                config.project,
-                failed_hypotheses=(
-                    list(existing_campaign.failed_hypotheses)
-                    if existing_campaign is not None
-                    else None
-                ),
-                metrics=metrics,
-            )
+            # Cross-failure correlation: reuse root cause analysis for
+            # failures with the same commit + error signature.
+            correlation_key = f"{report.commit_sha}:{failure_id}"
+            cached_root_cause = _root_cause_cache.get(correlation_key)
+            if cached_root_cause is not None:
+                root_cause, _ = cached_root_cause[0], cached_root_cause[1]
+                logger.info(
+                    "Reusing cached root cause for job %s (correlation=%s).",
+                    job.name, correlation_key[:40],
+                )
+                # Still generate a fresh fix for this specific job
+                diff = None
+                if root_cause and not root_cause.description.startswith("analysis-failed"):
+                    if root_cause.confidence != "low" or root_cause.is_flaky:
+                        if root_cause.files_to_change:
+                            try:
+                                source_files = _collect_source_files(
+                                    report, root_cause_analyzer, config.project,
+                                )
+                            except Exception as exc:
+                                logger.warning(
+                                    "Failed to retrieve source files for job %s: %s",
+                                    job.name, exc,
+                                )
+                                source_files = {}
+                            source_files = _load_root_cause_target_files(
+                                report, root_cause, root_cause_analyzer, source_files,
+                            )
+                            try:
+                                diff = fix_generator.generate(
+                                    root_cause, source_files,
+                                    repo_ref=report.commit_sha,
+                                    failed_hypotheses=(
+                                        list(existing_campaign.failed_hypotheses)
+                                        if existing_campaign is not None
+                                        else None
+                                    ),
+                                )
+                            except Exception as exc:
+                                logger.error(
+                                    "Fix generation failed for correlated job %s: %s",
+                                    job.name, exc,
+                                )
+            else:
+                # Analyze → Fix
+                root_cause, diff = _analyze_and_fix(
+                    report,
+                    root_cause_analyzer,
+                    fix_generator,
+                    config.project,
+                    failed_hypotheses=(
+                        list(existing_campaign.failed_hypotheses)
+                        if existing_campaign is not None
+                        else None
+                    ),
+                    metrics=metrics,
+                )
+                _root_cause_cache[correlation_key] = (root_cause, failure_id)
 
             if not diff or not root_cause:
                 outcome = "analysis-failed" if not root_cause else "no-fix-generated"

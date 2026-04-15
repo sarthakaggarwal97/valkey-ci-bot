@@ -761,7 +761,10 @@ class BedrockClient:
 
         converse_kwargs: dict[str, Any] = {
             "modelId": model_id or self._config.bedrock_model_id,
-            "system": [{"text": full_system_prompt}],
+            "system": [
+                {"text": full_system_prompt},
+                {"cachePoint": {"type": "default"}},
+            ],
             "inferenceConfig": {"maxTokens": effective_max_tokens},
             "toolConfig": {"tools": tools},
         }
