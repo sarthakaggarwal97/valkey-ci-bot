@@ -372,3 +372,153 @@ def test_single_workflow_shows_unique_failures_metric(tmp_path: Path) -> None:
     assert "Unique failures" in index_html
     # Should NOT show per-workflow breakdown for single workflow
     assert "Daily failures" not in index_html
+
+
+def _rich_run_dashboard() -> dict:
+    """Dashboard with job links, commits, failed job names, and tests timeline."""
+    return build_dashboard(
+        daily_health_data={
+            "repo": "valkey-io/valkey",
+            "workflow": "daily.yml",
+            "branch": "unstable",
+            "dates": ["2026-04-07", "2026-04-08"],
+            "total_runs": 2,
+            "failed_runs": 1,
+            "unique_failures": 1,
+            "failure_jobs": {
+                "jemalloc / sanitize": {
+                    "2026-04-08": ["9001", "9002"],
+                },
+            },
+            "tests": {
+                "jemalloc / sanitize": {
+                    "timeline": {
+                        "2026-04-08": {
+                            "errors": ["AddressSanitizer: heap-buffer-overflow"],
+                            "jobs": ["test-ubuntu-asan"],
+                        },
+                    },
+                },
+            },
+            "heatmap": [
+                {
+                    "name": "jemalloc / sanitize",
+                    "days_failed": 1,
+                    "total_days": 2,
+                    "cells": [
+                        {"date": "2026-04-07", "count": 0},
+                        {"date": "2026-04-08", "count": 1},
+                    ],
+                }
+            ],
+            "runs": [
+                {
+                    "date": "2026-04-08",
+                    "status": "failure",
+                    "commit_sha": "abcd123",
+                    "full_sha": "abcd1234ef567890",
+                    "commit_message": "Fix memory leak in jemalloc",
+                    "unique_failures": 1,
+                    "failed_jobs": 1,
+                    "failed_job_names": ["test-ubuntu-asan"],
+                    "run_id": "12345",
+                    "run_url": "https://github.com/valkey-io/valkey/actions/runs/12345",
+                    "commits_since_prev": [
+                        {"sha": "aaa1111", "message": "Refactor allocator", "author": "dev1"},
+                        {"sha": "bbb2222", "message": "Update tests", "author": "dev2"},
+                    ],
+                },
+                {
+                    "date": "2026-04-07",
+                    "status": "success",
+                    "commit_sha": "efgh456",
+                    "full_sha": "efgh4567ab890123",
+                    "unique_failures": 0,
+                    "failed_jobs": 0,
+                    "run_id": "12344",
+                    "run_url": "https://github.com/valkey-io/valkey/actions/runs/12344",
+                },
+            ],
+        },
+        generated_at="2026-04-08T03:00:00+00:00",
+    )
+
+
+def test_heatmap_run_status_row(tmp_path: Path) -> None:
+    """Heatmap should have a run status row with ✓/✗ indicators."""
+    site_dir = tmp_path / "site"
+    build_site(_rich_run_dashboard(), site_dir)
+    html = (site_dir / "index.html").read_text(encoding="utf-8")
+    assert "heat-status-row" in html
+    assert "✓" in html
+    assert "✗" in html
+    assert "heat-status-good" in html
+    assert "heat-status-bad" in html
+
+
+def test_heatmap_job_links(tmp_path: Path) -> None:
+    """Heatmap failure cells should have numbered job links."""
+    site_dir = tmp_path / "site"
+    build_site(_rich_run_dashboard(), site_dir)
+    html = (site_dir / "index.html").read_text(encoding="utf-8")
+    assert "job-link" in html
+    assert "/job/9001" in html
+    assert "/job/9002" in html
+    assert "[1]" in html
+    assert "[2]" in html
+
+
+def test_heatmap_error_tooltips(tmp_path: Path) -> None:
+    """Heatmap cells should show error details in title attribute."""
+    site_dir = tmp_path / "site"
+    build_site(_rich_run_dashboard(), site_dir)
+    html = (site_dir / "index.html").read_text(encoding="utf-8")
+    assert "heap-buffer-overflow" in html
+    assert "test-ubuntu-asan" in html
+
+
+def test_run_table_commits_since_prev(tmp_path: Path) -> None:
+    """Run detail table should show commits since previous run."""
+    site_dir = tmp_path / "site"
+    build_site(_rich_run_dashboard(), site_dir)
+    html = (site_dir / "index.html").read_text(encoding="utf-8")
+    assert "Commits since prev" in html
+    assert "aaa1111" in html
+    assert "bbb2222" in html
+    # Commit message should be in title attribute
+    assert "Refactor allocator" in html
+
+
+def test_run_table_failed_job_names(tmp_path: Path) -> None:
+    """Run detail table should show failed job names instead of count."""
+    site_dir = tmp_path / "site"
+    build_site(_rich_run_dashboard(), site_dir)
+    html = (site_dir / "index.html").read_text(encoding="utf-8")
+    assert "test-ubuntu-asan" in html
+
+
+def test_heatmap_frequency_no_d_suffix(tmp_path: Path) -> None:
+    """Frequency column should show N/M not N/Md."""
+    site_dir = tmp_path / "site"
+    build_site(_rich_run_dashboard(), site_dir)
+    html = (site_dir / "index.html").read_text(encoding="utf-8")
+    assert "1/2" in html
+    # Should NOT have the old "d" suffix
+    assert "1/2d" not in html
+
+
+def test_heatmap_monospace_font(tmp_path: Path) -> None:
+    """Heatmap table should use monospace font."""
+    site_dir = tmp_path / "site"
+    build_site(_rich_run_dashboard(), site_dir)
+    css = (site_dir / "assets" / "site.css").read_text(encoding="utf-8")
+    assert "Fira Mono" in css
+    assert "ui-monospace" in css
+
+
+def test_commit_message_tooltip_on_sha(tmp_path: Path) -> None:
+    """Commit SHA links should have the commit message as title."""
+    site_dir = tmp_path / "site"
+    build_site(_rich_run_dashboard(), site_dir)
+    html = (site_dir / "index.html").read_text(encoding="utf-8")
+    assert "Fix memory leak in jemalloc" in html

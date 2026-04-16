@@ -2478,6 +2478,8 @@ tr:last-child th {
 }
 .heatmap-table {
   min-width: 1080px;
+  font-family: "Fira Mono", ui-monospace, monospace;
+  font-size: 13px;
 }
 .heatmap-table .sticky-col {
   position: sticky;
@@ -2524,6 +2526,23 @@ tr:last-child th {
   color: #fff6f7;
   background: rgba(207, 60, 79, var(--heat-alpha));
   box-shadow: inset 0 0 0 1px rgba(120, 20, 39, 0.24);
+}
+.heat-status-row td {
+  font-weight: 700;
+  text-align: center;
+}
+.heat-status-good {
+  color: #a8f0cf;
+  background: rgba(32, 180, 122, 0.18);
+}
+.heat-status-bad {
+  color: #ffc4cc;
+  background: rgba(207, 60, 79, 0.22);
+}
+.job-link {
+  color: #a9c5ff;
+  font-size: 11px;
+  margin-left: 1px;
 }
 .split-note {
   margin: 0 0 16px;
