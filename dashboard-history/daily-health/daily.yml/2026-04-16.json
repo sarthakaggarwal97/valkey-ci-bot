@@ -1,30 +1,38 @@
 {
-  "captured_at": "2026-04-16T01:14:30.548506+00:00",
+  "captured_at": "2026-04-16T04:53:56.756418+00:00",
   "date": "2026-04-16",
   "repo": "valkey-io/valkey",
   "run": {
+    "commit_message": "Add cluster bus network traffic usage metric in bytes (#3396)\n\nAdds cluster bus byte metrics to `CLUSTER INFO`, split by admin,\npub/sub, and module traffic. The change tracks sent and received bytes\non the cluster bus, exposes them as\n`cluster_stats_*_bytes_{sent,received}`.\n\nExample:\n\n```\n> src/valkey-cli CLUSTER INFO\ncluster_state:fail\n...\ncluster_stats_bytes_sent:46088\ncluster_stats_bytes_received:46080\ncluster_stats_pubsub_bytes_sent:0\ncluster_stats_pubsub_bytes_received:0\ncluster_stats_module_bytes_sent:0\ncluster_stats_module_bytes_received:0\ntotal_cluster_links_buffer_limit_exceeded:0\n```\n\nFixes: https://github.com/valkey-io/valkey/issues/1929\n\n---------\n\nSigned-off-by: Harkrishn Patro <bunty.hari@gmail.com>\nCo-authored-by: Viktor S\u00f6derqvist <viktor.soderqvist@est.tech>",
     "commit_sha": "b2e0f63",
+    "commits_since_prev": [],
     "date": "2026-04-16",
     "failed_job_names": [
       "test-almalinux8-tls-module",
       "test-fedoralatest-tls-module",
       "test-fedorarawhide-jemalloc",
+      "test-macos-latest",
       "test-sanitizer-undefined (clang)",
       "test-sanitizer-undefined (gcc)",
       "test-sanitizer-undefined-large-memory (clang)",
       "test-sanitizer-undefined-large-memory (gcc)",
       "test-ubuntu-lttng",
-      "test-ubuntu-tls-no-tls"
+      "test-ubuntu-tls-no-tls",
+      "test-valgrind-no-malloc-usable-size-test",
+      "test-valgrind-test"
     ],
-    "failed_jobs": 9,
+    "failed_jobs": 12,
     "failure_jobs": {
       "module api test": [
         71559041425
       ],
       "test": [
         71559041176,
+        71559041284,
+        71559041350,
         71559041372,
         71559041390,
+        71559041392,
         71559041396,
         71559041411,
         71559041419
@@ -42,8 +50,8 @@
     "full_sha": "b2e0f6322d288bfdb5076e01791402fe790f0892",
     "run_id": 24485406038,
     "run_url": "https://github.com/valkey-io/valkey/actions/runs/24485406038",
-    "status": "in_progress",
-    "total_jobs": 48,
+    "status": "failure",
+    "total_jobs": 49,
     "unique_failures": 3,
     "workflow": "daily.yml"
   },
