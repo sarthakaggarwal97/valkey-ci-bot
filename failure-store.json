@@ -11947,6 +11947,24 @@
           "file_path": "",
           "fingerprint": "98e7cdd9bd17941167dff975df56d4c066ebab34f3566dd9406efcc58fac255f",
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-16T04:11:06.957144+00:00",
+          "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
+          "workflow_run_id": 23703136626,
+          "workflow_name": "Weekly Test Workflow for Released Branches",
+          "workflow_file": "weekly.yml",
+          "job_name": "run-daily-for-release-branches (8.0) / test-ubuntu-tls-io-threads",
+          "matrix_params": {
+            "param_0": "8.0"
+          },
+          "failure_identifier": "run-daily-for-release-branches (8.0) / test-ubuntu-tls-io-threads",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -12097,6 +12115,24 @@
           "file_path": "",
           "fingerprint": "c07a6241f23acf770ab0c24948cf7c87e3fd528c806caf99f3df0b1e6564c051",
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-16T04:11:13.671421+00:00",
+          "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
+          "workflow_run_id": 23703136626,
+          "workflow_name": "Weekly Test Workflow for Released Branches",
+          "workflow_file": "weekly.yml",
+          "job_name": "run-daily-for-release-branches (9.0) / test-sanitizer-force-defrag",
+          "matrix_params": {
+            "param_0": "9.0"
+          },
+          "failure_identifier": "run-daily-for-release-branches (9.0) / test-sanitizer-force-defrag",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -12127,6 +12163,24 @@
           "file_path": "",
           "fingerprint": "ec5da911a32c3a48e35cb204151311f2f5e691ef1f59292cc364d9a32f6b9306",
           "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-16T04:11:11.897494+00:00",
+          "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
+          "workflow_run_id": 23703136626,
+          "workflow_name": "Weekly Test Workflow for Released Branches",
+          "workflow_file": "weekly.yml",
+          "job_name": "run-daily-for-release-branches (9.0) / test-valgrind-test",
+          "matrix_params": {
+            "param_0": "9.0"
+          },
+          "failure_identifier": "valgrind-leak:possibly::None",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
+          "incident_key": null
         }
       ]
     },
@@ -12156,6 +12210,24 @@
           "error_signature": "2026-03-22T21:05:32.8855471Z === () Starting server on 127.0.0.1:28112 ok\n2026-03-22T21:05:32.9043519Z [3/151 done]: unit/quit (0 seconds)\n2026-03-22T21:05:32.9057078Z Testing unit/limits\n2026-03-22T21:05:32.9057877Z [ok]: PubSub messages with CLIENT REPLY OFF (86 ms)\n2026-03-22T21:05:32.9123352Z evicted keys: 11\n2026-03-22T21:05:32.9128818Z evicted clients: 0\n2026-03-22T21:05:32.9129963Z dbsize: 39\n2026-03-22T21:05:32.9130586Z [ok]: latencystats: disable/enable (9 ms)\n2026-03-22T21:05:32.9186440Z [ok]: PUNSUBSCRIBE from non-subscribed channels (11 ms)\n2026-03-22T21:05:32.9187901Z [ok]: eviction due to output buffers of many MGET clients, client eviction: false (162 ms)\n2026-03-22T21:05:32.9189085Z [ok]: NUMSUB returns numbers, not strings (#1561) (0 ms)\n2026-03-22T21:05:32.9239299Z [ok]: NUMPATs returns the number of unique patterns (9 ms)\n2026-03-22T21:05:32.9275145Z [ok]: Mix SUBSCRIBE and PSUBSCRIBE (4 ms)\n2026-03-22T21:05:32.9347844Z [ok]: PUNSUBSCRIBE and UNSUBSCRIBE should always reply (3 ms)\n2026-03-22T21:05:32.9348646Z [ok]: latencystats: configure percentiles (20 ms)\n2026-03-22T21:05:32.9491021Z [ok]: latencystats: bad configure percentiles (16 ms)\n2026-03-22T21:05:32.9694292Z [ok]: latencystats: blocking commands (20 ms)\n2026-03-22T21:05:32.9792391Z [ok]: Keyspace notifications: we receive keyspace notifications (45 ms)\n2026-03-22T21:05:32.9793829Z [ok]: latencystats: subcommands (8 ms)\n2026-03-22T21:05:32.9809367Z === () Starting server on 127.0.0.1:25112 ok\n2026-03-22T21:05:33.0211292Z === (scripting) Starting server on 127.0.0.1:21112 ok\n2026-03-22T21:05:33.0255379Z [ok]: Keyspace notifications: we receive keyevent notifications (47 ms)\n2026-03-22T21:05:33.0352206Z [ok]: Keyspace notifications: we can receive both kind of events (9 ms)\n2026-03-22T21:05:33.0381111Z [ok]: latencystats: measure latency (58 ms)\n2026-03-22T21:05:33.0381971Z [ok]: FUNCTION - Basic usage (3 ms)\n2026-03-22T21:05:33.0398415Z [ok]: FUNCTION - Load with unknown argument (2 ms)\n2026-03-22T21:05:33.0423828Z [ok]: FUNCTION - Create an already exiting library raise error (1 ms)\n2026-03-22T21:05:33.0427958Z [ok]: Keyspace notifications: we are able to mask events (8 ms)\n2026-03-22T21:05:33.0429393Z [ok]: FUNCTION - Create an already exiting library raise error (case insensitive) (0 ms)\n2026-03-22T21:05:33.0438139Z [ok]: FUNCTION - Create a library with wrong name format (2 ms)\n2026-03-22T21:05:33.0446564Z [ok]: errorstats: failed call authentication error (7 ms)\n2026-03-22T21:05:33.0477882Z === (limits network external:skip) Starting server on 127.0.0.1:23612 ok\n2026-03-22T21:05:33.0478687Z [ok]: FUNCTION - Create library with unexisting engine (1 ms)\n2026-03-22T21:05:33.0480212Z [ok]: FUNCTION - Test uncompiled script (0 ms)\n2026-03-22T21:05:33.0535753Z [ok]: FUNCTION - test replace argument (5 ms)\n2026-03-22T21:05:33.0536800Z [ok]: FUNCTION - test function case insensitive (0 ms)\n2026-03-22T21:05:33.0537729Z === () Starting server on 127.0.0.1:26612 ok\n2026-03-22T21:05:33.0552276Z [ok]: Keyspace notifications: general events test (10 ms)\n2026-03-22T21:05:33.0553459Z [ok]: FUNCTION - test replace argument with failure keeps old libraries (2 ms)\n2026-03-22T21:05:33.0558877Z [ok]: errorstats: failed call within MULTI/EXEC (11 ms)\n2026-03-22T21:05:33.0581580Z [ok]: FUNCTION - test function delete (3 ms)\n2026-03-22T21:05:33.0599171Z [ok]: FUNCTION - test fcall bad arguments (2 ms)\n2026-03-22T21:05:33.0622843Z [ok]: FUNCTION - test fcall bad number of keys arguments (1 ms)\n2026-03-22T21:05:33.0629610Z [ok]: Keyspace notifications: list events test (7 ms)\n2026-03-22T21:05:33.0635774Z [ok]: FUNCTION - test fcall negative number of keys (1 ms)\n2026-03-22T21:05:33.0639680Z [ok]: FUNCTION - test delete on not exiting library (1 ms)\n2026-03-22T21:05:33.0666176Z [ok]: errorstats: failed call within LUA (8 ms)\n2026-03-22T21:05:33.0667437Z [ok]: INFO tls reports empty values when TLS disabled (1 ms)\n2026-03-22T21:05:33.0668859Z [ok]: FUNCTION - test function kill when function is not running (1 ms)\n2026-03-22T21:05:33.0669883Z [ok]: FUNCTION - test wrong subcommand (1 ms)\n2026-03-22T21:05:33.0709813Z [ok]: errorstats: failed call NOSCRIPT error (6 ms)\n2026-03-22T21:05:33.0731287Z [ok]: Keyspace notifications: set events test (10 ms)\n2026-03-22T21:05:33.0741256Z [ok]: errorstats: failed call NOGROUP error (4 ms)\n2026-03-22T21:05:33.0779597Z [ok]: FUNCTION - test loading from rdb (12 ms)\n2026-03-22T21:05:33.0786090Z [ok]: errorstats: rejected call unknown command (5 ms)\n2026-03-22T21:05:33.0819350Z [ok]: Keyspace notifications: zset events test (9 ms)\n2026-03-22T21:05:33.0888003Z [ok]: errorstats: rejected call within MULTI/EXEC (9 ms)\n2026-03-22T21:05:33.0894003Z [ok]: FUNCTION - test debug reload different options (12 ms)\n2026-03-22T21:05:33.0901052Z [ok]: Keyspace notifications: hash events test (8 ms)\n2026-03-22T21:05:33.0945539Z [ok]: errorstats: rejected call due to wrong arity (6 ms)\n2026-03-22T21:05:33.1024278Z [ok]: FUNCTION - test debug reload with nosave and noflush (14 ms)\n2026-03-22T21:05:33.1033823Z [ok]: Keyspace notifications: stream events test (14 ms)\n2026-03-22T21:05:33.1049178Z [ok]: errorstats: rejected call by OOM error (8 ms)\n2026-03-22T21:05:33.1075745Z [ok]: FUNCTION - test flushall and flushdb do not clean functions (5 ms)\n2026-03-22T21:05:33.1150577Z [ok]: FUNCTION - test function dump and restore (7 ms)\n2026-03-22T21:05:33.1161921Z [ok]: errorstats: rejected call by authorization error (11 ms)\n2026-03-22T21:05:33.1183494Z [ok]: FUNCTION - test function dump and restore with flush argument (4 ms)\n2026-03-22T21:05:33.1220302Z [ok]: errorstats: blocking commands (6 ms)\n2026-03-22T21:05:33.1302028Z [ok]: FUNCTION - test function dump and restore with append argument (11 ms)\n2026-03-22T21:05:33.1390144Z [ok]: FUNCTION - test function dump and restore with replace argument (9 ms)\n2026-03-22T21:05:33.1417688Z [ok]: FUNCTION - test function restore with bad payload do not drop existing functions (3 ms)\n2026-03-22T21:05:33.1425533Z [ok]: FUNCTION - test function restore with wrong number of arguments (1 ms)\n2026-03-22T21:05:33.1439197Z [ok]: FUNCTION - test fcall_ro with write command (1 ms)\n2026-03-22T21:05:33.1482128Z [ok]: FUNCTION - test fcall_ro with read only commands (2 ms)\n2026-03-22T21:05:33.1492815Z [ok]: FUNCTION - test keys and argv (3 ms)\n2026-03-22T21:05:33.1498272Z [ok]: FUNCTION - test command get keys on fcall (1 ms)\n2026-03-22T21:05:33.1502818Z [ok]: FUNCTION - test command get keys on fcall_ro (1 ms)\n2026-03-22T21:05:33.2147395Z [ok]: Keyspace notifications: expired events (triggered expire) (111 ms)\n2026-03-22T21:05:33.3435355Z === (tls) Starting server on 127.0.0.1:26613 ok\n2026-03-22T21:05:33.4113584Z [ok]: verify reply buffer limits (672 ms)\n2026-03-22T21:05:33.4297439Z [ok]: Keyspace notifications: expired events (background expire) (213 ms)\n2026-03-22T21:05:33.4303732Z [ok]: Keyspace notification: expired event (Expiration time is already expired) (3 ms)\n2026-03-22T21:05:33.4378727Z [ok]: Keyspace notifications: evicted events (5 ms)\n2026-03-22T21:16:40.8633989Z === (repl singledb:skip) Starting server on 127.0.0.1:21692 ok\n2026-03-22T21:16:40.9889272Z === () Starting server on 127.0.0.1:21693 ok\n2026-03-22T21:16:42.9242763Z [ok]: Slave should be able to synchronize with the master (1924 ms)\n2026-03-22T21:16:42.9247727Z [ok]: Detect write load to master (1 ms)\n2026-03-22T21:16:49.9098347Z [ok]: diskless no replicas drop during rdb pipe (15475 ms)\n2026-03-22T21:16:50.0388800Z === () Starting server on 127.0.0.1:22759 ok\n2026-03-22T21:16:50.1812155Z === () Starting server on 127.0.0.1:22760 ok\n2026-03-22T21:16:51.5772849Z [ok]: Test replication partial resync: no backlog (diskless: yes, swapdb, dual-channel: no, reconnect: 1) (8652 ms)\n2026-03-22T21:16:52.0273978Z === (repl singledb:skip) Starting server on 127.0.0.1:21694 ok\n2026-03-22T21:16:52.1528163Z === () Starting server on 127.0.0.1:21695 ok\n2026-03-22T21:16:54.0918456Z [ok]: Slave should be able to synchronize with the master (1927 ms)\n2026-03-22T21:16:54.0930173Z [ok]: Detect write load to master (1 ms)\n2026-03-22T21:16:57.0011680Z [ok]: diskless slow replicas drop during rdb pipe (7092 ms)\n2026-03-22T21:16:57.1303921Z === () Starting server on 127.0.0.1:22761 ok\n2026-03-22T21:16:57.2728520Z === () Starting server on 127.0.0.1:22762 ok\n2026-03-22T21:17:03.4801392Z [ok]: Test replication partial resync: ok after delay (diskless: yes, swapdb, dual-channel: no, reconnect: 1) (9387 ms)\n2026-03-22T21:17:03.9597131Z === (repl singledb:skip) Starting server on 127.0.0.1:21696 ok\n2026-03-22T21:17:04.0894825Z === () Starting server on 127.0.0.1:21697 ok\n2026-03-22T21:17:06.0269877Z [ok]: Slave should be able to synchronize with the master (1925 ms)\n2026-03-22T21:17:06.0271147Z [ok]: Detect write load to master (0 ms)\n2026-03-22T21:17:08.5933781Z [ok]: diskless fast replicas drop during rdb pipe (11592 ms)\n2026-03-22T21:17:08.7203258Z === () Starting server on 127.0.0.1:22763 ok\n2026-03-22T21:17:08.8598697Z === () Starting server on 127.0.0.1:22764 ok\n2026-03-22T21:17:09.7484332Z [ok]: diskless all replicas drop during rdb pipe (1154 ms)\n2026-03-22T21:17:09.8787294Z === () Starting server on 127.0.0.1:22765 ok\n2026-03-22T21:17:10.0123219Z === () Starting server on 127.0.0.1:22766 ok\n2026-03-22T21:17:16.6525448Z [ok]: Test replication partial resync: backlog expired (diskless: yes, swapdb, dual-channel: no, reconnect: 1) (10624 ms)\n2026-03-22T21:17:16.9213905Z [146/156 done]: integration/replication-psync (269 seconds)\n2026-03-22T21:17:17.9887269Z [ok]: diskless timeout replicas drop during rdb pipe (8240 ms)\n2026-03-22T21:17:18.2802881Z === (repl) Starting server on 127.0.0.1:22767 ok\n2026-03-22T21:17:18.8129752Z === () Starting server on 127.0.0.1:22768 ok\n2026-03-22T21:17:20.1313861Z [ok]: diskless replication child being killed is collected (1972 ms)\n2026-03-22T21:17:20.2533236Z === (repl) Starting server on 127.0.0.1:22769 ok\n2026-03-22T21:17:20.42",
           "file_path": "",
           "fingerprint": "a79758b9aef1f7e7937f4ecbd7773ba57ef1c8fda182808aec3e08c786061f75",
+          "incident_key": null
+        },
+        {
+          "outcome": "pass",
+          "observed_at": "2026-04-16T04:11:13.671532+00:00",
+          "commit_sha": "b83209de0ab5807b695c780ec6d44e1f49d9140e",
+          "workflow_run_id": 23703136626,
+          "workflow_name": "Weekly Test Workflow for Released Branches",
+          "workflow_file": "weekly.yml",
+          "job_name": "run-daily-for-release-branches (9.1) / test-sanitizer-address (gcc)",
+          "matrix_params": {
+            "param_0": "9.1) / test-sanitizer-address (gcc"
+          },
+          "failure_identifier": "run-daily-for-release-branches (9.1) / test-sanitizer-address (gcc)",
+          "test_name": null,
+          "error_signature": "",
+          "file_path": "",
+          "fingerprint": null,
           "incident_key": null
         }
       ]
