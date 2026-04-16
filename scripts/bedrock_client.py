@@ -39,6 +39,45 @@ _RETRYABLE_ERROR_CODES = frozenset({
 })
 
 
+class CircuitBreaker:
+    """Simple circuit breaker for Bedrock API calls."""
+
+    def __init__(
+        self,
+        failure_threshold: int = 5,
+        recovery_timeout: float = 60.0,
+    ):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self._failure_count: int = 0
+        self._state: str = "closed"
+        self._last_failure_time: float = 0.0
+
+    def record_success(self) -> None:
+        self._failure_count = 0
+        self._state = "closed"
+
+    def record_failure(self) -> None:
+        self._failure_count += 1
+        if self._failure_count >= self.failure_threshold:
+            self._state = "open"
+            self._last_failure_time = time.monotonic()
+
+    def allow_request(self) -> bool:
+        if self._state == "closed":
+            return True
+        if self._state == "open":
+            if time.monotonic() - self._last_failure_time >= self.recovery_timeout:
+                self._state = "half-open"
+                return True
+            return False
+        # half-open: allow one request to test recovery
+        return True
+
+
+_circuit_breaker = CircuitBreaker()
+
+
 def _has_prompt_safety_guard(system_prompt: str, user_prompt: str) -> bool:
     """Return whether the prompt explicitly fences untrusted model inputs."""
     prompt = f"{system_prompt}\n{user_prompt}".lower()
@@ -282,6 +321,11 @@ class BedrockClient:
         Raises:
             BedrockError: On non-retryable errors or after exhausting retries.
         """
+        if not _circuit_breaker.allow_request():
+            raise BedrockError(
+                "Circuit breaker open — Bedrock API temporarily disabled"
+            )
+
         full_system_prompt = (
             f"{system_prompt}\n\n"
             f"## Project Context\n{self._project_context}"
@@ -355,6 +399,7 @@ class BedrockClient:
                 # Track actual token usage from the API response when available
                 self._adjust_token_usage(response, reserved_tokens)
                 self._record_ai_metric("bedrock.invoke.success")
+                _circuit_breaker.record_success()
                 return self._extract_response_text(response)
 
             except ClientError as exc:
@@ -368,6 +413,7 @@ class BedrockClient:
                         "Non-retryable Bedrock error (code=%s): %s",
                         error_code, error_message,
                     )
+                    _circuit_breaker.record_failure()
                     raise BedrockError(
                         f"Bedrock API error: {error_message}",
                         error_code=error_code,
@@ -381,6 +427,7 @@ class BedrockClient:
                         "Bedrock retries exhausted after %d attempts (code=%s): %s",
                         max_attempts, error_code, error_message,
                     )
+                    _circuit_breaker.record_failure()
                     raise BedrockError(
                         f"Bedrock API error after {max_attempts} attempts: {error_message}",
                         error_code=error_code,
@@ -397,6 +444,7 @@ class BedrockClient:
                 time.sleep(delay)
 
         # Should not reach here, but just in case
+        _circuit_breaker.record_failure()
         raise BedrockError(
             f"Bedrock API error after {max_attempts} attempts",
             error_code=last_error.response.get("Error", {}).get("Code", "") if last_error else None,
@@ -507,6 +555,11 @@ class BedrockClient:
         Raises:
             BedrockError: On non-retryable errors or after exhausting retries.
         """
+        if not _circuit_breaker.allow_request():
+            raise BedrockError(
+                "Circuit breaker open — Bedrock API temporarily disabled"
+            )
+
         full_system_prompt = (
             f"{system_prompt}\n\n"
             f"## Project Context\n{self._project_context}"
@@ -599,6 +652,7 @@ class BedrockClient:
                 response = self._client.converse(**converse_kwargs)
                 self._adjust_token_usage(response, reserved_tokens)
                 self._record_ai_metric("bedrock.invoke_schema.success")
+                _circuit_breaker.record_success()
                 return self._extract_tool_use_json(response)
 
             except ClientError as exc:
@@ -623,6 +677,7 @@ class BedrockClient:
                             "bedrock.schema_tool_choice_fallback_success"
                         )
                         self._record_ai_metric("bedrock.invoke_schema.success")
+                        _circuit_breaker.record_success()
                         return self._extract_tool_use_json(response)
                     except ClientError as fallback_exc:
                         self._record_ai_metric(
@@ -635,11 +690,13 @@ class BedrockClient:
                         )
                         if not _is_retryable_error(fallback_exc):
                             self._record_ai_metric("bedrock.errors.non_retryable")
+                            _circuit_breaker.record_failure()
                             raise BedrockError(
                                 f"Bedrock API error: {error_message}",
                                 error_code=error_code,
                                 retryable=False,
                             ) from fallback_exc
+                        _circuit_breaker.record_failure()
                         raise BedrockError(
                             f"Bedrock API error after fallback schema tool-use "
                             f"attempts: {error_message}",
@@ -649,6 +706,7 @@ class BedrockClient:
 
                 if not _is_retryable_error(exc):
                     self._record_ai_metric("bedrock.errors.non_retryable")
+                    _circuit_breaker.record_failure()
                     raise BedrockError(
                         f"Bedrock API error: {error_message}",
                         error_code=error_code,
@@ -658,6 +716,7 @@ class BedrockClient:
                 retries_left = max_attempts - attempt - 1
                 if retries_left == 0:
                     self._record_ai_metric("bedrock.errors.retry_exhausted")
+                    _circuit_breaker.record_failure()
                     raise BedrockError(
                         f"Bedrock API error after {max_attempts} attempts: {error_message}",
                         error_code=error_code,
@@ -673,6 +732,7 @@ class BedrockClient:
                 )
                 time.sleep(delay)
 
+        _circuit_breaker.record_failure()
         raise BedrockError(
             f"Bedrock API error after {max_attempts} attempts",
             error_code=last_error.response.get("Error", {}).get("Code", "") if last_error else None,
@@ -684,13 +744,16 @@ class BedrockClient:
         max_attempts = self._config.max_retries_bedrock + 1
         for attempt in range(max_attempts):
             try:
-                return self._client.converse(**converse_kwargs)
+                result = self._client.converse(**converse_kwargs)
+                _circuit_breaker.record_success()
+                return result
             except ClientError as exc:
                 if not _is_retryable_error(exc) or attempt == max_attempts - 1:
                     if _is_retryable_error(exc):
                         self._record_ai_metric("bedrock.errors.retry_exhausted")
                     else:
                         self._record_ai_metric("bedrock.errors.non_retryable")
+                    _circuit_breaker.record_failure()
                     raise
                 delay = _compute_backoff_delay(attempt)
                 error_code = exc.response.get("Error", {}).get("Code", "")
@@ -702,6 +765,7 @@ class BedrockClient:
                 )
                 time.sleep(delay)
         # Unreachable, but keeps mypy happy
+        _circuit_breaker.record_failure()
         raise BedrockError("converse retries exhausted", retryable=True)
 
     def converse_with_tools(
@@ -743,6 +807,11 @@ class BedrockClient:
             JSON string from the terminal tool invocation.
         """
         import json as _json
+
+        if not _circuit_breaker.allow_request():
+            raise BedrockError(
+                "Circuit breaker open — Bedrock API temporarily disabled"
+            )
 
         full_system_prompt = (
             f"{system_prompt}\n\n"
