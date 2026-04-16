@@ -1,9 +1,42 @@
 {
-  "captured_at": "2026-04-16T01:14:49.768606+00:00",
+  "captured_at": "2026-04-16T04:54:16.412639+00:00",
   "date": "2026-04-04",
   "repo": "valkey-io/valkey",
   "run": {
+    "commit_message": "Merge branch 'unstable' into unstable",
     "commit_sha": "26013ff",
+    "commits_since_prev": [
+      {
+        "author": "Satheesha Gowda",
+        "date": "2026-03-21T01:00:05+00:00",
+        "message": "Optimize MGET and MSET commands using prefetching.",
+        "sha": "878bfef856863519f12b40532e25b3d6a2ae9477"
+      },
+      {
+        "author": "Satheesha Gowda",
+        "date": "2026-03-28T15:59:01+00:00",
+        "message": "Address review comments",
+        "sha": "73dc3a75ef3afec105f16b8dd2f93d1c71c2c5e1"
+      },
+      {
+        "author": "Raghav",
+        "date": "2026-04-03T07:22:29+00:00",
+        "message": "Big endian bitmap byte order mismatch fix (#3401)",
+        "sha": "1db8bab50851cc22aa97d91aeccb4b8385be1672"
+      },
+      {
+        "author": "Madelyn Olson",
+        "date": "2026-04-03T20:40:06+00:00",
+        "message": "Fix VLA warning in linenoise and enable -Werror (#3439)",
+        "sha": "e8ca6c07b22ceb89692c17b7f51c4a8f03a268ba"
+      },
+      {
+        "author": "Satheesha CH Gowda",
+        "date": "2026-04-04T17:30:58+00:00",
+        "message": "Merge branch 'unstable' into unstable",
+        "sha": "26013ff1fef99db964d7053f8ac6a22f8ba6b786"
+      }
+    ],
     "date": "2026-04-04",
     "failed_job_names": [],
     "failed_jobs": 0,
