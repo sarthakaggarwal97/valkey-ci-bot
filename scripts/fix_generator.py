@@ -58,14 +58,7 @@ The diff must:
 _DIFF_FILE_RE = re.compile(r"^(?:---|\+\+\+) [ab]/(.+)$", re.MULTILINE)
 
 
-def _strip_markdown_fences(text: str) -> str:
-    """Remove markdown code fences from a response if present."""
-    cleaned = text.strip()
-    if cleaned.startswith("```"):
-        cleaned = re.sub(r"^```[a-z]*\n?", "", cleaned)
-        cleaned = re.sub(r"\n?```$", "", cleaned)
-        cleaned = cleaned.strip()
-    return cleaned
+from scripts.text_utils import strip_markdown_fences as _strip_markdown_fences
 
 
 def _count_patch_files(diff: str) -> set[str]:
@@ -97,6 +90,7 @@ def _validate_generated_patch(
     root_cause: RootCauseReport,
     source_files: dict[str, str],
     config: BotConfig,
+    build_commands: list[str] | None = None,
 ) -> tuple[bool, str, set[str]]:
     """Validate a generated patch before the model leaves the loop."""
     cleaned = _strip_markdown_fences(diff)
@@ -133,6 +127,10 @@ def _validate_generated_patch(
     success, error_output = _validate_patch_applies(cleaned, source_files)
     if not success:
         return False, error_output or "Patch did not apply cleanly.", modified_files
+
+    if build_commands and not _try_build(Path.cwd(), build_commands):
+        return False, "Build validation failed after applying patch.", modified_files
+
     return True, "", modified_files
 
 
@@ -245,6 +243,39 @@ def _validate_patch_applies(diff: str, source_files: dict[str, str]) -> tuple[bo
         return False, str(exc)
 
 
+def _try_build(repo_dir: Path, build_commands: list[str] | None) -> bool:
+    """Run build commands to validate a patch.
+
+    Returns True if all commands succeed or if no commands are provided.
+    """
+    if not build_commands:
+        return True
+    for cmd in build_commands:
+        try:
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                cwd=str(repo_dir),
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if result.returncode != 0:
+                logger.warning(
+                    "Build command failed: %s\nstdout: %s\nstderr: %s",
+                    cmd, result.stdout[-500:] if result.stdout else "",
+                    result.stderr[-500:] if result.stderr else "",
+                )
+                return False
+        except subprocess.TimeoutExpired:
+            logger.warning("Build command timed out (120s): %s", cmd)
+            return False
+        except OSError as exc:
+            logger.warning("Build command error: %s: %s", cmd, exc)
+            return False
+    return True
+
+
 class FixGenerator:
     """Bedrock-powered patch generation for CI failure fixes.
 
@@ -293,6 +324,7 @@ class FixGenerator:
         failed_hypotheses: list[str] | None = None,
         *,
         repo_ref: str | None = None,
+        build_commands: list[str] | None = None,
     ) -> str | None:
         """Generate a unified diff patch for the given root cause.
 
@@ -304,6 +336,8 @@ class FixGenerator:
                 previous attempt, included as additional context.
             repo_ref: Optional Git ref or commit SHA used when the
                 agentic path fetches additional repository files.
+            build_commands: Optional list of shell commands to run for
+                build validation after patch applies cleanly.
 
         Returns:
             The unified diff string, or None if generation fails or
@@ -385,6 +419,7 @@ class FixGenerator:
                 root_cause,
                 source_files,
                 self._config,
+                build_commands=build_commands,
             )
             if success:
                 logger.info(
@@ -534,7 +569,8 @@ class FixGenerator:
 
         try:
             payload = _json.loads(response) if isinstance(response, str) else response
-        except Exception:
+        except (ValueError, TypeError) as exc:
+            logger.debug("Could not parse agentic fix response as JSON: %s", exc)
             payload = {}
 
         diff = payload.get("diff", "") if isinstance(payload, dict) else str(payload)
