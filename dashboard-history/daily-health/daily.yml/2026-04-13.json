@@ -1,9 +1,60 @@
 {
-  "captured_at": "2026-04-16T01:14:35.046208+00:00",
+  "captured_at": "2026-04-16T04:54:01.503886+00:00",
   "date": "2026-04-13",
   "repo": "valkey-io/valkey",
   "run": {
+    "commit_message": "Merge branch 'unstable' into unstable\n\nSigned-off-by: Satheesha CH Gowda <satheesha.balaji@gmail.com>",
     "commit_sha": "79f8e11",
+    "commits_since_prev": [
+      {
+        "author": "Satheesha Gowda",
+        "date": "2026-03-21T01:00:05+00:00",
+        "message": "Optimize MGET and MSET commands using prefetching.",
+        "sha": "878bfef856863519f12b40532e25b3d6a2ae9477"
+      },
+      {
+        "author": "Satheesha Gowda",
+        "date": "2026-03-28T15:59:01+00:00",
+        "message": "Address review comments",
+        "sha": "73dc3a75ef3afec105f16b8dd2f93d1c71c2c5e1"
+      },
+      {
+        "author": "Satheesha CH Gowda",
+        "date": "2026-04-04T17:30:58+00:00",
+        "message": "Merge branch 'unstable' into unstable",
+        "sha": "26013ff1fef99db964d7053f8ac6a22f8ba6b786"
+      },
+      {
+        "author": "Satheesha CH Gowda",
+        "date": "2026-04-07T18:17:01+00:00",
+        "message": "Merge branch 'unstable' into unstable",
+        "sha": "4c75f05668ce8444de6e8644094ff9c2790b0d04"
+      },
+      {
+        "author": "Satheesha Gowda",
+        "date": "2026-04-07T20:41:56+00:00",
+        "message": " Adding prefetch capabilites for DEL/UNLINK/EXISTS and TOUCH",
+        "sha": "d6137a362544d9304c04a86c195d05055570b7cd"
+      },
+      {
+        "author": "Satheesha CH Gowda",
+        "date": "2026-04-08T17:56:16+00:00",
+        "message": "Merge branch 'unstable' into unstable",
+        "sha": "56996f226e12d7b9ad261a0280600a6a2959d4b9"
+      },
+      {
+        "author": "Ricardo Dias",
+        "date": "2026-04-13T10:48:41+00:00",
+        "message": "Adds new (hidden) ValkeyModule_CallArgv API functions (#3122)",
+        "sha": "0ec173351658e2b74b5936125233ab77da017e57"
+      },
+      {
+        "author": "Satheesha CH Gowda",
+        "date": "2026-04-13T14:20:06+00:00",
+        "message": "Merge branch 'unstable' into unstable",
+        "sha": "79f8e1169286bfb162b6ead4ff7337d9486e89b1"
+      }
+    ],
     "date": "2026-04-13",
     "failed_job_names": [],
     "failed_jobs": 0,
