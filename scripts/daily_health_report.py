@@ -205,7 +205,7 @@ def fetch_daily_runs(
         if curr_sha and prev_sha and curr_sha != prev_sha:
             try:
                 comparison = retry_github_call(
-                    lambda cs=curr_sha, ps=prev_sha: repo.compare(ps, cs),
+                    lambda cs=curr_sha, ps=prev_sha: repo.compare(ps, cs),  # type: ignore[misc]
                     retries=2,
                     description=f"compare {prev_sha[:7]}..{curr_sha[:7]}",
                 )

@@ -823,7 +823,7 @@ def _coalesce_daily_health(
     # The reported data (from daily_health_report.py) only has step-level names
     # like "test", "unittest". The derived data (from monitor) has actual test
     # case names like "clients state report follows."
-    derived_runs = {
+    derived_runs: dict[tuple[str, str], Any] = {
         (_str(r.get("date")), _str(r.get("workflow"))): r
         for r in _list(derived.get("runs"))
     }
