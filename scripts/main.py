@@ -989,7 +989,7 @@ def run_pipeline(
 
     # Build components
     detector = FailureDetector(gh)
-    log_retriever = LogRetriever(gh)
+    log_retriever = LogRetriever(gh, token=github_token)
     parser_router = _build_parser_router()
     failure_store = FailureStore(
         gh,
