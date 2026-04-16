@@ -818,6 +818,55 @@ def _coalesce_daily_health(
     for key in ("total_runs", "failed_runs", "unique_failures", "days_with_runs"):
         if _int(merged.get(key)) == 0 and _int(derived.get(key)) > 0:
             merged[key] = derived.get(key, 0)
+
+    # Enrich reported runs with monitor's test-level failure names and job data.
+    # The reported data (from daily_health_report.py) only has step-level names
+    # like "test", "unittest". The derived data (from monitor) has actual test
+    # case names like "clients state report follows."
+    derived_runs = {
+        (_str(r.get("date")), _str(r.get("workflow"))): r
+        for r in _list(derived.get("runs"))
+    }
+    for run in _list(merged.get("runs")):
+        key = (_str(run.get("date")), _str(run.get("workflow")))
+        dr = derived_runs.get(key)
+        if not dr:
+            continue
+        # Prefer monitor's failure_names if they are more specific
+        d_names = _list(dr.get("failure_names"))
+        r_names = _list(run.get("failure_names"))
+        if d_names and (not r_names or len(d_names) > len(r_names)):
+            run["failure_names"] = d_names
+            run["unique_failures"] = len(d_names)
+        # Merge failure_jobs from monitor
+        d_jobs = _mapping(dr.get("failure_jobs"))
+        if d_jobs:
+            existing = _mapping(run.get("failure_jobs"))
+            existing.update(d_jobs)
+            run["failure_jobs"] = existing
+        # Carry over commits_since_prev and commit_message if available
+        for field in ("commits_since_prev", "commit_message"):
+            if dr.get(field) and not run.get(field):
+                run[field] = dr[field]
+
+    # Rebuild heatmap and workflow_reports from enriched runs when derived
+    # data has more specific failure names.
+    d_heatmap = _list(derived.get("heatmap"))
+    r_heatmap = _list(merged.get("heatmap"))
+    if d_heatmap and r_heatmap:
+        d_names_set = {_str(row.get("name")) for row in d_heatmap}
+        r_names_set = {_str(row.get("name")) for row in r_heatmap}
+        # If derived has more rows (more specific names), prefer it
+        if len(d_names_set) > len(r_names_set):
+            merged["heatmap"] = d_heatmap
+    d_reports = _list(derived.get("workflow_reports"))
+    r_reports = _list(merged.get("workflow_reports"))
+    if d_reports and r_reports:
+        d_total = sum(len(_list(wr.get("heatmap"))) for wr in d_reports)
+        r_total = sum(len(_list(wr.get("heatmap"))) for wr in r_reports)
+        if d_total > r_total:
+            merged["workflow_reports"] = d_reports
+
     return merged
 
 

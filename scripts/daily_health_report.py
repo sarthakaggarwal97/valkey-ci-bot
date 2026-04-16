@@ -180,6 +180,7 @@ def fetch_daily_runs(
             "workflow": workflow_file,
             "commit_sha": commit_sha,
             "full_sha": run.head_sha or "",
+            "commit_message": (run.head_commit.message if hasattr(run, "head_commit") and run.head_commit else ""),
             "run_url": run.html_url,
             "total_jobs": total_jobs,
             "failed_jobs": len(failed_job_names),
@@ -194,6 +195,36 @@ def fetch_daily_runs(
 
     # Sort newest first
     collected.sort(key=lambda r: r["date"], reverse=True)
+
+    # Compute commits_since_prev by comparing consecutive SHAs via GitHub API
+    for i in range(len(collected) - 1):
+        curr = collected[i]
+        prev = collected[i + 1]
+        curr_sha = curr.get("full_sha", "")
+        prev_sha = prev.get("full_sha", "")
+        if curr_sha and prev_sha and curr_sha != prev_sha:
+            try:
+                comparison = retry_github_call(
+                    lambda cs=curr_sha, ps=prev_sha: repo.compare(ps, cs),
+                    retries=2,
+                    description=f"compare {prev_sha[:7]}..{curr_sha[:7]}",
+                )
+                curr["commits_since_prev"] = [
+                    {
+                        "sha": c.sha,
+                        "message": (c.commit.message.split("\n")[0] if c.commit and c.commit.message else ""),
+                        "author": (c.commit.author.name if c.commit and c.commit.author else ""),
+                        "date": (c.commit.author.date.isoformat() if c.commit and c.commit.author and c.commit.author.date else ""),
+                    }
+                    for c in (comparison.commits or [])
+                ]
+            except Exception:
+                curr["commits_since_prev"] = []
+        else:
+            curr["commits_since_prev"] = []
+    if collected:
+        collected[-1]["commits_since_prev"] = []
+
     return collected
 
 
@@ -206,14 +237,23 @@ def _build_report_snapshot(
     expected_dates: list[str] | None = None,
 ) -> JsonObject:
     """Build one report view from a set of workflow runs."""
+    # Only count dates where tests actually executed (not skipped/cancelled)
     run_dates = sorted(
+        {
+            str(r.get("date", "")).strip()
+            for r in runs
+            if str(r.get("date", "")).strip()
+            and str(r.get("status", "")).lower() not in ("skipped", "cancelled")
+        }
+    )
+    all_dates = sorted(
         {
             str(r.get("date", "")).strip()
             for r in runs
             if str(r.get("date", "")).strip()
         }
     )
-    dates = expected_dates or run_dates
+    dates = expected_dates or all_dates
 
     # Build heatmap: for each failure name, count occurrences per date
     failure_dates: dict[str, Counter[str]] = defaultdict(Counter)

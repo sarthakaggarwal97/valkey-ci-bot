@@ -81,20 +81,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          run_id="$(gh run list \
+          run_ids="$(gh run list \
             --workflow "Monitor Valkey CI Failures" \
             --branch "${DEFAULT_BRANCH}" \
             --status success \
-            --limit 1 \
+            --limit 15 \
             --json databaseId \
-            --jq '.[0].databaseId')"
-          if [[ -z "${run_id}" || "${run_id}" == "null" ]]; then
+            --jq '.[].databaseId')"
+          if [[ -z "${run_ids}" ]]; then
             exit 0
           fi
           mkdir -p latest-daily
-          gh run download "${run_id}" \
-            --name "valkey-daily-monitor-result-${run_id}" \
-            --dir latest-daily
+          for run_id in ${run_ids}; do
+            gh run download "${run_id}" \
+              --name "valkey-daily-monitor-result-${run_id}" \
+              --dir "latest-daily/${run_id}" || true
+          done
 
       - name: Download latest fuzzer analysis snapshot
         continue-on-error: true
@@ -141,6 +143,9 @@ jobs:
           if [[ -f "latest-daily/monitor-result.json" ]]; then
             args+=(--daily-result "latest-daily/monitor-result.json")
           fi
+          for f in latest-daily/*/monitor-result.json; do
+            [[ -f "$f" ]] && args+=(--daily-result "$f")
+          done
 
           for f in latest-fuzzer/*/fuzzer-monitor-result.json; do
             [[ -f "$f" ]] && args+=(--fuzzer-result "$f")
