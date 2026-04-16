@@ -99,7 +99,7 @@ Label Added: "backport <branch>"
 |--------|---------|
 | `rate_limiter.py` | Daily PR limits, token budgets, queue management |
 | `permission_gate.py` | Collaborator permission checks |
-| `bedrock_client.py` | Bedrock API with circuit breaker + retry |
+| `bedrock_client.py` | Bedrock API with retry + backoff |
 | `alerting.py` | Webhook/Slack notifications |
 | `sla_metrics.py` | Operation timing + cost tracking |
 
@@ -118,7 +118,6 @@ Label Added: "backport <branch>"
 - **Prompt injection defense** — all system prompts include untrusted-data fencing
 - **Fork safety** — untrusted fork PRs are gated by `PermissionGate`
 - **Rate limiting** — daily PR caps, token budgets, open PR limits
-- **Circuit breaker** — Bedrock API auto-disables after consecutive failures
 - **Safe YAML** — `yaml.safe_load` used everywhere, never `yaml.load`
 - **HTML escaping** — all dashboard output uses `html.escape()` wrappers
 
