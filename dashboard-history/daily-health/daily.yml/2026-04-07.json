@@ -1,9 +1,72 @@
 {
-  "captured_at": "2026-04-16T01:14:44.898750+00:00",
+  "captured_at": "2026-04-16T04:54:11.432084+00:00",
   "date": "2026-04-07",
   "repo": "valkey-io/valkey",
   "run": {
+    "commit_message": " Adding prefetch capabilites for DEL/UNLINK/EXISTS and TOUCH\n\nSigned-off-by: Satheesha Gowda <satheesha.balaji@gmail.com>",
     "commit_sha": "d6137a3",
+    "commits_since_prev": [
+      {
+        "author": "Satheesha Gowda",
+        "date": "2026-03-21T01:00:05+00:00",
+        "message": "Optimize MGET and MSET commands using prefetching.",
+        "sha": "878bfef856863519f12b40532e25b3d6a2ae9477"
+      },
+      {
+        "author": "Satheesha Gowda",
+        "date": "2026-03-28T15:59:01+00:00",
+        "message": "Address review comments",
+        "sha": "73dc3a75ef3afec105f16b8dd2f93d1c71c2c5e1"
+      },
+      {
+        "author": "Satheesha CH Gowda",
+        "date": "2026-04-04T17:30:58+00:00",
+        "message": "Merge branch 'unstable' into unstable",
+        "sha": "26013ff1fef99db964d7053f8ac6a22f8ba6b786"
+      },
+      {
+        "author": "Ran Shidlansik",
+        "date": "2026-04-06T01:49:24+00:00",
+        "message": "Avoid having server.h being included by cli and benchmark (#3420)",
+        "sha": "0c81b53d6af3bcffecbcbadf50639e5969178333"
+      },
+      {
+        "author": "Joseph Heck",
+        "date": "2026-04-06T18:15:02+00:00",
+        "message": "Grammar, spelling, and punctuation fixes across the summary fields for Valkey commands. (#3309)",
+        "sha": "ecba3e312300a12fa3bbd4718aedcab3e26ff425"
+      },
+      {
+        "author": "Lucas Yang",
+        "date": "2026-04-06T21:42:47+00:00",
+        "message": "Update maintainer affiliation (#3449)",
+        "sha": "3ed6e5f8441be4e33ccb4b8310d8a22f6cdf492f"
+      },
+      {
+        "author": "Nikhil Manglore",
+        "date": "2026-04-07T08:14:35+00:00",
+        "message": "Increase embedded string threshold from 64 to 128 bytes (#3397)",
+        "sha": "034d16ac44e8f722b26d30ea7be9422427092d05"
+      },
+      {
+        "author": "charsyam",
+        "date": "2026-04-07T12:56:30+00:00",
+        "message": "Fix RDB expiry write length and leak when loading zipmap (#3422)",
+        "sha": "2585f60ebc93c7b44a23e4df9fb02f2012e185fd"
+      },
+      {
+        "author": "Satheesha CH Gowda",
+        "date": "2026-04-07T18:17:01+00:00",
+        "message": "Merge branch 'unstable' into unstable",
+        "sha": "4c75f05668ce8444de6e8644094ff9c2790b0d04"
+      },
+      {
+        "author": "Satheesha Gowda",
+        "date": "2026-04-07T20:41:56+00:00",
+        "message": " Adding prefetch capabilites for DEL/UNLINK/EXISTS and TOUCH",
+        "sha": "d6137a362544d9304c04a86c195d05055570b7cd"
+      }
+    ],
     "date": "2026-04-07",
     "failed_job_names": [],
     "failed_jobs": 0,
