@@ -1,9 +1,24 @@
 {
-  "captured_at": "2026-04-16T01:14:31.821231+00:00",
+  "captured_at": "2026-04-16T04:53:58.066929+00:00",
   "date": "2026-04-15",
   "repo": "valkey-io/valkey",
   "run": {
+    "commit_message": "Add cluster bus network traffic usage metric in bytes (#3396)\n\nAdds cluster bus byte metrics to `CLUSTER INFO`, split by admin,\npub/sub, and module traffic. The change tracks sent and received bytes\non the cluster bus, exposes them as\n`cluster_stats_*_bytes_{sent,received}`.\n\nExample:\n\n```\n> src/valkey-cli CLUSTER INFO\ncluster_state:fail\n...\ncluster_stats_bytes_sent:46088\ncluster_stats_bytes_received:46080\ncluster_stats_pubsub_bytes_sent:0\ncluster_stats_pubsub_bytes_received:0\ncluster_stats_module_bytes_sent:0\ncluster_stats_module_bytes_received:0\ntotal_cluster_links_buffer_limit_exceeded:0\n```\n\nFixes: https://github.com/valkey-io/valkey/issues/1929\n\n---------\n\nSigned-off-by: Harkrishn Patro <bunty.hari@gmail.com>\nCo-authored-by: Viktor S\u00f6derqvist <viktor.soderqvist@est.tech>",
     "commit_sha": "b2e0f63",
+    "commits_since_prev": [
+      {
+        "author": "Binbin",
+        "date": "2026-04-15T02:54:06+00:00",
+        "message": "Change rdbSaveStreamConsumers return type from size_t to ssize_t (#3499)",
+        "sha": "a34f125d8e18201bc51878e2848c6b6187a8a3cb"
+      },
+      {
+        "author": "Harkrishn Patro",
+        "date": "2026-04-15T20:54:52+00:00",
+        "message": "Add cluster bus network traffic usage metric in bytes (#3396)",
+        "sha": "b2e0f6322d288bfdb5076e01791402fe790f0892"
+      }
+    ],
     "date": "2026-04-15",
     "failed_job_names": [
       "test-almalinux8-tls-module",
