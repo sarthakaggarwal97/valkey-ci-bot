@@ -14,7 +14,7 @@ _MODULE_LOAD_RE = re.compile(
 # Module API assertion: serverAssert / redisAssert / ValkeyModule_Assert
 _MODULE_ASSERT_RE = re.compile(
     r"((?:server|redis|ValkeyModule_?)Assert(?:WithInfo)?)\s*\(\s*(.+?)\s*\)"
-    r".*?(?:in\s+(\S+?):(\d+))?",
+    r"(?:\s+in\s+(\S+?):(\d+))?",
     re.IGNORECASE,
 )
 # Module test [err] patterns (Tcl-based but module-specific paths)

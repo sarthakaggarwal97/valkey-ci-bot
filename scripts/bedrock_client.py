@@ -74,6 +74,12 @@ class CircuitBreaker:
         # half-open: allow one request to test recovery
         return True
 
+    def reset(self) -> None:
+        """Reset the circuit breaker to closed state (useful for testing)."""
+        self._failure_count = 0
+        self._state = "closed"
+        self._last_failure_time = 0.0
+
 
 _circuit_breaker = CircuitBreaker()
 

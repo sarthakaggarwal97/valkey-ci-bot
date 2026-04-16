@@ -12,3 +12,10 @@ def clear_commit_identity_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "CI_BOT_REQUIRE_DCO_SIGNOFF",
     ):
         monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def reset_circuit_breaker() -> None:
+    """Reset the Bedrock circuit breaker between tests."""
+    from scripts.bedrock_client import _circuit_breaker
+    _circuit_breaker.reset()

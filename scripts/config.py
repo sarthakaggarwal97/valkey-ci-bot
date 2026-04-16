@@ -91,8 +91,8 @@ class BotConfig:
         self.max_retries_validation = max(0, self.max_retries_validation)
         self.daily_token_budget = max(0, self.daily_token_budget)
         self.thinking_budget = max(1024, min(self.thinking_budget, 128_000))
-        self.max_input_tokens = max(1000, self.max_input_tokens)
-        self.max_output_tokens = max(256, self.max_output_tokens)
+        self.max_input_tokens = max(1, self.max_input_tokens)
+        self.max_output_tokens = max(1, self.max_output_tokens)
         self.flaky_validation_passes = max(1, self.flaky_validation_passes)
         if self.confidence_threshold not in ("high", "medium", "low"):
             self.confidence_threshold = "medium"
@@ -146,8 +146,8 @@ class ReviewerConfig:
         self.bedrock_retries = max(0, self.bedrock_retries)
         self.github_retries = max(0, self.github_retries)
         self.daily_token_budget = max(0, self.daily_token_budget)
-        self.max_input_tokens = max(1000, self.max_input_tokens)
-        self.max_output_tokens = max(256, self.max_output_tokens)
+        self.max_input_tokens = max(1, self.max_input_tokens)
+        self.max_output_tokens = max(1, self.max_output_tokens)
 
     @property
     def bedrock_model_id(self) -> str:

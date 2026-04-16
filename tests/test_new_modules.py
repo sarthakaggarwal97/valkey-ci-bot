@@ -277,8 +277,8 @@ class TestCorrelationEngine:
         assert len(error_groups) == 1
 
     def test_shared_prefix_groups(self) -> None:
-        r1 = _make_report([_pf(test_name="tests/unit/cluster/a")])
-        r2 = _make_report([_pf(test_name="tests/unit/cluster/b")])
+        r1 = _make_report([_pf(ident="a", test_name="tests/unit/cluster/a", error_message="error alpha")])
+        r2 = _make_report([_pf(ident="b", test_name="tests/unit/cluster/b", error_message="completely different msg")])
         groups = correlate_failures([r1, r2])
         prefix_groups = [g for g in groups if "shared_test_prefix" in g.correlation_reason]
         assert len(prefix_groups) == 1
@@ -755,12 +755,12 @@ class TestBotConfigPostInit:
             assert cfg.confidence_threshold == level
 
     def test_max_input_tokens_floor(self) -> None:
-        cfg = BotConfig(max_input_tokens=10)
-        assert cfg.max_input_tokens == 1000
+        cfg = BotConfig(max_input_tokens=-5)
+        assert cfg.max_input_tokens == 1
 
     def test_max_output_tokens_floor(self) -> None:
-        cfg = BotConfig(max_output_tokens=1)
-        assert cfg.max_output_tokens == 256
+        cfg = BotConfig(max_output_tokens=-1)
+        assert cfg.max_output_tokens == 1
 
     def test_flaky_validation_passes_floor(self) -> None:
         cfg = BotConfig(flaky_validation_passes=0)
@@ -788,6 +788,6 @@ class TestReviewerConfigPostInit:
         assert cfg.max_retries_bedrock == 7
 
     def test_token_floors(self) -> None:
-        cfg = ReviewerConfig(max_input_tokens=5, max_output_tokens=5)
-        assert cfg.max_input_tokens == 1000
-        assert cfg.max_output_tokens == 256
+        cfg = ReviewerConfig(max_input_tokens=-1, max_output_tokens=-1)
+        assert cfg.max_input_tokens == 1
+        assert cfg.max_output_tokens == 1
