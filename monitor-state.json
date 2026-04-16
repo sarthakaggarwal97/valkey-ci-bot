@@ -28,10 +28,17 @@
     "updated_at": "2026-04-15T19:47:11.874727+00:00"
   },
   "valkey-io/valkey:daily.yml:schedule,pull_request": {
-    "last_seen_run_id": 24485406038,
+    "last_seen_run_id": 24477903435,
     "target_repo": "valkey-io/valkey",
     "workflow_file": "daily.yml",
     "event": "schedule,pull_request",
-    "updated_at": "2026-04-16T04:21:22.677446+00:00"
+    "updated_at": "2026-04-16T00:03:09.643178+00:00"
+  },
+  "valkey-io/valkey:weekly.yml:schedule": {
+    "last_seen_run_id": 24300553351,
+    "target_repo": "valkey-io/valkey",
+    "workflow_file": "weekly.yml",
+    "event": "schedule",
+    "updated_at": "2026-04-16T04:52:51.395442+00:00"
   }
 }
