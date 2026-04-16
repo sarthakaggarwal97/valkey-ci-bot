@@ -255,7 +255,7 @@ def _build_report_snapshot(
         unique_failures.update(run["failure_names"])
 
     total_runs = len(runs)
-    failed_runs = sum(1 for r in runs if r["status"] == "failure")
+    failed_runs = sum(1 for r in runs if r["status"] != "success")
 
     return {
         "repo": repo_full_name,
@@ -621,8 +621,13 @@ def _render_run_details(data: JsonObject) -> str:
             failure_jobs_map = run.get("failure_jobs", {})
             failed_job_names = run.get("failed_job_names", [])
 
-            status_css = "run-fail" if status == "failure" else "run-pass"
-            status_label = f"FAIL ({failed_jobs}/{total_jobs})" if status == "failure" else "PASS"
+            status_css = "run-pass" if status == "success" else "run-fail"
+            if status == "success":
+                status_label = "PASS"
+            elif status == "failure":
+                status_label = f"FAIL ({failed_jobs}/{total_jobs})"
+            else:
+                status_label = status.upper()
             workflow_label = _workflow_label(run.get("workflow"))
 
             # Render failure names with job links
