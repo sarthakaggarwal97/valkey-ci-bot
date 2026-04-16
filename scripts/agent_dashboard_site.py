@@ -943,7 +943,15 @@ def _daily_metrics(dashboard: JsonObject) -> list[str]:
     return metrics
 
 
-def _daily_heatmap_table(report: JsonObject, *, filter_id: str, repo: str = "", tests: JsonObject | None = None) -> str:
+def _daily_heatmap_table(
+    report: JsonObject,
+    *,
+    filter_id: str,
+    repo: str = "",
+    tests: JsonObject | None = None,
+    all_runs: list[Any] | None = None,
+    workflow_filter: str = "",
+) -> str:
     heatmap_rows = [
         _mapping(row)
         for row in _list(report.get("heatmap"))
@@ -961,14 +969,18 @@ def _daily_heatmap_table(report: JsonObject, *, filter_id: str, repo: str = "", 
         ),
         default=1,
     )
-    # Build run status index: date -> worst status
-    runs = _list(report.get("runs"))
+    # Build run status index: date -> worst status for this workflow
+    source_runs = all_runs if all_runs is not None else _list(report.get("runs"))
+    wf_filter = workflow_filter.lower()
     status_by_date: dict[str, str] = {}
     run_id_by_date: dict[str, str] = {}
-    for run in runs:
+    for run in source_runs:
         r = _mapping(run)
         d = _str(r.get("date"))
         if not d:
+            continue
+        # Filter to this workflow when in multi-workflow mode
+        if wf_filter and _str(r.get("workflow")).lower() != wf_filter:
             continue
         s = _str(r.get("status")).lower()
         run_id_by_date.setdefault(d, _str(r.get("run_id") or r.get("run_url", "").rstrip("/").rsplit("/", 1)[-1]))
@@ -1107,6 +1119,7 @@ def _daily_heatmap(daily_health: JsonObject) -> str:
         return '<p class="empty">No Daily heatmap is available in the supplied payload.</p>'
     repo = _str(daily_health.get("repo"))
     tests = _mapping(daily_health.get("tests"))
+    all_runs = _list(daily_health.get("runs"))
     if len(reports) == 1:
         missing = _heatmap_missing_count(reports[0])
         missing_note = (
@@ -1116,7 +1129,7 @@ def _daily_heatmap(daily_health: JsonObject) -> str:
         )
         return (
             f'<p class="split-note">A dash means no run data was available for that date.{missing_note}</p>'
-            + _daily_heatmap_table(reports[0], filter_id="daily-heatmap", repo=repo, tests=tests)
+            + _daily_heatmap_table(reports[0], filter_id="daily-heatmap", repo=repo, tests=tests, all_runs=all_runs)
         )
 
     blocks: list[str] = []
@@ -1139,7 +1152,7 @@ def _daily_heatmap(daily_health: JsonObject) -> str:
             f"{_meta_pill('Unique failures', _format_number(report.get('unique_failures', 0)))}"
             f"{missing_pill}"
             "</div></div>"
-            + _daily_heatmap_table(report, filter_id=f"daily-heatmap-{slug}", repo=repo, tests=tests)
+            + _daily_heatmap_table(report, filter_id=f"daily-heatmap-{slug}", repo=repo, tests=tests, all_runs=all_runs, workflow_filter=_str(report.get("workflow")))
             + "</section>"
         )
     return (
@@ -2496,6 +2509,12 @@ tr:last-child th {
 .heatmap-table thead .secondary-col {
   background: #132033;
 }
+.heatmap-table thead th {
+  font: 700 12px/1.2 "Fira Mono", ui-monospace, monospace;
+  text-transform: none;
+  letter-spacing: normal;
+  padding: 8px 8px;
+}
 .heatmap-table tbody .sticky-col {
   background: #0f1828;
 }
@@ -2512,11 +2531,14 @@ tr:last-child th {
   font-weight: 700;
 }
 .heat-cell {
-  min-width: 46px;
+  min-width: 42px;
   text-align: center;
   color: #91a3bf;
   background: rgba(105, 131, 255, 0.03);
   font-weight: 700;
+  font-size: 13px;
+  padding: 6px 4px;
+  white-space: nowrap;
 }
 .heat-cell-missing {
   color: #6f83a1;
@@ -2530,6 +2552,14 @@ tr:last-child th {
 .heat-status-row td {
   font-weight: 700;
   text-align: center;
+  font-size: 14px;
+  padding: 6px 8px;
+}
+.heat-status-row th {
+  font: 700 13px/1.4 "Fira Mono", ui-monospace, monospace;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--muted);
 }
 .heat-status-good {
   color: #a8f0cf;
@@ -2538,6 +2568,11 @@ tr:last-child th {
 .heat-status-bad {
   color: #ffc4cc;
   background: rgba(207, 60, 79, 0.22);
+}
+.heatmap-table tbody th {
+  font: 700 13px/1.4 "Fira Mono", ui-monospace, monospace;
+  text-transform: none;
+  letter-spacing: normal;
 }
 .job-link {
   color: #a9c5ff;

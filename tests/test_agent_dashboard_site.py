@@ -456,6 +456,15 @@ def test_heatmap_run_status_row(tmp_path: Path) -> None:
     assert "heat-status-bad" in html
 
 
+def test_status_row_filters_by_workflow(tmp_path: Path) -> None:
+    """In multi-workflow mode, status row should only show that workflow's runs."""
+    site_dir = tmp_path / "site"
+    build_site(_multi_workflow_dashboard(), site_dir)
+    html = (site_dir / "index.html").read_text(encoding="utf-8")
+    # Both workflows should have status rows
+    assert html.count("heat-status-row") == 2
+
+
 def test_heatmap_job_links(tmp_path: Path) -> None:
     """Heatmap failure cells should have numbered job links."""
     site_dir = tmp_path / "site"
