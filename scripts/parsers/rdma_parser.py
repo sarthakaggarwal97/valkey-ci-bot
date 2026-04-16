@@ -13,8 +13,9 @@ _RDMA_ERR_RE = re.compile(
 _RDMA_FAIL_RE = re.compile(
     r"(?:RDMA|rdma).*(?:failed|error|timeout|refused)", re.IGNORECASE,
 )
+# Match just the RDMA connection error phrase, not the whole line
 _RDMA_CONN_RE = re.compile(
-    r"(?:connection\s+refused|rdma_connect|ibv_\w+)\s*.*(?:fail|error)",
+    r"((?:connection\s+refused|rdma_connect\s+failed|ibv_\w+\s+(?:failed|error)))",
     re.IGNORECASE,
 )
 
@@ -23,9 +24,10 @@ class RdmaParser:
     """Parses RDMA test failure output from runtest-rdma."""
 
     def can_parse(self, log_content: str) -> bool:
-        return "rdma" in log_content.lower() and bool(
-            _RDMA_ERR_RE.search(log_content)
-            or _RDMA_FAIL_RE.search(log_content)
+        # Require actual RDMA protocol/connection errors, not just "rdma" in a job name
+        return bool(
+            ("rdma" in log_content.lower() and _RDMA_ERR_RE.search(log_content))
+            or _RDMA_CONN_RE.search(log_content)
         )
 
     def parse(self, log_content: str) -> list[ParsedFailure]:
@@ -51,9 +53,14 @@ class RdmaParser:
             ))
 
         if not failures:
+            # Deduplicate by the error phrase only (not timestamps/PIDs)
+            conn_errors: set[str] = set()
             for m in _RDMA_CONN_RE.finditer(log_content):
-                msg = m.group(0).strip()
-                ident = f"rdma-conn:{msg[:80]}"
+                phrase = m.group(1).strip().lower()
+                conn_errors.add(phrase)
+
+            for phrase in sorted(conn_errors):
+                ident = f"rdma:{phrase}"
                 if ident in seen:
                     continue
                 seen.add(ident)
@@ -61,7 +68,7 @@ class RdmaParser:
                     failure_identifier=ident,
                     test_name=None,
                     file_path="",
-                    error_message=f"RDMA: {msg}",
+                    error_message=f"RDMA: {phrase}",
                     assertion_details=None,
                     line_number=None,
                     stack_trace=None,
