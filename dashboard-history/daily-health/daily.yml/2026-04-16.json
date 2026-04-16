@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-04-16T11:34:24.462365+00:00",
+  "captured_at": "2026-04-16T14:19:26.785820+00:00",
   "date": "2026-04-16",
   "repo": "valkey-io/valkey",
   "run": {
@@ -15,16 +15,26 @@
     ],
     "date": "2026-04-16",
     "failed_job_names": [
+      "test-almalinux8-tls-module",
+      "test-almalinux9-tls-module",
+      "test-centosstream9-tls-module-no-tls",
+      "test-macos-latest",
       "test-sanitizer-undefined (clang)",
       "test-sanitizer-undefined (gcc)",
       "test-sanitizer-undefined-large-memory (clang)",
-      "test-sanitizer-undefined-large-memory (gcc)"
+      "test-sanitizer-undefined-large-memory (gcc)",
+      "test-valgrind-test"
     ],
-    "failed_jobs": 4,
+    "failed_jobs": 9,
     "failure_jobs": {
       "test": [
+        71628579647,
         71628579940,
-        71628579956
+        71628579947,
+        71628579948,
+        71628579953,
+        71628579956,
+        71628579970
       ],
       "unittest": [
         71628579708,
