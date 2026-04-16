@@ -1,9 +1,11 @@
 {
-  "captured_at": "2026-04-16T01:14:51.464690+00:00",
+  "captured_at": "2026-04-16T04:54:18.134994+00:00",
   "date": "2026-04-03",
   "repo": "valkey-io/valkey",
   "run": {
+    "commit_message": "Replace dict with thin wrapper around hashtable (#3366)\n\nReplace the dict.c implementation with a header-only wrapper (dict.h)\naround the hashtable API. The dict types, iterators and API functions\nare now typedefs, macros and inline functions that delegate to\nhashtable. This unifies the hashtable implementations in the project and\nremoves duplicated logic.\n\nChanges to dict:\n\n- Remove dict.c; dict.h is now the entire implementation\n- dict, dictType and dictIterator are direct aliases for the hashtable\n  counterparts.\n- dictEntry is a struct allocated by dict wrapper functions to hold key\n  and value. It doesn't have a next pointer anymore.\n- Fix key duplication for dictTypes that had keyDup callback by\n  calling sdsdup() at call sites in functions.c\n- Remove unused functions, macros, includes and casts\n- Move some dict defrag logic to defrag.c\n- Remove obsolete dict unit tests (covered by test_hashtable.cpp)\n\nChanges to hashtable:\n\n- Change hashtable keyCompare convention to match dict: non-zero means\n  keys are equal, so existing dict compare functions can be reused\n- Add const to hashtableMemUsage parameter\n\nChanges to server implementation:\n\n- Deduplicate common dict/hashtable callbacks in server.c\n- Change configured hash-seed to only apply to data hashtables. In\n  particular, it must not modify the hash seed for dicts already\n  initialized during startup for reading configs and similar.\n\nChanges to libvalkey:\n\n- Let libvalkey use its own dict implementation.\n\n---------\n\nSigned-off-by: Viktor S\u00f6derqvist <viktor.soderqvist@est.tech>",
     "commit_sha": "fb655db",
+    "commits_since_prev": [],
     "date": "2026-04-03",
     "failed_job_names": [
       "test-almalinux8-jemalloc",
