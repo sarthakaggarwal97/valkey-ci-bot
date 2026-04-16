@@ -319,7 +319,8 @@ def run_backport(
                 if f.patch:
                     diff_parts.append(f"--- a/{f.filename}\n+++ b/{f.filename}\n{f.patch}")
             diff_content = "\n".join(diff_parts)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Could not fetch PR diff for #%s: %s", source_pr_number, exc)
             diff_content = ""
 
         pr_context = BackportPRContext(

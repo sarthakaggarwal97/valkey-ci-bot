@@ -111,7 +111,7 @@ _FUZZER_ANALYSIS_SCHEMA: dict[str, Any] = {
     ],
 }
 
-_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
 _GITHUB_LOG_PREFIX_RE = re.compile(
     r"^[^\t]+\t[^\t]+\t\d{4}-\d{2}-\d{2}T[0-9:.]+Z\s?"
 )
@@ -245,8 +245,7 @@ def _decode_text(payload: bytes) -> str:
     return payload.decode("utf-8", errors="replace")
 
 
-def _strip_ansi(text: str) -> str:
-    return _ANSI_ESCAPE_RE.sub("", text)
+from scripts.text_utils import strip_ansi as _strip_ansi
 
 
 def _normalize_job_log(raw_log: str) -> str:

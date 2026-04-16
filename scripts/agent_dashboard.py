@@ -17,10 +17,16 @@ from pathlib import Path
 from typing import Any
 
 from scripts.event_ledger import parse_events
+from scripts.json_helpers import (
+    JsonObject,
+    bool_text as _bool_text,
+    mapping as _mapping,
+    safe_int as _int,
+    safe_list as _list,
+    safe_str as _str,
+)
 from scripts.valkey_repo_context import infer_valkey_subsystem
 
-
-JsonObject = dict[str, Any]
 
 _TERMINAL_CAMPAIGN_STATUSES = {"abandoned", "landed", "merged", "pr-created", "validated"}
 _SNAPSHOT_LABELS = {
@@ -36,31 +42,6 @@ _SNAPSHOT_LABELS = {
     "agent_events": "Agent events",
     "instrumentation_gaps": "Instrumentation gaps",
 }
-
-
-def _mapping(value: Any) -> JsonObject:
-    return value if isinstance(value, dict) else {}
-
-
-def _list(value: Any) -> list[Any]:
-    return value if isinstance(value, list) else []
-
-
-def _str(value: Any, default: str = "") -> str:
-    if value is None:
-        return default
-    return str(value)
-
-
-def _int(value: Any, default: int = 0) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _bool_text(value: bool) -> str:
-    return "yes" if value else "no"
 
 
 def _counter_dict(counter: Counter[str]) -> dict[str, int]:

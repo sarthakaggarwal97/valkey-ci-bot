@@ -27,16 +27,7 @@ from scripts.code_reviewer import ReviewToolHandler
 logger = logging.getLogger(__name__)
 
 
-def _strip_code_fences(text: str) -> str:
-    """Remove markdown code fences that LLMs sometimes wrap around output."""
-    # Match ```<optional lang>\n ... \n``` wrapping the entire response
-    stripped = re.sub(
-        r"^```[a-zA-Z]*\s*\n(.*?)```\s*$",
-        r"\1",
-        text.strip(),
-        flags=re.DOTALL,
-    )
-    return stripped
+from scripts.text_utils import strip_markdown_fences as _strip_code_fences
 
 
 _SYSTEM_PROMPT = (
@@ -474,7 +465,8 @@ class ConflictResolver:
 
         try:
             payload = _json.loads(response) if isinstance(response, str) else response
-        except Exception:
+        except (ValueError, TypeError) as exc:
+            logger.debug("Could not parse agentic response as JSON for %s: %s", conflict.path, exc)
             payload = {}
 
         resolved_text = payload.get("resolved_content", "") if isinstance(payload, dict) else str(payload)

@@ -40,8 +40,12 @@ from scripts.models import (
 )
 from scripts.parsers.build_error_parser import BuildErrorParser
 from scripts.parsers.gtest_parser import GTestParser
+from scripts.parsers.module_api_parser import ModuleApiParser
+from scripts.parsers.rdma_parser import RdmaParser
+from scripts.parsers.sanitizer_parser import SanitizerParser
 from scripts.parsers.sentinel_cluster_parser import SentinelClusterParser
 from scripts.parsers.tcl_parser import TclTestParser
+from scripts.parsers.valgrind_parser import ValgrindParser
 from scripts.pr_manager import PRManager
 from scripts.rate_limiter import RateLimiter
 from scripts.root_cause_analyzer import RootCauseAnalyzer
@@ -57,12 +61,19 @@ _PROOF_WORKFLOW_FILE = "prove-daily-fix.yml"
 
 
 def _build_parser_router() -> LogParserRouter:
-    """Create a parser router with all supported parsers registered."""
+    """Create a parser router with all supported parsers registered.
+
+    Lower priority = tried first. All matching parsers contribute results.
+    """
     router = LogParserRouter()
-    router.register(GTestParser())
-    router.register(TclTestParser())
-    router.register(SentinelClusterParser())
-    router.register(BuildErrorParser())
+    router.register(SanitizerParser(), priority=10)
+    router.register(ValgrindParser(), priority=20)
+    router.register(BuildErrorParser(), priority=30)
+    router.register(GTestParser(), priority=40)
+    router.register(ModuleApiParser(), priority=50)
+    router.register(RdmaParser(), priority=60)
+    router.register(SentinelClusterParser(), priority=70)
+    router.register(TclTestParser(), priority=80)
     return router
 @dataclass
 class PipelineResult:

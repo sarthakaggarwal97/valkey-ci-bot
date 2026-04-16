@@ -53,8 +53,8 @@ class FailureDetector:
             try:
                 for annotation in job.get_annotations() if hasattr(job, "get_annotations") else []:
                     check_text += " " + (getattr(annotation, "message", "") or "")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not fetch annotations for job %s: %s", job.name, exc)
 
             if self.is_infrastructure_failure(check_text):
                 logger.info("Skipping infrastructure failure: %s", job.name)

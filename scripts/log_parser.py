@@ -13,17 +13,14 @@ logger = logging.getLogger(__name__)
 RAW_EXCERPT_LINES = 500
 
 _ERROR_MARKERS = re.compile(
-    r"(?:error:|Error:|FAILED|fatal:|FATAL|assertion failed|Traceback)",
+    r"(?:error:|Error:|FAILED|fatal:|FATAL|assertion failed|Traceback"
+    r"|==\d+==ERROR|runtime error:|Invalid (?:read|write)|definitely lost)",
     re.IGNORECASE,
 )
 
 
 def _extract_marker_excerpt(lines: list[str], limit: int) -> str | None:
-    """Scan *lines* for error markers and return a context window.
-
-    Returns ``None`` when no markers are found so the caller can fall
-    back to the plain tail excerpt.
-    """
+    """Scan *lines* for error markers and return a context window."""
     marker_indices: list[int] = []
     for idx, line in enumerate(lines):
         if _ERROR_MARKERS.search(line):
@@ -32,8 +29,6 @@ def _extract_marker_excerpt(lines: list[str], limit: int) -> str | None:
     if not marker_indices:
         return None
 
-    # Find the first cluster of markers (consecutive markers within a
-    # 20-line window).
     cluster_start = marker_indices[0]
     cluster_end = marker_indices[0]
     for mi in marker_indices[1:]:
@@ -42,17 +37,14 @@ def _extract_marker_excerpt(lines: list[str], limit: int) -> str | None:
         else:
             break
 
-    # Extract a context window around the cluster
     context_padding = 30
     region_start = max(0, cluster_start - context_padding)
     region_end = min(len(lines), cluster_end + context_padding + 1)
     marker_region = lines[region_start:region_end]
 
-    # Combine marker region with log tail, up to the configured limit
     tail_budget = limit - len(marker_region)
     if tail_budget > 0:
         tail_lines = lines[-tail_budget:]
-        # Avoid duplicating lines that appear in both regions
         combined = list(marker_region)
         marker_region_set = set(range(region_start, region_end))
         tail_start = len(lines) - tail_budget
@@ -61,8 +53,7 @@ def _extract_marker_excerpt(lines: list[str], limit: int) -> str | None:
             if abs_idx not in marker_region_set:
                 combined.append(line)
         return "\n".join(combined[:limit])
-    else:
-        return "\n".join(marker_region[:limit])
+    return "\n".join(marker_region[:limit])
 
 
 class LogParser(Protocol):
@@ -73,13 +64,21 @@ class LogParser(Protocol):
 
 
 class LogParserRouter:
-    """Tries registered parsers in order; falls back to raw excerpt."""
+    """Tries registered parsers by priority; merges results from all matching parsers."""
 
     def __init__(self, parsers: list[LogParser] | None = None) -> None:
-        self._parsers: list[LogParser] = parsers or []
+        self._parsers: list[tuple[int, LogParser]] = []
+        if parsers:
+            for p in parsers:
+                self._parsers.append((100, p))
 
-    def register(self, parser: LogParser) -> None:
-        self._parsers.append(parser)
+    def register(self, parser: LogParser, *, priority: int = 100) -> None:
+        """Register a parser. Lower priority number = tried first.
+
+        All matching parsers contribute results (not just the first match).
+        """
+        self._parsers.append((priority, parser))
+        self._parsers.sort(key=lambda t: t[0])
 
     def parse(
         self,
@@ -87,35 +86,43 @@ class LogParserRouter:
         *,
         raw_excerpt_lines: int | None = None,
     ) -> tuple[list[ParsedFailure], str | None, bool]:
-        """Parse log content.
+        """Parse log content using all matching parsers.
 
         Returns:
             (parsed_failures, raw_excerpt_or_none, is_unparseable)
         """
-        for parser in self._parsers:
+        all_failures: list[ParsedFailure] = []
+        seen_ids: set[str] = set()
+        matched_parsers: list[str] = []
+
+        for _priority, parser in self._parsers:
             try:
                 if parser.can_parse(log_content):
                     failures = parser.parse(log_content)
+                    for f in failures:
+                        if f.failure_identifier not in seen_ids:
+                            seen_ids.add(f.failure_identifier)
+                            all_failures.append(f)
                     if failures:
-                        logger.info(
-                            "Parsing complete: %s matched, %d failure(s) extracted.",
-                            type(parser).__name__, len(failures),
-                        )
-                        return failures, None, False
+                        matched_parsers.append(type(parser).__name__)
             except Exception as exc:
                 logger.warning("Parser %s raised: %s", type(parser).__name__, exc)
                 continue
+
+        if all_failures:
+            logger.info(
+                "Parsing complete: %s matched, %d failure(s) extracted.",
+                "+".join(matched_parsers),
+                len(all_failures),
+            )
+            return all_failures, None, False
 
         # No parser matched — return raw excerpt
         limit = raw_excerpt_lines if raw_excerpt_lines is not None else RAW_EXCERPT_LINES
         lines = log_content.splitlines()
 
-        # Try error-marker extraction first
         marker_excerpt = _extract_marker_excerpt(lines, limit)
-        if marker_excerpt is not None:
-            excerpt = marker_excerpt
-        else:
-            excerpt = "\n".join(lines[-limit:])
+        excerpt = marker_excerpt if marker_excerpt is not None else "\n".join(lines[-limit:])
 
         logger.warning(
             "Parsing complete: no parser matched, flagging as unparseable "

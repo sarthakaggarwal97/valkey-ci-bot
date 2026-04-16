@@ -16,7 +16,21 @@ from pathlib import Path
 from typing import Any
 
 
-JsonObject = dict[str, Any]
+from scripts.html_helpers import (
+    SafeHtml as _Html,
+    html_attr as _html_attr,
+    html_cell as _html_cell,
+    html_escape as _html,
+    safe_html as _safe_html,
+)
+from scripts.json_helpers import (
+    JsonObject,
+    mapping as _mapping,
+    safe_float as _float,
+    safe_int as _int,
+    safe_list as _list,
+    safe_str as _str,
+)
 
 _VISIBLE_PAGES: list[tuple[str, str, str]] = [
     ("index.html", "Daily CI", "Runs and failures"),
@@ -49,54 +63,6 @@ _VALKEY_LOGO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 187.9
 """
 
 
-def _mapping(value: Any) -> JsonObject:
-    return value if isinstance(value, dict) else {}
-
-
-def _list(value: Any) -> list[Any]:
-    return value if isinstance(value, list) else []
-
-
-def _str(value: Any, default: str = "") -> str:
-    if value is None:
-        return default
-    return str(value)
-
-
-def _int(value: Any, default: int = 0) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _float(value: Any, default: float = 0.0) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return default
-
-
-class _Html(str):
-    """Marker for trusted HTML assembled in this module."""
-
-
-def _safe_html(value: str) -> _Html:
-    return _Html(value)
-
-
-def _html(value: object) -> str:
-    return html_lib.escape(_str(value), quote=False)
-
-
-def _html_attr(value: object) -> str:
-    return html_lib.escape(_str(value), quote=True)
-
-
-def _html_cell(value: object) -> str:
-    if isinstance(value, _Html):
-        return str(value)
-    return _html(value)
 
 
 def _format_number(value: Any) -> str:
@@ -375,6 +341,29 @@ def _run_url(repo: object, run_id: object) -> str:
     if not repo_text or not run_text:
         return ""
     return f"https://github.com/{repo_text}/actions/runs/{run_text}"
+
+
+def _job_url(repo: object, run_id: object, job_id: object) -> str:
+    repo_text = _str(repo)
+    run_text = _str(run_id)
+    job_text = _str(job_id)
+    if not repo_text or not run_text or not job_text:
+        return ""
+    return f"https://github.com/{repo_text}/actions/runs/{run_text}/job/{job_text}"
+
+
+def _job_links(repo: str, run_id: object, job_ids: list[Any]) -> _Html:
+    """Render [1] [2] [3] links to individual job logs."""
+    if not job_ids:
+        return _safe_html("")
+    parts: list[str] = []
+    for i, jid in enumerate(job_ids, 1):
+        url = _job_url(repo, run_id, jid)
+        if url:
+            parts.append(f'<a class="job-link" href="{_html_attr(url)}" target="_blank" rel="noreferrer">[{i}]</a>')
+        else:
+            parts.append(f"[{i}]")
+    return _safe_html(" ".join(parts))
 
 
 def _truncate(value: object, *, limit: int = 96) -> str:
@@ -954,7 +943,7 @@ def _daily_metrics(dashboard: JsonObject) -> list[str]:
     return metrics
 
 
-def _daily_heatmap_table(report: JsonObject, *, filter_id: str) -> str:
+def _daily_heatmap_table(report: JsonObject, *, filter_id: str, repo: str = "", tests: JsonObject | None = None) -> str:
     heatmap_rows = [
         _mapping(row)
         for row in _list(report.get("heatmap"))
@@ -972,7 +961,47 @@ def _daily_heatmap_table(report: JsonObject, *, filter_id: str) -> str:
         ),
         default=1,
     )
+    # Build run status index: date -> worst status
+    runs = _list(report.get("runs"))
+    status_by_date: dict[str, str] = {}
+    run_id_by_date: dict[str, str] = {}
+    for run in runs:
+        r = _mapping(run)
+        d = _str(r.get("date"))
+        if not d:
+            continue
+        s = _str(r.get("status")).lower()
+        run_id_by_date.setdefault(d, _str(r.get("run_id") or r.get("run_url", "").rstrip("/").rsplit("/", 1)[-1]))
+        if s in ("failure", "error"):
+            status_by_date[d] = "failure"
+        elif d not in status_by_date:
+            status_by_date[d] = s
+
+    # Build failure_jobs index from report
+    failure_jobs = _mapping(report.get("failure_jobs"))
+
     head = "".join(f"<th>{_html(date[-2:])}</th>" for date in dates)
+
+    # Run status row (✓/✗)
+    status_row = ""
+    if status_by_date:
+        status_cells: list[str] = []
+        for date in dates:
+            s = status_by_date.get(date, "")
+            if not s:
+                status_cells.append('<td class="heat-cell heat-cell-missing">—</td>')
+            elif s == "failure" or s == "error":
+                status_cells.append('<td class="heat-cell heat-status-bad">✗</td>')
+            else:
+                status_cells.append('<td class="heat-cell heat-status-good">✓</td>')
+        status_row = (
+            '<tr class="heat-status-row"><th class="sticky-col">Run status</th>'
+            '<td class="sticky-col secondary-col"></td>'
+            + "".join(status_cells)
+            + "</tr>"
+        )
+
+    tests_data = tests or {}
     body_rows: list[str] = []
     for row in heatmap_rows[:28]:
         days_failed = _int(row.get("days_failed"))
@@ -987,33 +1016,54 @@ def _daily_heatmap_table(report: JsonObject, *, filter_id: str) -> str:
             + daily_badge
             + "</div>"
         )
+        failure_name = _str(row.get("name"))
         cells: list[str] = []
         for cell in _list(row.get("cells")):
             data = _mapping(cell)
             count = _int(data.get("count"))
             has_run = bool(data.get("has_run", True))
+            cell_date = _str(data.get("date"))
             alpha = 0.20 + (count / max_count) * 0.80 if count else 0.0
             if not has_run:
-                text = "—"
+                content = "—"
                 style = ""
                 classes = "heat-cell heat-cell-missing"
-                title = f"{_html_attr(data.get('date'))}: no run data"
+                title = f"{_html_attr(cell_date)}: no run data"
             else:
-                text = str(count) if count else ""
                 style = f' style="--heat-alpha:{alpha:.2f}"' if count else ""
                 classes = "heat-cell heat-cell-hit" if count else "heat-cell"
-                title = f"{_html_attr(data.get('date'))}: {count}"
+                # Build tooltip from tests timeline
+                tooltip_parts = [f"{_html_attr(cell_date)}: {count}"]
+                test_info = _mapping(tests_data.get(failure_name))
+                timeline = _mapping(test_info.get("timeline"))
+                day_info = _mapping(timeline.get(cell_date))
+                errors = _list(day_info.get("errors"))
+                jobs = _list(day_info.get("jobs"))
+                if errors:
+                    tooltip_parts.append("Errors: " + "; ".join(_str(e) for e in errors[:3]))
+                if jobs:
+                    tooltip_parts.append("Jobs: " + ", ".join(_str(j) for j in jobs[:5]))
+                title = _html_attr("\n".join(tooltip_parts))
+                # Cell content: count + job links
+                cell_job_ids = _list(data.get("job_ids")) or _list(failure_jobs.get(failure_name, {}).get(cell_date) if isinstance(failure_jobs.get(failure_name), dict) else None)
+                if count and cell_job_ids and repo:
+                    rid = _str(data.get("run_id")) or run_id_by_date.get(cell_date, "")
+                    content = str(count) + " " + str(_job_links(repo, rid, cell_job_ids))
+                elif count:
+                    content = _html(str(count))
+                else:
+                    content = ""
             cells.append(
                 f'<td class="{classes}"{style} title="{title}">'
-                f"{_html(text)}</td>"
+                f"{content}</td>"
             )
         body_rows.append(
             '<tr data-filter-item="'
-            + _html_attr(_str(row.get("name")))
+            + _html_attr(failure_name)
             + '"><th class="sticky-col">'
             + _html_cell(name_cell)
             + '</th><td class="sticky-col secondary-col">'
-            + _html(f"{days_failed}/{total_days}d")
+            + _html(f"{days_failed}/{total_days}")
             + "</td>"
             + "".join(cells)
             + "</tr>"
@@ -1026,6 +1076,7 @@ def _daily_heatmap_table(report: JsonObject, *, filter_id: str) -> str:
         '<th class="sticky-col">Failure</th><th class="sticky-col secondary-col">Freq</th>'
         + head
         + "</tr></thead><tbody>"
+        + status_row
         + "".join(body_rows)
         + "</tbody></table></div>"
     )
@@ -1054,6 +1105,8 @@ def _daily_heatmap(daily_health: JsonObject) -> str:
     reports = _workflow_reports(daily_health)
     if not reports:
         return '<p class="empty">No Daily heatmap is available in the supplied payload.</p>'
+    repo = _str(daily_health.get("repo"))
+    tests = _mapping(daily_health.get("tests"))
     if len(reports) == 1:
         missing = _heatmap_missing_count(reports[0])
         missing_note = (
@@ -1063,7 +1116,7 @@ def _daily_heatmap(daily_health: JsonObject) -> str:
         )
         return (
             f'<p class="split-note">A dash means no run data was available for that date.{missing_note}</p>'
-            + _daily_heatmap_table(reports[0], filter_id="daily-heatmap")
+            + _daily_heatmap_table(reports[0], filter_id="daily-heatmap", repo=repo, tests=tests)
         )
 
     blocks: list[str] = []
@@ -1086,7 +1139,7 @@ def _daily_heatmap(daily_health: JsonObject) -> str:
             f"{_meta_pill('Unique failures', _format_number(report.get('unique_failures', 0)))}"
             f"{missing_pill}"
             "</div></div>"
-            + _daily_heatmap_table(report, filter_id=f"daily-heatmap-{slug}")
+            + _daily_heatmap_table(report, filter_id=f"daily-heatmap-{slug}", repo=repo, tests=tests)
             + "</section>"
         )
     return (
@@ -1142,6 +1195,7 @@ def _daily_run_rows(dashboard: JsonObject) -> list[list[object]]:
                             "—",
                             "—",
                             "—",
+                            "—",
                         ]
                     )
             else:
@@ -1154,19 +1208,57 @@ def _daily_run_rows(dashboard: JsonObject) -> list[list[object]]:
                         "—",
                         "—",
                         "—",
+                        "—",
                     ]
                 )
             continue
         for run_data in date_runs:
             sha = _str(run_data.get("full_sha") or run_data.get("commit_sha"))
+            commit_msg = _str(run_data.get("commit_message"))
+            sha_link = _safe_html(
+                f'<a class="link" href="{_html_attr(_commit_url(repo, sha))}" '
+                f'target="_blank" rel="noreferrer" title="{_html_attr(commit_msg)}">'
+                f'{_html(_short_sha(sha))}</a>'
+            ) if sha and commit_msg else _link_external(_short_sha(sha), _commit_url(repo, sha))
+
+            # Failed job names
+            failed_names = _list(run_data.get("failed_job_names"))
+            if failed_names:
+                failed_cell = _safe_html(", ".join(_html(n) for n in failed_names[:5]))
+            else:
+                failed_cell = run_data.get("failed_jobs", 0)
+
+            # Commits since previous run
+            commits = _list(run_data.get("commits_since_prev"))
+            if commits:
+                commit_parts: list[str] = []
+                for c in commits[:5]:
+                    cm = _mapping(c)
+                    c_sha = _str(cm.get("sha"))
+                    c_msg = _str(cm.get("message"))
+                    c_url = _commit_url(repo, c_sha)
+                    if c_url:
+                        commit_parts.append(
+                            f'<a class="link" href="{_html_attr(c_url)}" target="_blank" '
+                            f'rel="noreferrer" title="{_html_attr(c_msg)}">{_html(_short_sha(c_sha))}</a>'
+                        )
+                    else:
+                        commit_parts.append(_html(_short_sha(c_sha)))
+                if len(commits) > 5:
+                    commit_parts.append(f"+{len(commits) - 5}")
+                commits_cell = _safe_html(" ".join(commit_parts))
+            else:
+                commits_cell = "—"
+
             rows.append(
                 [
                     date,
                     _chip(_workflow_label(run_data.get("workflow")), tone="info"),
                     _chip(run_data.get("status", "")),
-                    _link_external(_short_sha(sha), _commit_url(repo, sha)),
+                    sha_link,
                     run_data.get("unique_failures", 0),
-                    run_data.get("failed_jobs", 0),
+                    failed_cell,
+                    commits_cell,
                     _link_external("run", run_data.get("run_url", "")),
                 ]
             )
@@ -1245,7 +1337,7 @@ def _render_daily(dashboard: JsonObject) -> str:
         + _panel(
             "Recent monitored runs",
             _table(
-                ["Date", "Run type", "Status", "Commit", "Unique failures", "Failed jobs", "Run"],
+                ["Date", "Run type", "Status", "Commit", "Unique failures", "Failed jobs", "Commits since prev", "Run"],
                 _daily_run_rows(dashboard),
                 empty="No monitored run records were supplied.",
             ),
@@ -1300,7 +1392,7 @@ def _render_daily_home(dashboard: JsonObject) -> str:
         + _panel(
             "Recent monitored runs",
             _table(
-                ["Date", "Run type", "Status", "Commit", "Unique failures", "Failed jobs", "Run"],
+                ["Date", "Run type", "Status", "Commit", "Unique failures", "Failed jobs", "Commits since prev", "Run"],
                 _daily_run_rows(dashboard),
                 empty="No monitored run records were supplied.",
             ),

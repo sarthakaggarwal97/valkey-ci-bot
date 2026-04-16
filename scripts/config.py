@@ -81,6 +81,22 @@ class BotConfig:
     validation_profiles: list[ValidationProfile] = field(default_factory=list)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
 
+    def __post_init__(self) -> None:
+        """Clamp numeric fields to valid ranges."""
+        self.max_prs_per_day = max(0, self.max_prs_per_day)
+        self.max_open_bot_prs = max(0, self.max_open_bot_prs)
+        self.max_failures_per_run = max(1, self.max_failures_per_run)
+        self.max_retries_bedrock = max(0, self.max_retries_bedrock)
+        self.max_retries_fix = max(0, self.max_retries_fix)
+        self.max_retries_validation = max(0, self.max_retries_validation)
+        self.daily_token_budget = max(0, self.daily_token_budget)
+        self.thinking_budget = max(1024, min(self.thinking_budget, 128_000))
+        self.max_input_tokens = max(1000, self.max_input_tokens)
+        self.max_output_tokens = max(256, self.max_output_tokens)
+        self.flaky_validation_passes = max(1, self.flaky_validation_passes)
+        if self.confidence_threshold not in ("high", "medium", "low"):
+            self.confidence_threshold = "medium"
+
 
 @dataclass
 class ReviewerModels:
@@ -122,6 +138,16 @@ class ReviewerConfig:
     project: ProjectContext = field(default_factory=ProjectContext)
     models: ReviewerModels = field(default_factory=ReviewerModels)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
+
+    def __post_init__(self) -> None:
+        """Clamp numeric fields to valid ranges."""
+        self.max_files = max(1, self.max_files)
+        self.max_review_comments = max(1, self.max_review_comments)
+        self.bedrock_retries = max(0, self.bedrock_retries)
+        self.github_retries = max(0, self.github_retries)
+        self.daily_token_budget = max(0, self.daily_token_budget)
+        self.max_input_tokens = max(1000, self.max_input_tokens)
+        self.max_output_tokens = max(256, self.max_output_tokens)
 
     @property
     def bedrock_model_id(self) -> str:
@@ -358,7 +384,10 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
             fix_gen.get("max_validation_retries"),
             defaults.max_retries_validation,
         ),
-        max_retries_bedrock=defaults.max_retries_bedrock,
+        max_retries_bedrock=_coerce_int(
+            bedrock.get("max_retries"),
+            defaults.max_retries_bedrock,
+        ),
         max_prs_per_day=_coerce_int(
             limits.get("max_prs_per_day"),
             defaults.max_prs_per_day,

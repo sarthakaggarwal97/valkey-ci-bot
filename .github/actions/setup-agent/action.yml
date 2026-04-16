@@ -1,0 +1,79 @@
+name: "Setup CI Agent"
+description: "Shared setup for valkey-ci-agent workflows: checkout, Python, deps, auth"
+
+inputs:
+  python-version:
+    description: "Python version"
+    default: "3.11"
+  agent-ref:
+    description: "Git ref for the agent repo checkout"
+    default: ""
+  install-dev-deps:
+    description: "Install dev dependencies (pytest, etc.)"
+    default: "false"
+  aws-role-arn:
+    description: "AWS IAM role ARN for OIDC"
+    default: ""
+  aws-region:
+    description: "AWS region"
+    default: "us-east-1"
+  github-app-id:
+    description: "GitHub App ID (optional, for app token)"
+    default: ""
+  github-app-private-key:
+    description: "GitHub App private key (optional)"
+    default: ""
+  github-token:
+    description: "GitHub token (fallback if no app)"
+    default: ""
+
+outputs:
+  target-token:
+    description: "Resolved GitHub token (app or PAT)"
+    value: ${{ steps.select-token.outputs.token }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout agent
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.agent-ref || github.ref }}
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        pip install -r requirements.txt
+        if [ "${{ inputs.install-dev-deps }}" = "true" ]; then
+          pip install -r requirements-dev.txt
+        fi
+
+    - name: Configure AWS credentials
+      if: inputs.aws-role-arn != ''
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ inputs.aws-role-arn }}
+        aws-region: ${{ inputs.aws-region }}
+
+    - name: Create GitHub App token
+      id: app-token
+      if: inputs.github-app-id != ''
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ inputs.github-app-id }}
+        private-key: ${{ inputs.github-app-private-key }}
+
+    - name: Select token
+      id: select-token
+      shell: bash
+      run: |
+        if [ -n "${{ steps.app-token.outputs.token }}" ]; then
+          echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+        else
+          echo "token=${{ inputs.github-token }}" >> "$GITHUB_OUTPUT"
+        fi
