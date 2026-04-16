@@ -99,9 +99,9 @@ def _tone_for_status(label: str) -> str:
     normalized = label.lower()
     if any(word in normalized for word in ("success", "pass", "ready", "merged", "normal", "available", "covered")):
         return "good"
-    if any(word in normalized for word in ("fail", "error", "dead", "abandoned", "anomalous", "missing", "critical", "blocked", "degraded")):
+    if any(word in normalized for word in ("fail", "error", "dead", "abandoned", "anomalous", "missing", "critical", "blocked", "degraded", "cancelled")):
         return "bad"
-    if any(word in normalized for word in ("warning", "queued", "retry", "incomplete", "needs", "pending", "processing", "partial", "sparse")):
+    if any(word in normalized for word in ("warning", "queued", "retry", "incomplete", "needs", "pending", "processing", "partial", "sparse", "skipped", "in_progress")):
         return "warn"
     return "info"
 
@@ -1002,10 +1002,13 @@ def _daily_heatmap_table(
             s = status_by_date.get(date, "")
             if not s:
                 status_cells.append('<td class="heat-cell heat-cell-missing">—</td>')
-            elif s == "failure" or s == "error":
-                status_cells.append('<td class="heat-cell heat-status-bad">✗</td>')
-            else:
+            elif s in ("success", "completed"):
                 status_cells.append('<td class="heat-cell heat-status-good">✓</td>')
+            elif s in ("in_progress", "queued", "pending"):
+                status_cells.append('<td class="heat-cell heat-status-neutral">⋯</td>')
+            else:
+                # failure, error, cancelled, skipped, etc. are all bad
+                status_cells.append('<td class="heat-cell heat-status-bad">✗</td>')
         status_row = (
             '<tr class="heat-status-row"><th class="sticky-col">Run status</th>'
             '<td class="sticky-col secondary-col"></td>'
@@ -2568,6 +2571,10 @@ tr:last-child th {
 .heat-status-bad {
   color: #ffc4cc;
   background: rgba(207, 60, 79, 0.22);
+}
+.heat-status-neutral {
+  color: #ffe1a4;
+  background: rgba(204, 147, 22, 0.14);
 }
 .heatmap-table tbody th {
   font: 700 13px/1.4 "Fira Mono", ui-monospace, monospace;
