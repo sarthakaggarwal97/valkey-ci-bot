@@ -349,6 +349,8 @@ class RootCauseAnalyzer:
         self,
         failure_report: FailureReport,
         project: ProjectContext,
+        *,
+        history_context: str | None = None,
     ) -> RootCauseReport:
         """Analyze a failure report and produce a RootCauseReport.
 
@@ -398,10 +400,12 @@ class RootCauseAnalyzer:
         # 5. Try agentic analysis first, fall back to single-shot
         report = self._analyze_agentic(
             failure_report, source_contents, retrieved_context,
+            history_context=history_context,
         )
         if report is None:
             report = self._analyze_single_shot(
                 failure_report, source_contents, retrieved_context,
+                history_context=history_context,
             )
 
         if report is None:
@@ -427,6 +431,8 @@ class RootCauseAnalyzer:
         failure_report: FailureReport,
         source_contents: dict[str, str],
         retrieved_context: str,
+        *,
+        history_context: str | None = None,
     ) -> RootCauseReport | None:
         """Run single-shot (non-agentic) root cause analysis."""
         user_prompt = _build_user_prompt(
@@ -435,6 +441,12 @@ class RootCauseAnalyzer:
             retrieved_context,
             self._domain_context,
         )
+        if history_context:
+            user_prompt += (
+                "\n\n## Historical Context\n"
+                "This failure has been seen before. Here is what we know:\n"
+                f"{history_context}"
+            )
 
         try:
             raw_response = self._invoke_model(user_prompt)
@@ -455,6 +467,8 @@ class RootCauseAnalyzer:
         failure_report: FailureReport,
         source_contents: dict[str, str],
         retrieved_context: str,
+        *,
+        history_context: str | None = None,
     ) -> RootCauseReport | None:
         """Try agentic tool-use loop for root cause analysis.
 
@@ -494,6 +508,12 @@ class RootCauseAnalyzer:
             retrieved_context,
             self._domain_context,
         )
+        if history_context:
+            user_prompt += (
+                "\n\n## Historical Context\n"
+                "This failure has been seen before. Here is what we know:\n"
+                f"{history_context}"
+            )
         user_prompt += (
             "\n\nYou have tools to fetch additional files from the repository "
             "if you need more context to diagnose the root cause. Use get_file "
