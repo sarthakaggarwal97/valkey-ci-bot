@@ -1,9 +1,66 @@
 {
-  "captured_at": "2026-04-16T01:14:39.904299+00:00",
+  "captured_at": "2026-04-16T04:54:06.409535+00:00",
   "date": "2026-04-10",
   "repo": "valkey-io/valkey",
   "run": {
+    "commit_message": "Merge branch 'unstable' into unstable",
     "commit_sha": "30aeaf1",
+    "commits_since_prev": [
+      {
+        "author": "Viktor S\u00f6derqvist",
+        "date": "2026-04-08T02:27:49+00:00",
+        "message": "Fix some flaky tests using CLIENT REPLY OFF (#3452)",
+        "sha": "c35dbdfc83b7860a66d2b88685b1d31739ceb962"
+      },
+      {
+        "author": "Raghav",
+        "date": "2026-04-08T07:03:35+00:00",
+        "message": "Skip faster-failover test under TLS  (#3444)",
+        "sha": "e6bbd4e0d22399a24135419c0a20e52e459a2240"
+      },
+      {
+        "author": "Binbin",
+        "date": "2026-04-08T08:26:29+00:00",
+        "message": "Fix slot-migration-max-failover-repl-bytes unable to accept -1 (#3443)",
+        "sha": "dba128f13b7486322fe3b52a8358bd9188ec613a"
+      },
+      {
+        "author": "Viktor S\u00f6derqvist",
+        "date": "2026-04-08T13:06:11+00:00",
+        "message": "Attempt to deflake 'diskless no replicas drop during rdb pipe' (#3461)",
+        "sha": "f6b5461b7348987da65f17a8c072ab46e93baaa4"
+      },
+      {
+        "author": "Binbin",
+        "date": "2026-04-09T02:43:16+00:00",
+        "message": "Fix config rewrite producing negative values for unsigned memory configs (#3440)",
+        "sha": "890b82ac335672cb545f38ee6ebc4fb6cafd6e31"
+      },
+      {
+        "author": "charsyam",
+        "date": "2026-04-09T02:46:39+00:00",
+        "message": "Fix trivial double-free issue in rdbLoadObject (#3453)",
+        "sha": "be52d8b81a82b81d3b3482ff89236513d195e3b1"
+      },
+      {
+        "author": "Roshan Khatri",
+        "date": "2026-04-09T13:12:17+00:00",
+        "message": "Increase timeouts in faster-failover test for slow CI runners (#3463)",
+        "sha": "b020b03c69874bfb0b24dfdb6eb20765f4e2cfba"
+      },
+      {
+        "author": "Ricardo Dias",
+        "date": "2026-04-09T15:42:57+00:00",
+        "message": "Defer argument redaction by storing indices instead of rewriting argv (#3471)",
+        "sha": "c0289c6a7225ed7e1aee59712d4546e33c05a813"
+      },
+      {
+        "author": "Deepak Nandihalli",
+        "date": "2026-04-10T00:23:17+00:00",
+        "message": "Merge branch 'unstable' into unstable",
+        "sha": "30aeaf18daa41bc5a6af7bfbe9c4d61d963d91e6"
+      }
+    ],
     "date": "2026-04-10",
     "failed_job_names": [],
     "failed_jobs": 0,
