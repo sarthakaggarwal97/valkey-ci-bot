@@ -1,9 +1,96 @@
 {
-  "captured_at": "2026-04-16T01:15:27.401874+00:00",
+  "captured_at": "2026-04-16T04:54:49.375995+00:00",
   "date": "2026-04-12",
   "repo": "valkey-io/valkey",
   "run": {
+    "commit_message": "Add cluster-config-save-behavior option to control nodes.conf save behavior (#3372)\n\nThis commit introduces a new configuration option `cluster-config-save-behavior`\nthat controls how the cluster handles nodes.conf file save failures.\n\nThe option supports two modes:\n- `sync` (default): Synchronously save the config file. If the save fails,\n  the process exits. This maintains backward compatibility with the old\n  behavior (before 9.1).\n- `best-effort`: Synchronously save the config file. If the save fails,\n  only log a warning and continue running. This allows the node to survive\n  disk failures (e.g., disk full, read-only filesystem) without exitting,\n  giving administrators time to address the issue.\n\nNote that this modifies the behavior of #1032, whereas #1032 was \"best-effort\",\nwe have now introduced a configuration option that defaults to \"sync.\"\nSee #1032 discussion for more details.\n\nBackground:\nWhen a disk becomes read-only or full, any cluster metadata change would\ntrigger a nodes.conf save attempt. With the old behavior, the node would\nimmediately exit via clusterSaveConfigOrDie(), potentially causing multiple\nnodes on the same machine to crash simultaneously, leading to cluster\nunavailability.\n\nThe new `best-effort` mode addresses this by allowing nodes to continue\noperating even when disk writes fail. This is particularly useful in cloud\nenvironments where disk failures are more common due to scale.\n\nNote: Startup-time config saves (in clusterInit and verifyClusterConfigWithData)\nstill use clusterSaveConfigOrDie() since disk issues at startup should cause\nimmediate failure.\n\nSigned-off-by: Binbin <binloveplay1314@qq.com>",
     "commit_sha": "2871efd",
+    "commits_since_prev": [
+      {
+        "author": "Ran Shidlansik",
+        "date": "2026-04-06T01:49:24+00:00",
+        "message": "Avoid having server.h being included by cli and benchmark (#3420)",
+        "sha": "0c81b53d6af3bcffecbcbadf50639e5969178333"
+      },
+      {
+        "author": "Joseph Heck",
+        "date": "2026-04-06T18:15:02+00:00",
+        "message": "Grammar, spelling, and punctuation fixes across the summary fields for Valkey commands. (#3309)",
+        "sha": "ecba3e312300a12fa3bbd4718aedcab3e26ff425"
+      },
+      {
+        "author": "Lucas Yang",
+        "date": "2026-04-06T21:42:47+00:00",
+        "message": "Update maintainer affiliation (#3449)",
+        "sha": "3ed6e5f8441be4e33ccb4b8310d8a22f6cdf492f"
+      },
+      {
+        "author": "Nikhil Manglore",
+        "date": "2026-04-07T08:14:35+00:00",
+        "message": "Increase embedded string threshold from 64 to 128 bytes (#3397)",
+        "sha": "034d16ac44e8f722b26d30ea7be9422427092d05"
+      },
+      {
+        "author": "charsyam",
+        "date": "2026-04-07T12:56:30+00:00",
+        "message": "Fix RDB expiry write length and leak when loading zipmap (#3422)",
+        "sha": "2585f60ebc93c7b44a23e4df9fb02f2012e185fd"
+      },
+      {
+        "author": "Viktor S\u00f6derqvist",
+        "date": "2026-04-08T02:27:49+00:00",
+        "message": "Fix some flaky tests using CLIENT REPLY OFF (#3452)",
+        "sha": "c35dbdfc83b7860a66d2b88685b1d31739ceb962"
+      },
+      {
+        "author": "Raghav",
+        "date": "2026-04-08T07:03:35+00:00",
+        "message": "Skip faster-failover test under TLS  (#3444)",
+        "sha": "e6bbd4e0d22399a24135419c0a20e52e459a2240"
+      },
+      {
+        "author": "Binbin",
+        "date": "2026-04-08T08:26:29+00:00",
+        "message": "Fix slot-migration-max-failover-repl-bytes unable to accept -1 (#3443)",
+        "sha": "dba128f13b7486322fe3b52a8358bd9188ec613a"
+      },
+      {
+        "author": "Viktor S\u00f6derqvist",
+        "date": "2026-04-08T13:06:11+00:00",
+        "message": "Attempt to deflake 'diskless no replicas drop during rdb pipe' (#3461)",
+        "sha": "f6b5461b7348987da65f17a8c072ab46e93baaa4"
+      },
+      {
+        "author": "Binbin",
+        "date": "2026-04-09T02:43:16+00:00",
+        "message": "Fix config rewrite producing negative values for unsigned memory configs (#3440)",
+        "sha": "890b82ac335672cb545f38ee6ebc4fb6cafd6e31"
+      },
+      {
+        "author": "charsyam",
+        "date": "2026-04-09T02:46:39+00:00",
+        "message": "Fix trivial double-free issue in rdbLoadObject (#3453)",
+        "sha": "be52d8b81a82b81d3b3482ff89236513d195e3b1"
+      },
+      {
+        "author": "Roshan Khatri",
+        "date": "2026-04-09T13:12:17+00:00",
+        "message": "Increase timeouts in faster-failover test for slow CI runners (#3463)",
+        "sha": "b020b03c69874bfb0b24dfdb6eb20765f4e2cfba"
+      },
+      {
+        "author": "Ricardo Dias",
+        "date": "2026-04-09T15:42:57+00:00",
+        "message": "Defer argument redaction by storing indices instead of rewriting argv (#3471)",
+        "sha": "c0289c6a7225ed7e1aee59712d4546e33c05a813"
+      },
+      {
+        "author": "Binbin",
+        "date": "2026-04-10T02:40:44+00:00",
+        "message": "Add cluster-config-save-behavior option to control nodes.conf save behavior (#3372)",
+        "sha": "2871efd43644f9bf222dca882a184e36f3e28d4a"
+      }
+    ],
     "date": "2026-04-12",
     "failed_job_names": [
       "run-daily-for-release-branches (7.2) / reply-schemas-validator",
