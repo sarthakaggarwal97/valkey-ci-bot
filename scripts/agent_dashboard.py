@@ -828,8 +828,8 @@ def _coalesce_daily_health(
         for r in _list(derived.get("runs"))
     }
     for run in _list(merged.get("runs")):
-        key = (_str(run.get("date")), _str(run.get("workflow")))
-        dr = derived_runs.get(key)
+        run_key = (_str(run.get("date")), _str(run.get("workflow")))
+        dr = derived_runs.get(run_key)
         if not dr:
             continue
         # Prefer monitor's failure_names if they are more specific
