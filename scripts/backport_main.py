@@ -152,6 +152,7 @@ def run_backport(
     config: BackportConfig,
     github_token: str,
     aws_region: str,
+    push_repo: str | None = None,
 ) -> BackportResult:
     """Execute the backport pipeline end-to-end.
 
@@ -215,9 +216,10 @@ def run_backport(
 
         # ---- Step 2: Check for duplicate backport PR (Req 6.1) ----
         logger.info("Checking for duplicate backport PR.")
+        pr_target_repo = push_repo or repo_full_name
         pr_creator = BackportPRCreator(
             gh,
-            repo_full_name,
+            pr_target_repo,
             backport_label=config.backport_label,
             llm_conflict_label=config.llm_conflict_label,
         )
@@ -409,8 +411,15 @@ def run_backport(
                 )
 
             # Push the backport branch to the remote
-            logger.info("Pushing branch %s to origin.", branch_name)
-            _run_git(tmp_dir, "push", "origin", branch_name, env=git_env)
+            push_target = push_repo or repo_full_name
+            if push_repo and push_repo != repo_full_name:
+                fork_url = f"https://x-access-token@github.com/{push_repo}.git"
+                _run_git(tmp_dir, "remote", "add", "fork", fork_url, env=git_env)
+                logger.info("Pushing branch %s to fork %s.", branch_name, push_repo)
+                _run_git(tmp_dir, "push", "fork", branch_name, env=git_env)
+            else:
+                logger.info("Pushing branch %s to origin.", branch_name)
+                _run_git(tmp_dir, "push", "origin", branch_name, env=git_env)
 
         # ---- Step 7: Create backport PR (Req 4.6) ----
         logger.info("Creating backport PR.")
@@ -718,6 +727,11 @@ def main() -> None:
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable debug logging",
     )
+    parser.add_argument(
+        "--push-repo",
+        default="",
+        help="Push the backport branch to this repo instead of --repo (e.g. your fork)",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -746,6 +760,7 @@ def main() -> None:
         config=config,
         github_token=github_token,
         aws_region=args.aws_region,
+        push_repo=args.push_repo or None,
     )
 
     logger.info("Backport outcome: %s", result.outcome)

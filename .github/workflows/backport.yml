@@ -35,6 +35,11 @@ on:
         required: false
         type: string
         default: "main"
+      push_repo:
+        description: "Push backport branch and create PR on this repo instead of repo_full_name (e.g. a fork)"
+        required: false
+        type: string
+        default: ""
     secrets:
       AWS_ROLE_ARN:
         required: true
@@ -95,4 +100,5 @@ jobs:
             --pr-number "${{ inputs.source_pr_number }}" \
             --target-branch "${{ inputs.target_branch }}" \
             --config "${{ inputs.config_path }}" \
-            --aws-region "${{ inputs.aws_region }}"
+            --aws-region "${{ inputs.aws_region }}" \
+            ${{ inputs.push_repo && format('--push-repo "{0}"', inputs.push_repo) || '' }}
