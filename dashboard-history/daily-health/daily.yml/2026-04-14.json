@@ -1,9 +1,30 @@
 {
-  "captured_at": "2026-04-16T01:14:33.433192+00:00",
+  "captured_at": "2026-04-16T04:53:59.691727+00:00",
   "date": "2026-04-14",
   "repo": "valkey-io/valkey",
   "run": {
+    "commit_message": "Env: Read VALKEYCLI_HOST and VALKEYCLI_PORT environment variables (#3402)\n\nThis allows setting the host and port using environment variables, which\nmakes using valkey-cli way easier in some development environments. No\nneed to recall the right host/port, just let your `.env` do the work.\n\n---\n\nBuilt locally and tested with,\n\n```fish\nVALKEY_PORT=36379 ./src/valkey-cli\n```\n\n```console\n127.0.0.1:36379>\n```\n\nAnd using both,\n\n```fish\nVALKEYCLI_HOST=(hostname).local VALKEYCLI_PORT=36379 ./src/valkey-cli\n```\n\n```console\n<HOSTNAME>.local:36379>\n```\n\nSigned-off-by: Dietrich Daroch <Dietrich@Daroch.me>",
     "commit_sha": "baa5a48",
+    "commits_since_prev": [
+      {
+        "author": "Akash Kumar",
+        "date": "2026-04-13T20:48:20+00:00",
+        "message": "Redesign IO threading communication model (#3324)",
+        "sha": "a3a839972ff10a68b1a7069d70d8ce1fffb8f02a"
+      },
+      {
+        "author": "charsyam",
+        "date": "2026-04-14T02:23:14+00:00",
+        "message": "enhance raxLowWalk: use memchr() for child-edge lookup in non-compressed nodes (#3472)",
+        "sha": "c4db208e9b2c1d41b3a8c6db8a8b982df2dc11c0"
+      },
+      {
+        "author": "Dietrich Daroch",
+        "date": "2026-04-14T17:04:32+00:00",
+        "message": "Env: Read VALKEYCLI_HOST and VALKEYCLI_PORT environment variables (#3402)",
+        "sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6"
+      }
+    ],
     "date": "2026-04-14",
     "failed_job_names": [
       "test-almalinux8-tls-module",
