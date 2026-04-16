@@ -1,9 +1,18 @@
 {
-  "captured_at": "2026-04-16T01:14:41.585679+00:00",
+  "captured_at": "2026-04-16T04:54:08.088000+00:00",
   "date": "2026-04-09",
   "repo": "valkey-io/valkey",
   "run": {
+    "commit_message": "When close_asap flag is set, set bytes read to 0\n\nIn the readToQueryBuf, the c->nread represents the number of bytes read. When close_asap flag is set, there is a bug where the c->nread isn't reset to 0 and this breaks the invariant. IOThreads then incorrectly think there is data to read and results in a crash. This change fixes this bug.\n\nSigned-off-by: Deepak Nandihalli <deepak.nandihalli@gmail.com>",
     "commit_sha": "5cc888f",
+    "commits_since_prev": [
+      {
+        "author": "Deepak Nandihalli",
+        "date": "2026-04-09T02:52:52+00:00",
+        "message": "When close_asap flag is set, set bytes read to 0",
+        "sha": "5cc888fd1629f5ae8968095dd21760390fee5334"
+      }
+    ],
     "date": "2026-04-09",
     "failed_job_names": [],
     "failed_jobs": 0,
