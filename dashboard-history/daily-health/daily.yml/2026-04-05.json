@@ -1,9 +1,11 @@
 {
-  "captured_at": "2026-04-16T01:14:48.129505+00:00",
+  "captured_at": "2026-04-16T04:54:14.718126+00:00",
   "date": "2026-04-05",
   "repo": "valkey-io/valkey",
   "run": {
+    "commit_message": "Fix VLA warning in linenoise and enable -Werror (#3439)\n\nReplace 'const int seqBufferMaxLength' with a #define to avoid a\nvariable-length array warning (-Wgnu-folding-constant) in C.\n\nAlso add -Werror to the linenoise Makefile so future warnings are caught\nat build time.\n\nSigned-off-by: Madelyn Olson <madelyneolson@gmail.com>",
     "commit_sha": "e8ca6c0",
+    "commits_since_prev": [],
     "date": "2026-04-05",
     "failed_job_names": [
       "test-fedorarawhide-jemalloc",
