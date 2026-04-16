@@ -512,3 +512,73 @@ def test_cli_writes_markdown_and_json(tmp_path: Path) -> None:
     assert "CI Agent Capability Dashboard" in output_html_path.read_text(
         encoding="utf-8"
     )
+
+
+# ---------------------------------------------------------------------------
+# WoW trends
+# ---------------------------------------------------------------------------
+
+def test_wow_trends_basic() -> None:
+    """WoW trends compare this week vs last week failure counts."""
+    dashboard = build_dashboard(
+        failure_store=_failure_store(),
+        daily_health_data={
+            "runs": [
+                {"date": "2026-04-08", "status": "failure", "failure_names": ["test-a", "test-b"]},
+                {"date": "2026-04-07", "status": "failure", "failure_names": ["test-a"]},
+                {"date": "2026-04-01", "status": "failure", "failure_names": ["test-a", "test-c"]},
+                {"date": "2026-03-31", "status": "success", "failure_names": []},
+            ],
+        },
+        generated_at="2026-04-08T12:00:00+00:00",
+    )
+    wow = dashboard["wow_trends"]
+    assert wow["has_data"] is True
+    tw = wow["this_week"]
+    lw = wow["last_week"]
+    # This week (Apr 2-8): test-a x2, test-b x1 = 3 hits, 2 unique
+    assert tw["total_failure_hits"] == 3
+    assert tw["unique_failures"] == 2
+    assert tw["failed_runs"] == 2
+    # Last week (Mar 26 - Apr 1): test-a x1, test-c x1 = 2 hits, 2 unique
+    assert lw["total_failure_hits"] == 2
+    assert lw["unique_failures"] == 2
+    assert lw["failed_runs"] == 1
+    # Delta
+    assert wow["delta"] == 1
+    assert "test-b" in wow["new_failures"]
+    assert "test-c" in wow["resolved_failures"]
+
+
+def test_wow_trends_empty_data() -> None:
+    """WoW trends handle empty data gracefully."""
+    dashboard = build_dashboard(
+        failure_store={},
+        daily_health_data={"runs": []},
+        generated_at="2026-04-08T12:00:00+00:00",
+    )
+    wow = dashboard["wow_trends"]
+    assert wow["has_data"] is False
+    assert wow["delta"] == 0
+    assert wow["new_failures"] == []
+    assert wow["resolved_failures"] == []
+    assert wow["top_movers"] == []
+
+
+def test_wow_trends_top_movers_sorted_by_abs_change() -> None:
+    """Top movers are sorted by absolute change descending."""
+    dashboard = build_dashboard(
+        failure_store={},
+        daily_health_data={
+            "runs": [
+                {"date": "2026-04-08", "status": "failure", "failure_names": ["big-increase"] * 5 + ["small-increase"]},
+                {"date": "2026-04-01", "status": "failure", "failure_names": ["big-decrease"] * 4},
+            ],
+        },
+        generated_at="2026-04-08T12:00:00+00:00",
+    )
+    movers = dashboard["wow_trends"]["top_movers"]
+    names = [m["name"] for m in movers]
+    # big-increase (+5) and big-decrease (-4) should come before small-increase (+1)
+    assert names.index("big-increase") < names.index("small-increase")
+    assert names.index("big-decrease") < names.index("small-increase")

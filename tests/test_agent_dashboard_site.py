@@ -531,3 +531,42 @@ def test_commit_message_tooltip_on_sha(tmp_path: Path) -> None:
     build_site(_rich_run_dashboard(), site_dir)
     html = (site_dir / "index.html").read_text(encoding="utf-8")
     assert "Fix memory leak in jemalloc" in html
+
+
+def test_wow_trends_panel_rendered(tmp_path: Path) -> None:
+    """WoW trends panel should appear on the daily home page when data exists."""
+    dashboard = build_dashboard(
+        failure_store={},
+        daily_health_data={
+            "repo": "valkey-io/valkey",
+            "dates": ["2026-04-06", "2026-04-07", "2026-04-08"],
+            "total_runs": 3,
+            "failed_runs": 2,
+            "unique_failures": 2,
+            "heatmap": [
+                {
+                    "name": "test-a",
+                    "days_failed": 2,
+                    "total_days": 3,
+                    "cells": [
+                        {"date": "2026-04-06", "count": 1},
+                        {"date": "2026-04-07", "count": 0},
+                        {"date": "2026-04-08", "count": 1},
+                    ],
+                }
+            ],
+            "runs": [
+                {"date": "2026-04-08", "status": "failure", "failure_names": ["test-a", "test-b"]},
+                {"date": "2026-04-07", "status": "success", "failure_names": []},
+                {"date": "2026-04-01", "status": "failure", "failure_names": ["test-a", "test-c"]},
+            ],
+        },
+        generated_at="2026-04-08T12:00:00+00:00",
+    )
+    site_dir = tmp_path / "site"
+    build_site(dashboard, site_dir)
+    html = (site_dir / "index.html").read_text(encoding="utf-8")
+    assert "Week-over-Week trends" in html
+    assert "wow-stats" in html
+    assert "This week" in html
+    assert "Last week" in html

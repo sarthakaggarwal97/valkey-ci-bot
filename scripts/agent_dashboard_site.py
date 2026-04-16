@@ -1393,6 +1393,73 @@ def _render_daily(dashboard: JsonObject) -> str:
     )
 
 
+def _render_wow_trends(dashboard: JsonObject) -> str:
+    wow = _mapping(dashboard.get("wow_trends"))
+    if not wow.get("has_data"):
+        return ""
+    tw = _mapping(wow.get("this_week"))
+    lw = _mapping(wow.get("last_week"))
+    delta = _int(wow.get("delta"))
+    pct = wow.get("pct_change", 0.0)
+    pct_str = f"+{pct}%" if pct > 0 else f"{pct}%"
+    delta_str = f"+{delta}" if delta > 0 else str(delta)
+    trend_tone = "bad" if delta > 0 else ("good" if delta < 0 else "accent")
+
+    # Summary stats row
+    stats = (
+        '<div class="wow-stats">'
+        f'<div class="wow-stat"><span>This week</span><strong>{_format_number(tw.get("total_failure_hits", 0))}</strong>'
+        f'<small>{_format_number(tw.get("unique_failures", 0))} unique · {_format_number(tw.get("failed_runs", 0))}/{_format_number(tw.get("total_runs", 0))} runs failed</small></div>'
+        f'<div class="wow-stat"><span>Last week</span><strong>{_format_number(lw.get("total_failure_hits", 0))}</strong>'
+        f'<small>{_format_number(lw.get("unique_failures", 0))} unique · {_format_number(lw.get("failed_runs", 0))}/{_format_number(lw.get("total_runs", 0))} runs failed</small></div>'
+        f'<div class="wow-stat wow-delta wow-delta-{_html_attr(trend_tone)}"><span>WoW change</span>'
+        f'<strong>{_html(delta_str)}</strong><small>{_html(pct_str)}</small></div>'
+        "</div>"
+    )
+
+    # New / resolved failures
+    new_failures = [_str(n) for n in _list(wow.get("new_failures")) if _str(n)]
+    resolved = [_str(n) for n in _list(wow.get("resolved_failures")) if _str(n)]
+    movement = '<div class="wow-movement">'
+    if new_failures:
+        items = "".join(f"<li>{_html(n)}</li>" for n in new_failures)
+        movement += f'<div class="wow-list wow-new"><h4>🆕 New this week ({len(new_failures)})</h4><ul>{items}</ul></div>'
+    if resolved:
+        items = "".join(f"<li>{_html(n)}</li>" for n in resolved)
+        movement += f'<div class="wow-list wow-resolved"><h4>✅ Resolved ({len(resolved)})</h4><ul>{items}</ul></div>'
+    if not new_failures and not resolved:
+        movement += '<p class="empty">No new or resolved failures between weeks.</p>'
+    movement += "</div>"
+
+    # Top movers table
+    movers = [_mapping(m) for m in _list(wow.get("top_movers")) if isinstance(m, dict)]
+    mover_rows = ""
+    for m in movers[:8]:
+        change = _int(m.get("change"))
+        arrow = "↑" if change > 0 else "↓"
+        tone = "bad" if change > 0 else "good"
+        mover_rows += (
+            f'<tr><td>{_html(_str(m.get("name")))}</td>'
+            f'<td>{_format_number(m.get("last_week", 0))}</td>'
+            f'<td>{_format_number(m.get("this_week", 0))}</td>'
+            f'<td class="wow-change-{_html_attr(tone)}">{arrow} {abs(change)}</td></tr>'
+        )
+    movers_html = ""
+    if mover_rows:
+        movers_html = (
+            '<div class="wow-movers"><h4>Top movers</h4>'
+            '<table class="wow-table"><thead><tr><th>Failure</th><th>Last wk</th><th>This wk</th><th>Δ</th></tr></thead>'
+            f"<tbody>{mover_rows}</tbody></table></div>"
+        )
+
+    return _panel(
+        "Week-over-Week trends",
+        stats + movement + movers_html,
+        subtitle="Compares the last 7 days against the prior 7 days to surface emerging and resolving failures.",
+        wide=True,
+    )
+
+
 def _render_daily_home(dashboard: JsonObject) -> str:
     daily_health = _mapping(dashboard.get("daily_health"))
     ci_failures = _mapping(dashboard.get("ci_failures"))
@@ -1405,6 +1472,7 @@ def _render_daily_home(dashboard: JsonObject) -> str:
             subtitle="Recurring failures stay split by workflow so the run type is visible before you decide what is noise and what is signal.",
             wide=True,
         )
+        + _render_wow_trends(dashboard)
         + _panel(
             "Recent monitored runs",
             _table(
@@ -2693,6 +2761,32 @@ tr:last-child th {
     position: static;
   }
 }
+
+/* WoW trends */
+.wow-stats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.wow-stat { flex: 1; min-width: 160px; background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px 18px; }
+.wow-stat span { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.wow-stat strong { display: block; font-size: 28px; font-weight: 800; margin: 2px 0; }
+.wow-stat small { font-size: 12px; color: var(--muted); }
+.wow-delta-good strong { color: var(--good); }
+.wow-delta-bad strong { color: var(--bad); }
+.wow-delta-accent strong { color: var(--accent); }
+.wow-movement { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.wow-list { flex: 1; min-width: 200px; background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px 18px; }
+.wow-list h4 { font-size: 13px; margin-bottom: 8px; }
+.wow-list ul { list-style: none; padding: 0; margin: 0; }
+.wow-list li { font-size: 13px; color: var(--muted); padding: 3px 0; border-bottom: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wow-list li:last-child { border-bottom: none; }
+.wow-new h4 { color: var(--bad); }
+.wow-resolved h4 { color: var(--good); }
+.wow-movers { margin-top: 4px; }
+.wow-movers h4 { font-size: 13px; margin-bottom: 8px; }
+.wow-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.wow-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.wow-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.wow-table td:first-child { max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wow-change-bad { color: var(--bad); font-weight: 700; }
+.wow-change-good { color: var(--good); font-weight: 700; }
 """
 
 

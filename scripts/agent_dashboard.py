@@ -207,6 +207,91 @@ def _average(values: list[float]) -> float:
     return round(sum(values) / len(values), 4) if values else 0.0
 
 
+def _build_wow_trends(daily_health: JsonObject, *, generated_at: str | None = None) -> JsonObject:
+    """Compare this week vs last week for failure counts and surface movers."""
+    end_dt = _parse_datetime(generated_at) or datetime.now(timezone.utc)
+    end_day = end_dt.date()
+    # This week = last 7 days ending today, last week = 7 days before that
+    this_week_dates = {(end_day - timedelta(days=d)).isoformat() for d in range(7)}
+    last_week_dates = {(end_day - timedelta(days=d + 7)).isoformat() for d in range(7)}
+
+    runs = _list(daily_health.get("runs"))
+    # Bucket runs by week
+    tw_failures: Counter[str] = Counter()
+    lw_failures: Counter[str] = Counter()
+    tw_failed_runs = 0
+    lw_failed_runs = 0
+    tw_total_runs = 0
+    lw_total_runs = 0
+    tw_failure_set: set[str] = set()
+    lw_failure_set: set[str] = set()
+
+    for run in runs:
+        r = _mapping(run)
+        date = _str(r.get("date"))
+        status = _str(r.get("status")).lower()
+        names = _list(r.get("failure_names"))
+        is_failure = status in ("failure", "error")
+        if date in this_week_dates:
+            tw_total_runs += 1
+            if is_failure:
+                tw_failed_runs += 1
+            for n in names:
+                name = _str(n)
+                if name:
+                    tw_failures[name] += 1
+                    tw_failure_set.add(name)
+        elif date in last_week_dates:
+            lw_total_runs += 1
+            if is_failure:
+                lw_failed_runs += 1
+            for n in names:
+                name = _str(n)
+                if name:
+                    lw_failures[name] += 1
+                    lw_failure_set.add(name)
+
+    tw_total = sum(tw_failures.values())
+    lw_total = sum(lw_failures.values())
+    delta = tw_total - lw_total
+    pct_change = round((delta / lw_total) * 100, 1) if lw_total else (100.0 if tw_total else 0.0)
+
+    new_failures = sorted(tw_failure_set - lw_failure_set)
+    resolved_failures = sorted(lw_failure_set - tw_failure_set)
+
+    # Top movers: failures with biggest absolute change
+    all_names = tw_failure_set | lw_failure_set
+    movers: list[JsonObject] = []
+    for name in all_names:
+        tw_count = tw_failures.get(name, 0)
+        lw_count = lw_failures.get(name, 0)
+        change = tw_count - lw_count
+        if change != 0:
+            movers.append({"name": name, "this_week": tw_count, "last_week": lw_count, "change": change})
+    movers.sort(key=lambda m: (-abs(m["change"]), m["name"]))
+
+    return {
+        "this_week": {
+            "total_failure_hits": tw_total,
+            "unique_failures": len(tw_failure_set),
+            "failed_runs": tw_failed_runs,
+            "total_runs": tw_total_runs,
+        },
+        "last_week": {
+            "total_failure_hits": lw_total,
+            "unique_failures": len(lw_failure_set),
+            "failed_runs": lw_failed_runs,
+            "total_runs": lw_total_runs,
+        },
+        "delta": delta,
+        "pct_change": pct_change,
+        "new_failures": new_failures[:10],
+        "resolved_failures": resolved_failures[:10],
+        "top_movers": movers[:10],
+        "has_data": bool(tw_total_runs or lw_total_runs),
+    }
+
+
 def _build_trend_metrics(
     failure_store: JsonObject,
     events: list[JsonObject],
@@ -945,6 +1030,10 @@ def build_dashboard(
         "state_health": state_health,
         "trends": trend_metrics,
         "daily_health": _coalesce_daily_health(_mapping(daily_health_data), daily_results),
+        "wow_trends": _build_wow_trends(
+            _coalesce_daily_health(_mapping(daily_health_data), daily_results),
+            generated_at=resolved_generated_at,
+        ),
     }
 
 
