@@ -1,58 +1,46 @@
 {
-  "captured_at": "2026-04-16T09:53:48.091660+00:00",
+  "captured_at": "2026-04-16T11:34:24.462365+00:00",
   "date": "2026-04-16",
   "repo": "valkey-io/valkey",
   "run": {
-    "commit_message": "Add cluster bus network traffic usage metric in bytes (#3396)\n\nAdds cluster bus byte metrics to `CLUSTER INFO`, split by admin,\npub/sub, and module traffic. The change tracks sent and received bytes\non the cluster bus, exposes them as\n`cluster_stats_*_bytes_{sent,received}`.\n\nExample:\n\n```\n> src/valkey-cli CLUSTER INFO\ncluster_state:fail\n...\ncluster_stats_bytes_sent:46088\ncluster_stats_bytes_received:46080\ncluster_stats_pubsub_bytes_sent:0\ncluster_stats_pubsub_bytes_received:0\ncluster_stats_module_bytes_sent:0\ncluster_stats_module_bytes_received:0\ntotal_cluster_links_buffer_limit_exceeded:0\n```\n\nFixes: https://github.com/valkey-io/valkey/issues/1929\n\n---------\n\nSigned-off-by: Harkrishn Patro <bunty.hari@gmail.com>\nCo-authored-by: Viktor S\u00f6derqvist <viktor.soderqvist@est.tech>",
-    "commit_sha": "b2e0f63",
-    "commits_since_prev": [],
+    "commit_message": "Rewrite the faster failover test case (#3495)\n\nThe test introduced in #2227 is fragile because it unconditionally asserted\nthat \"best ranked replica\" would be logged for every shard's replica. This\nassumption was incorrect for two reasons:\n\n1. myselfIsBestRankedReplica() requires failover_failed_primary_rank == 0.\n   When two primaries fail simultaneously, only the shard with the lowest\n   shard_id gets failed_primary_rank == 0. The other shard's replicas can\n   only trigger \"Myself become the best ranked replica\" after the first\n   shard completes failover and the result propagates via gossip.\n\n2. clusterAllReplicasThinkPrimaryIsFail() requires all sibling replicas\n   to have their MY_PRIMARY_FAIL flag propagated via gossip. If the\n   election delay is shorter than the gossip propagation time, the\n   replica may start the election before receiving the flag.\n\nIt's also too strict and checks too many things. Like we can check that there\nis no delay before starting the failover, but we shouldn't check that the rank\n0 replica actually wins, because maybe it doesn't. Also we're not sure the other\nreplica does a psync afterwards, it can also do a full sync.\n\nRestructure the test into three focused scenarios with retry logic:\n\n- Test 0 (3 primaries + 1 replica): The sole replica is deterministically\n  the best ranked replica. All conditions are trivially satisfied.\n\n- Test 1 (3 primaries + 2 replicas): Single primary failure with two\n  competing replicas. failed_primary_rank is deterministically 0, but\n  MY_PRIMARY_FAIL gossip timing may prevent triggering in some runs.\n  Uses internal retry with cluster recovery to ensure at least one\n  successful trigger.\n\n- Test 2 (5 primaries + 7 replicas): Two primaries failure. Verifies no\n  failover timeout and uses retry to cover the \"best ranked replica\"\n  path for at least one shard.\n\nSigned-off-by: Binbin <binloveplay1314@qq.com>",
+    "commit_sha": "087280e",
+    "commits_since_prev": [
+      {
+        "author": "Binbin",
+        "date": "2026-04-16T11:15:02+00:00",
+        "message": "Rewrite the faster failover test case (#3495)",
+        "sha": "087280e3f87ccbdc13714bf94f8288de8888c08f"
+      }
+    ],
     "date": "2026-04-16",
     "failed_job_names": [
-      "test-almalinux8-tls-module",
-      "test-fedoralatest-tls-module",
-      "test-fedorarawhide-jemalloc",
-      "test-macos-latest",
       "test-sanitizer-undefined (clang)",
       "test-sanitizer-undefined (gcc)",
       "test-sanitizer-undefined-large-memory (clang)",
-      "test-sanitizer-undefined-large-memory (gcc)",
-      "test-ubuntu-lttng",
-      "test-ubuntu-tls-no-tls",
-      "test-valgrind-no-malloc-usable-size-test",
-      "test-valgrind-test"
+      "test-sanitizer-undefined-large-memory (gcc)"
     ],
-    "failed_jobs": 12,
+    "failed_jobs": 4,
     "failure_jobs": {
-      "module api test": [
-        71559041425
-      ],
       "test": [
-        71559041176,
-        71559041284,
-        71559041350,
-        71559041372,
-        71559041390,
-        71559041392,
-        71559041396,
-        71559041411,
-        71559041419
+        71628579940,
+        71628579956
       ],
       "unittest": [
-        71559041335,
-        71559041362
+        71628579708,
+        71628579710
       ]
     },
     "failure_names": [
-      "module api test",
       "test",
       "unittest"
     ],
-    "full_sha": "b2e0f6322d288bfdb5076e01791402fe790f0892",
-    "run_id": 24485406038,
-    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24485406038",
-    "status": "failure",
-    "total_jobs": 49,
-    "unique_failures": 3,
+    "full_sha": "087280e3f87ccbdc13714bf94f8288de8888c08f",
+    "run_id": 24507179572,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24507179572",
+    "status": "in_progress",
+    "total_jobs": 48,
+    "unique_failures": 2,
     "workflow": "daily.yml"
   },
   "schema_version": 1,
