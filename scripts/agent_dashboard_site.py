@@ -1248,7 +1248,7 @@ def _daily_run_rows(dashboard: JsonObject) -> list[list[object]]:
                     commit_parts.append(f"+{len(commits) - 5}")
                 commits_cell = _safe_html(" ".join(commit_parts))
             else:
-                commits_cell = "—"
+                commits_cell = _safe_html("—")
 
             rows.append(
                 [
