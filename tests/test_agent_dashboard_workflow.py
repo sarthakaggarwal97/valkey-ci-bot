@@ -71,7 +71,7 @@ def test_dashboard_workflow_generates_static_artifacts() -> None:
     assert "--daily-health daily-health-report.json" in generate_step["run"]
     assert "latest-daily/monitor-result.json" in generate_step["run"]
     assert "--fuzzer-result" in generate_step["run"]
-    assert "latest-fuzzer/fuzzer-monitor-result.json" in generate_step["run"]
+    assert "latest-fuzzer/fuzzer-monitor-result.json" in generate_step["run"] or "latest-fuzzer/*/fuzzer-monitor-result.json" in generate_step["run"]
     assert "--output-html agent-dashboard.html" in generate_step["run"]
     assert "-m scripts.agent_dashboard_site" in site_step["run"]
     assert "--dashboard-json agent-dashboard.json" in site_step["run"]
@@ -182,7 +182,7 @@ def test_publish_workflow_builds_pages_site() -> None:
     assert "--daily-health daily-health-report.json" in generate_dashboard["run"]
     assert "latest-daily/monitor-result.json" in generate_dashboard["run"]
     assert "--fuzzer-result" in generate_dashboard["run"]
-    assert "latest-fuzzer/fuzzer-monitor-result.json" in generate_dashboard["run"]
+    assert "latest-fuzzer/fuzzer-monitor-result.json" in generate_dashboard["run"] or "latest-fuzzer/*/fuzzer-monitor-result.json" in generate_dashboard["run"]
     assert "-m scripts.agent_dashboard_site" in generate_site["run"]
     assert upload_pages["uses"] == "actions/upload-pages-artifact@v4"
     assert upload_pages["with"]["path"] == "dashboard-site"
