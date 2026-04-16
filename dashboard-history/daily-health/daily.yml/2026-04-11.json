@@ -1,9 +1,18 @@
 {
-  "captured_at": "2026-04-16T01:14:38.280010+00:00",
+  "captured_at": "2026-04-16T04:54:04.716506+00:00",
   "date": "2026-04-11",
   "repo": "valkey-io/valkey",
   "run": {
+    "commit_message": "Add cluster-config-save-behavior option to control nodes.conf save behavior (#3372)\n\nThis commit introduces a new configuration option `cluster-config-save-behavior`\nthat controls how the cluster handles nodes.conf file save failures.\n\nThe option supports two modes:\n- `sync` (default): Synchronously save the config file. If the save fails,\n  the process exits. This maintains backward compatibility with the old\n  behavior (before 9.1).\n- `best-effort`: Synchronously save the config file. If the save fails,\n  only log a warning and continue running. This allows the node to survive\n  disk failures (e.g., disk full, read-only filesystem) without exitting,\n  giving administrators time to address the issue.\n\nNote that this modifies the behavior of #1032, whereas #1032 was \"best-effort\",\nwe have now introduced a configuration option that defaults to \"sync.\"\nSee #1032 discussion for more details.\n\nBackground:\nWhen a disk becomes read-only or full, any cluster metadata change would\ntrigger a nodes.conf save attempt. With the old behavior, the node would\nimmediately exit via clusterSaveConfigOrDie(), potentially causing multiple\nnodes on the same machine to crash simultaneously, leading to cluster\nunavailability.\n\nThe new `best-effort` mode addresses this by allowing nodes to continue\noperating even when disk writes fail. This is particularly useful in cloud\nenvironments where disk failures are more common due to scale.\n\nNote: Startup-time config saves (in clusterInit and verifyClusterConfigWithData)\nstill use clusterSaveConfigOrDie() since disk issues at startup should cause\nimmediate failure.\n\nSigned-off-by: Binbin <binloveplay1314@qq.com>",
     "commit_sha": "2871efd",
+    "commits_since_prev": [
+      {
+        "author": "Binbin",
+        "date": "2026-04-10T02:40:44+00:00",
+        "message": "Add cluster-config-save-behavior option to control nodes.conf save behavior (#3372)",
+        "sha": "2871efd43644f9bf222dca882a184e36f3e28d4a"
+      }
+    ],
     "date": "2026-04-11",
     "failed_job_names": [
       "test-almalinux9-tls-module",
