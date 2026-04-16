@@ -53,7 +53,7 @@ class BotConfig:
     bedrock_model_id: str = "us.anthropic.claude-opus-4-6-v1"
     max_input_tokens: int = 100_000
     max_output_tokens: int = 4096
-    max_patch_files: int = 15
+    max_patch_files: int = 30
     max_patch_files_override: int | None = None
     confidence_threshold: str = "medium"
     monitored_workflows: list[str] = field(default_factory=lambda: [
@@ -63,10 +63,10 @@ class BotConfig:
     max_retries_validation: int = 1
     max_retries_bedrock: int = 3
     max_prs_per_day: int = 5
-    max_failures_per_run: int = 10
+    max_failures_per_run: int = 50
     max_open_bot_prs: int = 3
     queued_pr_max_attempts: int = 5
-    daily_token_budget: int = 1_000_000
+    daily_token_budget: int = 100_000_000
     min_failure_streak_before_queue: int = 2
     max_history_entries_per_test: int = 20
     flaky_campaign_enabled: bool = True
@@ -124,7 +124,7 @@ class ReviewerConfig:
     post_policy_notes: bool = True
     ignore_keyword: str = "/reviewbot: ignore"
     max_files: int = 150
-    max_review_comments: int = 5
+    max_review_comments: int = 25
     path_filters: list[str] = field(default_factory=list)
     daily_token_budget: int = 1_000_000_000
     bedrock_retries: int = 5
