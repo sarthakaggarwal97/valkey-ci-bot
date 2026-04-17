@@ -28,11 +28,11 @@
     "updated_at": "2026-04-16T22:02:36.163346+00:00"
   },
   "valkey-io/valkey:daily.yml:schedule,pull_request": {
-    "last_seen_run_id": 24532847022,
+    "last_seen_run_id": 24538959723,
     "target_repo": "valkey-io/valkey",
     "workflow_file": "daily.yml",
     "event": "schedule,pull_request",
-    "updated_at": "2026-04-16T21:07:05.381678+00:00"
+    "updated_at": "2026-04-17T00:34:15.627126+00:00"
   },
   "valkey-io/valkey:weekly.yml:schedule": {
     "last_seen_run_id": 24300553351,
