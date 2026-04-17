@@ -1,0 +1,58 @@
+{
+  "captured_at": "2026-04-17T02:21:56.036710+00:00",
+  "date": "2026-04-17",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "Unique samples in hashtableSampleEntries (#3460)\n\nInstead of \"scanning\" random bucket chains using a random cursor for\neach scan call, start at a random cursor and then continue sampling\nbuckets in scan order. The scan stops when we have sampled all elements,\nso the cursor never wraps around to sample the same buckets again. This\nensures that we don't get any duplicate samples.\n\nThe functions hashtableRandomEntry and hashtableFairRandomEntry keeps\nthe old behavior using another sampling function preserving their\nbehavior. The fairness tests fail if we use the modified\nhashtableSampleEntries.\n\nThis restores the behavior of dictGetSomeKeys (which is now an alias of\nhashtableSampleEntries) and deflakes the test case:\n\nGossip count scales with higher percentage of\n`cluster-message-gossip-perc`\n    in tests/unit/cluster/packet.tcl\n\nFixes #3454\n\n---------\n\nSigned-off-by: Viktor S\u00f6derqvist <viktor.soderqvist@est.tech>",
+    "commit_sha": "8a91a12",
+    "commits_since_prev": [
+      {
+        "author": "Viktor S\u00f6derqvist",
+        "date": "2026-04-16T14:53:47+00:00",
+        "message": "Unique samples in hashtableSampleEntries (#3460)",
+        "sha": "8a91a123980bf7715a851792b5f00c45b993aeba"
+      }
+    ],
+    "date": "2026-04-17",
+    "failed_job_names": [
+      "test-fedorarawhide-tls-module",
+      "test-sanitizer-undefined (clang)",
+      "test-sanitizer-undefined (gcc)",
+      "test-sanitizer-undefined-large-memory (clang)",
+      "test-sanitizer-undefined-large-memory (gcc)",
+      "test-ubuntu-tls-io-threads"
+    ],
+    "failed_jobs": 6,
+    "failure_jobs": {
+      "cluster tests": [
+        71747101677
+      ],
+      "module api test": [
+        71747101836
+      ],
+      "test": [
+        71747101742,
+        71747101769
+      ],
+      "unittest": [
+        71747101778,
+        71747101798
+      ]
+    },
+    "failure_names": [
+      "cluster tests",
+      "module api test",
+      "test",
+      "unittest"
+    ],
+    "full_sha": "8a91a123980bf7715a851792b5f00c45b993aeba",
+    "run_id": 24541175475,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24541175475",
+    "status": "in_progress",
+    "total_jobs": 48,
+    "unique_failures": 4,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
