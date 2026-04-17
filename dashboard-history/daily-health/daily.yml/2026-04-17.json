@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-04-17T02:21:56.036710+00:00",
+  "captured_at": "2026-04-17T03:49:32.305118+00:00",
   "date": "2026-04-17",
   "repo": "valkey-io/valkey",
   "run": {
@@ -16,13 +16,15 @@
     "date": "2026-04-17",
     "failed_job_names": [
       "test-fedorarawhide-tls-module",
+      "test-macos-latest",
       "test-sanitizer-undefined (clang)",
       "test-sanitizer-undefined (gcc)",
       "test-sanitizer-undefined-large-memory (clang)",
       "test-sanitizer-undefined-large-memory (gcc)",
-      "test-ubuntu-tls-io-threads"
+      "test-ubuntu-tls-io-threads",
+      "test-valgrind-no-malloc-usable-size-test"
     ],
-    "failed_jobs": 6,
+    "failed_jobs": 8,
     "failure_jobs": {
       "cluster tests": [
         71747101677
@@ -31,8 +33,10 @@
         71747101836
       ],
       "test": [
+        71747101690,
         71747101742,
-        71747101769
+        71747101769,
+        71747101788
       ],
       "unittest": [
         71747101778,
