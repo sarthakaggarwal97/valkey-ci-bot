@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-04-18T03:33:41.989732+00:00",
+  "captured_at": "2026-04-18T06:02:57.763022+00:00",
   "date": "2026-04-18",
   "repo": "valkey-io/valkey",
   "run": {
@@ -32,14 +32,16 @@
       "test-sanitizer-undefined (gcc)",
       "test-sanitizer-undefined-large-memory (clang)",
       "test-sanitizer-undefined-large-memory (gcc)",
+      "test-valgrind-no-malloc-usable-size-test",
       "test-valgrind-test"
     ],
-    "failed_jobs": 6,
+    "failed_jobs": 7,
     "failure_jobs": {
       "test": [
         71915768170,
         71915768237,
         71915768242,
+        71915768257,
         71915768262
       ],
       "unittest": [
@@ -54,8 +56,8 @@
     "full_sha": "4a42c95853c0f3978715cb509a774f457edc182b",
     "run_id": 24592418617,
     "run_url": "https://github.com/valkey-io/valkey/actions/runs/24592418617",
-    "status": "in_progress",
-    "total_jobs": 48,
+    "status": "failure",
+    "total_jobs": 49,
     "unique_failures": 2,
     "workflow": "daily.yml"
   },
