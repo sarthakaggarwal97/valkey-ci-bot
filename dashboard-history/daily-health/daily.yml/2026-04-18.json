@@ -1,0 +1,64 @@
+{
+  "captured_at": "2026-04-18T03:33:41.989732+00:00",
+  "date": "2026-04-18",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "Fix HPERSIST RESP protocol violation on wrong-type key (#3516)\n\n`hpersistCommand` calls `addReplyArrayLen` before `lookupKeyWrite` +\n`checkType`. When HPERSIST targets a non-hash key, the server writes a\nRESP array header followed by a WRONGTYPE error \u2014 a malformed response\nthat permanently desynchronizes the client connection.\n\nThis moves `lookupKeyWrite` + `checkType` before `addReplyArrayLen`,\nmatching the pattern used by every other HFE command (e.g.\n`hgetdelCommand`, `hexpireGenericCommand`).\n\nAdded a test for HPERSIST on a wrong-type key.\n\nSigned-off-by: Madelyn Olson <madelyneolson@gmail.com>",
+    "commit_sha": "4a42c95",
+    "commits_since_prev": [
+      {
+        "author": "Roshan Khatri",
+        "date": "2026-04-17T17:05:03+00:00",
+        "message": "Fix use-after-unload crash in test auth module's blocking thread (#3464)",
+        "sha": "b2d08c9ef9acf793d9a4bb6776ff8a645d0f5ee5"
+      },
+      {
+        "author": "Sarthak Aggarwal",
+        "date": "2026-04-18T00:00:43+00:00",
+        "message": "[Flaky Tests] Avoid re-triggering io-thread activation (#3509)",
+        "sha": "109ef346f3552b238beb6e475c6af8096b944582"
+      },
+      {
+        "author": "Madelyn Olson",
+        "date": "2026-04-18T00:02:04+00:00",
+        "message": "Fix HPERSIST RESP protocol violation on wrong-type key (#3516)",
+        "sha": "4a42c95853c0f3978715cb509a774f457edc182b"
+      }
+    ],
+    "date": "2026-04-18",
+    "failed_job_names": [
+      "test-almalinux9-tls-module-no-tls",
+      "test-sanitizer-undefined (clang)",
+      "test-sanitizer-undefined (gcc)",
+      "test-sanitizer-undefined-large-memory (clang)",
+      "test-sanitizer-undefined-large-memory (gcc)",
+      "test-valgrind-test"
+    ],
+    "failed_jobs": 6,
+    "failure_jobs": {
+      "test": [
+        71915768170,
+        71915768237,
+        71915768242,
+        71915768262
+      ],
+      "unittest": [
+        71915768248,
+        71915768249
+      ]
+    },
+    "failure_names": [
+      "test",
+      "unittest"
+    ],
+    "full_sha": "4a42c95853c0f3978715cb509a774f457edc182b",
+    "run_id": 24592418617,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24592418617",
+    "status": "in_progress",
+    "total_jobs": 48,
+    "unique_failures": 2,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
