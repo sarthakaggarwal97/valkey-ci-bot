@@ -1,0 +1,155 @@
+{
+  "captured_at": "2026-04-19T07:50:08.320507+00:00",
+  "date": "2026-04-19",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "Fix HPERSIST RESP protocol violation on wrong-type key (#3516)\n\n`hpersistCommand` calls `addReplyArrayLen` before `lookupKeyWrite` +\n`checkType`. When HPERSIST targets a non-hash key, the server writes a\nRESP array header followed by a WRONGTYPE error \u2014 a malformed response\nthat permanently desynchronizes the client connection.\n\nThis moves `lookupKeyWrite` + `checkType` before `addReplyArrayLen`,\nmatching the pattern used by every other HFE command (e.g.\n`hgetdelCommand`, `hexpireGenericCommand`).\n\nAdded a test for HPERSIST on a wrong-type key.\n\nSigned-off-by: Madelyn Olson <madelyneolson@gmail.com>",
+    "commit_sha": "4a42c95",
+    "commits_since_prev": [
+      {
+        "author": "Ricardo Dias",
+        "date": "2026-04-13T10:48:41+00:00",
+        "message": "Adds new (hidden) ValkeyModule_CallArgv API functions (#3122)",
+        "sha": "0ec173351658e2b74b5936125233ab77da017e57"
+      },
+      {
+        "author": "Akash Kumar",
+        "date": "2026-04-13T20:48:20+00:00",
+        "message": "Redesign IO threading communication model (#3324)",
+        "sha": "a3a839972ff10a68b1a7069d70d8ce1fffb8f02a"
+      },
+      {
+        "author": "charsyam",
+        "date": "2026-04-14T02:23:14+00:00",
+        "message": "enhance raxLowWalk: use memchr() for child-edge lookup in non-compressed nodes (#3472)",
+        "sha": "c4db208e9b2c1d41b3a8c6db8a8b982df2dc11c0"
+      },
+      {
+        "author": "Dietrich Daroch",
+        "date": "2026-04-14T17:04:32+00:00",
+        "message": "Env: Read VALKEYCLI_HOST and VALKEYCLI_PORT environment variables (#3402)",
+        "sha": "baa5a48b5acb2afebdf463ca5b91f3ad77bdaec6"
+      },
+      {
+        "author": "Binbin",
+        "date": "2026-04-15T02:54:06+00:00",
+        "message": "Change rdbSaveStreamConsumers return type from size_t to ssize_t (#3499)",
+        "sha": "a34f125d8e18201bc51878e2848c6b6187a8a3cb"
+      },
+      {
+        "author": "Harkrishn Patro",
+        "date": "2026-04-15T20:54:52+00:00",
+        "message": "Add cluster bus network traffic usage metric in bytes (#3396)",
+        "sha": "b2e0f6322d288bfdb5076e01791402fe790f0892"
+      },
+      {
+        "author": "Binbin",
+        "date": "2026-04-16T11:15:02+00:00",
+        "message": "Rewrite the faster failover test case (#3495)",
+        "sha": "087280e3f87ccbdc13714bf94f8288de8888c08f"
+      },
+      {
+        "author": "Viktor S\u00f6derqvist",
+        "date": "2026-04-16T14:53:47+00:00",
+        "message": "Unique samples in hashtableSampleEntries (#3460)",
+        "sha": "8a91a123980bf7715a851792b5f00c45b993aeba"
+      },
+      {
+        "author": "Roshan Khatri",
+        "date": "2026-04-17T17:05:03+00:00",
+        "message": "Fix use-after-unload crash in test auth module's blocking thread (#3464)",
+        "sha": "b2d08c9ef9acf793d9a4bb6776ff8a645d0f5ee5"
+      },
+      {
+        "author": "Sarthak Aggarwal",
+        "date": "2026-04-18T00:00:43+00:00",
+        "message": "[Flaky Tests] Avoid re-triggering io-thread activation (#3509)",
+        "sha": "109ef346f3552b238beb6e475c6af8096b944582"
+      },
+      {
+        "author": "Madelyn Olson",
+        "date": "2026-04-18T00:02:04+00:00",
+        "message": "Fix HPERSIST RESP protocol violation on wrong-type key (#3516)",
+        "sha": "4a42c95853c0f3978715cb509a774f457edc182b"
+      }
+    ],
+    "date": "2026-04-19",
+    "failed_job_names": [
+      "run-daily-for-release-branches (7.2) / reply-schemas-validator",
+      "run-daily-for-release-branches (7.2) / test-almalinux8-tls-module",
+      "run-daily-for-release-branches (7.2) / test-almalinux8-tls-module-no-tls",
+      "run-daily-for-release-branches (7.2) / test-almalinux9-jemalloc",
+      "run-daily-for-release-branches (7.2) / test-almalinux9-tls-module",
+      "run-daily-for-release-branches (7.2) / test-almalinux9-tls-module-no-tls",
+      "run-daily-for-release-branches (7.2) / test-alpine-jemalloc",
+      "run-daily-for-release-branches (7.2) / test-alpine-libc-malloc",
+      "run-daily-for-release-branches (7.2) / test-centosstream9-jemalloc",
+      "run-daily-for-release-branches (7.2) / test-centosstream9-tls-module",
+      "run-daily-for-release-branches (7.2) / test-centosstream9-tls-module-no-tls",
+      "run-daily-for-release-branches (7.2) / test-fedoralatest-jemalloc",
+      "run-daily-for-release-branches (7.2) / test-fedoralatest-tls-module",
+      "run-daily-for-release-branches (7.2) / test-fedoralatest-tls-module-no-tls",
+      "run-daily-for-release-branches (7.2) / test-fedorarawhide-jemalloc",
+      "run-daily-for-release-branches (7.2) / test-fedorarawhide-tls-module",
+      "run-daily-for-release-branches (7.2) / test-fedorarawhide-tls-module-no-tls",
+      "run-daily-for-release-branches (7.2) / test-sanitizer-force-defrag",
+      "run-daily-for-release-branches (7.2) / test-sanitizer-undefined (clang)",
+      "run-daily-for-release-branches (7.2) / test-sanitizer-undefined (gcc)",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-32bit",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-io-threads",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-jemalloc",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-jemalloc-fortify",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-libc-malloc",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-no-malloc-usable-size",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-tls",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-tls-io-threads",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-tls-no-tls"
+    ],
+    "failed_jobs": 29,
+    "failure_jobs": {
+      "test": [
+        71996978842,
+        71996978843,
+        71996978849,
+        71996978852,
+        71996978857,
+        71996978858,
+        71996978887,
+        71996978888,
+        71996978904,
+        71996978905,
+        71996978907,
+        71996978913,
+        71996978916,
+        71996978918,
+        71996978921,
+        71996978922,
+        71996978923,
+        71996978925,
+        71996978927,
+        71996978931,
+        71996978932,
+        71996978933,
+        71996978934,
+        71996978938,
+        71996978939,
+        71996978940,
+        71996978941,
+        71996978946,
+        71996978947
+      ]
+    },
+    "failure_names": [
+      "test"
+    ],
+    "full_sha": "4a42c95853c0f3978715cb509a774f457edc182b",
+    "run_id": 24622934314,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24622934314",
+    "status": "in_progress",
+    "total_jobs": 49,
+    "unique_failures": 1,
+    "workflow": "weekly.yml"
+  },
+  "schema_version": 1,
+  "workflow": "weekly.yml"
+}
