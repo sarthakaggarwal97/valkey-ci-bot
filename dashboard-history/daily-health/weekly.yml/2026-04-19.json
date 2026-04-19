@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-04-19T17:56:32.364108+00:00",
+  "captured_at": "2026-04-19T19:57:18.861619+00:00",
   "date": "2026-04-19",
   "repo": "valkey-io/valkey",
   "run": {
@@ -139,9 +139,29 @@
       "run-daily-for-release-branches (9.0) / test-fedorarawhide-jemalloc",
       "run-daily-for-release-branches (9.0) / test-sanitizer-address-large-memory (clang)",
       "run-daily-for-release-branches (9.0) / test-valgrind-misc",
-      "run-daily-for-release-branches (9.0) / test-valgrind-no-malloc-usable-size-misc"
+      "run-daily-for-release-branches (9.0) / test-valgrind-no-malloc-usable-size-misc",
+      "run-daily-for-release-branches (9.1) / test-almalinux8-jemalloc",
+      "run-daily-for-release-branches (9.1) / test-almalinux8-tls-module",
+      "run-daily-for-release-branches (9.1) / test-almalinux9-jemalloc",
+      "run-daily-for-release-branches (9.1) / test-almalinux9-tls-module",
+      "run-daily-for-release-branches (9.1) / test-alpine-jemalloc",
+      "run-daily-for-release-branches (9.1) / test-alpine-libc-malloc",
+      "run-daily-for-release-branches (9.1) / test-centosstream9-jemalloc",
+      "run-daily-for-release-branches (9.1) / test-centosstream9-tls-module",
+      "run-daily-for-release-branches (9.1) / test-fedoralatest-jemalloc",
+      "run-daily-for-release-branches (9.1) / test-fedoralatest-tls-module",
+      "run-daily-for-release-branches (9.1) / test-fedoralatest-tls-module-no-tls",
+      "run-daily-for-release-branches (9.1) / test-fedorarawhide-jemalloc",
+      "run-daily-for-release-branches (9.1) / test-fedorarawhide-tls-module",
+      "run-daily-for-release-branches (9.1) / test-fedorarawhide-tls-module-no-tls",
+      "run-daily-for-release-branches (9.1) / test-sanitizer-undefined (gcc)",
+      "run-daily-for-release-branches (9.1) / test-ubuntu-jemalloc-fortify",
+      "run-daily-for-release-branches (9.1) / test-ubuntu-lttng",
+      "run-daily-for-release-branches (9.1) / test-ubuntu-no-malloc-usable-size",
+      "run-daily-for-release-branches (9.1) / test-ubuntu-tls",
+      "run-daily-for-release-branches (9.1) / test-ubuntu-tls-no-tls"
     ],
-    "failed_jobs": 65,
+    "failed_jobs": 85,
     "failure_jobs": {
       "Process error: run-daily-for-release-branches (9.0) / test-sanitizer-address-large-memory (clang)": [
         72021148692
@@ -210,7 +230,27 @@
         72003053045,
         72003053047,
         72003053054,
-        72011472469
+        72011472469,
+        72033717524,
+        72033717531,
+        72033717541,
+        72033717554,
+        72033717602,
+        72033717619,
+        72033717621,
+        72033717628,
+        72033717643,
+        72033717647,
+        72033717649,
+        72033717652,
+        72033717655,
+        72033717657,
+        72033717658,
+        72033717663,
+        72033717664,
+        72033717670,
+        72033717676,
+        72033717677
       ],
       "unittest": [
         72003052953,
@@ -230,7 +270,7 @@
     "run_id": 24622934314,
     "run_url": "https://github.com/valkey-io/valkey/actions/runs/24622934314",
     "status": "in_progress",
-    "total_jobs": 196,
+    "total_jobs": 245,
     "unique_failures": 5,
     "workflow": "weekly.yml"
   },
