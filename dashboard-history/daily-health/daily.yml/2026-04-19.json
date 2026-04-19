@@ -1,0 +1,49 @@
+{
+  "captured_at": "2026-04-19T03:58:36.657857+00:00",
+  "date": "2026-04-19",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "Fix HPERSIST RESP protocol violation on wrong-type key (#3516)\n\n`hpersistCommand` calls `addReplyArrayLen` before `lookupKeyWrite` +\n`checkType`. When HPERSIST targets a non-hash key, the server writes a\nRESP array header followed by a WRONGTYPE error \u2014 a malformed response\nthat permanently desynchronizes the client connection.\n\nThis moves `lookupKeyWrite` + `checkType` before `addReplyArrayLen`,\nmatching the pattern used by every other HFE command (e.g.\n`hgetdelCommand`, `hexpireGenericCommand`).\n\nAdded a test for HPERSIST on a wrong-type key.\n\nSigned-off-by: Madelyn Olson <madelyneolson@gmail.com>",
+    "commit_sha": "4a42c95",
+    "commits_since_prev": [],
+    "date": "2026-04-19",
+    "failed_job_names": [
+      "test-almalinux9-jemalloc",
+      "test-alpine-libc-malloc",
+      "test-sanitizer-undefined (clang)",
+      "test-sanitizer-undefined (gcc)",
+      "test-sanitizer-undefined-large-memory (clang)",
+      "test-sanitizer-undefined-large-memory (gcc)",
+      "test-valgrind-no-malloc-usable-size-test",
+      "test-valgrind-test"
+    ],
+    "failed_jobs": 8,
+    "failure_jobs": {
+      "test": [
+        71981264340,
+        71981264345,
+        71981264350,
+        71981264357,
+        71981264359,
+        71981264371
+      ],
+      "unittest": [
+        71981264374,
+        71981264382
+      ]
+    },
+    "failure_names": [
+      "test",
+      "unittest"
+    ],
+    "full_sha": "4a42c95853c0f3978715cb509a774f457edc182b",
+    "run_id": 24617187103,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24617187103",
+    "status": "failure",
+    "total_jobs": 49,
+    "unique_failures": 2,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
