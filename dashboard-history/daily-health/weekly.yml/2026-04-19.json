@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-04-19T07:50:08.320507+00:00",
+  "captured_at": "2026-04-19T09:10:50.135069+00:00",
   "date": "2026-04-19",
   "repo": "valkey-io/valkey",
   "run": {
@@ -76,6 +76,7 @@
     "date": "2026-04-19",
     "failed_job_names": [
       "run-daily-for-release-branches (7.2) / reply-schemas-validator",
+      "run-daily-for-release-branches (7.2) / test-almalinux8-jemalloc",
       "run-daily-for-release-branches (7.2) / test-almalinux8-tls-module",
       "run-daily-for-release-branches (7.2) / test-almalinux8-tls-module-no-tls",
       "run-daily-for-release-branches (7.2) / test-almalinux9-jemalloc",
@@ -100,12 +101,16 @@
       "run-daily-for-release-branches (7.2) / test-ubuntu-jemalloc",
       "run-daily-for-release-branches (7.2) / test-ubuntu-jemalloc-fortify",
       "run-daily-for-release-branches (7.2) / test-ubuntu-libc-malloc",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-lttng",
       "run-daily-for-release-branches (7.2) / test-ubuntu-no-malloc-usable-size",
       "run-daily-for-release-branches (7.2) / test-ubuntu-tls",
       "run-daily-for-release-branches (7.2) / test-ubuntu-tls-io-threads",
-      "run-daily-for-release-branches (7.2) / test-ubuntu-tls-no-tls"
+      "run-daily-for-release-branches (7.2) / test-ubuntu-tls-no-tls",
+      "run-daily-for-release-branches (8.0) / test-sanitizer-undefined-large-memory (clang)",
+      "run-daily-for-release-branches (8.0) / test-sanitizer-undefined-large-memory (gcc)",
+      "run-daily-for-release-branches (8.0) / test-valgrind-no-malloc-usable-size-misc"
     ],
-    "failed_jobs": 29,
+    "failed_jobs": 34,
     "failure_jobs": {
       "test": [
         71996978842,
@@ -119,6 +124,7 @@
         71996978904,
         71996978905,
         71996978907,
+        71996978910,
         71996978913,
         71996978916,
         71996978918,
@@ -135,19 +141,26 @@
         71996978939,
         71996978940,
         71996978941,
+        71996978943,
         71996978946,
         71996978947
+      ],
+      "unittest": [
+        72003052964,
+        72003052996,
+        72003053006
       ]
     },
     "failure_names": [
-      "test"
+      "test",
+      "unittest"
     ],
     "full_sha": "4a42c95853c0f3978715cb509a774f457edc182b",
     "run_id": 24622934314,
     "run_url": "https://github.com/valkey-io/valkey/actions/runs/24622934314",
     "status": "in_progress",
-    "total_jobs": 49,
-    "unique_failures": 1,
+    "total_jobs": 98,
+    "unique_failures": 2,
     "workflow": "weekly.yml"
   },
   "schema_version": 1,
