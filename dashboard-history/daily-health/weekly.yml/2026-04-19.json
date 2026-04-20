@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-04-19T22:59:49.208619+00:00",
+  "captured_at": "2026-04-20T00:14:55.063022+00:00",
   "date": "2026-04-19",
   "repo": "valkey-io/valkey",
   "run": {
@@ -269,8 +269,8 @@
     "full_sha": "4a42c95853c0f3978715cb509a774f457edc182b",
     "run_id": 24622934314,
     "run_url": "https://github.com/valkey-io/valkey/actions/runs/24622934314",
-    "status": "in_progress",
-    "total_jobs": 245,
+    "status": "failure",
+    "total_jobs": 246,
     "unique_failures": 5,
     "workflow": "weekly.yml"
   },
