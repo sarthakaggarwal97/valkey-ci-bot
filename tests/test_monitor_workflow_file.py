@@ -59,7 +59,7 @@ def test_monitor_workflow_uses_oidc_and_matrixed_ci_scope() -> None:
         for entry in matrix_entries
     } == {
         ("ci.yml", "pull_request,push", "14"),
-        ("daily.yml", "schedule,pull_request", "14"),
+        ("daily.yml", "schedule", "14"),
         ("external.yml", "schedule,pull_request,push", "14"),
         ("weekly.yml", "schedule", "4"),
     }
