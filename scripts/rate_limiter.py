@@ -101,9 +101,10 @@ class RateLimiter:
         """Check if a new PR can be created within the daily limit.
 
         Also checks the open agent PR limit via GitHub API if available.
+        A limit of 0 means unlimited (no restriction).
         """
         self._prune_old_timestamps()
-        if len(self._pr_timestamps) >= self._config.max_prs_per_day:
+        if self._config.max_prs_per_day > 0 and len(self._pr_timestamps) >= self._config.max_prs_per_day:
             logger.info(
                 "Daily PR limit reached (%d/%d).",
                 len(self._pr_timestamps), self._config.max_prs_per_day,
@@ -116,7 +117,12 @@ class RateLimiter:
         return True
 
     def _exceeds_open_pr_limit(self) -> bool:
-        """Check if the number of open agent PRs meets or exceeds the cap."""
+        """Check if the number of open agent PRs meets or exceeds the cap.
+
+        A cap of 0 means unlimited (no restriction).
+        """
+        if self._config.max_open_bot_prs == 0:
+            return False
         if not self._gh or not self._repo_name:
             return False
 
@@ -154,7 +160,12 @@ class RateLimiter:
             self._token_window_start = datetime.now(timezone.utc).isoformat()
 
     def can_use_tokens(self, amount: int) -> bool:
-        """Check if the token budget allows using `amount` more tokens."""
+        """Check if the token budget allows using `amount` more tokens.
+
+        A budget of 0 means unlimited (no restriction).
+        """
+        if self._config.daily_token_budget == 0:
+            return True
         self._prune_token_window()
         if self._token_usage + amount > self._config.daily_token_budget:
             logger.info(

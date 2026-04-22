@@ -12,11 +12,12 @@ retrieval:
   max_total_chars: 5000
 
 limits:
-  max_failures_per_run: 20
-  max_prs_per_day: 20
-  max_open_bot_prs: 20
+  max_failures_per_run: 0
+  max_prs_per_day: 0
+  max_open_bot_prs: 0
+  daily_token_budget: 0
   min_failure_streak_before_queue: 1
-  max_history_entries_per_test: 30
+  max_history_entries_per_test: 50
 
 validation:
   require_profile: true

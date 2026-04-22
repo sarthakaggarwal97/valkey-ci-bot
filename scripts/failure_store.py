@@ -411,7 +411,9 @@ class FailureStore:
             campaign.status = "active"
             campaign.consecutive_full_passes = 0
             if max_failed_hypotheses == 0:
-                campaign.failed_hypotheses = []
+                # 0 means unlimited — keep all failed hypotheses
+                if summary not in campaign.failed_hypotheses:
+                    campaign.failed_hypotheses.append(summary)
             else:
                 if summary not in campaign.failed_hypotheses:
                     campaign.failed_hypotheses.append(summary)

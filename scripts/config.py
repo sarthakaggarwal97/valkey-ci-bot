@@ -74,20 +74,20 @@ class BotConfig:
     monitored_workflows: list[str] = field(default_factory=lambda: [
         "ci.yml", "daily.yml", "weekly.yml", "external.yml"
     ])
-    max_retries_fix: int = 2
-    max_retries_validation: int = 1
-    max_retries_bedrock: int = 3
-    max_prs_per_day: int = 5
-    max_failures_per_run: int = 50
-    max_open_bot_prs: int = 3
-    queued_pr_max_attempts: int = 5
-    daily_token_budget: int = 100_000_000
-    min_failure_streak_before_queue: int = 2
-    max_history_entries_per_test: int = 20
+    max_retries_fix: int = 10
+    max_retries_validation: int = 5
+    max_retries_bedrock: int = 10
+    max_prs_per_day: int = 0
+    max_failures_per_run: int = 0
+    max_open_bot_prs: int = 0
+    queued_pr_max_attempts: int = 0
+    daily_token_budget: int = 0
+    min_failure_streak_before_queue: int = 1
+    max_history_entries_per_test: int = 50
     flaky_campaign_enabled: bool = True
-    flaky_max_attempts_per_run: int = 3
+    flaky_max_attempts_per_run: int = 10
     flaky_validation_passes: int = 3
-    flaky_max_failed_hypotheses: int = 8
+    flaky_max_failed_hypotheses: int = 0
     require_validation_profile: bool = True
     soak_validation_workflows: list[str] = field(default_factory=list)
     soak_validation_passes: int = 1
@@ -100,7 +100,7 @@ class BotConfig:
         """Clamp numeric fields to valid ranges."""
         self.max_prs_per_day = max(0, self.max_prs_per_day)
         self.max_open_bot_prs = max(0, self.max_open_bot_prs)
-        self.max_failures_per_run = max(1, self.max_failures_per_run)
+        self.max_failures_per_run = max(0, self.max_failures_per_run)
         self.max_retries_bedrock = max(0, self.max_retries_bedrock)
         self.max_retries_fix = max(0, self.max_retries_fix)
         self.max_retries_validation = max(0, self.max_retries_validation)

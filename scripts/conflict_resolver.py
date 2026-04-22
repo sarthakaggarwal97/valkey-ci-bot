@@ -135,7 +135,8 @@ class ConflictResolver:
                 continue
 
             # Token budget check — stop resolving further files.
-            if tokens_used_total >= token_budget:
+            # A budget of 0 means unlimited.
+            if token_budget > 0 and tokens_used_total >= token_budget:
                 logger.warning(
                     "Token budget exhausted (%d / %d). Skipping %s.",
                     tokens_used_total,

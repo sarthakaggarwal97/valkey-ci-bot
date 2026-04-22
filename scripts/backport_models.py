@@ -68,10 +68,10 @@ class BackportConfig:
     """Configuration for the backport agent, loaded from consumer repo YAML."""
 
     bedrock_model_id: str = "us.anthropic.claude-sonnet-4-20250514-v1:0"
-    max_conflict_retries: int = 2
-    max_conflicting_files: int = 20
-    max_prs_per_day: int = 10
-    per_backport_token_budget: int = 100_000
+    max_conflict_retries: int = 5
+    max_conflicting_files: int = 100
+    max_prs_per_day: int = 0
+    per_backport_token_budget: int = 0
     backport_label: str = "backport"
     llm_conflict_label: str = "llm-resolved-conflicts"
     thinking_budget: int = 32_000

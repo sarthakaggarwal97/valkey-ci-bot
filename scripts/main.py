@@ -1172,7 +1172,7 @@ def run_pipeline(
             )
         )
 
-    if len(prepared_candidates) > config.max_failures_per_run:
+    if config.max_failures_per_run > 0 and len(prepared_candidates) > config.max_failures_per_run:
         skipped = prepared_candidates[config.max_failures_per_run:]
         for candidate in skipped:
             logger.warning(
@@ -1750,7 +1750,7 @@ def run_reconciliation(
                 attempts=attempts,
                 error=str(exc),
             )
-            if attempts >= max(1, config.queued_pr_max_attempts):
+            if config.queued_pr_max_attempts > 0 and attempts >= config.queued_pr_max_attempts:
                 failure_store.mark_queued_pr_dead_letter(fingerprint, str(exc))
                 event_ledger.record(
                     "fix.dead_lettered",
