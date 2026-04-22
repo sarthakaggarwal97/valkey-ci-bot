@@ -8,7 +8,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import Any, Dict, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from github import Github
@@ -20,7 +20,7 @@ _LEDGER_FILE = "agent-events.jsonl"
 _MAX_PERSIST_ATTEMPTS = 3
 
 
-JsonObject = dict[str, Any]
+JsonObject = Dict[str, Any]
 
 
 def _github_status(exc: Exception) -> int | None:

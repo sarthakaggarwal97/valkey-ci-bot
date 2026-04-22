@@ -6,7 +6,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict
 
 from github.GithubException import GithubException
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-JsonObject = dict[str, Any]
+JsonObject = Dict[str, Any]
 
 _HISTORY_BRANCH = "bot-data"
 _HISTORY_ROOT = "dashboard-history/daily-health"

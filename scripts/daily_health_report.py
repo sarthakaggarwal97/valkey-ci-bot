@@ -18,7 +18,7 @@ import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 from github import Auth, Github
 
@@ -27,7 +27,7 @@ from scripts.github_client import retry_github_call
 
 logger = logging.getLogger(__name__)
 
-JsonObject = dict[str, Any]
+JsonObject = Dict[str, Any]
 
 # ---------------------------------------------------------------------------
 # Data collection
