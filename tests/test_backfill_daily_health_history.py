@@ -57,10 +57,12 @@ def test_main_backfills_multiple_workflows_and_prints_summary(
 
     def _fake_fetch(gh, repo: str, workflow: str, branch: str, days: int) -> list[dict[str, object]]:
         fetch_calls.append((gh.auth, repo, workflow, branch, days))
+        from datetime import datetime, timezone
+        today = datetime.now(timezone.utc).date().isoformat()
         return [
             {
                 "workflow": workflow,
-                "date": "2026-04-15",
+                "date": today,
                 "run_id": 100 if workflow == "daily.yml" else 200,
             }
         ]

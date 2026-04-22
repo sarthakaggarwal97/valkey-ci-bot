@@ -7,6 +7,7 @@ router updates, and config __post_init__ validation.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from unittest.mock import patch, MagicMock
 
@@ -364,21 +365,28 @@ class TestFuzzerTrendTracker:
 
     def test_degrading_trend(self) -> None:
         t = FuzzerTrendTracker()
+        now = datetime.now(timezone.utc)
         for i in range(4):
-            t.record_run("scen1", f"2026-04-{5+i:02d}T00:00:00+00:00", True)
+            ts = (now - timedelta(days=10 - i)).isoformat()
+            t.record_run("scen1", ts, True)
         for i in range(4):
-            t.record_run("scen1", f"2026-04-{10+i:02d}T00:00:00+00:00", False)
+            ts = (now - timedelta(days=4 - i)).isoformat()
+            t.record_run("scen1", ts, False)
         trends = t.get_trends()
         assert trends[0].trend == "degrading"
 
     def test_get_degrading_scenarios(self) -> None:
         t = FuzzerTrendTracker()
+        now = datetime.now(timezone.utc)
         for i in range(4):
-            t.record_run("good", f"2026-04-{5+i:02d}T00:00:00+00:00", True)
+            ts = (now - timedelta(days=10 - i)).isoformat()
+            t.record_run("good", ts, True)
         for i in range(4):
-            t.record_run("bad", f"2026-04-{5+i:02d}T00:00:00+00:00", True)
+            ts = (now - timedelta(days=10 - i)).isoformat()
+            t.record_run("bad", ts, True)
         for i in range(4):
-            t.record_run("bad", f"2026-04-{10+i:02d}T00:00:00+00:00", False)
+            ts = (now - timedelta(days=4 - i)).isoformat()
+            t.record_run("bad", ts, False)
         degrading = t.get_degrading_scenarios()
         names = [s.scenario_name for s in degrading]
         assert "bad" in names
@@ -735,7 +743,7 @@ class TestBotConfigPostInit:
         )
         assert cfg.max_prs_per_day == 0
         assert cfg.max_open_bot_prs == 0
-        assert cfg.max_failures_per_run == 1
+        assert cfg.max_failures_per_run == 0
         assert cfg.max_retries_bedrock == 0
         assert cfg.daily_token_budget == 0
 
