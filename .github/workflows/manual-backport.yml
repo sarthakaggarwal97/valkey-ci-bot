@@ -25,9 +25,14 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   parse-inputs:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       pr_number: ${{ steps.parse.outputs.pr_number }}
       repo: ${{ steps.parse.outputs.repo }}

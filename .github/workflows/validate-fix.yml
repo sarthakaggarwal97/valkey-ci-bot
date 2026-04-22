@@ -42,15 +42,19 @@ on:
         description: "Combined build/test output"
         value: ${{ jobs.validate.outputs.output }}
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     outputs:
       passed: ${{ steps.result.outputs.passed }}
       output: ${{ steps.result.outputs.output }}
     steps:
       - name: Checkout consumer repo at SHA
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ inputs.consumer_repo }}
           ref: ${{ inputs.commit_sha }}
