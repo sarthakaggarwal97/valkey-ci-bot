@@ -1,0 +1,84 @@
+{
+  "captured_at": "2026-04-22T03:45:51.032478+00:00",
+  "date": "2026-04-22",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "Stabilize diskless no-drop replication test (#3511)\n\nThis deflakes all variants of `diskless replicas drop during rdb pipe`.\n\nThe main issue turned out to be that the test was too sensitive to\ntiming and log ordering under TLS, not that the core behavior was wrong.\nThis keeps the same five subcases (no, slow, fast, all, timeout) but\nmakes them much less CI-fragile.\n\nCI passes 200 times:\nhttps://github.com/sarthakaggarwal97/valkey/actions/runs/24547258515\n\n---------\n\nSigned-off-by: Sarthak Aggarwal <sarthagg@amazon.com>\nSigned-off-by: Sarthak Aggarwal <25262500+sarthakaggarwal97@users.noreply.github.com>\nCo-authored-by: Sarthak Aggarwal <25262500+sarthakaggarwal97@users.noreply.github.com>",
+    "commit_sha": "03c2d4c",
+    "commits_since_prev": [
+      {
+        "author": "Dietrich Daroch",
+        "date": "2026-04-21T09:52:54+00:00",
+        "message": "Document VALKEYCLI_HOST/PORT variables in help (#3520)",
+        "sha": "9d51f5ff8a8634a20f29fc38f39d592b848ddc14"
+      },
+      {
+        "author": "martinrvisser",
+        "date": "2026-04-21T13:14:14+00:00",
+        "message": "Module command result callback addition (#2936)",
+        "sha": "6444717517316ecd16712e5f50794f99f600cdfe"
+      },
+      {
+        "author": "Yang Zhao",
+        "date": "2026-04-21T20:07:58+00:00",
+        "message": "Fix VLA warning in io_threads (#3518)",
+        "sha": "fc00f7be030784ac115e088ddf31bc94266cb01d"
+      },
+      {
+        "author": "Sarthak Aggarwal",
+        "date": "2026-04-21T22:14:18+00:00",
+        "message": "Stabilize diskless no-drop replication test (#3511)",
+        "sha": "03c2d4c2a21bdebc182266b49932e71716e2762a"
+      }
+    ],
+    "date": "2026-04-22",
+    "failed_job_names": [
+      "reply-schemas-validator",
+      "test-alpine-jemalloc",
+      "test-alpine-libc-malloc",
+      "test-sanitizer-address (clang)",
+      "test-sanitizer-address-large-memory (clang)",
+      "test-sanitizer-undefined (clang)",
+      "test-sanitizer-undefined (gcc)",
+      "test-sanitizer-undefined-large-memory (clang)",
+      "test-sanitizer-undefined-large-memory (gcc)",
+      "test-valgrind-no-malloc-usable-size-test"
+    ],
+    "failed_jobs": 10,
+    "failure_jobs": {
+      "make": [
+        72421581507,
+        72421581510,
+        72421581512,
+        72421581577
+      ],
+      "module api test": [
+        72421581529,
+        72421581588,
+        72421581610
+      ],
+      "test": [
+        72421581540,
+        72421581579
+      ],
+      "unittest": [
+        72421581575
+      ]
+    },
+    "failure_names": [
+      "make",
+      "module api test",
+      "test",
+      "unittest"
+    ],
+    "full_sha": "03c2d4c2a21bdebc182266b49932e71716e2762a",
+    "run_id": 24753491944,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24753491944",
+    "status": "in_progress",
+    "total_jobs": 48,
+    "unique_failures": 4,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
