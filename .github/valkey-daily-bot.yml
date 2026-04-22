@@ -12,10 +12,10 @@ retrieval:
   max_total_chars: 5000
 
 limits:
-  max_failures_per_run: 5
-  max_prs_per_day: 3
-  max_open_bot_prs: 2
-  min_failure_streak_before_queue: 2
+  max_failures_per_run: 20
+  max_prs_per_day: 20
+  max_open_bot_prs: 20
+  min_failure_streak_before_queue: 1
   max_history_entries_per_test: 30
 
 validation:

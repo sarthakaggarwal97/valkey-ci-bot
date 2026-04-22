@@ -2,7 +2,7 @@ name: Monitor Valkey CI Failures
 
 on:
   schedule:
-    - cron: "23 * * * *"
+    - cron: "0 6 * * *"
   workflow_dispatch:
     inputs:
       workflow_scope:
@@ -57,7 +57,7 @@ jobs:
           - scope: daily
             label: Daily
             workflow_file: daily.yml
-            monitor_events: "schedule,pull_request"
+            monitor_events: "schedule"
             max_runs: "14"
           - scope: external
             label: External

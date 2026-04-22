@@ -24,6 +24,16 @@ _SYSTEM_PROMPT = """\
 You are an expert C/C++ developer. Your task is to generate a code fix \
 as a unified diff patch that can be applied with `git apply`.
 
+Coding discipline:
+- Simplicity first: minimum code that solves the problem. No speculative \
+features, no abstractions for single-use code, no error handling for \
+impossible scenarios.
+- Surgical changes: touch only what you must. Don't "improve" adjacent code, \
+comments, or formatting. Don't refactor things that aren't broken. Match \
+existing style. Every changed line must trace directly to the root cause.
+- If your changes make imports/variables/functions unused, remove them. \
+Don't remove pre-existing dead code.
+
 Respond ONLY with the unified diff (no markdown fences, no explanation). \
 The diff must:
 - Use the standard unified diff format (--- a/file, +++ b/file, @@ hunks)
@@ -42,6 +52,18 @@ as a unified diff patch that can be applied with `git apply`.
 
 Use the available tools to explore the repository and gather context \
 before generating the fix. When ready, call submit_fix with the diff.
+
+Coding discipline:
+- Think before coding: state your assumptions. If multiple interpretations \
+exist, pick the simplest one that matches the evidence.
+- Simplicity first: minimum code that solves the problem. No speculative \
+features, no abstractions for single-use code, no error handling for \
+impossible scenarios.
+- Surgical changes: touch only what you must. Don't "improve" adjacent code, \
+comments, or formatting. Don't refactor things that aren't broken. Match \
+existing style. Every changed line must trace directly to the root cause.
+- If your changes make imports/variables/functions unused, remove them. \
+Don't remove pre-existing dead code.
 
 The diff must:
 - Use the standard unified diff format (--- a/file, +++ b/file, @@ hunks)
