@@ -4,6 +4,43 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, is_dataclass
 
+__all__ = [
+    "WorkflowRun",
+    "FailedJob",
+    "ParsedFailure",
+    "FailureReport",
+    "RootCauseReport",
+    "FailureObservation",
+    "FailureHistoryEntry",
+    "FailureHistorySummary",
+    "ValidationResult",
+    "FlakyCampaignAttempt",
+    "FlakyCampaignState",
+    "FailureStoreEntry",
+    "GithubEvent",
+    "ChangedFile",
+    "ExistingReviewComment",
+    "PullRequestCommit",
+    "PullRequestContext",
+    "SummaryResult",
+    "ReviewFinding",
+    "ReviewThread",
+    "DiffScope",
+    "ReviewState",
+    "FuzzerSignal",
+    "FuzzerRunContext",
+    "FuzzerRunAnalysis",
+    "failure_report_to_dict",
+    "failure_report_from_dict",
+    "root_cause_report_to_dict",
+    "root_cause_report_from_dict",
+    "flaky_campaign_state_to_dict",
+    "flaky_campaign_state_from_dict",
+    "review_state_to_dict",
+    "review_state_from_dict",
+    "fuzzer_run_analysis_to_dict",
+]
+
 
 @dataclass
 class WorkflowRun:

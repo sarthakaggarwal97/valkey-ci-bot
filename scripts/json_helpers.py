@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict
 
-JsonObject = dict[str, Any]
+__all__ = [
+    "JsonObject",
+    "mapping",
+    "safe_list",
+    "safe_str",
+    "safe_int",
+    "safe_float",
+    "bool_text",
+]
+
+JsonObject = Dict[str, Any]
 
 
 def mapping(value: Any) -> JsonObject:

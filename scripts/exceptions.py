@@ -6,6 +6,18 @@ handling more precise and debugging easier.
 
 from __future__ import annotations
 
+__all__ = [
+    "CIAgentError",
+    "GitHubAPIError",
+    "ConfigurationError",
+    "StoreError",
+    "StoreConflictError",
+    "ParseError",
+    "ValidationError",
+    "RateLimitExceeded",
+    "AnalysisError",
+]
+
 
 class CIAgentError(Exception):
     """Base exception for all CI agent errors."""
