@@ -1,0 +1,61 @@
+{
+  "captured_at": "2026-04-23T09:13:17.689824+00:00",
+  "date": "2026-04-23",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "Stabilize diskless no-drop replication test (#3511)\n\nThis deflakes all variants of `diskless replicas drop during rdb pipe`.\n\nThe main issue turned out to be that the test was too sensitive to\ntiming and log ordering under TLS, not that the core behavior was wrong.\nThis keeps the same five subcases (no, slow, fast, all, timeout) but\nmakes them much less CI-fragile.\n\nCI passes 200 times:\nhttps://github.com/sarthakaggarwal97/valkey/actions/runs/24547258515\n\n---------\n\nSigned-off-by: Sarthak Aggarwal <sarthagg@amazon.com>\nSigned-off-by: Sarthak Aggarwal <25262500+sarthakaggarwal97@users.noreply.github.com>\nCo-authored-by: Sarthak Aggarwal <25262500+sarthakaggarwal97@users.noreply.github.com>",
+    "commit_sha": "03c2d4c",
+    "commits_since_prev": [],
+    "date": "2026-04-23",
+    "failed_job_names": [
+      "reply-schemas-validator",
+      "test-alpine-jemalloc",
+      "test-alpine-libc-malloc",
+      "test-fedoralatest-tls-module",
+      "test-sanitizer-address (clang)",
+      "test-sanitizer-address-large-memory (clang)",
+      "test-sanitizer-undefined (clang)",
+      "test-sanitizer-undefined (gcc)",
+      "test-sanitizer-undefined-large-memory (clang)",
+      "test-sanitizer-undefined-large-memory (gcc)",
+      "test-valgrind-test"
+    ],
+    "failed_jobs": 11,
+    "failure_jobs": {
+      "make": [
+        72612148530,
+        72612148580,
+        72612148583,
+        72612148608
+      ],
+      "module api test": [
+        72612148564,
+        72612148570,
+        72612148629
+      ],
+      "test": [
+        72612148559,
+        72612148612,
+        72612148664
+      ],
+      "unittest": [
+        72612148573
+      ]
+    },
+    "failure_names": [
+      "make",
+      "module api test",
+      "test",
+      "unittest"
+    ],
+    "full_sha": "03c2d4c2a21bdebc182266b49932e71716e2762a",
+    "run_id": 24809842318,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24809842318",
+    "status": "failure",
+    "total_jobs": 49,
+    "unique_failures": 4,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
