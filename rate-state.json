@@ -1,7 +1,7 @@
 {
   "pr_timestamps": [],
-  "token_usage": 5252614,
-  "token_window_start": "2026-04-23T06:27:12.013607+00:00",
+  "token_usage": 0,
+  "token_window_start": "2026-04-24T06:28:40.529395+00:00",
   "queued_failures": [],
   "ai_metrics": {
     "bedrock.invoke_schema.calls": 113,
