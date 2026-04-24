@@ -1,0 +1,98 @@
+{
+  "captured_at": "2026-04-24T08:19:53.506653+00:00",
+  "date": "2026-04-24",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "Fix module commandresult event cleanup during unsubscribe and module unload (#3545)\n\nThis follows up on the commandresult API work and fixes cleanup around\nunsubscribe and module unload.\n\nThe main issue was that command-result event listeners could leave stale\nstate behind. On unload, we removed the listeners themselves but didn\u2019t\nfully update the fast-path listener counters. Separately, unsubscribing\nwith a NULL callback could behave badly if the listener wasn\u2019t present\nanymore. In practice, that meant later commands could still walk into\ncommand-result event handling after the module was supposed to be\ncleaned up.\n\nFailed in Daily as well yesterday:\nhttps://github.com/valkey-io/valkey/actions/runs/24753491944/job/72421581610#step:10:852\nRelated Failures:\nhttps://github.com/valkey-io/valkey/pull/2936#issuecomment-4290490199\n\n---------\n\nSigned-off-by: Sarthak Aggarwal <sarthagg@amazon.com>",
+    "commit_sha": "d2db0c2",
+    "commits_since_prev": [
+      {
+        "author": "Deepak Nandihalli",
+        "date": "2026-04-23T00:39:44+00:00",
+        "message": "Fix race condition during async client freeing with IO threading enabled (#3458)",
+        "sha": "3ab9d9797ebaaf1e6ec582dcab6f56284bc74dd2"
+      },
+      {
+        "author": "Roshan Khatri",
+        "date": "2026-04-23T04:31:32+00:00",
+        "message": "Deflake many-slot-migration under valgrind (#3462)",
+        "sha": "04896c1e6dab95f6da6c0cf6c2fa2d3d23330bb8"
+      },
+      {
+        "author": "Binbin",
+        "date": "2026-04-23T04:32:10+00:00",
+        "message": "Fix double free in stream consumer PEL loading with corrupt RDB data (#3498)",
+        "sha": "c403eecd5b7dbfdf737e8c6aae8e1d022727ba50"
+      },
+      {
+        "author": "Madelyn Olson",
+        "date": "2026-04-23T04:34:34+00:00",
+        "message": "Fix FD leak in connSocketBlockingConnect on timeout (#3541)",
+        "sha": "651c40a89ebe6427e2053bb139a7dedf466821ff"
+      },
+      {
+        "author": "charsyam",
+        "date": "2026-04-23T04:56:52+00:00",
+        "message": "Optimize HGETDEL to pause auto shrink when deleting multiple items (#3535)",
+        "sha": "97098434463c4687f8ed1f4567717fea4c6bce21"
+      },
+      {
+        "author": "Sarthak Aggarwal",
+        "date": "2026-04-23T18:46:22+00:00",
+        "message": "Add zmalloc_aligned() and fix SPMC queue buffer alignment (#3504)",
+        "sha": "5abf79e0e3b7d6af5f1bbb3a6385e5f339c8cc18"
+      },
+      {
+        "author": "Hanxi Zhang",
+        "date": "2026-04-23T23:14:24+00:00",
+        "message": "Pin clang to version 17 in sanitizer CI jobs (#3546)",
+        "sha": "7db5b70737f43c59310735444a62dce5e13f49ef"
+      },
+      {
+        "author": "Harkrishn Patro",
+        "date": "2026-04-24T02:01:52+00:00",
+        "message": "Revert \"Pin clang to version 17 in sanitizer CI jobs\" (#3556)",
+        "sha": "cb2cfdd4e016462cdfb20471d9094b81c22fb852"
+      },
+      {
+        "author": "Sarthak Aggarwal",
+        "date": "2026-04-24T02:10:20+00:00",
+        "message": "Fix module commandresult event cleanup during unsubscribe and module unload (#3545)",
+        "sha": "d2db0c268cc73ede427f46ad206cb93685c0b10f"
+      }
+    ],
+    "date": "2026-04-24",
+    "failed_job_names": [
+      "test-centosstream9-tls-module",
+      "test-sanitizer-address (clang)",
+      "test-sanitizer-address-large-memory (clang)",
+      "test-sanitizer-undefined (clang)",
+      "test-sanitizer-undefined-large-memory (clang)"
+    ],
+    "failed_jobs": 5,
+    "failure_jobs": {
+      "make": [
+        72810817296,
+        72810817385,
+        72810817392,
+        72810817406
+      ],
+      "test": [
+        72810817341
+      ]
+    },
+    "failure_names": [
+      "make",
+      "test"
+    ],
+    "full_sha": "d2db0c268cc73ede427f46ad206cb93685c0b10f",
+    "run_id": 24868854674,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24868854674",
+    "status": "failure",
+    "total_jobs": 49,
+    "unique_failures": 2,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
