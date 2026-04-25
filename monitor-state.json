@@ -7,11 +7,11 @@
     "updated_at": "2026-04-23T09:12:01.663683+00:00"
   },
   "valkey-io/valkey-fuzzer:fuzzer-run.yml:schedule": {
-    "last_seen_run_id": 24917580659,
+    "last_seen_run_id": 24926533053,
     "target_repo": "valkey-io/valkey-fuzzer",
     "workflow_file": "fuzzer-run.yml",
     "event": "schedule",
-    "updated_at": "2026-04-25T03:44:16.730189+00:00"
+    "updated_at": "2026-04-25T09:34:54.513571+00:00"
   },
   "valkey-io/valkey:ci.yml:pull_request,push": {
     "last_seen_run_id": 24922570752,
