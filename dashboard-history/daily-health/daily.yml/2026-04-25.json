@@ -1,0 +1,58 @@
+{
+  "captured_at": "2026-04-25T07:33:12.998175+00:00",
+  "date": "2026-04-25",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "extra UT\n\nSigned-off-by: Rain Valentine <rsg000@gmail.com>",
+    "commit_sha": "a7d4953",
+    "commits_since_prev": [
+      {
+        "author": "Rain Valentine",
+        "date": "2026-04-23T21:15:05+00:00",
+        "message": "hashtable iterator safety: invalidate on exhaustion",
+        "sha": "54980ece3a46a1bf83eea40870542c09c843b8fa"
+      },
+      {
+        "author": "Rain Valentine",
+        "date": "2026-04-23T21:42:40+00:00",
+        "message": "extra UT",
+        "sha": "a7d495352ac0ba724eeec51fd57b615e8e805f52"
+      }
+    ],
+    "date": "2026-04-25",
+    "failed_job_names": [
+      "test-almalinux8-tls-module",
+      "test-sanitizer-address (clang)",
+      "test-sanitizer-address-large-memory (clang)",
+      "test-sanitizer-undefined (clang)",
+      "test-sanitizer-undefined-large-memory (clang)",
+      "test-ubuntu-arm"
+    ],
+    "failed_jobs": 6,
+    "failure_jobs": {
+      "make": [
+        72973581238,
+        72973581280,
+        72973581309,
+        72973581356
+      ],
+      "test": [
+        72973581134,
+        72973581312
+      ]
+    },
+    "failure_names": [
+      "make",
+      "test"
+    ],
+    "full_sha": "a7d495352ac0ba724eeec51fd57b615e8e805f52",
+    "run_id": 24917909722,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24917909722",
+    "status": "failure",
+    "total_jobs": 49,
+    "unique_failures": 2,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
