@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-04-24T08:19:53.506653+00:00",
+  "captured_at": "2026-04-25T07:33:14.359690+00:00",
   "date": "2026-04-24",
   "repo": "valkey-io/valkey",
   "run": {
@@ -63,34 +63,52 @@
     ],
     "date": "2026-04-24",
     "failed_job_names": [
-      "test-centosstream9-tls-module",
+      "reply-schemas-validator",
       "test-sanitizer-address (clang)",
       "test-sanitizer-address-large-memory (clang)",
       "test-sanitizer-undefined (clang)",
-      "test-sanitizer-undefined-large-memory (clang)"
+      "test-sanitizer-undefined-large-memory (clang)",
+      "test-ubuntu-io-threads",
+      "test-ubuntu-libc-malloc",
+      "test-ubuntu-lttng",
+      "test-ubuntu-tls-io-threads",
+      "test-valgrind-no-malloc-usable-size-test",
+      "test-valgrind-test"
     ],
-    "failed_jobs": 5,
+    "failed_jobs": 11,
     "failure_jobs": {
+      "cluster tests": [
+        72869126917,
+        72869127167,
+        72869127287
+      ],
       "make": [
-        72810817296,
-        72810817385,
-        72810817392,
-        72810817406
+        72869127210,
+        72869127355,
+        72869127365,
+        72869127428
       ],
       "test": [
-        72810817341
+        72869127241,
+        72869127263,
+        72869127315
+      ],
+      "validator": [
+        72869127331
       ]
     },
     "failure_names": [
+      "cluster tests",
       "make",
-      "test"
+      "test",
+      "validator"
     ],
     "full_sha": "d2db0c268cc73ede427f46ad206cb93685c0b10f",
-    "run_id": 24868854674,
-    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24868854674",
+    "run_id": 24886932489,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24886932489",
     "status": "failure",
     "total_jobs": 49,
-    "unique_failures": 2,
+    "unique_failures": 4,
     "workflow": "daily.yml"
   },
   "schema_version": 1,
