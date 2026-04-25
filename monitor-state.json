@@ -1,10 +1,10 @@
 {
   "valkey-io/valkey:daily.yml:schedule": {
-    "last_seen_run_id": 24917909722,
+    "last_seen_run_id": 24809842318,
     "target_repo": "valkey-io/valkey",
     "workflow_file": "daily.yml",
     "event": "schedule",
-    "updated_at": "2026-04-25T07:30:27.008410+00:00"
+    "updated_at": "2026-04-23T09:12:01.663683+00:00"
   },
   "valkey-io/valkey-fuzzer:fuzzer-run.yml:schedule": {
     "last_seen_run_id": 24917580659,
@@ -14,11 +14,11 @@
     "updated_at": "2026-04-25T03:44:16.730189+00:00"
   },
   "valkey-io/valkey:ci.yml:pull_request,push": {
-    "last_seen_run_id": 24800172066,
+    "last_seen_run_id": 24922570752,
     "target_repo": "valkey-io/valkey",
     "workflow_file": "ci.yml",
     "event": "pull_request,push",
-    "updated_at": "2026-04-22T21:12:21.462162+00:00"
+    "updated_at": "2026-04-25T07:32:03.961249+00:00"
   },
   "valkey-io/valkey:external.yml:schedule,pull_request,push": {
     "last_seen_run_id": 24872294010,
