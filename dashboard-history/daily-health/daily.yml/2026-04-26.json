@@ -1,0 +1,45 @@
+{
+  "captured_at": "2026-04-26T08:10:01.598380+00:00",
+  "date": "2026-04-26",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "extra UT\n\nSigned-off-by: Rain Valentine <rsg000@gmail.com>",
+    "commit_sha": "a7d4953",
+    "commits_since_prev": [],
+    "date": "2026-04-26",
+    "failed_job_names": [
+      "test-centosstream9-tls-module",
+      "test-fedoralatest-jemalloc",
+      "test-sanitizer-address (clang)",
+      "test-sanitizer-address-large-memory (clang)",
+      "test-sanitizer-undefined (clang)",
+      "test-sanitizer-undefined-large-memory (clang)"
+    ],
+    "failed_jobs": 6,
+    "failure_jobs": {
+      "make": [
+        73042705710,
+        73042705713,
+        73042705735,
+        73042705744
+      ],
+      "test": [
+        73042705734,
+        73042705752
+      ]
+    },
+    "failure_names": [
+      "make",
+      "test"
+    ],
+    "full_sha": "a7d495352ac0ba724eeec51fd57b615e8e805f52",
+    "run_id": 24944219518,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24944219518",
+    "status": "failure",
+    "total_jobs": 49,
+    "unique_failures": 2,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
