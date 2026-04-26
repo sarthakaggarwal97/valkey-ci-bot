@@ -1,0 +1,191 @@
+{
+  "captured_at": "2026-04-26T08:10:42.894997+00:00",
+  "date": "2026-04-26",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "extra UT\n\nSigned-off-by: Rain Valentine <rsg000@gmail.com>",
+    "commit_sha": "a7d4953",
+    "commits_since_prev": [
+      {
+        "author": "Daniil Kashapov",
+        "date": "2026-04-20T11:45:51+00:00",
+        "message": "Improve COB memory tracking with copy avoidance (#3306)",
+        "sha": "269b1c5eda9347fb7d4d485ac9d375d11d467edd"
+      },
+      {
+        "author": "eifrah-aws",
+        "date": "2026-04-20T11:45:57+00:00",
+        "message": "Add Static Module Support (#3392)",
+        "sha": "0327c271316daa952e6c9a41cc922ea8a9548827"
+      },
+      {
+        "author": "Dietrich Daroch",
+        "date": "2026-04-21T09:52:54+00:00",
+        "message": "Document VALKEYCLI_HOST/PORT variables in help (#3520)",
+        "sha": "9d51f5ff8a8634a20f29fc38f39d592b848ddc14"
+      },
+      {
+        "author": "martinrvisser",
+        "date": "2026-04-21T13:14:14+00:00",
+        "message": "Module command result callback addition (#2936)",
+        "sha": "6444717517316ecd16712e5f50794f99f600cdfe"
+      },
+      {
+        "author": "Yang Zhao",
+        "date": "2026-04-21T20:07:58+00:00",
+        "message": "Fix VLA warning in io_threads (#3518)",
+        "sha": "fc00f7be030784ac115e088ddf31bc94266cb01d"
+      },
+      {
+        "author": "Sarthak Aggarwal",
+        "date": "2026-04-21T22:14:18+00:00",
+        "message": "Stabilize diskless no-drop replication test (#3511)",
+        "sha": "03c2d4c2a21bdebc182266b49932e71716e2762a"
+      },
+      {
+        "author": "Deepak Nandihalli",
+        "date": "2026-04-23T00:39:44+00:00",
+        "message": "Fix race condition during async client freeing with IO threading enabled (#3458)",
+        "sha": "3ab9d9797ebaaf1e6ec582dcab6f56284bc74dd2"
+      },
+      {
+        "author": "Roshan Khatri",
+        "date": "2026-04-23T04:31:32+00:00",
+        "message": "Deflake many-slot-migration under valgrind (#3462)",
+        "sha": "04896c1e6dab95f6da6c0cf6c2fa2d3d23330bb8"
+      },
+      {
+        "author": "Binbin",
+        "date": "2026-04-23T04:32:10+00:00",
+        "message": "Fix double free in stream consumer PEL loading with corrupt RDB data (#3498)",
+        "sha": "c403eecd5b7dbfdf737e8c6aae8e1d022727ba50"
+      },
+      {
+        "author": "Madelyn Olson",
+        "date": "2026-04-23T04:34:34+00:00",
+        "message": "Fix FD leak in connSocketBlockingConnect on timeout (#3541)",
+        "sha": "651c40a89ebe6427e2053bb139a7dedf466821ff"
+      },
+      {
+        "author": "charsyam",
+        "date": "2026-04-23T04:56:52+00:00",
+        "message": "Optimize HGETDEL to pause auto shrink when deleting multiple items (#3535)",
+        "sha": "97098434463c4687f8ed1f4567717fea4c6bce21"
+      },
+      {
+        "author": "Sarthak Aggarwal",
+        "date": "2026-04-23T18:46:22+00:00",
+        "message": "Add zmalloc_aligned() and fix SPMC queue buffer alignment (#3504)",
+        "sha": "5abf79e0e3b7d6af5f1bbb3a6385e5f339c8cc18"
+      },
+      {
+        "author": "Hanxi Zhang",
+        "date": "2026-04-23T23:14:24+00:00",
+        "message": "Pin clang to version 17 in sanitizer CI jobs (#3546)",
+        "sha": "7db5b70737f43c59310735444a62dce5e13f49ef"
+      },
+      {
+        "author": "Harkrishn Patro",
+        "date": "2026-04-24T02:01:52+00:00",
+        "message": "Revert \"Pin clang to version 17 in sanitizer CI jobs\" (#3556)",
+        "sha": "cb2cfdd4e016462cdfb20471d9094b81c22fb852"
+      },
+      {
+        "author": "Sarthak Aggarwal",
+        "date": "2026-04-24T02:10:20+00:00",
+        "message": "Fix module commandresult event cleanup during unsubscribe and module unload (#3545)",
+        "sha": "d2db0c268cc73ede427f46ad206cb93685c0b10f"
+      },
+      {
+        "author": "Rain Valentine",
+        "date": "2026-04-23T21:15:05+00:00",
+        "message": "hashtable iterator safety: invalidate on exhaustion",
+        "sha": "54980ece3a46a1bf83eea40870542c09c843b8fa"
+      },
+      {
+        "author": "Rain Valentine",
+        "date": "2026-04-23T21:42:40+00:00",
+        "message": "extra UT",
+        "sha": "a7d495352ac0ba724eeec51fd57b615e8e805f52"
+      }
+    ],
+    "date": "2026-04-26",
+    "failed_job_names": [
+      "run-daily-for-release-branches (7.2) / reply-schemas-validator",
+      "run-daily-for-release-branches (7.2) / test-almalinux8-jemalloc",
+      "run-daily-for-release-branches (7.2) / test-almalinux8-tls-module",
+      "run-daily-for-release-branches (7.2) / test-almalinux8-tls-module-no-tls",
+      "run-daily-for-release-branches (7.2) / test-almalinux9-jemalloc",
+      "run-daily-for-release-branches (7.2) / test-almalinux9-tls-module",
+      "run-daily-for-release-branches (7.2) / test-almalinux9-tls-module-no-tls",
+      "run-daily-for-release-branches (7.2) / test-alpine-jemalloc",
+      "run-daily-for-release-branches (7.2) / test-alpine-libc-malloc",
+      "run-daily-for-release-branches (7.2) / test-centosstream9-tls-module",
+      "run-daily-for-release-branches (7.2) / test-centosstream9-tls-module-no-tls",
+      "run-daily-for-release-branches (7.2) / test-fedoralatest-jemalloc",
+      "run-daily-for-release-branches (7.2) / test-fedoralatest-tls-module",
+      "run-daily-for-release-branches (7.2) / test-fedoralatest-tls-module-no-tls",
+      "run-daily-for-release-branches (7.2) / test-fedorarawhide-jemalloc",
+      "run-daily-for-release-branches (7.2) / test-fedorarawhide-tls-module",
+      "run-daily-for-release-branches (7.2) / test-fedorarawhide-tls-module-no-tls",
+      "run-daily-for-release-branches (7.2) / test-sanitizer-address (gcc)",
+      "run-daily-for-release-branches (7.2) / test-sanitizer-force-defrag",
+      "run-daily-for-release-branches (7.2) / test-sanitizer-undefined (clang)",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-32bit",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-io-threads",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-jemalloc",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-jemalloc-fortify",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-lttng",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-no-malloc-usable-size",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-tls",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-tls-io-threads",
+      "run-daily-for-release-branches (7.2) / test-ubuntu-tls-no-tls"
+    ],
+    "failed_jobs": 29,
+    "failure_jobs": {
+      "test": [
+        73060254782,
+        73060254784,
+        73060254787,
+        73060254795,
+        73060254835,
+        73060254848,
+        73060254851,
+        73060254853,
+        73060254856,
+        73060254860,
+        73060254861,
+        73060254863,
+        73060254864,
+        73060254868,
+        73060254872,
+        73060254878,
+        73060254879,
+        73060254881,
+        73060254882,
+        73060254889,
+        73060254893,
+        73060254896,
+        73060254897,
+        73060254900,
+        73060254907,
+        73060254909,
+        73060254912,
+        73060254917,
+        73060254923
+      ]
+    },
+    "failure_names": [
+      "test"
+    ],
+    "full_sha": "a7d495352ac0ba724eeec51fd57b615e8e805f52",
+    "run_id": 24950306814,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24950306814",
+    "status": "in_progress",
+    "total_jobs": 49,
+    "unique_failures": 1,
+    "workflow": "weekly.yml"
+  },
+  "schema_version": 1,
+  "workflow": "weekly.yml"
+}
