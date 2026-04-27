@@ -1,0 +1,96 @@
+{
+  "captured_at": "2026-04-27T09:45:27.992841+00:00",
+  "date": "2026-04-27",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "Ensure client slot migration pointer is cleared during reset (#3554)\n\nIf not cleared, the job may no longer be valid by the time the client\ngoes to cleanup. This dangling reference could cause a crash if you set\nslot-migration-log-max-len to 0 and are very unlucky.\n\nSigned-off-by: Jacob Murphy <jkmurphy@google.com>",
+    "commit_sha": "28ecbd2",
+    "commits_since_prev": [
+      {
+        "author": "Ping Xie",
+        "date": "2026-04-26T21:36:18+00:00",
+        "message": "Implement Provenance Guard (#3109)",
+        "sha": "c86118476267c1b36b7e0fc49bc85fd493e9a5fc"
+      },
+      {
+        "author": "Hanxi Zhang",
+        "date": "2026-04-27T02:28:21+00:00",
+        "message": "Strip LTO flags from static Lua module build (#3555)",
+        "sha": "edc0d26ada082b34cd693fe862a5e2005dd66dd7"
+      },
+      {
+        "author": "charsyam",
+        "date": "2026-04-27T02:45:50+00:00",
+        "message": "hashtable: fix dismissHashtable madvise size (#3533)",
+        "sha": "bb88665578b8da8ef94e9b17d32859c25b09688d"
+      },
+      {
+        "author": "Binbin",
+        "date": "2026-04-27T03:01:52+00:00",
+        "message": "Fix rdmaServer leaks when create listen cm id error (#3557)",
+        "sha": "ac9ca9de3d1feff4a40358935b0f2e2acdcdc789"
+      },
+      {
+        "author": "Binbin",
+        "date": "2026-04-27T03:04:14+00:00",
+        "message": "Fix lua-enable-insecure-api default value cannot be changed to yes (#3548)",
+        "sha": "a3e44a55d3da5bc590b5ee596f195e56f187f70e"
+      },
+      {
+        "author": "Jacob Murphy",
+        "date": "2026-04-27T03:05:35+00:00",
+        "message": "Ensure client slot migration pointer is cleared during reset (#3554)",
+        "sha": "28ecbd204fceec9f0bf1aa1b2d791b0f7e9fc7e5"
+      }
+    ],
+    "date": "2026-04-27",
+    "failed_job_names": [
+      "reply-schemas-validator",
+      "test-macos-latest-cluster",
+      "test-sanitizer-address (clang)",
+      "test-sanitizer-address-large-memory (clang)",
+      "test-sanitizer-undefined (clang)",
+      "test-sanitizer-undefined-large-memory (clang)",
+      "test-ubuntu-io-threads",
+      "test-ubuntu-tls-io-threads",
+      "test-valgrind-no-malloc-usable-size-test",
+      "test-valgrind-test"
+    ],
+    "failed_jobs": 10,
+    "failure_jobs": {
+      "cluster tests": [
+        73123935149,
+        73123935244,
+        73123935267
+      ],
+      "make": [
+        73123935189,
+        73123935207,
+        73123935216,
+        73123935257
+      ],
+      "test": [
+        73123935260,
+        73123935271
+      ],
+      "validator": [
+        73123935192
+      ]
+    },
+    "failure_names": [
+      "cluster tests",
+      "make",
+      "test",
+      "validator"
+    ],
+    "full_sha": "28ecbd204fceec9f0bf1aa1b2d791b0f7e9fc7e5",
+    "run_id": 24974602245,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/24974602245",
+    "status": "failure",
+    "total_jobs": 49,
+    "unique_failures": 4,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
