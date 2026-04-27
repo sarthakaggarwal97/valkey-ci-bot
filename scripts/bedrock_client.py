@@ -12,6 +12,7 @@ import time
 from typing import Any, Protocol
 
 import boto3
+from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError
 
 from scripts.config import ProjectContext
@@ -226,7 +227,10 @@ class BedrockClient:
                 (IAM credentials from environment / GitHub Actions secrets).
         """
         self._config = config
-        self._client = client or boto3.client("bedrock-runtime")
+        self._client = client or boto3.client(
+            "bedrock-runtime",
+            config=BotoConfig(read_timeout=600, connect_timeout=10, retries={"max_attempts": 3}),
+        )
         self._project_context = _build_project_context_text(config.project)
         self._rate_limiter = rate_limiter
 
