@@ -1,0 +1,47 @@
+{
+  "captured_at": "2026-04-28T09:20:58.558639+00:00",
+  "date": "2026-04-28",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "Migrate the remaining cluster tests to the new framework and remove legacy files (#2297) (#3382)\n\nMigrated the remaining cluster tests to tests/unit/cluster/ to use the same\nframework for all cluster tests. Cleaned up the obsolete cluster test framework\nfiles and updated the CI workflows to use the new unified test runner.\n\nChanges:\n  Moved and mapped 6 test files:\n  - 03-failover-loop.tcl \u2192 Merged into existing failover.tcl\n  - 04-resharding.tcl \u2192 resharding.tcl\n  - 12-replica-migration-2.tcl + 12.1-replica-migration-3.tcl \u2192\n  replica-migration-slow.tcl\n  - 07-replica-migration.tcl \u2192 Merged into existing replica-migration.tcl\n  - 28-cluster-shards.tcl \u2192 Merged into existing cluster-shards.tcl\n\nOther changes:\n  - Converted old framework APIs (e.g., K, RI) to new framework APIs (e.g., R, srv)\n  - Added process_is_alive check in cluster_util.tcl to fix an exception in\n  failover tests caused by executing ps on dead processes\n  - Heavy tests (resharding, replica-migration-slow) marked with slow tag and\n  wrapped in run_solo to prevent resource contention in sanitizer environments\n  - replica-migration-slow marked with valgrind:skip tag since it is very slow\n  - Removed the entire tests/cluster/ directory including run.tcl, cluster.tcl,\n  includes/, and helpers/\n  - Kept runtest-cluster as a wrapper script (exec ./runtest --cluster \"$@\")\n  - Removed ./runtest-cluster calls from .github/workflows/daily.yml as cluster\n  tests are now included in ./runtest\n\nCloses #2297.\n\nSigned-off-by: Jun Yeong Kim <junyeonggim5@gmail.com>\nSigned-off-by: Binbin <binloveplay1314@qq.com>\nCo-authored-by: Binbin <binloveplay1314@qq.com>",
+    "commit_sha": "ff80b2d",
+    "commits_since_prev": [
+      {
+        "author": "eifrah-aws",
+        "date": "2026-04-27T03:29:20+00:00",
+        "message": "Fix remove cached eval scripts on engine unregister (#3503)",
+        "sha": "6dbb7f81a97f7d687cf7fcc88bdcbe78bf6cf170"
+      },
+      {
+        "author": "Jun Yeong Kim",
+        "date": "2026-04-27T09:31:37+00:00",
+        "message": "Migrate the remaining cluster tests to the new framework and remove legacy files (#2297) (#3382)",
+        "sha": "ff80b2d1dc7c7858e938ece683d5c3fcb8c9ed31"
+      }
+    ],
+    "date": "2026-04-28",
+    "failed_job_names": [
+      "test-valgrind-no-malloc-usable-size-test",
+      "test-valgrind-test"
+    ],
+    "failed_jobs": 2,
+    "failure_jobs": {
+      "test": [
+        73300565628,
+        73300565687
+      ]
+    },
+    "failure_names": [
+      "test"
+    ],
+    "full_sha": "ff80b2d1dc7c7858e938ece683d5c3fcb8c9ed31",
+    "run_id": 25027109539,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/25027109539",
+    "status": "failure",
+    "total_jobs": 49,
+    "unique_failures": 1,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
