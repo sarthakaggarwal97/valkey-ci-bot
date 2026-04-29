@@ -13,8 +13,7 @@
 #   Variable: CI_BOT_AWS_REGION          — optional, defaults to us-east-1
 #
 # Pin the reusable workflow to a trusted release tag or full commit SHA in
-# production instead of tracking a moving branch, and set `agent_ref` below to
-# the same trusted ref.
+# production instead of tracking a moving branch.
 name: Backport Agent
 
 permissions:
@@ -82,14 +81,12 @@ jobs:
       fail-fast: false
       matrix:
         target_branch: ${{ fromJson(needs.preflight.outputs.branches) }}
-    uses: sarthakaggarwal97/valkey-ci-agent/.github/workflows/backport.yml@main
+    uses: valkey-io/valkey-ci-agent/.github/workflows/backport.yml@REPLACE_WITH_RELEASE_SHA
     with:
       source_pr_number: ${{ github.event.pull_request.number }}
       repo_full_name: ${{ github.repository }}
       target_branch: ${{ matrix.target_branch }}
       config_path: .github/backport-agent.yml
       aws_region: ${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}
-      agent_repository: sarthakaggarwal97/valkey-ci-agent
-      agent_ref: main
     secrets:
       AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}

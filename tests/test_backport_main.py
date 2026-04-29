@@ -487,7 +487,7 @@ class TestRunBackportRateLimitSkip:
         # Rate limit exceeded
         mock_rate_limiter = MagicMock()
         mock_rate_limiter_cls.return_value = mock_rate_limiter
-        mock_rate_limiter.can_create_pr.return_value = False
+        mock_rate_limiter.reserve_pr_creation.return_value = False
 
         result = run_backport(
             repo_full_name="valkey-io/valkey",

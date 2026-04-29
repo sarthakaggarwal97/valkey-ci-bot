@@ -84,11 +84,8 @@ jobs:
       CI_BOT_COMMIT_NAME: ${{ vars.CI_BOT_COMMIT_NAME || '' }}
       CI_BOT_COMMIT_EMAIL: ${{ vars.CI_BOT_COMMIT_EMAIL || '' }}
       CI_BOT_REQUIRE_DCO_SIGNOFF: ${{ vars.CI_BOT_REQUIRE_DCO_SIGNOFF || 'false' }}
-      VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
       VALKEY_GITHUB_APP_ID: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
-      VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
-      VALKEY_FORK_REPO: ${{ vars.VALKEY_FORK_REPO || 'sarthakaggarwal97/valkey' }}
-      VALKEY_FORK_GITHUB_TOKEN: ${{ secrets.VALKEY_FORK_GITHUB_TOKEN }}
+      VALKEY_FORK_REPO: ${{ vars.VALKEY_FORK_REPO || 'valkey-io/valkey' }}
     steps:
       - name: Check out agent repository
         if: ${{ env.MONITOR_SCOPE_SELECTED == 'true' }}
@@ -108,19 +105,31 @@ jobs:
         if: ${{ env.MONITOR_SCOPE_SELECTED == 'true' }}
         run: pip install -r requirements.txt
 
-      - name: Validate target repository authentication inputs
-        if: ${{ env.MONITOR_SCOPE_SELECTED == 'true' && env.VALKEY_GITHUB_TOKEN == '' && (env.VALKEY_GITHUB_APP_ID == '' || env.VALKEY_GITHUB_APP_PRIVATE_KEY == '') }}
+      - name: Resolve target repository auth mode
+        id: target-auth
+        if: ${{ env.MONITOR_SCOPE_SELECTED == 'true' }}
+        shell: bash
+        env:
+          VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+          VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
         run: |
-          echo "Configure either VALKEY_GITHUB_TOKEN or VALKEY_GITHUB_APP_ID plus VALKEY_GITHUB_APP_PRIVATE_KEY." >&2
-          exit 1
+          set -euo pipefail
+          if [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
+            echo "use-app=false" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${VALKEY_GITHUB_APP_ID}" && -n "${VALKEY_GITHUB_APP_PRIVATE_KEY}" ]]; then
+            echo "use-app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Configure either VALKEY_GITHUB_TOKEN or VALKEY_GITHUB_APP_ID plus VALKEY_GITHUB_APP_PRIVATE_KEY." >&2
+            exit 1
+          fi
 
       - name: Create target repository GitHub App token
         id: app-token
-        if: ${{ env.MONITOR_SCOPE_SELECTED == 'true' && env.VALKEY_GITHUB_TOKEN == '' }}
+        if: ${{ env.MONITOR_SCOPE_SELECTED == 'true' && steps.target-auth.outputs.use-app == 'true' }}
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ env.VALKEY_GITHUB_APP_ID }}
-          private-key: ${{ env.VALKEY_GITHUB_APP_PRIVATE_KEY }}
+          private-key: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
           owner: valkey-io
           repositories: valkey
           permission-actions: read
@@ -132,6 +141,8 @@ jobs:
         id: target-token
         if: ${{ env.MONITOR_SCOPE_SELECTED == 'true' }}
         shell: bash
+        env:
+          VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
         run: |
           if [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
             echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
@@ -223,6 +234,9 @@ jobs:
         id: fork-token
         if: ${{ env.MONITOR_SCOPE_SELECTED == 'true' && steps.capture-monitor.outputs.monitor_dry_run != 'true' && steps.capture-monitor.outputs.has_queued_failures == 'true' }}
         shell: bash
+        env:
+          VALKEY_FORK_GITHUB_TOKEN: ${{ secrets.VALKEY_FORK_GITHUB_TOKEN }}
+          VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           if [[ -n "${VALKEY_FORK_GITHUB_TOKEN}" ]]; then

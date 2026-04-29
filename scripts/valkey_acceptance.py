@@ -527,7 +527,7 @@ def _run_review_case(
     config = _load_runtime_reviewer_config(gh, repo_name, reviewer_config_path)
     fetcher = PRContextFetcher(gh, github_retries=config.github_retries)
     context = fetcher.fetch(repo_name, case.pr_number)
-    valkey_context = load_valkey_repo_context(gh, repo_name, ref=context.head_sha)
+    valkey_context = load_valkey_repo_context(gh, repo_name, ref=context.base_sha)
     config = augment_reviewer_config_for_valkey(config, context, valkey_context)
     selected_paths = set(_select_review_files(context, config))
     review_context: PullRequestContext = _filtered_context(
@@ -902,6 +902,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default="",
         help="Optional structured JSON output path.",
     )
+    parser.add_argument(
+        "--fail-on-followup",
+        action="store_true",
+        help="Exit non-zero when the readiness scorecard needs follow-up.",
+    )
     return parser
 
 
@@ -938,6 +943,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         workflow_results.append(_run_workflow_case(workflow_case))
 
+    scorecard = _build_scorecard(manifest, results, workflow_results)
     report = _render_report(manifest, results, workflow_results)
     if args.output:
         Path(args.output).write_text(report, encoding="utf-8")
@@ -945,7 +951,6 @@ def main(argv: list[str] | None = None) -> int:
         print(report)
 
     if args.json_output:
-        scorecard = _build_scorecard(manifest, results, workflow_results)
         payload = {
             "manifest": asdict(manifest),
             "scorecard": {
@@ -978,6 +983,8 @@ def main(argv: list[str] | None = None) -> int:
             ],
         }
         Path(args.json_output).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    if args.fail_on_followup and scorecard.readiness != "pass":
+        return 1
     return 0
 
 

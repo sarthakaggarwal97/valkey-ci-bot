@@ -356,8 +356,10 @@ class TestFuzzerTrendTracker:
 
     def test_stable_trend(self) -> None:
         t = FuzzerTrendTracker()
+        now = datetime.now(timezone.utc)
         for i in range(6):
-            t.record_run("scen1", f"2026-04-{10+i:02d}T00:00:00+00:00", True)
+            ts = (now - timedelta(days=6 - i)).isoformat()
+            t.record_run("scen1", ts, True)
         trends = t.get_trends()
         assert len(trends) == 1
         assert trends[0].trend == "stable"

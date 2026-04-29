@@ -81,6 +81,7 @@ class RateLimiter:
         self._pending_queue_additions: set[str] = set()
         self._pending_queue_removals: set[str] = set()
         self._pending_ai_metrics: Counter[str] = Counter()
+        self._reserved_pr_timestamps: list[str] = []
 
     # --- Daily PR limit ---
 
@@ -146,9 +147,88 @@ class RateLimiter:
 
     def record_pr_created(self) -> None:
         """Record that a PR was just created."""
+        if self._reserved_pr_timestamps:
+            self._reserved_pr_timestamps.pop(0)
+            return
         timestamp = datetime.now(timezone.utc).isoformat()
         self._pr_timestamps.append(timestamp)
         self._pending_pr_timestamps.append(timestamp)
+
+    def reserve_pr_creation(self) -> bool:
+        """Atomically reserve one PR slot before creating a PR.
+
+        The reservation is intentionally kept even if later PR creation fails:
+        it is safer to under-use the daily allowance than to exceed the cap
+        when multiple workflow jobs race.
+        """
+        if self._exceeds_open_pr_limit():
+            return False
+
+        if not self._state_gh or not self._state_repo_name:
+            self._prune_old_timestamps()
+            if self._config.max_prs_per_day > 0 and len(self._pr_timestamps) >= self._config.max_prs_per_day:
+                logger.info(
+                    "Daily PR limit reached (%d/%d).",
+                    len(self._pr_timestamps), self._config.max_prs_per_day,
+                )
+                return False
+            timestamp = datetime.now(timezone.utc).isoformat()
+            self._pr_timestamps.append(timestamp)
+            self._reserved_pr_timestamps.append(timestamp)
+            return True
+
+        repo = self._state_gh.get_repo(self._state_repo_name)
+        self._ensure_state_branch(repo)
+        for attempt in range(1, _MAX_PERSIST_ATTEMPTS + 1):
+            remote_data, existing = self._read_remote_state(repo)
+            merged = self._merge_remote_state(remote_data)
+            now = datetime.now(timezone.utc)
+            cutoff = now - timedelta(hours=24)
+            pr_timestamps = [
+                ts for ts in list(merged.get("pr_timestamps", []))
+                if datetime.fromisoformat(ts) > cutoff
+            ]
+            if self._config.max_prs_per_day > 0 and len(pr_timestamps) >= self._config.max_prs_per_day:
+                logger.info(
+                    "Daily PR limit reached (%d/%d).",
+                    len(pr_timestamps), self._config.max_prs_per_day,
+                )
+                self.from_dict({**merged, "pr_timestamps": pr_timestamps})
+                return False
+            timestamp = now.isoformat()
+            pr_timestamps.append(timestamp)
+            merged["pr_timestamps"] = pr_timestamps
+            content = json.dumps(merged, indent=2)
+            try:
+                if existing is None:
+                    repo.create_file(
+                        _RATE_STATE_FILE,
+                        "Reserve PR rate limit slot",
+                        content,
+                        branch=_RATE_STATE_BRANCH,
+                    )
+                else:
+                    repo.update_file(
+                        _RATE_STATE_FILE,
+                        "Reserve PR rate limit slot",
+                        content,
+                        getattr(existing, "sha", ""),
+                        branch=_RATE_STATE_BRANCH,
+                    )
+                self.from_dict(merged)
+                self._reserved_pr_timestamps.append(timestamp)
+                logger.info("Reserved PR rate limit slot.")
+                return True
+            except Exception as exc:
+                if attempt < _MAX_PERSIST_ATTEMPTS and _is_write_conflict(exc):
+                    logger.info(
+                        "Rate limiter reservation conflict on attempt %d/%d; reloading and retrying.",
+                        attempt,
+                        _MAX_PERSIST_ATTEMPTS,
+                    )
+                    continue
+                raise RuntimeError(f"failed to reserve PR rate limit slot: {exc}") from exc
+        raise RuntimeError("failed to reserve PR rate limit slot")
 
     # --- Token budget ---
 
@@ -262,6 +342,7 @@ class RateLimiter:
         self._pending_queue_additions = set()
         self._pending_queue_removals = set()
         self._pending_ai_metrics = Counter()
+        self._reserved_pr_timestamps = []
 
     def _ensure_state_branch(self, repo) -> None:
         """Create the data branch from the default branch when missing."""

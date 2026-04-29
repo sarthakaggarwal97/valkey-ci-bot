@@ -388,3 +388,39 @@ class TestSerialization:
         }
         assert set(merged_payload["queued_failures"]) == {"fp-a", "fp-b", "fp-c"}
         assert repo.update_file.call_args_list[-1].args[3] == "sha-2"
+
+    def test_reserve_pr_creation_uses_latest_remote_limit(self) -> None:
+        config = BotConfig(max_prs_per_day=1)
+        now = datetime.now(timezone.utc)
+
+        def contents(payload: dict, sha: str) -> MagicMock:
+            return MagicMock(decoded_content=json.dumps(payload).encode(), sha=sha)
+
+        base_payload = {
+            "pr_timestamps": [],
+            "token_usage": 0,
+            "token_window_start": now.isoformat(),
+            "queued_failures": [],
+            "ai_metrics": {},
+        }
+        full_payload = {
+            **base_payload,
+            "pr_timestamps": [now.isoformat()],
+        }
+
+        repo = MagicMock()
+        repo.default_branch = "main"
+        repo.get_git_ref.return_value = MagicMock()
+        repo.get_contents.side_effect = [
+            contents(base_payload, "sha-1"),
+            contents(full_payload, "sha-2"),
+        ]
+        gh = MagicMock()
+        gh.get_repo.return_value = repo
+
+        first = RateLimiter(config, github_client=gh, repo_full_name="owner/repo")
+        second = RateLimiter(config, github_client=gh, repo_full_name="owner/repo")
+
+        assert first.reserve_pr_creation() is True
+        assert second.reserve_pr_creation() is False
+        assert repo.update_file.call_count == 1

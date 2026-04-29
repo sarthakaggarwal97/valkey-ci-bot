@@ -114,9 +114,9 @@ def test_external_review_workflow_supports_cross_repo_dispatch() -> None:
         "review-external-pr-${{ github.event.inputs.target_repo }}-"
         "${{ github.event.inputs.pr_number }}"
     )
-    assert "TARGET_GITHUB_TOKEN" in job_env
     assert "TARGET_GITHUB_APP_ID" in job_env
-    assert "TARGET_GITHUB_APP_PRIVATE_KEY" in job_env
+    assert "TARGET_GITHUB_TOKEN" not in job_env
+    assert "TARGET_GITHUB_APP_PRIVATE_KEY" not in job_env
 
     resolve_step = next(
         step
@@ -141,6 +141,7 @@ def test_external_review_workflow_supports_cross_repo_dispatch() -> None:
 
     assert "TARGET_REPO" in resolve_step["run"]
     assert app_token_step["uses"] == "actions/create-github-app-token@v2"
+    assert app_token_step["if"] == "${{ steps.target-auth.outputs.use-app == 'true' }}"
     assert app_token_step["with"]["owner"] == "${{ steps.target-repo.outputs.owner }}"
     assert app_token_step["with"]["repositories"] == "${{ steps.target-repo.outputs.repository }}"
     assert app_token_step["with"]["permission-contents"] == "read"
@@ -151,8 +152,8 @@ def test_external_review_workflow_supports_cross_repo_dispatch() -> None:
     review_script = review_step["run"]
     assert "python -m scripts.pr_review_main" in review_script
     assert '--pr-number "${TARGET_PR_NUMBER}"' in review_script
-    assert '--state-token "${{ github.token }}"' in review_script
-    assert '--state-repo "${{ github.repository }}"' in review_script
+    assert '--state-token "${STATE_TOKEN}"' in review_script
+    assert '--state-repo "${STATE_REPO}"' in review_script
 
     for step in job["steps"]:
         if "if" in step:

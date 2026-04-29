@@ -90,18 +90,18 @@ workflow_cases:
   workflow_path: .github/workflows/review-external-pr.yml
   required_strings:
   - actions/create-github-app-token@v2
-  - --state-token "${{ github.token }}"
+  - --state-token "${STATE_TOKEN}"
   - python -m scripts.pr_review_main
 - name: backport workflow
   workflow_path: .github/workflows/backport.yml
   required_strings:
-  - python -m scripts.backport_main
+  - -m scripts.backport_main
   - BACKPORT_GITHUB_TOKEN
   - aws-actions/configure-aws-credentials@v5
 - name: daily monitor workflow
   workflow_path: .github/workflows/monitor-valkey-daily.yml
   required_strings:
-  - python -m scripts.monitor_workflow_runs
+  - -m scripts.monitor_workflow_runs
   - python -m scripts.preflight_reconciliation
   - python -m scripts.main
   - --draft-prs
@@ -109,7 +109,7 @@ workflow_cases:
 - name: fuzzer monitor workflow
   workflow_path: .github/workflows/monitor-valkey-fuzzer.yml
   required_strings:
-  - python -m scripts.monitor_fuzzer_runs
+  - -m scripts.monitor_fuzzer_runs
   - actions/create-github-app-token@v2
   - --event-log bot-data/agent-events.jsonl
 - name: validate fix workflow

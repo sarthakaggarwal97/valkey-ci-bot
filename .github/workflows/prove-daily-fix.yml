@@ -43,10 +43,12 @@ jobs:
       group: prove-daily-fix-${{ inputs.target_repo }}-${{ inputs.pr_number }}
       cancel-in-progress: false
     env:
-      VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
       VALKEY_GITHUB_APP_ID: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
-      VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
-      VALKEY_FORK_GITHUB_TOKEN: ${{ secrets.VALKEY_FORK_GITHUB_TOKEN }}
+      TARGET_REPO: ${{ inputs.target_repo }}
+      TARGET_PR_NUMBER: ${{ inputs.pr_number }}
+      FINGERPRINT: ${{ inputs.fingerprint }}
+      CONFIG_PATH: ${{ inputs.config_path }}
+      REPEAT_COUNT: ${{ inputs.repeat_count }}
     steps:
       - name: Checkout agent repository
         uses: actions/checkout@v6
@@ -66,6 +68,9 @@ jobs:
       - name: Select target repository token
         id: target-token
         shell: bash
+        env:
+          VALKEY_FORK_GITHUB_TOKEN: ${{ secrets.VALKEY_FORK_GITHUB_TOKEN }}
+          VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           if [[ -n "${VALKEY_FORK_GITHUB_TOKEN}" ]]; then
@@ -77,13 +82,29 @@ jobs:
             exit 1
           fi
 
+      - name: Resolve landing repository auth mode
+        id: landing-auth
+        shell: bash
+        env:
+          VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+          VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
+            echo "use-app=false" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${VALKEY_GITHUB_APP_ID}" && -n "${VALKEY_GITHUB_APP_PRIVATE_KEY}" ]]; then
+            echo "use-app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "use-app=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create upstream GitHub App token
         id: app-token
-        if: ${{ env.VALKEY_GITHUB_TOKEN == '' && env.VALKEY_GITHUB_APP_ID != '' && env.VALKEY_GITHUB_APP_PRIVATE_KEY != '' }}
+        if: ${{ steps.landing-auth.outputs.use-app == 'true' }}
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ env.VALKEY_GITHUB_APP_ID }}
-          private-key: ${{ env.VALKEY_GITHUB_APP_PRIVATE_KEY }}
+          private-key: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
           owner: valkey-io
           repositories: valkey
           permission-actions: read
@@ -93,12 +114,15 @@ jobs:
       - name: Select landing repository token
         id: landing-token
         shell: bash
+        env:
+          VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
           if [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
             echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
-          elif [[ -n "${{ steps.app-token.outputs.token }}" ]]; then
-            echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${APP_TOKEN}" ]]; then
+            echo "token=${APP_TOKEN}" >> "$GITHUB_OUTPUT"
           else
             echo "token=" >> "$GITHUB_OUTPUT"
           fi
@@ -107,18 +131,39 @@ jobs:
         shell: bash
         env:
           FAILURE_REPORT_JSON: ${{ inputs.failure_report_json }}
+          TARGET_TOKEN: ${{ steps.target-token.outputs.token }}
+          LANDING_TOKEN: ${{ steps.landing-token.outputs.token }}
+          STATE_TOKEN: ${{ github.token }}
+          STATE_REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
+          if [[ ! "${TARGET_REPO}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "Invalid target_repo: ${TARGET_REPO}" >&2
+            exit 1
+          fi
+          if [[ ! "${TARGET_PR_NUMBER}" =~ ^[0-9]+$ ]]; then
+            echo "Invalid pr_number: ${TARGET_PR_NUMBER}" >&2
+            exit 1
+          fi
+          if [[ "${CONFIG_PATH}" == /* || "${CONFIG_PATH}" == *..* || "${CONFIG_PATH}" == -* ]]; then
+            echo "Invalid config_path: ${CONFIG_PATH}" >&2
+            exit 1
+          fi
+          if [[ ! "${REPEAT_COUNT}" =~ ^[0-9]+$ ]]; then
+            echo "Invalid repeat_count: ${REPEAT_COUNT}" >&2
+            exit 1
+          fi
           python -m scripts.prove_pr_fix \
-            --repo "${{ inputs.target_repo }}" \
-            --pr-number "${{ inputs.pr_number }}" \
-            --fingerprint "${{ inputs.fingerprint }}" \
+            --repo "${TARGET_REPO}" \
+            --pr-number "${TARGET_PR_NUMBER}" \
+            --fingerprint "${FINGERPRINT}" \
             --failure-report-json "${FAILURE_REPORT_JSON}" \
-            --config "${{ inputs.config_path }}" \
-            --token "${{ steps.target-token.outputs.token }}" \
-            --landing-token "${{ steps.landing-token.outputs.token }}" \
-            --state-token "${{ github.token }}" \
-            --state-repo "${{ github.repository }}" \
-            --repeat-count "${{ inputs.repeat_count }}" \
+            --config "${CONFIG_PATH}" \
+            --token "${TARGET_TOKEN}" \
+            --landing-token "${LANDING_TOKEN}" \
+            --state-token "${STATE_TOKEN}" \
+            --state-repo "${STATE_REPO}" \
+            --repeat-count "${REPEAT_COUNT}" \
             --output proof-result.json
 
       - name: Publish proof summary

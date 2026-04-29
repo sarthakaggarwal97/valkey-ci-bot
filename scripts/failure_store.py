@@ -38,6 +38,7 @@ _STORE_BRANCH = "bot-data"
 _STORE_FILE = "failure-store.json"
 _MAX_ERROR_SIGNATURE_CHARS = 10_000
 _ACTIVE_QUEUE_STATUSES = {"queued", "queued-pr-retry"}
+_MAX_PERSIST_ATTEMPTS = 3
 
 
 @dataclass
@@ -59,6 +60,16 @@ def _is_missing_store_error(exc: Exception) -> bool:
     if isinstance(exc, GithubException):
         return exc.status == 404
     return isinstance(exc, FileNotFoundError)
+
+
+def _is_write_conflict(exc: Exception) -> bool:
+    """Return True when a GitHub write failed due to a stale file SHA."""
+    if not isinstance(exc, GithubException):
+        return False
+    if exc.status in {409, 422}:
+        return True
+    message = str(exc).lower()
+    return "sha" in message or "already exists" in message or "conflict" in message
 
 
 def _parse_pr_url(pr_url: str) -> tuple[str, int] | None:
@@ -1097,28 +1108,56 @@ class FailureStore:
         try:
             repo = self._state_gh.get_repo(self._state_repo_name)
             self._ensure_store_branch(repo)
-            content = json.dumps(self.to_dict(), indent=2)
-            try:
-                existing = repo.get_contents(_STORE_FILE, ref=_STORE_BRANCH)
-            except GithubException as exc:
-                if exc.status != 404:
+            for attempt in range(1, _MAX_PERSIST_ATTEMPTS + 1):
+                remote_data, existing = self._read_remote_store(repo)
+                merged = self._merge_remote_store(remote_data)
+                content = json.dumps(merged, indent=2)
+                try:
+                    if existing is None:
+                        repo.create_file(
+                            _STORE_FILE, "Initialize failure store", content,
+                            branch=_STORE_BRANCH,
+                        )
+                    else:
+                        repo.update_file(
+                            _STORE_FILE, "Update failure store", content,
+                            getattr(existing, "sha", ""), branch=_STORE_BRANCH,
+                        )
+                    self.from_dict(merged)
+                    logger.info("Saved %d entries to failure store.", len(self._entries))
+                    return
+                except Exception as exc:
+                    if attempt < _MAX_PERSIST_ATTEMPTS and _is_write_conflict(exc):
+                        logger.info(
+                            "Failure store write conflict on attempt %d/%d; reloading and retrying.",
+                            attempt,
+                            _MAX_PERSIST_ATTEMPTS,
+                        )
+                        continue
                     raise
-                existing = None
-            except FileNotFoundError:
-                existing = None
-
-            if isinstance(existing, list):
-                raise ValueError("Failure store path resolved to a directory.")
-            if existing is None:
-                repo.create_file(
-                    _STORE_FILE, "Initialize failure store", content,
-                    branch=_STORE_BRANCH,
-                )
-            else:
-                repo.update_file(
-                    _STORE_FILE, "Update failure store", content,
-                    existing.sha, branch=_STORE_BRANCH,
-                )
-            logger.info("Saved %d entries to failure store.", len(self._entries))
         except Exception as exc:
-            logger.error("Failed to save failure store: %s", exc)
+            raise RuntimeError(f"failed to save failure store: {exc}") from exc
+
+    def _read_remote_store(self, repo) -> tuple[dict, object | None]:
+        """Load the remote failure store payload and contents object."""
+        try:
+            existing = repo.get_contents(_STORE_FILE, ref=_STORE_BRANCH)
+        except GithubException as exc:
+            if exc.status == 404:
+                return {}, None
+            raise
+        except FileNotFoundError:
+            return {}, None
+
+        if isinstance(existing, list):
+            raise ValueError("Failure store path resolved to a directory.")
+        return json.loads(_read_repo_file_text(existing)), existing
+
+    def _merge_remote_store(self, remote_data: dict) -> dict:
+        """Merge this process's store mutations into the latest remote snapshot."""
+        remote = FailureStore()
+        remote.from_dict(remote_data)
+        remote.entries.update(self._entries)
+        remote.history.update(self._history)
+        remote.campaigns.update(self._campaigns)
+        return remote.to_dict()

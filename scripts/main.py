@@ -1406,7 +1406,7 @@ def run_pipeline(
                         target_branch=report.target_branch or "unstable",
                     )
                 summary.add_result(job.name, failure_id, "queued-manual-approval")
-            elif rate_limiter.can_create_pr():
+            elif rate_limiter.reserve_pr_creation():
                 pr_creation_start = time.perf_counter()
                 pr_url = _create_pr_from_validated_fix(
                     report,
@@ -1608,7 +1608,7 @@ def run_reconciliation(
     processed = 0
     for fingerprint in list(queued):
         # Check if we can still create PRs
-        if not rate_limiter.can_create_pr():
+        if not rate_limiter.reserve_pr_creation():
             logger.info(
                 "Rate limit reached during reconciliation drain, stopping. "
                 "%d failure(s) remain queued.", len(queued) - processed,

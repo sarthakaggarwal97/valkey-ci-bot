@@ -81,13 +81,16 @@ jobs:
   analyze:
     needs: preflight
     if: needs.preflight.outputs.mode == 'analyze'
-    uses: valkey-io/valkey-ci-agent/.github/workflows/analyze-failure.yml@v1
+    uses: valkey-io/valkey-ci-agent/.github/workflows/analyze-failure.yml@REPLACE_WITH_RELEASE_SHA
     with:
       config_path: .github/ci-failure-bot.yml
       aws_region: ${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}
+      github_app_id: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
       mode: analyze
     secrets:
       AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}
+      VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+      VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
 
   # ---------------------------------------------------------------------------
   # Reconcile: drain queued failures and sync failure store with PR state.
@@ -96,13 +99,16 @@ jobs:
   reconcile:
     needs: preflight
     if: needs.preflight.outputs.mode == 'reconcile'
-    uses: valkey-io/valkey-ci-agent/.github/workflows/analyze-failure.yml@v1
+    uses: valkey-io/valkey-ci-agent/.github/workflows/analyze-failure.yml@REPLACE_WITH_RELEASE_SHA
     with:
       config_path: .github/ci-failure-bot.yml
       aws_region: ${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}
+      github_app_id: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
       mode: reconcile
     secrets:
       AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}
+      VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+      VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
 
   # ---------------------------------------------------------------------------
   # Skip: log untrusted or non-failure workflow_run events.

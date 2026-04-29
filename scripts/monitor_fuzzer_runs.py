@@ -246,7 +246,8 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                     subject,
                     error=str(exc),
                 )
-                break
+                new_last_seen = max(new_last_seen, run.id)
+                continue
 
             run_result["action"] = "analyzed"
             run_result["analysis"] = fuzzer_run_analysis_to_dict(analysis)

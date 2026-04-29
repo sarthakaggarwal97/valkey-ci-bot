@@ -543,7 +543,7 @@ class TestRunReconciliation:
 
         rate_limiter = MagicMock()
         # Allow first 2, then block
-        rate_limiter.can_create_pr.side_effect = [True, True, False]
+        rate_limiter.reserve_pr_creation.side_effect = [True, True, False]
 
         store_instance = MagicMock()
         store_instance.list_queued_failures.return_value = ["fp1", "fp2", "fp3"]
@@ -1048,7 +1048,7 @@ class TestRunPipeline:
 
         rate_limiter = MagicMock()
         rate_limiter.can_use_tokens.return_value = True
-        rate_limiter.can_create_pr.return_value = False
+        rate_limiter.reserve_pr_creation.return_value = False
 
         reports = run_pipeline(
             "owner/repo",

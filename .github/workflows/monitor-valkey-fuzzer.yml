@@ -40,9 +40,7 @@ jobs:
       MONITOR_DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || github.event.inputs.dry_run || 'true' }}
       MONITOR_MAX_RUNS: ${{ github.event.inputs.max_runs || '1' }}
       MONITOR_VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
-      VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
       VALKEY_GITHUB_APP_ID: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
-      VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
     steps:
       - name: Check out agent repository
         uses: actions/checkout@v6
@@ -59,19 +57,30 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Validate target repository authentication inputs
-        if: ${{ env.VALKEY_GITHUB_TOKEN == '' && (env.VALKEY_GITHUB_APP_ID == '' || env.VALKEY_GITHUB_APP_PRIVATE_KEY == '') }}
+      - name: Resolve target repository auth mode
+        id: target-auth
+        shell: bash
+        env:
+          VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+          VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
         run: |
-          echo "Configure either VALKEY_GITHUB_TOKEN or VALKEY_GITHUB_APP_ID plus VALKEY_GITHUB_APP_PRIVATE_KEY." >&2
-          exit 1
+          set -euo pipefail
+          if [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
+            echo "use-app=false" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${VALKEY_GITHUB_APP_ID}" && -n "${VALKEY_GITHUB_APP_PRIVATE_KEY}" ]]; then
+            echo "use-app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Configure either VALKEY_GITHUB_TOKEN or VALKEY_GITHUB_APP_ID plus VALKEY_GITHUB_APP_PRIVATE_KEY." >&2
+            exit 1
+          fi
 
       - name: Create target repository GitHub App token
         id: app-token
-        if: ${{ env.VALKEY_GITHUB_TOKEN == '' }}
+        if: ${{ steps.target-auth.outputs.use-app == 'true' }}
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ env.VALKEY_GITHUB_APP_ID }}
-          private-key: ${{ env.VALKEY_GITHUB_APP_PRIVATE_KEY }}
+          private-key: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
           owner: valkey-io
           repositories: valkey-fuzzer
           permission-actions: read
@@ -81,6 +90,8 @@ jobs:
       - name: Select target repository token
         id: target-token
         shell: bash
+        env:
+          VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
         run: |
           if [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
             echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"

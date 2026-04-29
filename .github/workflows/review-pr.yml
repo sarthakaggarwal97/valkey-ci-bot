@@ -18,9 +18,18 @@ on:
         required: false
         type: string
         default: "us-east-1"
+      github_app_id:
+        description: "Optional GitHub App ID used when VALKEY_GITHUB_TOKEN is not provided"
+        required: false
+        type: string
+        default: ""
     secrets:
       AWS_ROLE_ARN:
         required: true
+      VALKEY_GITHUB_TOKEN:
+        required: false
+      VALKEY_GITHUB_APP_PRIVATE_KEY:
+        required: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -73,6 +82,70 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Resolve repository
+        id: target-repo
+        shell: bash
+        env:
+          TARGET_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          owner="${TARGET_REPO%%/*}"
+          repository="${TARGET_REPO#*/}"
+          if [[ -z "${owner}" || -z "${repository}" || "${owner}" == "${repository}" ]]; then
+            echo "Expected TARGET_REPO in owner/repo format, got '${TARGET_REPO}'." >&2
+            exit 1
+          fi
+          echo "owner=${owner}" >> "$GITHUB_OUTPUT"
+          echo "repository=${repository}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve GitHub auth mode
+        id: github-auth
+        shell: bash
+        env:
+          VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+          VALKEY_GITHUB_APP_ID: ${{ inputs.github_app_id || vars.VALKEY_GITHUB_APP_ID || '' }}
+          VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
+            echo "use-app=false" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${VALKEY_GITHUB_APP_ID}" && -n "${VALKEY_GITHUB_APP_PRIVATE_KEY}" ]]; then
+            echo "use-app=true" >> "$GITHUB_OUTPUT"
+            echo "app-id=${VALKEY_GITHUB_APP_ID}" >> "$GITHUB_OUTPUT"
+          else
+            echo "use-app=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub App token
+        id: app-token
+        if: ${{ steps.github-auth.outputs.use-app == 'true' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ steps.github-auth.outputs.app-id }}
+          private-key: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ steps.target-repo.outputs.owner }}
+          repositories: ${{ steps.target-repo.outputs.repository }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+
+      - name: Select GitHub token
+        id: github-token
+        shell: bash
+        env:
+          VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          FALLBACK_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
+            echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${APP_TOKEN}" ]]; then
+            echo "token=${APP_TOKEN}" >> "$GITHUB_OUTPUT"
+          else
+            echo "token=${FALLBACK_TOKEN}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Configure AWS credentials from OIDC role
         uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -88,5 +161,5 @@ jobs:
             --repo "${{ github.repository }}" \
             --config "${{ inputs.config_path }}" \
             --mode "${{ inputs.mode }}" \
-            --token "${{ github.token }}" \
+            --token "${{ steps.github-token.outputs.token }}" \
             --aws-region "${{ inputs.aws_region }}"

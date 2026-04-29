@@ -59,10 +59,13 @@ jobs:
   review:
     needs: preflight
     if: needs.preflight.outputs.allowed == 'true'
-    uses: valkey-io/valkey-ci-agent/.github/workflows/review-pr.yml@v1
+    uses: valkey-io/valkey-ci-agent/.github/workflows/review-pr.yml@REPLACE_WITH_RELEASE_SHA
     with:
       config_path: .github/pr-review-bot.yml
       aws_region: ${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}
+      github_app_id: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
       mode: ${{ needs.preflight.outputs.mode }}
     secrets:
       AWS_ROLE_ARN: ${{ secrets.CI_BOT_AWS_ROLE_ARN }}
+      VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+      VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}

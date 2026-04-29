@@ -310,7 +310,7 @@ LLM-resolved.
 
 Configuration is loaded from `.github/backport-agent.yml` in the consumer repo. When the file is missing, sensible defaults are used. Configurable settings include the Bedrock model ID, max conflict retries, max conflicting files, daily PR limit, per-backport token budget, and labels applied to generated backport PRs.
 
-The example caller maps consumer-repo credentials into the reusable workflow explicitly. Pin the reusable workflow reference to a trusted release tag or full commit SHA in production instead of tracking a moving branch, and set the `agent_ref` input to the same trusted ref so the checked-out agent code matches the workflow you invoked.
+The example caller maps consumer-repo credentials into the reusable workflow explicitly. Pin the reusable workflow reference to a trusted release tag or full commit SHA in production instead of tracking a moving branch.
 
 Example consumer-repo files:
 
@@ -330,14 +330,14 @@ Required GitHub configuration in the consumer repo:
 
 Workflow at `.github/workflows/monitor-valkey-daily.yml`.
 
-Runs from this repo, watches the live Valkey CI surface in `valkey-io/valkey`, analyzes new failures, records per-job pass/fail history, validates candidate fixes, and reconciles any queue-worthy fixes into draft PRs in `sarthakaggarwal97/valkey` using the local config at `.github/valkey-daily-bot.yml`. When a draft fix survives proof, the proof job now opens or updates the real upstream PR in `valkey-io/valkey` automatically.
+Runs from this repo, watches the live Valkey CI surface in `valkey-io/valkey`, analyzes new failures, records per-job pass/fail history, validates candidate fixes, and reconciles any queue-worthy fixes into draft PRs in `valkey-io/valkey` or the configured `VALKEY_FORK_REPO` using the local config at `.github/valkey-daily-bot.yml`. When a draft fix survives proof, the proof job now opens or updates the real upstream PR in `valkey-io/valkey` automatically.
 
 The flow is intentionally simple:
 
 - monitor new `CI`, `Daily`, `External`, and `Weekly` runs
 - queue only the fixes that validate and pass the normal safety heuristics
-- verify the target branches exist in your fork
-- open draft PRs automatically in your fork
+- verify the target branches exist in the configured PR repository
+- open draft PRs automatically in the configured PR repository
 - proof successful draft fixes and hand them off upstream automatically
 
 Runner-specific duplicates are collapsed at a canonical incident level, so the same underlying test failure across multiple runners produces one queued fix / one draft PR while still preserving the per-runner observations in bot state.
@@ -348,14 +348,14 @@ The validated-fix queue now lives in `FailureStore`, so reconciliation, prefligh
 
 Approval context is written into the workflow summary so you can review the root-cause rationale, files the agent wants to change, observed failure streak, and last known good / first bad commits when history exists.
 
-Manual dispatch defaults to `dry_run=true` so you can inspect candidate runs without advancing state or queueing fixes. Dispatch with `dry_run=false` for a real automated pass; any queued fixes will be reconciled automatically into draft PRs in your fork. You can also narrow a manual run to one workflow surface with the `workflow_scope` input.
+Manual dispatch defaults to `dry_run=true` so you can inspect candidate runs without advancing state or queueing fixes. Dispatch with `dry_run=false` for a real automated pass; any queued fixes will be reconciled automatically into draft PRs in the configured PR repository. You can also narrow a manual run to one workflow surface with the `workflow_scope` input.
 
 Required GitHub configuration:
 
 - secret: `AWS_ROLE_ARN`
 - either secret: `VALKEY_GITHUB_TOKEN`
 - or variable: `VALKEY_GITHUB_APP_ID` plus secret: `VALKEY_GITHUB_APP_PRIVATE_KEY`
-- optional variable: `VALKEY_FORK_REPO` (defaults to `sarthakaggarwal97/valkey`)
+- optional variable: `VALKEY_FORK_REPO` (defaults to `valkey-io/valkey`; set it to a fork if you want branches opened there)
 - secret: `VALKEY_FORK_GITHUB_TOKEN` (or reuse `VALKEY_GITHUB_TOKEN` if it also has write access to the fork)
 - optional variable: `CI_BOT_COMMIT_NAME`
 - optional variable: `CI_BOT_COMMIT_EMAIL`

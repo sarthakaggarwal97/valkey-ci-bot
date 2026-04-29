@@ -83,8 +83,8 @@ def test_backport_workflow_contract_and_token_handling() -> None:
     secrets = on_block["workflow_call"]["secrets"]
 
     assert inputs["aws_region"]["default"] == "us-east-1"
-    assert inputs["agent_repository"]["default"] == "sarthakaggarwal97/valkey-ci-agent"
-    assert inputs["agent_ref"]["default"] == "main"
+    assert "agent_repository" not in inputs
+    assert "agent_ref" not in inputs
     assert secrets["AWS_ROLE_ARN"]["required"] is True
     assert secrets["VALKEY_GITHUB_TOKEN"]["required"] is False
     assert workflow["env"]["FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"] is True
@@ -114,8 +114,8 @@ def test_backport_workflow_contract_and_token_handling() -> None:
         if step["name"] == "Run backport pipeline"
     )
 
-    assert checkout_step["with"]["repository"] == "${{ inputs.agent_repository }}"
-    assert checkout_step["with"]["ref"] == "${{ inputs.agent_ref }}"
+    assert checkout_step["with"]["repository"] == "${{ steps.called-workflow.outputs.repository }}"
+    assert checkout_step["with"]["ref"] == "${{ steps.called-workflow.outputs.ref }}"
     assert role_step["with"]["role-to-assume"] == "${{ secrets.AWS_ROLE_ARN }}"
     assert role_step["with"]["aws-region"] == "${{ inputs.aws_region }}"
     assert run_step["env"]["AWS_DEFAULT_REGION"] == "${{ inputs.aws_region }}"
@@ -123,7 +123,7 @@ def test_backport_workflow_contract_and_token_handling() -> None:
         "${{ secrets.VALKEY_GITHUB_TOKEN || github.token }}"
     )
     assert "--token" not in run_step["run"]
-    assert '--aws-region "${{ inputs.aws_region }}"' in run_step["run"]
+    assert '--aws-region "${AWS_REGION_INPUT}"' in run_step["run"]
 
 
 def test_example_caller_passes_bot_checkout_inputs() -> None:
@@ -155,8 +155,8 @@ def test_example_backport_caller_passes_required_contract() -> None:
 
     backport_with = workflow["jobs"]["backport"]["with"]
     assert backport_with["aws_region"] == "${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}"
-    assert backport_with["agent_repository"] == "sarthakaggarwal97/valkey-ci-agent"
-    assert backport_with["agent_ref"] == "main"
+    assert "agent_repository" not in backport_with
+    assert "agent_ref" not in backport_with
 
     backport_secrets = workflow["jobs"]["backport"]["secrets"]
     assert backport_secrets["AWS_ROLE_ARN"] == "${{ secrets.CI_BOT_AWS_ROLE_ARN }}"

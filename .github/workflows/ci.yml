@@ -64,7 +64,8 @@ jobs:
           python3 -m scripts.valkey_acceptance \
             --manifest examples/ci-agent-acceptance.yml \
             --output acceptance-report.md \
-            --json-output acceptance-report.json
+            --json-output acceptance-report.json \
+            --fail-on-followup
 
       - name: Publish acceptance report to summary
         run: cat acceptance-report.md >> "$GITHUB_STEP_SUMMARY"

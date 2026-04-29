@@ -253,7 +253,7 @@ def run_backport(
             state_repo_full_name=repo_full_name,
         )
         rate_limiter.load()
-        if not rate_limiter.can_create_pr():
+        if not rate_limiter.reserve_pr_creation():
             msg = "Daily backport PR rate limit reached. Please try again later."
             logger.warning(msg)
             _post_comment(repo, source_pr_number, f"Backport skipped: {msg}")

@@ -40,11 +40,11 @@ def test_monitor_workflow_uses_oidc_and_matrixed_ci_scope() -> None:
     assert job_env["MONITOR_WORKFLOW_FILE"] == "${{ matrix.workflow_file }}"
     assert job_env["MONITOR_EVENTS"] == "${{ matrix.monitor_events }}"
     assert "matrix.scope" in job_env["MONITOR_SCOPE_SELECTED"]
-    assert job_env["VALKEY_GITHUB_TOKEN"] == "${{ secrets.VALKEY_GITHUB_TOKEN }}"
     assert job_env["VALKEY_GITHUB_APP_ID"] == "${{ vars.VALKEY_GITHUB_APP_ID || '' }}"
-    assert job_env["VALKEY_GITHUB_APP_PRIVATE_KEY"] == "${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}"
-    assert job_env["VALKEY_FORK_REPO"] == "${{ vars.VALKEY_FORK_REPO || 'sarthakaggarwal97/valkey' }}"
-    assert job_env["VALKEY_FORK_GITHUB_TOKEN"] == "${{ secrets.VALKEY_FORK_GITHUB_TOKEN }}"
+    assert job_env["VALKEY_FORK_REPO"] == "${{ vars.VALKEY_FORK_REPO || 'valkey-io/valkey' }}"
+    assert "VALKEY_GITHUB_TOKEN" not in job_env
+    assert "VALKEY_GITHUB_APP_PRIVATE_KEY" not in job_env
+    assert "VALKEY_FORK_GITHUB_TOKEN" not in job_env
     assert monitor_job["concurrency"]["group"] == "monitor-valkey-ci-${{ matrix.scope }}"
     assert "create-draft-prs" not in workflow["jobs"]
 
@@ -82,6 +82,7 @@ def test_monitor_workflow_uses_oidc_and_matrixed_ci_scope() -> None:
     assert setup_step["uses"] == "actions/setup-python@v6"
     assert configure_step["uses"] == "aws-actions/configure-aws-credentials@v5"
     assert app_token_step["uses"] == "actions/create-github-app-token@v2"
+    assert app_token_step["if"] == "${{ env.MONITOR_SCOPE_SELECTED == 'true' && steps.target-auth.outputs.use-app == 'true' }}"
     assert app_token_step["with"]["owner"] == "valkey-io"
     assert app_token_step["with"]["repositories"] == "valkey"
     assert app_token_step["with"]["permission-actions"] == "read"

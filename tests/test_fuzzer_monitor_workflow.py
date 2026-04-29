@@ -29,9 +29,9 @@ def test_fuzzer_monitor_workflow_uses_oidc_and_app_token_support() -> None:
     assert workflow["env"]["FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"] is True
     assert workflow["jobs"]["monitor"]["concurrency"]["group"] == "monitor-valkey-fuzzer-scan"
     assert "github.event_name != 'workflow_dispatch'" in job_env["MONITOR_DRY_RUN"]
-    assert "VALKEY_GITHUB_TOKEN" in job_env
     assert "VALKEY_GITHUB_APP_ID" in job_env
-    assert "VALKEY_GITHUB_APP_PRIVATE_KEY" in job_env
+    assert "VALKEY_GITHUB_TOKEN" not in job_env
+    assert "VALKEY_GITHUB_APP_PRIVATE_KEY" not in job_env
 
     app_token_step = next(
         step
@@ -44,6 +44,7 @@ def test_fuzzer_monitor_workflow_uses_oidc_and_app_token_support() -> None:
         if step["name"] == "Configure AWS credentials from OIDC role"
     )
     assert app_token_step["uses"] == "actions/create-github-app-token@v2"
+    assert app_token_step["if"] == "${{ steps.target-auth.outputs.use-app == 'true' }}"
     assert app_token_step["with"]["owner"] == "valkey-io"
     assert app_token_step["with"]["repositories"] == "valkey-fuzzer"
     assert app_token_step["with"]["permission-actions"] == "read"

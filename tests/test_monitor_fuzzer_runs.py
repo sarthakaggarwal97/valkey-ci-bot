@@ -151,6 +151,69 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
 @patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
 @patch("scripts.monitor_fuzzer_runs.Github")
 @patch("scripts.monitor_fuzzer_runs.MonitorStateStore")
+def test_monitor_continues_after_analysis_error_and_advances_watermark(
+    mock_state_store_cls,
+    mock_github_cls,
+    mock_analyzer_cls,
+    mock_issue_publisher_cls,
+    mock_make_bedrock_client,
+    mock_rate_limiter_cls,
+    _mock_event_ledger,
+) -> None:
+    state_store = mock_state_store_cls.return_value
+    state_store.get_last_seen_run_id.return_value = 100
+
+    workflow = MagicMock()
+    workflow.get_runs.return_value = [_run(102, "success"), _run(101, "failure")]
+    repo = MagicMock()
+    repo.get_workflow.return_value = workflow
+    mock_github_cls.return_value.get_repo.return_value = repo
+    mock_make_bedrock_client.return_value = (MagicMock(), None)
+
+    analyzer = mock_analyzer_cls.return_value
+    analyzer.analyze_workflow_run.side_effect = [
+        RuntimeError("bad artifact"),
+        MagicMock(
+            run_id=102,
+            run_url="https://example.com/102",
+            conclusion="success",
+            overall_status="normal",
+            triage_verdict="expected-chaos-noise",
+            suggested_labels=[],
+            scenario_id="seed-102",
+            seed="102",
+            anomalies=[],
+            normal_signals=["ok"],
+            summary="Healthy run.",
+            reproduction_hint="valkey-fuzzer cluster --seed 102",
+        ),
+    ]
+
+    result = monitor(_args())
+
+    assert [item["action"] for item in result["runs"]] == ["analysis-error", "analyzed"]
+    assert analyzer.analyze_workflow_run.call_count == 2
+    mock_issue_publisher_cls.return_value.upsert_issue.assert_not_called()
+    state_store.mark_seen.assert_called_once_with(
+        "valkey-io/valkey-fuzzer:fuzzer-run.yml:schedule",
+        last_seen_run_id=102,
+        target_repo="valkey-io/valkey-fuzzer",
+        workflow_file="fuzzer-run.yml",
+        event="schedule",
+    )
+    _mock_event_ledger.record.assert_any_call(
+        "fuzzer.analysis_failed",
+        "valkey-io/valkey-fuzzer:fuzzer-run:101",
+        error="bad artifact",
+    )
+
+
+@patch("scripts.monitor_fuzzer_runs.RateLimiter")
+@patch("scripts.monitor_fuzzer_runs._make_bedrock_client")
+@patch("scripts.monitor_fuzzer_runs.FuzzerIssuePublisher")
+@patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
+@patch("scripts.monitor_fuzzer_runs.Github")
+@patch("scripts.monitor_fuzzer_runs.MonitorStateStore")
 def test_monitor_dry_run_does_not_analyze_or_advance_state(
     mock_state_store_cls,
     mock_github_cls,

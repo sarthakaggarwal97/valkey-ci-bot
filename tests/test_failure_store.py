@@ -718,6 +718,7 @@ def test_save_creates_bot_data_branch_when_missing() -> None:
         GithubException(404, {"message": "missing bot-data"}),
         MagicMock(object=MagicMock(sha="base-sha")),
     ]
+    repo.get_contents.side_effect = GithubException(404, {"message": "missing store"})
     gh = MagicMock()
     gh.get_repo.return_value = repo
     store = FailureStore(gh, "owner/repo")
@@ -739,7 +740,8 @@ def test_save_does_not_fallback_to_create_on_non_404_lookup_error() -> None:
     gh.get_repo.return_value = repo
     store = FailureStore(gh, "owner/repo")
 
-    store.save()
+    with pytest.raises(RuntimeError, match="failed to save failure store"):
+        store.save()
 
     repo.create_file.assert_not_called()
 
@@ -752,6 +754,7 @@ def test_save_uses_separate_state_repository_when_configured() -> None:
         GithubException(404, {"message": "missing bot-data"}),
         MagicMock(object=MagicMock(sha="base-sha")),
     ]
+    state_repo.get_contents.side_effect = GithubException(404, {"message": "missing store"})
     state_gh = MagicMock()
     state_gh.get_repo.return_value = state_repo
 
@@ -766,3 +769,60 @@ def test_save_uses_separate_state_repository_when_configured() -> None:
 
     state_gh.get_repo.assert_called_once_with("owner/valkey-ci-agent")
     target_gh.get_repo.assert_not_called()
+
+
+def test_save_retries_conflict_and_preserves_remote_entries() -> None:
+    def contents(data: dict, sha: str) -> MagicMock:
+        item = MagicMock()
+        item.decoded_content = json.dumps(data).encode()
+        item.sha = sha
+        return item
+
+    remote_entry = FailureStoreEntry(
+        fingerprint="remote",
+        failure_identifier="remote-test",
+        test_name=None,
+        incident_key="remote",
+        error_signature="remote boom",
+        file_path="tests/unit/remote.tcl",
+        pr_url=None,
+        status="queued",
+        created_at="2026-04-08T00:00:00+00:00",
+        updated_at="2026-04-08T00:00:00+00:00",
+    )
+    local_entry = FailureStoreEntry(
+        fingerprint="local",
+        failure_identifier="local-test",
+        test_name=None,
+        incident_key="local",
+        error_signature="local boom",
+        file_path="tests/unit/local.tcl",
+        pr_url=None,
+        status="queued",
+        created_at="2026-04-08T00:00:00+00:00",
+        updated_at="2026-04-08T00:00:00+00:00",
+    )
+
+    remote_store = FailureStore()
+    remote_store.entries["remote"] = remote_entry
+
+    repo = MagicMock()
+    repo.default_branch = "main"
+    repo.get_git_ref.return_value = MagicMock()
+    repo.get_contents.side_effect = [
+        contents({"entries": {}}, "old-sha"),
+        contents(remote_store.to_dict(), "new-sha"),
+    ]
+    repo.update_file.side_effect = [
+        GithubException(409, {"message": "sha does not match"}),
+        None,
+    ]
+    gh = MagicMock()
+    gh.get_repo.return_value = repo
+    store = FailureStore(gh, "owner/repo")
+    store.entries["local"] = local_entry
+
+    store.save()
+
+    saved_payload = json.loads(repo.update_file.call_args_list[-1].args[2])
+    assert sorted(saved_payload["entries"]) == ["local", "remote"]
