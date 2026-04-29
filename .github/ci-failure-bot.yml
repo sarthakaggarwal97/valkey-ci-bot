@@ -9,3 +9,16 @@ retrieval:
   max_results_per_knowledge_base: 3
   max_chars_per_result: 1200
   max_total_chars: 5000
+
+limits:
+  max_patch_files: 10
+  max_failures_per_run: 5
+  max_prs_per_day: 3
+  max_open_bot_prs: 3
+  queued_pr_max_attempts: 5
+  daily_token_budget: 1000000
+
+fix_generation:
+  confidence_threshold: "medium"
+  max_retries: 2
+  max_validation_retries: 1

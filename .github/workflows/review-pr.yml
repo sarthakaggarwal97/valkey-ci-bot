@@ -82,6 +82,27 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Validate workflow inputs
+        shell: bash
+        env:
+          REVIEW_MODE: ${{ inputs.mode }}
+          CONFIG_PATH: ${{ inputs.config_path }}
+          AWS_REGION_INPUT: ${{ inputs.aws_region }}
+        run: |
+          set -euo pipefail
+          if [[ "${REVIEW_MODE}" != "auto" && "${REVIEW_MODE}" != "review" && "${REVIEW_MODE}" != "chat" ]]; then
+            echo "Invalid mode: ${REVIEW_MODE}" >&2
+            exit 1
+          fi
+          if [[ "${CONFIG_PATH}" == /* || "${CONFIG_PATH}" == *..* || "${CONFIG_PATH}" == -* ]]; then
+            echo "Invalid config_path: ${CONFIG_PATH}" >&2
+            exit 1
+          fi
+          if [[ ! "${AWS_REGION_INPUT}" =~ ^[A-Za-z0-9-]+$ ]]; then
+            echo "Invalid aws_region: ${AWS_REGION_INPUT}" >&2
+            exit 1
+          fi
+
       - name: Resolve repository
         id: target-repo
         shell: bash
@@ -91,7 +112,7 @@ jobs:
           set -euo pipefail
           owner="${TARGET_REPO%%/*}"
           repository="${TARGET_REPO#*/}"
-          if [[ -z "${owner}" || -z "${repository}" || "${owner}" == "${repository}" ]]; then
+          if [[ ! "${TARGET_REPO}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
             echo "Expected TARGET_REPO in owner/repo format, got '${TARGET_REPO}'." >&2
             exit 1
           fi
@@ -156,10 +177,15 @@ jobs:
       - name: Run PR reviewer
         env:
           AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
+          TARGET_REPO: ${{ github.repository }}
+          CONFIG_PATH: ${{ inputs.config_path }}
+          REVIEW_MODE: ${{ inputs.mode }}
+          REVIEW_TOKEN: ${{ steps.github-token.outputs.token }}
+          AWS_REGION_INPUT: ${{ inputs.aws_region }}
         run: |
           python -m scripts.pr_review_main \
-            --repo "${{ github.repository }}" \
-            --config "${{ inputs.config_path }}" \
-            --mode "${{ inputs.mode }}" \
-            --token "${{ steps.github-token.outputs.token }}" \
-            --aws-region "${{ inputs.aws_region }}"
+            --repo "${TARGET_REPO}" \
+            --config "${CONFIG_PATH}" \
+            --mode "${REVIEW_MODE}" \
+            --token "${REVIEW_TOKEN}" \
+            --aws-region "${AWS_REGION_INPUT}"

@@ -65,20 +65,69 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Resolve target repository
+        id: target-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${TARGET_REPO%%/*}"
+          repository="${TARGET_REPO#*/}"
+          if [[ ! "${TARGET_REPO}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "Expected TARGET_REPO in owner/repo format, got '${TARGET_REPO}'." >&2
+            exit 1
+          fi
+          echo "owner=${owner}" >> "$GITHUB_OUTPUT"
+          echo "repository=${repository}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve target repository authentication mode
+        id: target-auth
+        shell: bash
+        env:
+          VALKEY_FORK_GITHUB_TOKEN: ${{ secrets.VALKEY_FORK_GITHUB_TOKEN }}
+          VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+          VALKEY_GITHUB_APP_PRIVATE_KEY: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${VALKEY_FORK_GITHUB_TOKEN}" || -n "${VALKEY_GITHUB_TOKEN}" ]]; then
+            echo "use-app=false" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${VALKEY_GITHUB_APP_ID}" && -n "${VALKEY_GITHUB_APP_PRIVATE_KEY}" ]]; then
+            echo "use-app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Configure VALKEY_FORK_GITHUB_TOKEN, VALKEY_GITHUB_TOKEN, or VALKEY_GITHUB_APP_ID plus VALKEY_GITHUB_APP_PRIVATE_KEY for proof campaigns." >&2
+            exit 1
+          fi
+
+      - name: Create target repository GitHub App token
+        id: target-app-token
+        if: ${{ steps.target-auth.outputs.use-app == 'true' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ env.VALKEY_GITHUB_APP_ID }}
+          private-key: ${{ secrets.VALKEY_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ steps.target-repo.outputs.owner }}
+          repositories: ${{ steps.target-repo.outputs.repository }}
+          permission-actions: read
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+
       - name: Select target repository token
         id: target-token
         shell: bash
         env:
           VALKEY_FORK_GITHUB_TOKEN: ${{ secrets.VALKEY_FORK_GITHUB_TOKEN }}
           VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+          APP_TOKEN: ${{ steps.target-app-token.outputs.token }}
         run: |
           set -euo pipefail
           if [[ -n "${VALKEY_FORK_GITHUB_TOKEN}" ]]; then
             echo "token=${VALKEY_FORK_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
           elif [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
             echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${APP_TOKEN}" ]]; then
+            echo "token=${APP_TOKEN}" >> "$GITHUB_OUTPUT"
           else
-            echo "Configure VALKEY_FORK_GITHUB_TOKEN or VALKEY_GITHUB_TOKEN for proof campaigns." >&2
+            echo "Unable to resolve target repository token." >&2
             exit 1
           fi
 

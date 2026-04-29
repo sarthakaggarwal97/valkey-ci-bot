@@ -59,6 +59,7 @@ jobs:
           repository: ${{ inputs.consumer_repo }}
           ref: ${{ inputs.commit_sha }}
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Apply patch
         id: apply
@@ -157,9 +158,15 @@ jobs:
       - name: Collect results
         id: result
         if: always()
+        env:
+          APPLY_OUTCOME: ${{ steps.apply.outcome }}
+          BUILD_PASSED: ${{ steps.build.outputs.build_passed }}
+          TEST_PASSED: ${{ steps.test.outputs.test_passed }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+          BUILD_ONLY: ${{ steps.test.outputs.build_only }}
         run: |
           # Determine overall pass/fail based on previous step outcomes
-          if [ "${{ steps.apply.outcome }}" != "success" ]; then
+          if [ "${APPLY_OUTCOME}" != "success" ]; then
             echo "passed=false" >> "$GITHUB_OUTPUT"
             {
               echo 'output<<VALIDATE_OUTPUT_EOF'
@@ -169,7 +176,7 @@ jobs:
             exit 0
           fi
 
-          if [ "${{ steps.build.outputs.build_passed }}" != "true" ]; then
+          if [ "${BUILD_PASSED}" != "true" ]; then
             echo "passed=false" >> "$GITHUB_OUTPUT"
             {
               echo 'output<<VALIDATE_OUTPUT_EOF'
@@ -180,7 +187,7 @@ jobs:
             exit 0
           fi
 
-          if [ "${{ steps.test.outputs.test_passed }}" != "true" ] && [ "${{ steps.test.outcome }}" != "skipped" ]; then
+          if [ "${TEST_PASSED}" != "true" ] && [ "${TEST_OUTCOME}" != "skipped" ]; then
             echo "passed=false" >> "$GITHUB_OUTPUT"
             {
               echo 'output<<VALIDATE_OUTPUT_EOF'
@@ -194,7 +201,7 @@ jobs:
           echo "passed=true" >> "$GITHUB_OUTPUT"
           {
             echo 'output<<VALIDATE_OUTPUT_EOF'
-            if [ "${{ steps.test.outputs.build_only }}" = "true" ]; then
+            if [ "${BUILD_ONLY}" = "true" ]; then
               echo "Validation passed with explicit build-only checks."
             else
               echo "Validation passed."

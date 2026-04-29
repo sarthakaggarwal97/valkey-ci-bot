@@ -82,7 +82,7 @@ jobs:
           set -euo pipefail
           owner="${TARGET_REPO%%/*}"
           repository="${TARGET_REPO#*/}"
-          if [[ -z "${owner}" || -z "${repository}" || "${owner}" == "${repository}" ]]; then
+          if [[ ! "${TARGET_REPO}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
             echo "Expected TARGET_REPO in owner/repo format, got '${TARGET_REPO}'." >&2
             exit 1
           fi
@@ -107,11 +107,13 @@ jobs:
         shell: bash
         env:
           TARGET_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
+          set -euo pipefail
           if [[ -n "${TARGET_GITHUB_TOKEN}" ]]; then
             echo "token=${TARGET_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
           else
-            echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+            echo "token=${APP_TOKEN}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Configure AWS credentials from OIDC role

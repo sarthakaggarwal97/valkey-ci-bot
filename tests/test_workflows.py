@@ -213,6 +213,11 @@ def test_validate_fix_workflow_requires_explicit_build_only_opt_in() -> None:
     assert inputs["allow_build_only"]["default"] is False
     assert inputs["test_commands"]["default"] == "[]"
 
+    checkout_step = next(
+        step
+        for step in workflow["jobs"]["validate"]["steps"]
+        if step["name"] == "Checkout consumer repo at SHA"
+    )
     test_step = next(
         step
         for step in workflow["jobs"]["validate"]["steps"]
@@ -223,9 +228,28 @@ def test_validate_fix_workflow_requires_explicit_build_only_opt_in() -> None:
         for step in workflow["jobs"]["validate"]["steps"]
         if step["name"] == "Collect results"
     )
+    assert checkout_step["with"]["persist-credentials"] is False
     assert "allow_build_only" in test_step["env"]["ALLOW_BUILD_ONLY"]
     assert "Missing test commands. Provide at least one test command or set allow_build_only=true." in test_step["run"]
     assert "Validation passed with explicit build-only checks." in result_step["run"]
+
+
+def test_workflow_run_blocks_do_not_interpolate_github_expressions() -> None:
+    workflow_paths = sorted((REPO_ROOT / ".github/workflows").glob("*.yml"))
+    assert workflow_paths
+
+    offenders: list[str] = []
+    for path in workflow_paths:
+        workflow = _load_yaml(path)
+        for job_name, job in workflow.get("jobs", {}).items():
+            for step in job.get("steps", []):
+                run = step.get("run")
+                if isinstance(run, str) and "${{" in run:
+                    offenders.append(
+                        f"{path.name}:{job_name}:{step.get('name', step.get('id', '<unnamed>'))}"
+                    )
+
+    assert offenders == []
 
 
 def test_prove_daily_fix_workflow_dispatches_pr_proof_loop() -> None:

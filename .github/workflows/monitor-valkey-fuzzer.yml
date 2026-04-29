@@ -92,11 +92,13 @@ jobs:
         shell: bash
         env:
           VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
+          set -euo pipefail
           if [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
             echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
           else
-            echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+            echo "token=${APP_TOKEN}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Configure AWS credentials from OIDC role
@@ -108,6 +110,10 @@ jobs:
 
       - name: Analyze Valkey fuzzer runs
         shell: bash
+        env:
+          TARGET_TOKEN: ${{ steps.target-token.outputs.token }}
+          STATE_TOKEN: ${{ github.token }}
+          STATE_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           args=(
@@ -115,9 +121,9 @@ jobs:
             --target-repo "valkey-io/valkey-fuzzer"
             --workflow-file "fuzzer-run.yml"
             --config ".github/valkey-fuzzer-bot.yml"
-            --target-token "${{ steps.target-token.outputs.token }}"
-            --state-token "${{ github.token }}"
-            --state-repo "${{ github.repository }}"
+            --target-token "${TARGET_TOKEN}"
+            --state-token "${STATE_TOKEN}"
+            --state-repo "${STATE_REPO}"
             --max-runs "${MONITOR_MAX_RUNS}"
             --aws-region "${AWS_REGION}"
           )

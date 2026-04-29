@@ -39,14 +39,23 @@ jobs:
     steps:
       - name: Parse PR URL or number
         id: parse
+        shell: bash
+        env:
+          PR_INPUT: ${{ inputs.pr_url }}
+          DEFAULT_REPO: ${{ inputs.repo }}
         run: |
-          INPUT="${{ inputs.pr_url }}"
+          set -euo pipefail
+          INPUT="${PR_INPUT}"
           # If it looks like a URL, extract owner/repo and PR number
           if [[ "$INPUT" =~ github\.com/([^/]+/[^/]+)/pull/([0-9]+) ]]; then
             echo "repo=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
             echo "pr_number=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
           elif [[ "$INPUT" =~ ^[0-9]+$ ]]; then
-            echo "repo=${{ inputs.repo }}" >> "$GITHUB_OUTPUT"
+            if [[ ! "${DEFAULT_REPO}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+              echo "::error::Invalid repo input: ${DEFAULT_REPO}"
+              exit 1
+            fi
+            echo "repo=${DEFAULT_REPO}" >> "$GITHUB_OUTPUT"
             echo "pr_number=$INPUT" >> "$GITHUB_OUTPUT"
           else
             echo "::error::Could not parse PR input: $INPUT. Use a URL or a number."

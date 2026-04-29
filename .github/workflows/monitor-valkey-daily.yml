@@ -143,11 +143,13 @@ jobs:
         shell: bash
         env:
           VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
+          set -euo pipefail
           if [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
             echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
           else
-            echo "token=${{ steps.app-token.outputs.token }}" >> "$GITHUB_OUTPUT"
+            echo "token=${APP_TOKEN}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Configure AWS credentials from OIDC role
@@ -162,6 +164,10 @@ jobs:
         id: run-monitor
         if: ${{ env.MONITOR_SCOPE_SELECTED == 'true' }}
         shell: bash
+        env:
+          TARGET_TOKEN: ${{ steps.target-token.outputs.token }}
+          STATE_TOKEN: ${{ github.token }}
+          STATE_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           args=(
@@ -169,9 +175,9 @@ jobs:
             --target-repo "valkey-io/valkey"
             --workflow-file "${MONITOR_WORKFLOW_FILE}"
             --config ".github/valkey-daily-bot.yml"
-            --target-token "${{ steps.target-token.outputs.token }}"
-            --state-token "${{ github.token }}"
-            --state-repo "${{ github.repository }}"
+            --target-token "${TARGET_TOKEN}"
+            --state-token "${STATE_TOKEN}"
+            --state-repo "${STATE_REPO}"
             --max-runs "${MONITOR_MAX_RUNS}"
             --aws-region "${AWS_REGION}"
             --queue-only
@@ -237,12 +243,15 @@ jobs:
         env:
           VALKEY_FORK_GITHUB_TOKEN: ${{ secrets.VALKEY_FORK_GITHUB_TOKEN }}
           VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+          TARGET_TOKEN: ${{ steps.target-token.outputs.token }}
         run: |
           set -euo pipefail
           if [[ -n "${VALKEY_FORK_GITHUB_TOKEN}" ]]; then
             echo "token=${VALKEY_FORK_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
           elif [[ -n "${VALKEY_GITHUB_TOKEN}" ]]; then
             echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
+          elif [[ "${VALKEY_FORK_REPO}" == "valkey-io/valkey" && -n "${TARGET_TOKEN}" ]]; then
+            echo "token=${TARGET_TOKEN}" >> "$GITHUB_OUTPUT"
           else
             echo "Configure VALKEY_FORK_GITHUB_TOKEN or a VALKEY_GITHUB_TOKEN with write access to ${VALKEY_FORK_REPO}." >&2
             exit 1
@@ -251,24 +260,32 @@ jobs:
       - name: Validate fork base branches for queued fixes
         if: ${{ env.MONITOR_SCOPE_SELECTED == 'true' && steps.capture-monitor.outputs.monitor_dry_run != 'true' && steps.capture-monitor.outputs.has_queued_failures == 'true' }}
         shell: bash
+        env:
+          FORK_TOKEN: ${{ steps.fork-token.outputs.token }}
+          STATE_TOKEN: ${{ github.token }}
+          STATE_REPO: ${{ github.repository }}
         run: |
           python -m scripts.preflight_reconciliation \
             --repo "${VALKEY_FORK_REPO}" \
-            --token "${{ steps.fork-token.outputs.token }}" \
-            --state-token "${{ github.token }}" \
-            --state-repo "${{ github.repository }}" | tee reconcile-preflight.json
+            --token "${FORK_TOKEN}" \
+            --state-token "${STATE_TOKEN}" \
+            --state-repo "${STATE_REPO}" | tee reconcile-preflight.json
 
       - name: Create draft PRs for queued fixes
         if: ${{ env.MONITOR_SCOPE_SELECTED == 'true' && steps.capture-monitor.outputs.monitor_dry_run != 'true' && steps.capture-monitor.outputs.has_queued_failures == 'true' }}
         shell: bash
+        env:
+          FORK_TOKEN: ${{ steps.fork-token.outputs.token }}
+          STATE_TOKEN: ${{ github.token }}
+          STATE_REPO: ${{ github.repository }}
         run: |
           python -m scripts.main \
             --mode reconcile \
             --repo "${VALKEY_FORK_REPO}" \
             --config ".github/valkey-daily-bot.yml" \
-            --token "${{ steps.fork-token.outputs.token }}" \
-            --state-token "${{ github.token }}" \
-            --state-repo "${{ github.repository }}" \
+            --token "${FORK_TOKEN}" \
+            --state-token "${STATE_TOKEN}" \
+            --state-repo "${STATE_REPO}" \
             --draft-prs
 
       - name: Upload monitor result
@@ -325,6 +342,7 @@ jobs:
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          STATE_REPO: ${{ github.repository }}
         shell: bash
         run: |
           python3 -m scripts.backfill_daily_health_history \
@@ -334,7 +352,7 @@ jobs:
             --days 14 \
             --token "${GITHUB_TOKEN}" \
             --state-token "${GITHUB_TOKEN}" \
-            --state-repo "${{ github.repository }}" \
+            --state-repo "${STATE_REPO}" \
             --mirror-dir "bot-data/dashboard-history/daily-health"
 
       - name: Generate daily CI health report

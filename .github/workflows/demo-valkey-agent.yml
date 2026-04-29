@@ -116,60 +116,102 @@ jobs:
 
       - name: Build demo bundle
         shell: bash
+        env:
+          DEMO_REPOSITORY: ${{ github.repository }}
+          DEMO_TOKEN: ${{ github.token }}
+          DEMO_REF: ${{ github.ref_name }}
+          RUN_DASHBOARD: ${{ github.event.inputs.run_dashboard || 'true' }}
+          RUN_REPLAY: ${{ github.event.inputs.run_replay || 'true' }}
+          REPLAY_MANIFEST: ${{ github.event.inputs.replay_manifest || 'examples/valkey-acceptance.yml' }}
+          REPLAY_RUN_MODELS: ${{ github.event.inputs.replay_run_models || 'false' }}
+          RUN_DAILY: ${{ github.event.inputs.run_daily || 'true' }}
+          DAILY_DRY_RUN: ${{ github.event.inputs.daily_dry_run || 'true' }}
+          DAILY_MAX_RUNS: ${{ github.event.inputs.daily_max_runs || '' }}
+          RUN_FUZZER: ${{ github.event.inputs.run_fuzzer || 'true' }}
+          FUZZER_DRY_RUN: ${{ github.event.inputs.fuzzer_dry_run || 'true' }}
+          FUZZER_MAX_RUNS: ${{ github.event.inputs.fuzzer_max_runs || '' }}
+          REVIEW_TARGET_REPO: ${{ github.event.inputs.review_target_repo || '' }}
+          REVIEW_PR_NUMBER: ${{ github.event.inputs.review_pr_number || '' }}
+          REVIEW_CONFIG_PATH: ${{ github.event.inputs.review_config_path || '.github/pr-review-bot.yml' }}
+          PUBLISH_SITE: ${{ github.event.inputs.publish_site || 'true' }}
         run: |
           set -euo pipefail
-          repo="${{ github.repository }}"
+          repo="${DEMO_REPOSITORY}"
           owner="${repo%%/*}"
           repository="${repo#*/}"
           pages_url="https://${owner}.github.io/${repository}/"
+          if [[ "${REPLAY_MANIFEST}" == /* || "${REPLAY_MANIFEST}" == *..* || "${REPLAY_MANIFEST}" == -* ]]; then
+            echo "Invalid replay manifest path: ${REPLAY_MANIFEST}" >&2
+            exit 1
+          fi
+          if [[ "${REVIEW_CONFIG_PATH}" == /* || "${REVIEW_CONFIG_PATH}" == *..* || "${REVIEW_CONFIG_PATH}" == -* ]]; then
+            echo "Invalid review config path: ${REVIEW_CONFIG_PATH}" >&2
+            exit 1
+          fi
+          if [[ -n "${REVIEW_TARGET_REPO}" && ! "${REVIEW_TARGET_REPO}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "Invalid review target repo: ${REVIEW_TARGET_REPO}" >&2
+            exit 1
+          fi
+          if [[ -n "${REVIEW_PR_NUMBER}" && ! "${REVIEW_PR_NUMBER}" =~ ^[0-9]+$ ]]; then
+            echo "Invalid review PR number: ${REVIEW_PR_NUMBER}" >&2
+            exit 1
+          fi
+          if [[ -n "${DAILY_MAX_RUNS}" && ! "${DAILY_MAX_RUNS}" =~ ^[0-9]+$ ]]; then
+            echo "Invalid daily max runs: ${DAILY_MAX_RUNS}" >&2
+            exit 1
+          fi
+          if [[ -n "${FUZZER_MAX_RUNS}" && ! "${FUZZER_MAX_RUNS}" =~ ^[0-9]+$ ]]; then
+            echo "Invalid fuzzer max runs: ${FUZZER_MAX_RUNS}" >&2
+            exit 1
+          fi
           args=(
             -m scripts.demo_bundle
             --repo "${repo}"
-            --token "${{ github.token }}"
-            --ref "${{ github.ref_name }}"
+            --token "${DEMO_TOKEN}"
+            --ref "${DEMO_REF}"
             --pages-url "${pages_url}"
             --failure-store "bot-data/failure-store.json"
-            --replay-manifest "${{ github.event.inputs.replay_manifest || 'examples/valkey-acceptance.yml' }}"
-            --review-target-repo "${{ github.event.inputs.review_target_repo }}"
-            --review-config-path "${{ github.event.inputs.review_config_path || '.github/pr-review-bot.yml' }}"
+            --replay-manifest "${REPLAY_MANIFEST}"
+            --review-target-repo "${REVIEW_TARGET_REPO}"
+            --review-config-path "${REVIEW_CONFIG_PATH}"
             --output-markdown demo-report.md
             --output-json demo-report.json
             --output-html demo-report.html
             --site-dir demo-site
           )
 
-          if [[ "${{ github.event.inputs.run_dashboard || 'true' }}" == "true" ]]; then
+          if [[ "${RUN_DASHBOARD}" == "true" ]]; then
             args+=(--run-dashboard)
           fi
-          if [[ "${{ github.event.inputs.run_replay || 'true' }}" == "true" ]]; then
+          if [[ "${RUN_REPLAY}" == "true" ]]; then
             args+=(--run-replay)
           fi
-          if [[ "${{ github.event.inputs.replay_run_models || 'false' }}" == "true" ]]; then
+          if [[ "${REPLAY_RUN_MODELS}" == "true" ]]; then
             args+=(--replay-run-models)
           fi
-          if [[ "${{ github.event.inputs.run_daily || 'true' }}" == "true" ]]; then
+          if [[ "${RUN_DAILY}" == "true" ]]; then
             args+=(--run-daily)
           fi
-          if [[ "${{ github.event.inputs.daily_dry_run || 'true' }}" == "true" ]]; then
+          if [[ "${DAILY_DRY_RUN}" == "true" ]]; then
             args+=(--daily-dry-run)
           fi
-          if [[ "${{ github.event.inputs.run_fuzzer || 'true' }}" == "true" ]]; then
+          if [[ "${RUN_FUZZER}" == "true" ]]; then
             args+=(--run-fuzzer)
           fi
-          if [[ "${{ github.event.inputs.fuzzer_dry_run || 'true' }}" == "true" ]]; then
+          if [[ "${FUZZER_DRY_RUN}" == "true" ]]; then
             args+=(--fuzzer-dry-run)
           fi
-          if [[ "${{ github.event.inputs.publish_site || 'true' }}" == "true" ]]; then
+          if [[ "${PUBLISH_SITE}" == "true" ]]; then
             args+=(--publish-site)
           fi
-          if [[ -n "${{ github.event.inputs.review_pr_number }}" ]]; then
-            args+=(--review-pr-number "${{ github.event.inputs.review_pr_number }}")
+          if [[ -n "${REVIEW_PR_NUMBER}" ]]; then
+            args+=(--review-pr-number "${REVIEW_PR_NUMBER}")
           fi
-          if [[ -n "${{ github.event.inputs.daily_max_runs }}" ]]; then
-            args+=(--daily-max-runs "${{ github.event.inputs.daily_max_runs }}")
+          if [[ -n "${DAILY_MAX_RUNS}" ]]; then
+            args+=(--daily-max-runs "${DAILY_MAX_RUNS}")
           fi
-          if [[ -n "${{ github.event.inputs.fuzzer_max_runs }}" ]]; then
-            args+=(--fuzzer-max-runs "${{ github.event.inputs.fuzzer_max_runs }}")
+          if [[ -n "${FUZZER_MAX_RUNS}" ]]; then
+            args+=(--fuzzer-max-runs "${FUZZER_MAX_RUNS}")
           fi
 
           python3 "${args[@]}"

@@ -61,18 +61,26 @@ jobs:
 
       - name: Run replay lab
         shell: bash
+        env:
+          REPLAY_MANIFEST: ${{ github.event.inputs.manifest || 'examples/valkey-acceptance.yml' }}
+          RUN_MODELS: ${{ github.event.inputs.run_models || 'false' }}
+          REPLAY_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          if [[ "${REPLAY_MANIFEST}" == /* || "${REPLAY_MANIFEST}" == *..* || "${REPLAY_MANIFEST}" == -* ]]; then
+            echo "Invalid replay manifest path: ${REPLAY_MANIFEST}" >&2
+            exit 1
+          fi
           args=(
             -m scripts.valkey_acceptance
-            --manifest "${{ github.event.inputs.manifest }}"
-            --token "${{ github.token }}"
+            --manifest "${REPLAY_MANIFEST}"
+            --token "${REPLAY_TOKEN}"
             --aws-region "${AWS_REGION}"
             --output acceptance-report.md
             --json-output acceptance-report.json
           )
 
-          if [[ "${{ github.event.inputs.run_models }}" == "true" ]]; then
+          if [[ "${RUN_MODELS}" == "true" ]]; then
             args+=(--run-models)
           fi
 

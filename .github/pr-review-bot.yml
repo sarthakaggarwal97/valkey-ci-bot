@@ -1,7 +1,11 @@
 reviewer:
   approve_on_no_findings: false
+  chat_collaborator_only: true
+  review_comment_lgtm: false
   model_file_triage: false
   post_policy_notes: true
+  max_review_comments: 20
+  daily_token_budget: 1000000
   custom_instructions: |
     This project is Valkey, a high-performance in-memory key-value store
     forked from Redis 7.2. It is written in C and uses an event-driven,

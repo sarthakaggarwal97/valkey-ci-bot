@@ -83,6 +83,27 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Validate workflow inputs
+        shell: bash
+        env:
+          PIPELINE_MODE: ${{ inputs.mode }}
+          CONFIG_PATH: ${{ inputs.config_path }}
+          AWS_REGION_INPUT: ${{ inputs.aws_region }}
+        run: |
+          set -euo pipefail
+          if [[ "${PIPELINE_MODE}" != "analyze" && "${PIPELINE_MODE}" != "reconcile" ]]; then
+            echo "Invalid mode: ${PIPELINE_MODE}" >&2
+            exit 1
+          fi
+          if [[ "${CONFIG_PATH}" == /* || "${CONFIG_PATH}" == *..* || "${CONFIG_PATH}" == -* ]]; then
+            echo "Invalid config_path: ${CONFIG_PATH}" >&2
+            exit 1
+          fi
+          if [[ ! "${AWS_REGION_INPUT}" =~ ^[A-Za-z0-9-]+$ ]]; then
+            echo "Invalid aws_region: ${AWS_REGION_INPUT}" >&2
+            exit 1
+          fi
+
       - name: Resolve target repository
         id: target-repo
         shell: bash
@@ -92,7 +113,7 @@ jobs:
           set -euo pipefail
           owner="${TARGET_REPO%%/*}"
           repository="${TARGET_REPO#*/}"
-          if [[ -z "${owner}" || -z "${repository}" || "${owner}" == "${repository}" ]]; then
+          if [[ ! "${TARGET_REPO}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
             echo "Expected TARGET_REPO in owner/repo format, got '${TARGET_REPO}'." >&2
             exit 1
           fi
@@ -159,22 +180,31 @@ jobs:
         if: inputs.mode == 'analyze'
         env:
           AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
+          TARGET_REPO: ${{ steps.target-repo.outputs.name }}
+          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+          CONFIG_PATH: ${{ inputs.config_path }}
+          AGENT_TOKEN: ${{ steps.github-token.outputs.token }}
+          AWS_REGION_INPUT: ${{ inputs.aws_region }}
         run: |
           python -m scripts.main \
-            --repo "${{ steps.target-repo.outputs.name }}" \
-            --run-id "${{ github.event.workflow_run.id }}" \
-            --config "${{ inputs.config_path }}" \
-            --token "${{ steps.github-token.outputs.token }}" \
-            --aws-region "${{ inputs.aws_region }}"
+            --repo "${TARGET_REPO}" \
+            --run-id "${WORKFLOW_RUN_ID}" \
+            --config "${CONFIG_PATH}" \
+            --token "${AGENT_TOKEN}" \
+            --aws-region "${AWS_REGION_INPUT}"
 
       - name: Run reconciliation
         if: inputs.mode == 'reconcile'
         env:
           AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
+          RECONCILE_REPO: ${{ github.repository }}
+          CONFIG_PATH: ${{ inputs.config_path }}
+          AGENT_TOKEN: ${{ steps.github-token.outputs.token }}
+          AWS_REGION_INPUT: ${{ inputs.aws_region }}
         run: |
           python -m scripts.main \
-            --repo "${{ github.repository }}" \
-            --config "${{ inputs.config_path }}" \
-            --token "${{ steps.github-token.outputs.token }}" \
-            --aws-region "${{ inputs.aws_region }}" \
+            --repo "${RECONCILE_REPO}" \
+            --config "${CONFIG_PATH}" \
+            --token "${AGENT_TOKEN}" \
+            --aws-region "${AWS_REGION_INPUT}" \
             --mode reconcile
