@@ -1,0 +1,41 @@
+{
+  "captured_at": "2026-04-29T08:44:50.708928+00:00",
+  "date": "2026-04-29",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "Remove redundant count division in genericHgetallCommand (#3573)\n\nThe argument `count /= 2` modifies `count` as a side effect, and the\nfollowing `count /= 2` divides it again unnecessarily.\nSince `count` is not used after this point, fix it by using `count / 2`\nwithout the side effect and remove the redundant second assignment.\n\nSigned-off-by: djk1027 <djk9510271@gmail.com>",
+    "commit_sha": "8091c6c",
+    "commits_since_prev": [
+      {
+        "author": "Daejun Kim",
+        "date": "2026-04-28T08:43:56+00:00",
+        "message": "Remove redundant count division in genericHgetallCommand (#3573)",
+        "sha": "8091c6c10a3bd80fcb639a036dde882580f61fcb"
+      }
+    ],
+    "date": "2026-04-29",
+    "failed_job_names": [
+      "test-valgrind-no-malloc-usable-size-test",
+      "test-valgrind-test"
+    ],
+    "failed_jobs": 2,
+    "failure_jobs": {
+      "test": [
+        73498047227,
+        73498047265
+      ]
+    },
+    "failure_names": [
+      "test"
+    ],
+    "full_sha": "8091c6c10a3bd80fcb639a036dde882580f61fcb",
+    "run_id": 25084868965,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/25084868965",
+    "status": "failure",
+    "total_jobs": 49,
+    "unique_failures": 1,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
