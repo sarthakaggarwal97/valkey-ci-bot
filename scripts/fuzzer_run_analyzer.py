@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from pathlib import Path
 from typing import Any
 
 from scripts.bedrock_client import PromptClient
@@ -800,13 +801,144 @@ def _collapse_run_log_archive(log_files: dict[str, bytes]) -> str:
     return "\n".join(parts).strip()
 
 
+
+def _write_context_to_dir(context: FuzzerRunContext, tmpdir: Path) -> list[str]:
+    """Write fuzzer run context to disk for Claude Code to read.
+
+    Returns a list of file descriptions for the prompt.
+    """
+    files: list[str] = []
+    if context.results:
+        p = tmpdir / "results.json"
+        p.write_text(json.dumps(context.results, indent=2))
+        files.append("results.json (structured run results with validation checks)")
+    if context.scenario_yaml:
+        p = tmpdir / "scenario.yaml"
+        p.write_text(context.scenario_yaml)
+        files.append("scenario.yaml (chaos scenario DSL)")
+    if context.structured_logs:
+        logs_dir = tmpdir / "logs"
+        logs_dir.mkdir(exist_ok=True)
+        for name, data in context.structured_logs.items():
+            p = logs_dir / name
+            p.write_text(json.dumps(data, indent=2))
+            files.append(f"logs/{name} (structured log)")
+    if context.node_logs:
+        logs_dir = tmpdir / "logs"
+        logs_dir.mkdir(exist_ok=True)
+        for name, text in context.node_logs.items():
+            p = logs_dir / name
+            p.write_text(text)
+            files.append(f"logs/{name} (node log)")
+    if context.raw_job_log:
+        p = tmpdir / "job-log.txt"
+        p.write_text(context.raw_job_log)
+        files.append("job-log.txt (raw workflow job log)")
+    return files
+
+
+def _format_deterministic_summary(
+    anomalies: list[FuzzerSignal], normal_signals: list[str],
+) -> str:
+    """Render deterministic findings as concise text for the Claude prompt."""
+    parts: list[str] = []
+    if anomalies:
+        parts.append(f"Anomalies ({len(anomalies)}):")
+        for a in anomalies[:20]:
+            parts.append(f"- [{a.severity}] {a.title}: {a.evidence}")
+    if normal_signals:
+        parts.append(f"Normal signals ({len(normal_signals)}):")
+        for s in normal_signals[:15]:
+            parts.append(f"- {s}")
+    return "\n".join(parts) if parts else "No deterministic findings."
+
+
+def _invoke_claude_code(
+    system_prompt: str,
+    deterministic_summary: str,
+    retrieved_context: str,
+    artifact_dir: Path,
+    context: FuzzerRunContext,
+) -> dict[str, Any]:
+    """Call Claude Code CLI to analyze a fuzzer run from files on disk."""
+    from scripts.claude_code import run_claude_code
+
+    prompt_parts = [
+        system_prompt,
+        "",
+        "## Run Metadata",
+        f"Repository: {context.repo}",
+        f"Run URL: {context.run_url}",
+        f"Conclusion: {context.conclusion}",
+        f"Commit: {context.head_sha}",
+        f"Scenario ID: {context.scenario_id or 'unknown'}",
+        f"Seed: {context.seed or 'unknown'}",
+        "",
+        "## Artifacts on disk",
+        "Read the files in the current directory to understand the run.",
+        "Use Grep to search for crash patterns, assertions, or errors across log files.",
+        "",
+    ]
+    # List files written
+    file_list = _write_context_to_dir(context, artifact_dir)
+    if file_list:
+        prompt_parts.append("Available files:")
+        for desc in file_list:
+            prompt_parts.append(f"- {desc}")
+    else:
+        prompt_parts.append("No artifact files available — use the metadata and deterministic findings only.")
+    prompt_parts.append("")
+
+    if deterministic_summary:
+        prompt_parts.append("## Pre-computed deterministic findings")
+        prompt_parts.append(deterministic_summary)
+        prompt_parts.append("")
+
+    if retrieved_context:
+        prompt_parts.append(retrieved_context)
+        prompt_parts.append("")
+
+    prompt_parts.extend([
+        "## Your task",
+        "Analyze this fuzzer run. Read the artifact files as needed.",
+        "Return ONLY valid JSON matching this schema:",
+        '{',
+        '  "overall_status": "normal|warning|anomalous",',
+        '  "triage_verdict": "likely-core-valkey-bug|possible-core-valkey-bug|expected-chaos-noise|environmental-or-infra|needs-human-triage",',
+        '  "root_cause_category": "short stable label or null",',
+        '  "summary": "short maintainer-facing analysis",',
+        '  "anomalies": [{"title": "...", "severity": "warning|critical", "evidence": "..."}],',
+        '  "normal_signals": ["..."],',
+        '  "reproduction_hint": "command or null"',
+        '}',
+    ])
+
+    prompt = "\n".join(prompt_parts)
+    logger.info("Calling Claude Code for fuzzer run %s...", context.run_id)
+    stdout, stderr, rc = run_claude_code(
+        prompt, cwd=str(artifact_dir), timeout=300,
+        allowed_tools="Read,Grep,Glob",
+    )
+    logger.info(
+        "Claude Code returned for run %s (rc=%d, %d chars).",
+        context.run_id, rc, len(stdout),
+    )
+    try:
+        return _parse_model_payload(stdout)
+    except Exception as exc:
+        logger.warning(
+            "Failed to parse Claude Code output for run %s: %s\nOutput: %s",
+            context.run_id, exc, stdout[:500],
+        )
+        return {}
+
 class FuzzerRunAnalyzer:
     """Analysis-only evaluator for scheduled Valkey fuzzer workflow runs."""
 
     def __init__(
         self,
         github_client: Any,
-        bedrock_client: PromptClient,
+        bedrock_client: PromptClient | None = None,
         *,
         github_token: str | None = None,
         artifact_client: WorkflowArtifactClient | None = None,
@@ -814,9 +946,11 @@ class FuzzerRunAnalyzer:
         retriever: BedrockRetriever | None = None,
         retrieval_config: RetrievalConfig | None = None,
         thinking_budget: int = 32_000,
+        prompt_backend: str = "claude_code",
     ) -> None:
         self._gh = github_client
         self._bedrock = bedrock_client
+        self._prompt_backend = prompt_backend
         self._artifact_client = artifact_client or WorkflowArtifactClient(
             github_client,
             token=github_token,
@@ -892,14 +1026,30 @@ class FuzzerRunAnalyzer:
 
         model_payload: dict[str, Any] = {}
         try:
-            model_payload = self._invoke_model(
-                _build_user_prompt(
-                    context,
-                    anomalies,
-                    normal_signals,
-                    retrieved_context,
-                ),
-            )
+            if self._prompt_backend == "claude_code":
+                import shutil
+                import tempfile
+                tmpdir = Path(tempfile.mkdtemp(prefix="fuzzer-analysis-"))
+                try:
+                    det_summary = _format_deterministic_summary(anomalies, normal_signals)
+                    model_payload = _invoke_claude_code(
+                        system_prompt=_SYSTEM_PROMPT,
+                        deterministic_summary=det_summary,
+                        retrieved_context=retrieved_context,
+                        artifact_dir=tmpdir,
+                        context=context,
+                    )
+                finally:
+                    shutil.rmtree(tmpdir, ignore_errors=True)
+            else:
+                model_payload = self._invoke_model(
+                    _build_user_prompt(
+                        context,
+                        anomalies,
+                        normal_signals,
+                        retrieved_context,
+                    ),
+                )
         except Exception as exc:
             logger.warning("Fuzzer run analysis model call failed for run %s: %s", run_id, exc)
 

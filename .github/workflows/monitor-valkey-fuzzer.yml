@@ -37,6 +37,7 @@ jobs:
       cancel-in-progress: false
     env:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      CLAUDE_CODE_USE_BEDROCK: "1"
       MONITOR_DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || github.event.inputs.dry_run || 'true' }}
       MONITOR_MAX_RUNS: ${{ github.event.inputs.max_runs || '1' }}
       MONITOR_VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
@@ -55,7 +56,9 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          npm install -g @anthropic-ai/claude-code
 
       - name: Resolve target repository auth mode
         id: target-auth

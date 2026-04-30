@@ -17,7 +17,6 @@ if __package__ in {None, ""}:
 
 from github import Auth, Github
 
-from scripts.bedrock_client import BedrockClient
 from scripts.bedrock_retriever import BedrockRetriever
 from scripts.config import BotConfig, load_config
 from scripts.event_ledger import EventLedger
@@ -125,20 +124,15 @@ def _load_local_bot_config(config_path: str) -> BotConfig:
     return load_config(path)
 
 
-def _make_bedrock_client(
+def _make_retriever(
     config: BotConfig,
     aws_region: str | None,
     *,
     rate_limiter: RateLimiter | None = None,
-) -> tuple[BedrockClient, BedrockRetriever | None]:
+) -> BedrockRetriever | None:
     client_kwargs: dict[str, str] = {}
     if aws_region:
         client_kwargs["region_name"] = aws_region
-    bedrock_client = BedrockClient(
-        config,
-        client=boto3.client("bedrock-runtime", **client_kwargs),
-        rate_limiter=rate_limiter,
-    )
     retriever: BedrockRetriever | None = None
     if config.retrieval.enabled:
         retriever = BedrockRetriever(
@@ -147,7 +141,7 @@ def _make_bedrock_client(
                 rate_limiter.record_ai_metric if rate_limiter is not None else None
             ),
         )
-    return bedrock_client, retriever
+    return retriever
 
 
 def monitor(args: MonitorArgs) -> dict[str, object]:
@@ -167,14 +161,13 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
         state_repo_full_name=args.state_repo,
     )
     rate_limiter.load()
-    bedrock_client, retriever = _make_bedrock_client(
+    retriever = _make_retriever(
         config,
         args.aws_region,
         rate_limiter=rate_limiter,
     )
     analyzer = FuzzerRunAnalyzer(
         target_gh,
-        bedrock_client,
         github_token=args.target_token,
         retriever=retriever,
         retrieval_config=config.retrieval,

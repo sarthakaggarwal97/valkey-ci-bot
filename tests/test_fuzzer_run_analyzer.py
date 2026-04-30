@@ -1,8 +1,7 @@
-"""Tests for Valkey fuzzer workflow run analysis."""
-
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from scripts.fuzzer_run_analyzer import FuzzerRunAnalyzer
@@ -75,7 +74,7 @@ def test_analyzer_prefers_artifacts_and_keeps_deterministic_findings() -> None:
         "bundle/logs/node-4.log": b"Failover election won\n",
     }
     bedrock_client = MagicMock()
-    bedrock_client.invoke.return_value = json.dumps(
+    claude_response = json.dumps(
         {
             "overall_status": "warning",
             "summary": "The run exposed slot coverage loss after chaos.",
@@ -85,17 +84,21 @@ def test_analyzer_prefers_artifacts_and_keeps_deterministic_findings() -> None:
         }
     )
 
-    analyzer = FuzzerRunAnalyzer(
-        github_client,
-        bedrock_client,
-        artifact_client=artifact_client,
-        log_retriever=MagicMock(),
-    )
-    analysis = analyzer.analyze_workflow_run(
-        "valkey-io/valkey-fuzzer",
-        10,
-        workflow_file="fuzzer-run.yml",
-    )
+    import unittest.mock
+    with unittest.mock.patch(
+        "scripts.fuzzer_run_analyzer.run_claude_code",
+        return_value=(claude_response, "", 0),
+    ):
+        analyzer = FuzzerRunAnalyzer(
+            github_client,
+            artifact_client=artifact_client,
+            log_retriever=MagicMock(),
+        )
+        analysis = analyzer.analyze_workflow_run(
+            "valkey-io/valkey-fuzzer",
+            10,
+            workflow_file="fuzzer-run.yml",
+        )
 
     assert analysis.scenario_id == "839534793"
     assert analysis.seed == "839534793"
@@ -132,19 +135,22 @@ def test_analyzer_falls_back_to_job_log_when_artifacts_are_missing() -> None:
         "random-fuzzer\tUNKNOWN STEP\t2026-03-12T07:05:45.7118655Z   Replication: PASS\n"
     )
     bedrock_client = MagicMock()
-    bedrock_client.invoke.side_effect = RuntimeError("bedrock unavailable")
 
-    analyzer = FuzzerRunAnalyzer(
-        github_client,
-        bedrock_client,
-        artifact_client=artifact_client,
-        log_retriever=log_retriever,
-    )
-    analysis = analyzer.analyze_workflow_run(
-        "valkey-io/valkey-fuzzer",
-        11,
-        workflow_file="fuzzer-run.yml",
-    )
+    import unittest.mock
+    with unittest.mock.patch(
+        "scripts.fuzzer_run_analyzer.run_claude_code",
+        side_effect=RuntimeError("claude unavailable"),
+    ):
+        analyzer = FuzzerRunAnalyzer(
+            github_client,
+            artifact_client=artifact_client,
+            log_retriever=log_retriever,
+        )
+        analysis = analyzer.analyze_workflow_run(
+            "valkey-io/valkey-fuzzer",
+            11,
+            workflow_file="fuzzer-run.yml",
+        )
 
     assert analysis.scenario_id == "12345"
     assert analysis.seed == "12345"
@@ -169,16 +175,19 @@ def test_analyzer_does_not_treat_serverassert_object_name_as_crash() -> None:
         )
     }
     bedrock_client = MagicMock()
-    bedrock_client.invoke.side_effect = RuntimeError("bedrock unavailable")
 
-    analyzer = FuzzerRunAnalyzer(
-        github_client,
-        bedrock_client,
-        artifact_client=artifact_client,
-        log_retriever=MagicMock(),
-    )
-    analysis = analyzer.analyze_workflow_run(
-        "valkey-io/valkey-fuzzer",
+    import unittest.mock
+    with unittest.mock.patch(
+        "scripts.fuzzer_run_analyzer.run_claude_code",
+        side_effect=RuntimeError("claude unavailable"),
+    ):
+        analyzer = FuzzerRunAnalyzer(
+            github_client,
+            artifact_client=artifact_client,
+            log_retriever=MagicMock(),
+        )
+        analysis = analyzer.analyze_workflow_run(
+            "valkey-io/valkey-fuzzer",
         12,
         workflow_file="fuzzer-run.yml",
     )
@@ -186,3 +195,126 @@ def test_analyzer_does_not_treat_serverassert_object_name_as_crash() -> None:
     assert analysis.overall_status == "normal"
     assert analysis.triage_verdict == "expected-chaos-noise"
     assert analysis.anomalies == []
+
+
+def test_write_context_to_dir_creates_all_files(tmp_path: Path) -> None:
+    from scripts.fuzzer_run_analyzer import _write_context_to_dir
+    from scripts.models import FuzzerRunContext
+
+    context = FuzzerRunContext(
+        repo="valkey-io/valkey-fuzzer",
+        workflow_file="fuzzer-run.yml",
+        run_id=99,
+        run_url="https://example.com/99",
+        conclusion="failure",
+        head_sha="abc",
+        scenario_yaml="chaos:\n  kill: node-4",
+        results={"success": False, "error_message": "slot loss"},
+        structured_logs={"events.json": {"chaos_events": []}},
+        node_logs={"node-4.log": "ASSERTION FAILED\nstack trace here"},
+        raw_job_log="some raw log output",
+    )
+    files = _write_context_to_dir(context, tmp_path)
+    assert (tmp_path / "results.json").exists()
+    assert (tmp_path / "scenario.yaml").exists()
+    assert (tmp_path / "logs" / "events.json").exists()
+    assert (tmp_path / "logs" / "node-4.log").exists()
+    assert (tmp_path / "job-log.txt").exists()
+    assert len(files) == 5
+    # Verify content round-trips
+    assert "slot loss" in (tmp_path / "results.json").read_text()
+    assert "ASSERTION FAILED" in (tmp_path / "logs" / "node-4.log").read_text()
+
+
+def test_format_deterministic_summary() -> None:
+    from scripts.fuzzer_run_analyzer import _format_deterministic_summary
+    from scripts.models import FuzzerSignal
+
+    anomalies = [
+        FuzzerSignal(title="Crash", severity="critical", evidence="node-4: SIGABRT"),
+    ]
+    normal = ["Failover election won (node-7.log)."]
+    result = _format_deterministic_summary(anomalies, normal)
+    assert "Anomalies (1):" in result
+    assert "[critical] Crash" in result
+    assert "Normal signals (1):" in result
+    assert "Failover election won" in result
+
+
+def test_invoke_claude_code_parses_json(tmp_path: Path, monkeypatch: object) -> None:
+    import json
+
+    from scripts.fuzzer_run_analyzer import _invoke_claude_code
+    from scripts.models import FuzzerRunContext
+
+    context = FuzzerRunContext(
+        repo="valkey-io/valkey-fuzzer",
+        workflow_file="fuzzer-run.yml",
+        run_id=42,
+        run_url="https://example.com/42",
+        conclusion="failure",
+        head_sha="def456",
+    )
+    mock_response = json.dumps({
+        "overall_status": "anomalous",
+        "triage_verdict": "likely-core-valkey-bug",
+        "root_cause_category": "split-brain",
+        "summary": "Split brain detected.",
+        "anomalies": [{"title": "Split brain", "severity": "critical", "evidence": "two primaries"}],
+        "normal_signals": [],
+        "reproduction_hint": None,
+    })
+    monkeypatch.setattr(
+        "scripts.fuzzer_run_analyzer.run_claude_code",
+        lambda prompt, **kw: (mock_response, "", 0),
+    )
+    result = _invoke_claude_code(
+        system_prompt="You analyze fuzzer runs.",
+        deterministic_summary="",
+        retrieved_context="",
+        artifact_dir=tmp_path,
+        context=context,
+    )
+    assert result["overall_status"] == "anomalous"
+    assert result["triage_verdict"] == "likely-core-valkey-bug"
+    assert result["root_cause_category"] == "split-brain"
+
+
+def test_analyzer_bedrock_backend_still_works() -> None:
+    """Verify the Bedrock fallback path still works when explicitly selected."""
+    github_client = MagicMock()
+    repo = github_client.get_repo.return_value
+    run = _make_run(run_id=20, conclusion="success")
+    repo.get_workflow_run.return_value = run
+
+    artifact_client = MagicMock()
+    artifact_client.list_run_artifacts.return_value = []
+    artifact_client.download_run_log_files.return_value = {}
+    log_retriever = MagicMock()
+    log_retriever.get_job_log.return_value = ""
+
+    bedrock_client = MagicMock()
+    bedrock_client.invoke.return_value = json.dumps({
+        "overall_status": "normal",
+        "summary": "Clean run via Bedrock.",
+        "anomalies": [],
+        "normal_signals": [],
+        "reproduction_hint": None,
+    })
+
+    analyzer = FuzzerRunAnalyzer(
+        github_client,
+        bedrock_client,
+        artifact_client=artifact_client,
+        log_retriever=log_retriever,
+        prompt_backend="bedrock",
+    )
+    analysis = analyzer.analyze_workflow_run(
+        "valkey-io/valkey-fuzzer",
+        20,
+        workflow_file="fuzzer-run.yml",
+    )
+
+    assert analysis.overall_status == "normal"
+    assert "Clean run via Bedrock" in analysis.summary
+    bedrock_client.invoke.assert_called_once()
