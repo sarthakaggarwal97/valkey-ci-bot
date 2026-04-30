@@ -1294,22 +1294,45 @@ def run_pipeline(
                 pf = report.parsed_failures[0]
                 failure_id = pf.failure_identifier
 
-                # Quick root cause analysis (existing code)
-                domain_context = (
-                    valkey_context.render_failure_guidance(report)
-                    if valkey_context is not None
-                    else ""
-                )
-                root_cause_analyzer.with_domain_context(domain_context)
-                fix_generator.with_domain_context(domain_context)
+                # Root cause analysis via Claude Code CLI (fast, no custom tool-use loop)
                 try:
-                    root_cause = root_cause_analyzer.analyze(report, config.project)
+                    from scripts.claude_code import run_claude_code
+                    pf = report.parsed_failures[0]
+                    rc_prompt = (
+                        f"Analyze this CI test failure in the Valkey project.\n\n"
+                        f"Test: {pf.test_name or pf.failure_identifier}\n"
+                        f"File: {pf.file_path}\n"
+                        f"Error: {pf.error_message}\n"
+                        f"Job: {report.job_name}\n\n"
+                        f"Respond with JSON only:\n"
+                        f'{{"description": "...", "files_to_change": ["file1.c"], '
+                        f'"confidence": "high|medium|low", "rationale": "...", '
+                        f'"is_flaky": false}}'
+                    )
+                    import json as _json
+                    rc_stdout, _, rc_rc = run_claude_code(rc_prompt, timeout=120)
+                    # Try to parse JSON from the output
+                    rc_text = rc_stdout.strip()
+                    if "```" in rc_text:
+                        # Strip markdown fences
+                        import re
+                        m = re.search(r"```(?:json)?\n(.+?)\n```", rc_text, re.DOTALL)
+                        if m:
+                            rc_text = m.group(1)
+                    rc_data = _json.loads(rc_text)
+                    root_cause = RootCauseReport(
+                        description=str(rc_data.get("description", "")),
+                        files_to_change=list(rc_data.get("files_to_change", [])),
+                        confidence=str(rc_data.get("confidence", "medium")),
+                        rationale=str(rc_data.get("rationale", "")),
+                        is_flaky=bool(rc_data.get("is_flaky", False)),
+                    )
                 except Exception as exc:
                     logger.error("Root cause analysis failed for %s: %s", job.name, exc)
                     summary.add_result(job.name, failure_id, "analysis-failed")
                     continue
 
-                if not root_cause:
+                if not root_cause or not root_cause.description:
                     summary.add_result(job.name, failure_id, "analysis-failed")
                     continue
 
