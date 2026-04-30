@@ -73,12 +73,11 @@ def run_deterministic(fixtures_dir: str | Path, outputs_dir: str | Path | None =
                 stage_outputs = json.loads(output_path.read_text())
 
         results = score_fixture(fixture, stage_outputs)
-        all_results.append(results)
+        all_results.extend(results)
 
     # Aggregate
-    flat = [r for batch in all_results for r in batch]
     by_scorer: dict[str, list[ScoringResult]] = {}
-    for r in flat:
+    for r in all_results:
         by_scorer.setdefault(r.scorer, []).append(r)
 
     report: dict[str, Any] = {"total_fixtures": len(fixtures), "scorers": {}}

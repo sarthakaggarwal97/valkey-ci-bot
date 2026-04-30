@@ -188,6 +188,7 @@ def run_specialist_review(
     all_findings: list[ReviewFinding] = []
 
     for cluster in clusters:
+        reviewer: SubsystemReviewer | SecurityPolicyReviewer
         if cluster.specialist == "subsystem":
             reviewer = SubsystemReviewer()
         elif cluster.specialist == "security_policy":

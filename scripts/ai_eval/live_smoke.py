@@ -218,10 +218,10 @@ def main(argv: list[str] | None = None) -> int:
             import boto3
 
             from scripts.bedrock_client import BedrockClient
-            from scripts.config import BotConfig, ProjectContext
+            from scripts.config import BotConfig
             runtime = boto3.client("bedrock-runtime", region_name=args.region)
             cfg = BotConfig(bedrock_model_id=args.model_id)
-            bedrock = BedrockClient(runtime, cfg, ProjectContext())
+            bedrock = BedrockClient(cfg, client=runtime)
         except Exception as exc:
             print(f"Failed to init Bedrock: {exc}", file=sys.stderr)
             print("Is AWS_DEFAULT_REGION set and credentials available?", file=sys.stderr)
