@@ -1303,7 +1303,7 @@ def run_pipeline(
                 root_cause_analyzer.with_domain_context(domain_context)
                 fix_generator.with_domain_context(domain_context)
                 try:
-                    root_cause = root_cause_analyzer.analyze(report)
+                    root_cause = root_cause_analyzer.analyze(report, config.project)
                 except Exception as exc:
                     logger.error("Root cause analysis failed for %s: %s", job.name, exc)
                     summary.add_result(job.name, failure_id, "analysis-failed")
