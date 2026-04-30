@@ -8,7 +8,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-from scripts.bedrock_client import PromptClient
 from scripts.bedrock_retriever import BedrockRetriever
 from scripts.config import RetrievalConfig
 from scripts.log_retriever import LogRetriever
@@ -51,66 +50,6 @@ Return valid JSON only using this exact schema:
 }
 """
 
-_FUZZER_ANALYSIS_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "overall_status": {
-            "type": "string",
-            "enum": ["normal", "warning", "anomalous"],
-        },
-        "triage_verdict": {
-            "type": "string",
-            "enum": [
-                "likely-core-valkey-bug",
-                "possible-core-valkey-bug",
-                "expected-chaos-noise",
-                "environmental-or-infra",
-                "needs-human-triage",
-            ],
-        },
-        "root_cause_category": {
-            "anyOf": [
-                {"type": "string"},
-                {"type": "null"},
-            ],
-        },
-        "summary": {"type": "string"},
-        "anomalies": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string"},
-                    "severity": {
-                        "type": "string",
-                        "enum": ["warning", "critical"],
-                    },
-                    "evidence": {"type": "string"},
-                },
-                "required": ["title", "severity", "evidence"],
-            },
-        },
-        "normal_signals": {
-            "type": "array",
-            "items": {"type": "string"},
-        },
-        "reproduction_hint": {
-            "anyOf": [
-                {"type": "string"},
-                {"type": "null"},
-            ],
-        },
-    },
-    "required": [
-        "overall_status",
-        "triage_verdict",
-        "root_cause_category",
-        "summary",
-        "anomalies",
-        "normal_signals",
-        "reproduction_hint",
-    ],
-}
 
 
 _GITHUB_LOG_PREFIX_RE = re.compile(
@@ -291,12 +230,6 @@ def _select_bundle_artifact(artifacts: list[WorkflowArtifact]) -> WorkflowArtifa
             return artifact
     return None
 
-
-def _truncate(text: str, limit: int) -> str:
-    normalized = text.strip()
-    if len(normalized) <= limit:
-        return normalized
-    return normalized[:limit].rstrip() + "\n...[truncated]"
 
 
 def _dedupe_normal_signals(signals: list[str]) -> list[str]:
@@ -732,65 +665,6 @@ def _build_retrieval_query(context: FuzzerRunContext, anomalies: list[FuzzerSign
     return "\n".join(filter(None, lines))
 
 
-def _build_user_prompt(
-    context: FuzzerRunContext,
-    anomalies: list[FuzzerSignal],
-    normal_signals: list[str],
-    retrieved_context: str,
-) -> str:
-    parts = [
-        "## Run Metadata",
-        f"Repository: {context.repo}",
-        f"Workflow file: {context.workflow_file}",
-        f"Run URL: {context.run_url}",
-        f"Conclusion: {context.conclusion}",
-        f"Commit: {context.head_sha}",
-        f"Scenario ID: {context.scenario_id or 'unknown'}",
-        f"Seed: {context.seed or 'unknown'}",
-    ]
-
-    if anomalies:
-        parts.append("\n## Deterministic Anomalies")
-        for anomaly in anomalies[:12]:
-            parts.append(
-                f"- [{anomaly.severity}] {anomaly.title}: {anomaly.evidence}"
-            )
-    if normal_signals:
-        parts.append("\n## Deterministic Normal Signals")
-        for signal in normal_signals[:12]:
-            parts.append(f"- {signal}")
-
-    if context.results:
-        parts.append("\n## Structured Results")
-        parts.append("```json")
-        parts.append(_truncate(json.dumps(context.results, indent=2), 10_000))
-        parts.append("```")
-
-    if context.scenario_yaml:
-        parts.append("\n## Scenario DSL")
-        parts.append("```yaml")
-        parts.append(_truncate(context.scenario_yaml, 5000))
-        parts.append("```")
-
-    if context.node_logs:
-        parts.append("\n## Node Log Excerpts")
-        for name, text in list(context.node_logs.items())[:8]:
-            parts.append(f"### {name}")
-            parts.append("```text")
-            parts.append(_truncate(_strip_ansi(text), 12_000))
-            parts.append("```")
-    elif context.raw_job_log:
-        parts.append("\n## Workflow Log Excerpt")
-        parts.append("```text")
-        parts.append(_truncate(_normalize_job_log(context.raw_job_log), 20_000))
-        parts.append("```")
-
-    if retrieved_context:
-        parts.append(f"\n{retrieved_context}")
-
-    return "\n".join(parts)
-
-
 def _collapse_run_log_archive(log_files: dict[str, bytes]) -> str:
     parts: list[str] = []
     for path, payload in sorted(log_files.items()):
@@ -938,19 +812,14 @@ class FuzzerRunAnalyzer:
     def __init__(
         self,
         github_client: Any,
-        bedrock_client: PromptClient | None = None,
         *,
         github_token: str | None = None,
         artifact_client: WorkflowArtifactClient | None = None,
         log_retriever: LogRetriever | None = None,
         retriever: BedrockRetriever | None = None,
         retrieval_config: RetrievalConfig | None = None,
-        thinking_budget: int = 32_000,
-        prompt_backend: str = "claude_code",
     ) -> None:
         self._gh = github_client
-        self._bedrock = bedrock_client
-        self._prompt_backend = prompt_backend
         self._artifact_client = artifact_client or WorkflowArtifactClient(
             github_client,
             token=github_token,
@@ -961,7 +830,6 @@ class FuzzerRunAnalyzer:
         )
         self._retriever = retriever
         self._retrieval_config = retrieval_config or RetrievalConfig()
-        self._thinking_budget = thinking_budget
 
     def analyze_workflow_run(
         self,
@@ -1026,30 +894,20 @@ class FuzzerRunAnalyzer:
 
         model_payload: dict[str, Any] = {}
         try:
-            if self._prompt_backend == "claude_code":
-                import shutil
-                import tempfile
-                tmpdir = Path(tempfile.mkdtemp(prefix="fuzzer-analysis-"))
-                try:
-                    det_summary = _format_deterministic_summary(anomalies, normal_signals)
-                    model_payload = _invoke_claude_code(
-                        system_prompt=_SYSTEM_PROMPT,
-                        deterministic_summary=det_summary,
-                        retrieved_context=retrieved_context,
-                        artifact_dir=tmpdir,
-                        context=context,
-                    )
-                finally:
-                    shutil.rmtree(tmpdir, ignore_errors=True)
-            else:
-                model_payload = self._invoke_model(
-                    _build_user_prompt(
-                        context,
-                        anomalies,
-                        normal_signals,
-                        retrieved_context,
-                    ),
+            import shutil
+            import tempfile
+            tmpdir = Path(tempfile.mkdtemp(prefix="fuzzer-analysis-"))
+            try:
+                det_summary = _format_deterministic_summary(anomalies, normal_signals)
+                model_payload = _invoke_claude_code(
+                    system_prompt=_SYSTEM_PROMPT,
+                    deterministic_summary=det_summary,
+                    retrieved_context=retrieved_context,
+                    artifact_dir=tmpdir,
+                    context=context,
                 )
+            finally:
+                shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as exc:
             logger.warning("Fuzzer run analysis model call failed for run %s: %s", run_id, exc)
 
@@ -1113,39 +971,4 @@ class FuzzerRunAnalyzer:
             suggested_labels=_suggested_labels_for_triage(triage_verdict),
         )
 
-    def _invoke_model(self, user_prompt: str) -> dict[str, Any]:
-        """Invoke the model, preferring native schema output when available."""
-        invoke_with_schema = getattr(self._bedrock, "invoke_with_schema", None)
-        if (
-            callable(invoke_with_schema)
-            and type(self._bedrock).__name__ != "MagicMock"
-        ):
-            try:
-                response = invoke_with_schema(
-                    _SYSTEM_PROMPT,
-                    user_prompt,
-                    tool_name="submit_fuzzer_analysis",
-                    tool_description=(
-                        "Submit the structured fuzzer workflow-run analysis."
-                    ),
-                    json_schema=_FUZZER_ANALYSIS_SCHEMA,
-                    temperature=0.0,
-                    thinking_budget=self._thinking_budget,
-                )
-                payload = json.loads(response) if isinstance(response, str) else response
-                if isinstance(payload, dict):
-                    logger.info("Used structured tool-use output for fuzzer analysis.")
-                    return payload
-            except Exception as exc:
-                logger.info(
-                    "Structured fuzzer analysis output failed (%s); falling back to plain invoke.",
-                    exc,
-                )
 
-        response = self._bedrock.invoke(
-            _SYSTEM_PROMPT,
-            user_prompt,
-            temperature=0.0,
-            thinking_budget=self._thinking_budget,
-        )
-        return _parse_model_payload(response)

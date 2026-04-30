@@ -73,7 +73,6 @@ def test_analyzer_prefers_artifacts_and_keeps_deterministic_findings() -> None:
         ).encode("utf-8"),
         "bundle/logs/node-4.log": b"Failover election won\n",
     }
-    bedrock_client = MagicMock()
     claude_response = json.dumps(
         {
             "overall_status": "warning",
@@ -134,8 +133,6 @@ def test_analyzer_falls_back_to_job_log_when_artifacts_are_missing() -> None:
         "random-fuzzer\tUNKNOWN STEP\t2026-03-12T07:05:45.7118462Z Final Validation Details:\n"
         "random-fuzzer\tUNKNOWN STEP\t2026-03-12T07:05:45.7118655Z   Replication: PASS\n"
     )
-    bedrock_client = MagicMock()
-
     import unittest.mock
     with unittest.mock.patch(
         "scripts.fuzzer_run_analyzer.run_claude_code",
@@ -174,7 +171,6 @@ def test_analyzer_does_not_treat_serverassert_object_name_as_crash() -> None:
             b"Successful build output only\n"
         )
     }
-    bedrock_client = MagicMock()
 
     import unittest.mock
     with unittest.mock.patch(
@@ -280,41 +276,3 @@ def test_invoke_claude_code_parses_json(tmp_path: Path, monkeypatch: object) -> 
     assert result["root_cause_category"] == "split-brain"
 
 
-def test_analyzer_bedrock_backend_still_works() -> None:
-    """Verify the Bedrock fallback path still works when explicitly selected."""
-    github_client = MagicMock()
-    repo = github_client.get_repo.return_value
-    run = _make_run(run_id=20, conclusion="success")
-    repo.get_workflow_run.return_value = run
-
-    artifact_client = MagicMock()
-    artifact_client.list_run_artifacts.return_value = []
-    artifact_client.download_run_log_files.return_value = {}
-    log_retriever = MagicMock()
-    log_retriever.get_job_log.return_value = ""
-
-    bedrock_client = MagicMock()
-    bedrock_client.invoke.return_value = json.dumps({
-        "overall_status": "normal",
-        "summary": "Clean run via Bedrock.",
-        "anomalies": [],
-        "normal_signals": [],
-        "reproduction_hint": None,
-    })
-
-    analyzer = FuzzerRunAnalyzer(
-        github_client,
-        bedrock_client,
-        artifact_client=artifact_client,
-        log_retriever=log_retriever,
-        prompt_backend="bedrock",
-    )
-    analysis = analyzer.analyze_workflow_run(
-        "valkey-io/valkey-fuzzer",
-        20,
-        workflow_file="fuzzer-run.yml",
-    )
-
-    assert analysis.overall_status == "normal"
-    assert "Clean run via Bedrock" in analysis.summary
-    bedrock_client.invoke.assert_called_once()
