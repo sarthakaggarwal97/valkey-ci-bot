@@ -13,6 +13,9 @@ __all__ = [
     "ProjectContext",
     "ValidationProfile",
     "RetrievalConfig",
+    "AIStageModelConfig",
+    "AIFixesConfig",
+    "AIStagesConfig",
     "BotConfig",
     "ReviewerModels",
     "ReviewerConfig",
@@ -63,6 +66,36 @@ class RetrievalConfig:
 
 
 @dataclass
+class AIStageModelConfig:
+    """Per-stage model override. Empty string = use default bedrock.model_id."""
+
+    model: str = ""
+
+
+@dataclass
+class AIFixesConfig:
+    """Fix tournament configuration."""
+
+    candidate_count: int = 1
+    max_parallel_candidates: int = 2
+    require_passing_validation: bool = True
+    prefer_smallest_patch: bool = True
+    global_validation_concurrency: int = 3
+
+
+@dataclass
+class AIStagesConfig:
+    """Configuration for the evidence-first AI pipeline stages."""
+
+    root_cause_analyst: AIStageModelConfig = field(default_factory=AIStageModelConfig)
+    root_cause_critic: AIStageModelConfig = field(default_factory=AIStageModelConfig)
+    fix_generator: AIStageModelConfig = field(default_factory=AIStageModelConfig)
+    rubric_critic: AIStageModelConfig = field(default_factory=AIStageModelConfig)
+    fixes: AIFixesConfig = field(default_factory=AIFixesConfig)
+    min_confidence_for_fix: str = "medium"
+
+
+@dataclass
 class BotConfig:
     """Top-level agent configuration with sensible defaults."""
     bedrock_model_id: str = "us.anthropic.claude-opus-4-6-v1"
@@ -95,6 +128,7 @@ class BotConfig:
     project: ProjectContext = field(default_factory=ProjectContext)
     validation_profiles: list[ValidationProfile] = field(default_factory=list)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
+    ai_stages: AIStagesConfig = field(default_factory=AIStagesConfig)
 
     def __post_init__(self) -> None:
         """Clamp numeric fields to valid ranges."""
@@ -342,6 +376,34 @@ def _coerce_bool(value: Any, default: bool) -> bool:
     return value if isinstance(value, bool) else default
 
 
+def _merge_ai_stages(data: dict) -> AIStagesConfig:
+    """Build an AIStagesConfig from a raw dict."""
+    defaults = AIStagesConfig()
+    stages = data.get("stages", {}) if isinstance(data.get("stages"), dict) else {}
+    fixes = data.get("fixes", {}) if isinstance(data.get("fixes"), dict) else {}
+
+    def _stage_model(key: str) -> AIStageModelConfig:
+        raw = stages.get(key, {})
+        if not isinstance(raw, dict):
+            return AIStageModelConfig()
+        return AIStageModelConfig(model=_coerce_str(raw.get("model"), ""))
+
+    return AIStagesConfig(
+        root_cause_analyst=_stage_model("root_cause_analyst"),
+        root_cause_critic=_stage_model("root_cause_critic"),
+        fix_generator=_stage_model("fix_generator"),
+        rubric_critic=_stage_model("rubric_critic"),
+        fixes=AIFixesConfig(
+            candidate_count=_coerce_int(fixes.get("candidate_count"), defaults.fixes.candidate_count),
+            max_parallel_candidates=_coerce_int(fixes.get("max_parallel_candidates"), defaults.fixes.max_parallel_candidates),
+            require_passing_validation=_coerce_bool(fixes.get("require_passing_validation"), defaults.fixes.require_passing_validation),
+            prefer_smallest_patch=_coerce_bool(fixes.get("prefer_smallest_patch"), defaults.fixes.prefer_smallest_patch),
+            global_validation_concurrency=_coerce_int(fixes.get("global_validation_concurrency"), defaults.fixes.global_validation_concurrency),
+        ),
+        min_confidence_for_fix=_coerce_str(data.get("min_confidence_for_fix"), defaults.min_confidence_for_fix),
+    )
+
+
 def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
     """Build a BotConfig from pre-loaded YAML data."""
     if not isinstance(raw, dict):
@@ -466,6 +528,7 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
         project=_merge_project(raw.get("project", {})) if isinstance(raw.get("project"), dict) else defaults.project,
         validation_profiles=_merge_validation_profiles(raw.get("validation_profiles", [])) if isinstance(raw.get("validation_profiles"), list) else defaults.validation_profiles,
         retrieval=_merge_retrieval(retrieval),
+        ai_stages=_merge_ai_stages(raw.get("ai", {})) if isinstance(raw.get("ai"), dict) else AIStagesConfig(),
     )
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import enum
 from dataclasses import asdict, dataclass, field, is_dataclass
 
 __all__ = [
@@ -39,6 +40,21 @@ __all__ = [
     "review_state_to_dict",
     "review_state_from_dict",
     "fuzzer_run_analysis_to_dict",
+    "RejectionReason",
+    "LogExcerpt",
+    "InspectedFile",
+    "CommitInfo",
+    "EvidencePack",
+    "RootCauseHypothesis",
+    "RejectedHypothesis",
+    "CriticVerdict",
+    "RootCauseResult",
+    "FixCandidate",
+    "ValidatedCandidate",
+    "RejectedCandidate",
+    "TournamentResult",
+    "RubricCheck",
+    "RubricVerdict",
 ]
 
 
@@ -240,6 +256,8 @@ class FailureStoreEntry:
     queued_pr_payload: dict | None = None
     campaign_status: str | None = None
     incident_observations: list[FailureObservation] = field(default_factory=list)
+    evidence_pack: dict | None = None
+    rejection_reason: str | None = None
 
 
 @dataclass
@@ -570,3 +588,403 @@ def fuzzer_run_analysis_to_dict(analysis: FuzzerRunAnalysis) -> dict:
             "suggested_labels": list(getattr(analysis, "suggested_labels", [])),
         }
     return asdict(analysis)
+
+
+# ---------------------------------------------------------------------------
+# Evidence-First AI Pipeline stage contracts
+# ---------------------------------------------------------------------------
+
+
+class RejectionReason(enum.Enum):
+    """Why a failure was routed to needs-human-follow-up."""
+
+    THIN_EVIDENCE = "thin_evidence"
+    LOW_CONFIDENCE_ROOT_CAUSE = "low_confidence_root_cause"
+    CRITIC_REJECTED = "critic_rejected"
+    TOURNAMENT_EMPTY = "tournament_empty"
+    VALIDATION_FAILED = "validation_failed"
+    RUBRIC_FAILED = "rubric_failed"
+
+
+@dataclass
+class LogExcerpt:
+    """A log excerpt around a failure point."""
+
+    source: str  # e.g. "job-log", "test-output"
+    content: str
+    line_start: int | None = None
+    line_end: int | None = None
+
+    def validate(self) -> None:
+        if not self.content:
+            raise ValueError("LogExcerpt.content must not be empty")
+
+
+@dataclass
+class InspectedFile:
+    """A source or test file inspected during evidence gathering."""
+
+    path: str
+    reason: str  # why this file was inspected
+    excerpt: str | None = None
+
+    def validate(self) -> None:
+        if not self.path:
+            raise ValueError("InspectedFile.path must not be empty")
+
+
+@dataclass
+class CommitInfo:
+    """Recent commit context."""
+
+    sha: str
+    message: str
+    author: str
+    files_changed: list[str] = field(default_factory=list)
+
+    def validate(self) -> None:
+        if not self.sha:
+            raise ValueError("CommitInfo.sha must not be empty")
+
+
+@dataclass
+class EvidencePack:
+    """Canonical evidence object built before any AI stage runs."""
+
+    failure_id: str
+    run_id: int | None
+    job_ids: list[str]
+    workflow: str
+    parsed_failures: list[ParsedFailure]
+    log_excerpts: list[LogExcerpt]
+    source_files_inspected: list[InspectedFile]
+    test_files_inspected: list[InspectedFile]
+    valkey_guidance_used: list[str]
+    recent_commits: list[CommitInfo]
+    linked_urls: list[str]
+    unknowns: list[str]
+    built_at: str
+
+    def validate(self) -> None:
+        if not self.failure_id:
+            raise ValueError("EvidencePack.failure_id must not be empty")
+        if not self.workflow:
+            raise ValueError("EvidencePack.workflow must not be empty")
+        for le in self.log_excerpts:
+            le.validate()
+        for sf in self.source_files_inspected:
+            sf.validate()
+        for tf in self.test_files_inspected:
+            tf.validate()
+        for ci in self.recent_commits:
+            ci.validate()
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> EvidencePack:
+        parsed_failures = [
+            ParsedFailure(**pf) for pf in data.get("parsed_failures", [])
+        ]
+        log_excerpts = [
+            LogExcerpt(**le) for le in data.get("log_excerpts", [])
+        ]
+        source_files = [
+            InspectedFile(**sf) for sf in data.get("source_files_inspected", [])
+        ]
+        test_files = [
+            InspectedFile(**tf) for tf in data.get("test_files_inspected", [])
+        ]
+        commits = [
+            CommitInfo(**ci) for ci in data.get("recent_commits", [])
+        ]
+        return cls(
+            failure_id=str(data.get("failure_id", "")),
+            run_id=data.get("run_id"),
+            job_ids=list(data.get("job_ids", [])),
+            workflow=str(data.get("workflow", "")),
+            parsed_failures=parsed_failures,
+            log_excerpts=log_excerpts,
+            source_files_inspected=source_files,
+            test_files_inspected=test_files,
+            valkey_guidance_used=list(data.get("valkey_guidance_used", [])),
+            recent_commits=commits,
+            linked_urls=list(data.get("linked_urls", [])),
+            unknowns=list(data.get("unknowns", [])),
+            built_at=str(data.get("built_at", "")),
+        )
+
+
+@dataclass
+class RootCauseHypothesis:
+    """A single root-cause hypothesis with evidence references."""
+
+    summary: str
+    causal_chain: list[str]
+    evidence_refs: list[str]
+    confidence: str  # "low", "medium", "high"
+    disconfirmed_alternatives: list[str] = field(default_factory=list)
+
+    def validate(self) -> None:
+        if not self.summary:
+            raise ValueError("RootCauseHypothesis.summary must not be empty")
+        if self.confidence not in ("low", "medium", "high"):
+            raise ValueError(f"Invalid confidence: {self.confidence}")
+        if not self.causal_chain:
+            raise ValueError("RootCauseHypothesis.causal_chain must not be empty")
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> RootCauseHypothesis:
+        return cls(
+            summary=str(data.get("summary", "")),
+            causal_chain=list(data.get("causal_chain", [])),
+            evidence_refs=list(data.get("evidence_refs", [])),
+            confidence=str(data.get("confidence", "low")),
+            disconfirmed_alternatives=list(data.get("disconfirmed_alternatives", [])),
+        )
+
+
+@dataclass
+class RejectedHypothesis:
+    """A hypothesis that was rejected by the critic."""
+
+    hypothesis: RootCauseHypothesis
+    reason: str
+
+    def to_dict(self) -> dict:
+        return {"hypothesis": self.hypothesis.to_dict(), "reason": self.reason}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> RejectedHypothesis:
+        return cls(
+            hypothesis=RootCauseHypothesis.from_dict(data.get("hypothesis", {})),
+            reason=str(data.get("reason", "")),
+        )
+
+
+@dataclass
+class CriticVerdict:
+    """The critic's overall judgment."""
+
+    deterministic_checks_passed: int
+    deterministic_checks_failed: int
+    model_critic_called: bool
+    model_critic_rationale: str = ""
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> CriticVerdict:
+        return cls(
+            deterministic_checks_passed=int(data.get("deterministic_checks_passed", 0)),
+            deterministic_checks_failed=int(data.get("deterministic_checks_failed", 0)),
+            model_critic_called=bool(data.get("model_critic_called", False)),
+            model_critic_rationale=str(data.get("model_critic_rationale", "")),
+        )
+
+
+@dataclass
+class RootCauseResult:
+    """Output of the root-cause analyst + critic pipeline."""
+
+    accepted: RootCauseHypothesis | None
+    rejected: list[RejectedHypothesis]
+    critic_verdict: CriticVerdict
+    rejection_reason: RejectionReason | None = None
+
+    def validate(self) -> None:
+        if self.accepted is not None:
+            self.accepted.validate()
+
+    def to_dict(self) -> dict:
+        return {
+            "accepted": self.accepted.to_dict() if self.accepted else None,
+            "rejected": [r.to_dict() for r in self.rejected],
+            "critic_verdict": self.critic_verdict.to_dict(),
+            "rejection_reason": self.rejection_reason.value if self.rejection_reason else None,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> RootCauseResult:
+        accepted_data = data.get("accepted")
+        accepted = RootCauseHypothesis.from_dict(accepted_data) if accepted_data else None
+        rejected = [RejectedHypothesis.from_dict(r) for r in data.get("rejected", [])]
+        critic_verdict = CriticVerdict.from_dict(data.get("critic_verdict", {}))
+        rr = data.get("rejection_reason")
+        rejection_reason = RejectionReason(rr) if rr else None
+        return cls(
+            accepted=accepted,
+            rejected=rejected,
+            critic_verdict=critic_verdict,
+            rejection_reason=rejection_reason,
+        )
+
+
+@dataclass
+class FixCandidate:
+    """A single fix candidate from the tournament."""
+
+    candidate_id: str
+    prompt_variant: str  # "minimal", "root_cause_deep", "defensive_guard"
+    patch: str
+    rationale: str
+    evidence_refs: list[str] = field(default_factory=list)
+
+    def validate(self) -> None:
+        if not self.candidate_id:
+            raise ValueError("FixCandidate.candidate_id must not be empty")
+        if self.prompt_variant not in ("minimal", "root_cause_deep", "defensive_guard"):
+            raise ValueError(f"Invalid prompt_variant: {self.prompt_variant}")
+        if not self.patch:
+            raise ValueError("FixCandidate.patch must not be empty")
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> FixCandidate:
+        return cls(
+            candidate_id=str(data.get("candidate_id", "")),
+            prompt_variant=str(data.get("prompt_variant", "minimal")),
+            patch=str(data.get("patch", "")),
+            rationale=str(data.get("rationale", "")),
+            evidence_refs=list(data.get("evidence_refs", [])),
+        )
+
+
+@dataclass
+class ValidatedCandidate:
+    """A fix candidate with its validation result."""
+
+    candidate: FixCandidate
+    validation_result: ValidationResult
+
+    def to_dict(self) -> dict:
+        return {
+            "candidate": self.candidate.to_dict(),
+            "validation_result": asdict(self.validation_result),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ValidatedCandidate:
+        candidate = FixCandidate.from_dict(data.get("candidate", {}))
+        vr_data = data.get("validation_result", {})
+        validation_result = ValidationResult(
+            passed=bool(vr_data.get("passed", False)),
+            output=str(vr_data.get("output", "")),
+            strategy=str(vr_data.get("strategy", "local")),
+            passed_runs=int(vr_data.get("passed_runs", 0)),
+            attempted_runs=int(vr_data.get("attempted_runs", 0)),
+        )
+        return cls(candidate=candidate, validation_result=validation_result)
+
+
+@dataclass
+class RejectedCandidate:
+    """A fix candidate that was rejected during the tournament."""
+
+    candidate: FixCandidate
+    reason: str
+    validation_output: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "candidate": self.candidate.to_dict(),
+            "reason": self.reason,
+            "validation_output": self.validation_output,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> RejectedCandidate:
+        return cls(
+            candidate=FixCandidate.from_dict(data.get("candidate", {})),
+            reason=str(data.get("reason", "")),
+            validation_output=str(data.get("validation_output", "")),
+        )
+
+
+@dataclass
+class TournamentResult:
+    """Output of the fix tournament."""
+
+    winning: ValidatedCandidate | None
+    rejected: list[RejectedCandidate]
+    reason_if_empty: str | None = None
+
+    def validate(self) -> None:
+        if self.winning is not None:
+            self.winning.candidate.validate()
+
+    def to_dict(self) -> dict:
+        return {
+            "winning": self.winning.to_dict() if self.winning else None,
+            "rejected": [r.to_dict() for r in self.rejected],
+            "reason_if_empty": self.reason_if_empty,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> TournamentResult:
+        winning_data = data.get("winning")
+        winning = ValidatedCandidate.from_dict(winning_data) if winning_data else None
+        rejected = [RejectedCandidate.from_dict(r) for r in data.get("rejected", [])]
+        return cls(
+            winning=winning,
+            rejected=rejected,
+            reason_if_empty=data.get("reason_if_empty"),
+        )
+
+
+@dataclass
+class RubricCheck:
+    """Result of a single rubric check."""
+
+    name: str
+    kind: str  # "deterministic" or "model"
+    passed: bool
+    detail: str
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> RubricCheck:
+        return cls(
+            name=str(data.get("name", "")),
+            kind=str(data.get("kind", "deterministic")),
+            passed=bool(data.get("passed", False)),
+            detail=str(data.get("detail", "")),
+        )
+
+
+@dataclass
+class RubricVerdict:
+    """Aggregate result of all rubric checks."""
+
+    checks: list[RubricCheck]
+    overall_passed: bool
+    blocking_checks: list[str]
+
+    def validate(self) -> None:
+        if not self.checks:
+            raise ValueError("RubricVerdict.checks must not be empty")
+
+    def to_dict(self) -> dict:
+        return {
+            "checks": [c.to_dict() for c in self.checks],
+            "overall_passed": self.overall_passed,
+            "blocking_checks": self.blocking_checks,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> RubricVerdict:
+        checks = [RubricCheck.from_dict(c) for c in data.get("checks", [])]
+        return cls(
+            checks=checks,
+            overall_passed=bool(data.get("overall_passed", False)),
+            blocking_checks=list(data.get("blocking_checks", [])),
+        )
