@@ -54,6 +54,28 @@ PR Opened/Updated
   → ReviewStateStore.save()         # persist incremental state
 ```
 
+#### Specialist Review Mode
+
+When `specialist_mode: true` is set in the reviewer config, the PR Review Pipeline runs 9 specialist reviewers in parallel (via `ThreadPoolExecutor`) alongside the standard `CodeReviewer`. Each specialist makes a single Bedrock call focused on one concern:
+
+| Specialist | Focus |
+|------------|-------|
+| Test Runner | Test coverage of changed code paths |
+| Linter & Static Analysis | Compiler warnings, macro hygiene, naming |
+| Code Reviewer | Correctness bugs, logic errors, concurrency hazards |
+| Security Reviewer | Injection, auth bypass, buffer overflows, use-after-free |
+| Quality & Style | Complexity, dead code, convention violations |
+| Test Quality | Flakiness risks, assertion quality, edge cases |
+| Performance Reviewer | Hot-path allocations, algorithmic complexity, memory leaks |
+| Dependency & Deployment Safety | Breaking changes, migration safety, observability gaps |
+| Simplification & Maintainability | Unnecessary abstractions, change atomicity |
+
+Findings are deduplicated, ranked by severity, and synthesized into a verdict:
+
+- **Ready to Merge** — no critical or high-severity findings
+- **Needs Attention** — medium-severity findings only
+- **Needs Work** — critical or high-severity findings present
+
 ### Backport Pipeline
 ```
 Label Added: "backport <branch>"
@@ -91,6 +113,7 @@ Label Added: "backport <branch>"
 | `correlation_engine.py` | Cross-failure clustering before RCA |
 | `fix_generator.py` | Patch generation + build validation |
 | `failure_detector.py` | Infrastructure failure filtering |
+| `specialist_reviewer.py` | 9-specialist parallel review with verdict synthesis |
 | `review_feedback.py` | PR review accuracy tracking |
 | `fuzzer_trends.py` | Per-scenario failure rate trends |
 

@@ -286,6 +286,14 @@ Required GitHub configuration:
 - either secret: `VALKEY_GITHUB_TOKEN`
 - or variable: `VALKEY_GITHUB_APP_ID` plus secret: `VALKEY_GITHUB_APP_PRIVATE_KEY`
 
+### Specialist Review Mode
+
+When `specialist_mode: true` is set in the reviewer config, the PR Review Agent runs 9 specialist reviewers in parallel alongside the standard review pass. Each specialist focuses on one concern (test coverage, security, performance, style, etc.) and makes a single Bedrock call. Findings are deduplicated, ranked by severity, and synthesized into a verdict:
+
+- **Ready to Merge** — no critical or high-severity findings
+- **Needs Attention** — medium-severity findings only
+- **Needs Work** — critical or high-severity findings present
+
 ## Backport Agent
 
 Reusable workflow at `.github/workflows/backport.yml`.
