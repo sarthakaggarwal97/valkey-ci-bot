@@ -95,6 +95,10 @@ class BotConfig:
     project: ProjectContext = field(default_factory=ProjectContext)
     validation_profiles: list[ValidationProfile] = field(default_factory=list)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
+    # When deterministic parsers do not match a CI log, try an AI fallback
+    # that calls Bedrock to extract a structured failure. Default True; set
+    # to False to disable the fallback (and its per-run token cost).
+    ai_fallback_parser_enabled: bool = True
 
     def __post_init__(self) -> None:
         """Clamp numeric fields to valid ranges."""
@@ -466,6 +470,10 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
         project=_merge_project(raw.get("project", {})) if isinstance(raw.get("project"), dict) else defaults.project,
         validation_profiles=_merge_validation_profiles(raw.get("validation_profiles", [])) if isinstance(raw.get("validation_profiles"), list) else defaults.validation_profiles,
         retrieval=_merge_retrieval(retrieval),
+        ai_fallback_parser_enabled=_coerce_bool(
+            raw.get("ai_fallback_parser_enabled"),
+            defaults.ai_fallback_parser_enabled,
+        ),
     )
 
 

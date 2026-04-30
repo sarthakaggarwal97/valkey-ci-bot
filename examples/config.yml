@@ -93,6 +93,17 @@ fix_generation:
   max_validation_retries: 1
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# AI fallback parser
+# ---------------------------------------------------------------------------
+# When none of the deterministic log parsers (tcl, gtest, sanitizer, valgrind,
+# crash, build errors, ...) recognize a CI log, the agent can fall back to a
+# single Bedrock call to extract a structured failure. Keeps token cost
+# bounded: one call per unparseable log, ~3K-token truncated input, strict
+# JSON output schema. Disable if you don't want the per-unparseable-log cost.
+ai_fallback_parser_enabled: true
+
+# ---------------------------------------------------------------------------
 # Flaky failure campaigns
 # ---------------------------------------------------------------------------
 flaky_campaign:

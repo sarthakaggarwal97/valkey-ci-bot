@@ -6,9 +6,13 @@ import re
 
 from scripts.models import ParsedFailure
 
+# Optional ISO-8601 timestamp that GitHub Actions prepends to every log line.
+_TS_PREFIX = r"(?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\s+)?"
+
 # RDMA-specific patterns from runtest-rdma
 _RDMA_ERR_RE = re.compile(
-    r"^\[err\]:\s+(.+?)(?:\s+in\s+(\S+))?$", re.MULTILINE | re.IGNORECASE,
+    rf"^{_TS_PREFIX}\[err\]:\s+(.+?)(?:\s+in\s+(\S+))?\s*(?:\(\d+\s*ms\))?\s*$",
+    re.MULTILINE | re.IGNORECASE,
 )
 _RDMA_FAIL_RE = re.compile(
     r"(?:RDMA|rdma).*(?:failed|error|timeout|refused)", re.IGNORECASE,

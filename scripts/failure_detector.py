@@ -25,6 +25,10 @@ _INFRA_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"service\s+unavailable", re.IGNORECASE),
     re.compile(r"runner\s+provisioning\s+error", re.IGNORECASE),
     re.compile(r"no\s+space\s+left\s+on\s+device", re.IGNORECASE),
+    # GitHub job/workflow cancellation — not actionable as a code failure.
+    re.compile(r"The operation was cancelled\.?", re.IGNORECASE),
+    re.compile(r"The run was cancel(?:ed|led)", re.IGNORECASE),
+    re.compile(r"Error:\s+The operation was can?celled", re.IGNORECASE),
 ]
 
 

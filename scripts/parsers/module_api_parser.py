@@ -6,6 +6,9 @@ import re
 
 from scripts.models import ParsedFailure
 
+# Optional ISO-8601 timestamp that GitHub Actions prepends to every log line.
+_TS_PREFIX = r"(?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\s+)?"
+
 # Module load/unload failures
 _MODULE_LOAD_RE = re.compile(
     r"(?:Error|Failed)\s+(?:loading|unloading)\s+(?:module|shared object)\s*[:\s]+(\S+)",
@@ -19,7 +22,9 @@ _MODULE_ASSERT_RE = re.compile(
 )
 # Module test [err] patterns (Tcl-based but module-specific paths)
 _MODULE_ERR_RE = re.compile(
-    r"^\[err\]:\s+(.+?)(?:\s+in\s+(tests/(?:modules|unit/moduleapi)/\S+\.tcl))?$",
+    rf"^{_TS_PREFIX}\[err\]:\s+(.+?)"
+    rf"(?:\s+in\s+(tests/(?:modules|unit/moduleapi)/\S+\.tcl))?"
+    rf"\s*(?:\(\d+\s*ms\))?\s*$",
     re.MULTILINE | re.IGNORECASE,
 )
 # Module crash: "Module ... caused a crash"

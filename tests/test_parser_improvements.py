@@ -199,3 +199,171 @@ def test_workflow_condition_only_partial_eval_allows_through():
         "2026-03-24T00:42:33Z Process completed with exit code 2\n"
     )
     assert _is_workflow_condition_only(log) is False
+
+
+# -----------------------------------------------------------------------------
+# TCL-family parsers: timestamp support
+# -----------------------------------------------------------------------------
+
+
+def test_sentinel_cluster_parser_timestamped_err():
+    from scripts.parsers.sentinel_cluster_parser import SentinelClusterParser
+    log = (
+        "2026-03-24T05:30:40.1194677Z [err]: Failover target rejects sync request "
+        "in tests/sentinel/failover.tcl\n"
+    )
+    parser = SentinelClusterParser()
+    assert parser.can_parse(log)
+    results = parser.parse(log)
+    assert len(results) == 1
+    assert results[0].test_name == "Failover target rejects sync request"
+    assert results[0].file_path == "tests/sentinel/failover.tcl"
+    assert results[0].parser_type == "sentinel"
+
+
+def test_sentinel_cluster_parser_timestamped_cluster_err():
+    from scripts.parsers.sentinel_cluster_parser import SentinelClusterParser
+    log = (
+        "2026-03-24T05:30:40.12Z [err]: Slot migration cannot resume "
+        "in tests/cluster/migration.tcl\n"
+    )
+    parser = SentinelClusterParser()
+    results = parser.parse(log)
+    assert len(results) == 1
+    assert results[0].parser_type == "cluster"
+
+
+def test_sentinel_cluster_parser_plain_err_still_works():
+    """Untimestamped logs should keep working."""
+    from scripts.parsers.sentinel_cluster_parser import SentinelClusterParser
+    log = "[err]: Cluster split brain in tests/unit/cluster/basic.tcl\n"
+    parser = SentinelClusterParser()
+    assert parser.can_parse(log)
+    assert len(parser.parse(log)) == 1
+
+
+def test_module_api_parser_timestamped_err():
+    from scripts.parsers.module_api_parser import ModuleApiParser
+    log = (
+        "2026-03-24T05:30:40.12Z [err]: Module command foo fails "
+        "in tests/modules/test.tcl\n"
+    )
+    parser = ModuleApiParser()
+    assert parser.can_parse(log)
+    results = parser.parse(log)
+    assert any(r.parser_type == "module" for r in results)
+    assert any(r.file_path == "tests/modules/test.tcl" for r in results)
+
+
+def test_rdma_parser_timestamped_err():
+    from scripts.parsers.rdma_parser import RdmaParser
+    log = (
+        "rdma some context text to pass can_parse guard\n"
+        "2026-03-24T05:30:40.12Z [err]: RDMA connection timeout "
+        "in tests/integration/rdma-test.tcl\n"
+    )
+    parser = RdmaParser()
+    assert parser.can_parse(log)
+    results = parser.parse(log)
+    assert len(results) >= 1
+    assert any(r.parser_type == "rdma" for r in results)
+
+
+# -----------------------------------------------------------------------------
+# ValkeyCrashParser
+# -----------------------------------------------------------------------------
+
+
+def test_crash_parser_signal_11_segfault():
+    from scripts.parsers.valkey_crash_parser import ValkeyCrashParser
+    log = (
+        "2026-03-24T05:30:40.12Z 24782:M 24 Mar 2026 05:30:40.101 # "
+        "Valkey 8.2.0 crashed by signal: 11, si_code: 1\n"
+        "2026-03-24T05:30:40.12Z ------ STACK TRACE ------\n"
+        "/usr/local/bin/valkey-server(hashTypeResize+0x1a) [0x5555556a1234]\n"
+        "/usr/local/bin/valkey-server(beforeSleep+0x2e) [0x5555556a5678]\n"
+    )
+    parser = ValkeyCrashParser()
+    assert parser.can_parse(log)
+    results = parser.parse(log)
+    assert len(results) == 1
+    assert results[0].parser_type == "crash"
+    assert "SIGSEGV" in results[0].error_message
+    assert "8.2.0" in results[0].error_message
+    assert results[0].stack_trace is not None
+    assert "valkey-server" in results[0].stack_trace
+
+
+def test_crash_parser_signal_6_abort():
+    from scripts.parsers.valkey_crash_parser import ValkeyCrashParser
+    log = "Valkey 8.1.0 crashed by signal: 6, si_code: 2\n"
+    parser = ValkeyCrashParser()
+    results = parser.parse(log)
+    assert len(results) == 1
+    assert "SIGABRT" in results[0].error_message
+
+
+def test_crash_parser_redis_legacy_name_still_works():
+    """Pre-Valkey branches still call themselves 'Redis'."""
+    from scripts.parsers.valkey_crash_parser import ValkeyCrashParser
+    log = "Redis 7.2.5 crashed by signal: 11, si_code: 1\n"
+    parser = ValkeyCrashParser()
+    assert parser.can_parse(log)
+    assert len(parser.parse(log)) == 1
+
+
+def test_crash_parser_assertion_banner():
+    from scripts.parsers.valkey_crash_parser import ValkeyCrashParser
+    log = (
+        "=== ASSERTION FAILED ===\n"
+        "==> /home/runner/work/valkey/src/t_hash.c:842 'h != NULL' is not true\n"
+        "/usr/local/bin/valkey-server(hashTypeSet+0x5a) [0x5555556a9999]\n"
+    )
+    parser = ValkeyCrashParser()
+    assert parser.can_parse(log)
+    results = parser.parse(log)
+    assert len(results) == 1
+    assert results[0].parser_type == "crash"
+    assert results[0].line_number == 842
+    assert "t_hash.c" in results[0].file_path
+    assert "h != NULL" in (results[0].assertion_details or "")
+
+
+def test_crash_parser_ignores_unrelated_logs():
+    from scripts.parsers.valkey_crash_parser import ValkeyCrashParser
+    log = "2026-03-24T00:42:18Z [ok]: test (10 ms)\n"
+    parser = ValkeyCrashParser()
+    assert not parser.can_parse(log)
+    assert parser.parse(log) == []
+
+
+def test_crash_parser_deduplicates_same_signal_reported_twice():
+    from scripts.parsers.valkey_crash_parser import ValkeyCrashParser
+    log = (
+        "Valkey 8.2.0 crashed by signal: 11, si_code: 1\n"
+        "Valkey 8.2.0 crashed by signal: 11, si_code: 1\n"
+    )
+    parser = ValkeyCrashParser()
+    assert len(parser.parse(log)) == 1
+
+
+# -----------------------------------------------------------------------------
+# Infra cancellation detection
+# -----------------------------------------------------------------------------
+
+
+def test_failure_detector_flags_job_cancellation_as_infra():
+    from scripts.failure_detector import FailureDetector
+    assert FailureDetector.is_infrastructure_failure("The operation was cancelled.")
+    assert FailureDetector.is_infrastructure_failure(
+        "Error: The operation was cancelled."
+    )
+    assert FailureDetector.is_infrastructure_failure("The run was canceled by user.")
+
+
+def test_failure_detector_does_not_flag_real_error_as_infra():
+    from scripts.failure_detector import FailureDetector
+    assert not FailureDetector.is_infrastructure_failure(
+        "assertion failed: foo != bar"
+    )
+    assert not FailureDetector.is_infrastructure_failure("[err]: real failure")

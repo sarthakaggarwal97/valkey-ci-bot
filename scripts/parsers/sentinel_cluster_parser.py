@@ -6,16 +6,21 @@ import re
 
 from scripts.models import ParsedFailure
 
+# Optional ISO-8601 timestamp that GitHub Actions prepends to every log line.
+_TS_PREFIX = r"(?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\s+)?"
+
 # Sentinel/cluster tests use the same Tcl [err] pattern but may also have:
 # Caught [err]: ... in tests/sentinel/foo.tcl
 # or cluster-specific patterns
 _SENTINEL_ERR_RE = re.compile(
-    r"^\[err\]:\s+(.+?)(?:\s+in\s+(tests/(?:sentinel|cluster|integration)/\S+\.tcl))?$",
+    rf"^{_TS_PREFIX}\[err\]:\s+(.+?)"
+    rf"(?:\s+in\s+(tests/(?:sentinel|cluster|integration)/\S+\.tcl))?"
+    rf"\s*(?:\(\d+\s*ms\))?\s*$",
     re.MULTILINE | re.IGNORECASE,
 )
 # Cluster test specific: "FAIL: <test description>"
 _CLUSTER_FAIL_RE = re.compile(
-    r"^FAIL:\s+(.+?)(?:\s+in\s+(\S+\.tcl))?$", re.MULTILINE
+    rf"^{_TS_PREFIX}FAIL:\s+(.+?)(?:\s+in\s+(\S+\.tcl))?\s*$", re.MULTILINE
 )
 
 

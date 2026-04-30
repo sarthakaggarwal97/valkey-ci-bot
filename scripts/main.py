@@ -46,6 +46,7 @@ from scripts.parsers.sanitizer_parser import SanitizerParser
 from scripts.parsers.sentinel_cluster_parser import SentinelClusterParser
 from scripts.parsers.tcl_parser import TclTestParser
 from scripts.parsers.valgrind_parser import ValgrindParser
+from scripts.parsers.valkey_crash_parser import ValkeyCrashParser
 from scripts.pr_manager import PRManager
 from scripts.publish_guard import check_publish_allowed
 from scripts.rate_limiter import RateLimiter
@@ -67,6 +68,7 @@ def _build_parser_router() -> LogParserRouter:
     Lower priority = tried first. All matching parsers contribute results.
     """
     router = LogParserRouter()
+    router.register(ValkeyCrashParser(), priority=5)
     router.register(SanitizerParser(), priority=10)
     router.register(ValgrindParser(), priority=20)
     router.register(BuildErrorParser(), priority=30)
@@ -1046,6 +1048,14 @@ def run_pipeline(
     if aws_region:
         bedrock_kwargs["client"] = boto3.client("bedrock-runtime", region_name=aws_region)
     bedrock_client = BedrockClient(config, rate_limiter=rate_limiter, **bedrock_kwargs)
+
+    # Wire the AI fallback parser: invoked only when deterministic parsers
+    # fail to extract any structured failure. Default enabled; operators
+    # can disable via config.ai_fallback_parser_enabled=false.
+    if getattr(config, "ai_fallback_parser_enabled", True):
+        from scripts.parsers.ai_fallback_parser import AIFallbackParser
+        parser_router.set_fallback(AIFallbackParser(bedrock_client))
+
     retriever = None
     retrieval_enabled = config.retrieval.enabled and any([
         config.retrieval.code_knowledge_base_id,

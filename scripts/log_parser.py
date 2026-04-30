@@ -69,7 +69,14 @@ class LogParser(Protocol):
 
 _CONDITION_EVAL_RE = re.compile(
     r"^Evaluating\s*(?::|[\w.-]+\.if)"
-    r"|^\(success\(\)",
+    r"|^Expanded\s*:"
+    r"|^\(success\(\)"
+    r"|^Result\s*:\s*(?:true|false)"
+    r"|^Requested labels\s*:"
+    r"|^Job defined at\s*:"
+    r"|^Waiting for a runner to pick up"
+    r"|^Job is (?:about to start running|waiting for a hosted runner)"
+    r"|^\s*(?:true|false)\s*&&",
 )
 _TS_LINE_PREFIX_RE = re.compile(
     r"(?m)^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\s*",
@@ -77,12 +84,16 @@ _TS_LINE_PREFIX_RE = re.compile(
 
 
 def is_workflow_condition_only(log_content: str) -> bool:
-    """Return True when the log is only GitHub Actions workflow-condition evaluation.
+    """Return True when the log is only GitHub Actions workflow/lifecycle metadata.
 
-    When a job's steps are all skipped via an ``if:`` condition, the log
-    contains only the condition-evaluation text ("Evaluating: ...",
-    "Evaluating <job>.if" etc.) without any real failure output. Such logs
-    are not actionable failures and should be filtered upstream of parsing.
+    When a job's steps are all skipped via an ``if:`` condition, or the job
+    failed before it could actually run, the log contains only GitHub's job
+    startup / condition-evaluation output — lines like ``Evaluating: ...``,
+    ``Expanded: ...``, ``Result: true``, ``Requested labels: ...``, ``Job
+    defined at: ...``, ``Waiting for a runner to pick up this job...``.
+
+    These are not actionable code failures and should be filtered upstream
+    of parsing.
     """
     if not log_content:
         return True
@@ -91,15 +102,21 @@ def is_workflow_condition_only(log_content: str) -> bool:
     if not lines:
         return True
     matched = sum(1 for ln in lines if _CONDITION_EVAL_RE.search(ln))
-    # Treat as noise if ≥80% of non-empty lines are evaluation text.
+    # Treat as noise if ≥80% of non-empty lines are GitHub lifecycle text.
     return matched >= max(1, int(len(lines) * 0.8))
 
 
 class LogParserRouter:
-    """Tries registered parsers by priority; merges results from all matching parsers."""
+    """Tries registered parsers by priority; merges results from all matching parsers.
+
+    An optional ``fallback_parser`` is invoked only when no deterministic
+    parser matched. Use this for expensive (LLM-backed) extraction that
+    should not run on every log.
+    """
 
     def __init__(self, parsers: list[LogParser] | None = None) -> None:
         self._parsers: list[tuple[int, LogParser]] = []
+        self._fallback_parser: LogParser | None = None
         if parsers:
             for p in parsers:
                 self._parsers.append((100, p))
@@ -111,6 +128,12 @@ class LogParserRouter:
         """
         self._parsers.append((priority, parser))
         self._parsers.sort(key=lambda t: t[0])
+
+    def set_fallback(self, parser: LogParser | None) -> None:
+        """Install a fallback parser invoked only when all deterministic
+        parsers miss. Pass ``None`` to remove the fallback.
+        """
+        self._fallback_parser = parser
 
     def parse(
         self,
@@ -149,7 +172,29 @@ class LogParserRouter:
             )
             return all_failures, None, False
 
-        # No parser matched — return raw excerpt
+        # No deterministic parser matched — try the AI fallback if configured.
+        if self._fallback_parser is not None:
+            try:
+                if self._fallback_parser.can_parse(log_content):
+                    failures = self._fallback_parser.parse(log_content)
+                    for f in failures:
+                        if f.failure_identifier not in seen_ids:
+                            seen_ids.add(f.failure_identifier)
+                            all_failures.append(f)
+                    if all_failures:
+                        logger.info(
+                            "Parsing complete: AI fallback matched, %d failure(s) extracted.",
+                            len(all_failures),
+                        )
+                        return all_failures, None, False
+            except Exception as exc:
+                logger.warning(
+                    "Fallback parser %s raised: %s",
+                    type(self._fallback_parser).__name__,
+                    exc,
+                )
+
+        # No parser matched (including fallback) — return raw excerpt
         limit = raw_excerpt_lines if raw_excerpt_lines is not None else RAW_EXCERPT_LINES
         lines = log_content.splitlines()
 
