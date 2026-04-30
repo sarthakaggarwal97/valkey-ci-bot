@@ -969,6 +969,8 @@ class FuzzerRunAnalyzer:
                 shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as exc:
             logger.warning("Fuzzer run analysis model call failed for run %s: %s", run_id, exc)
+            import traceback
+            traceback.print_exc()
 
         merged_anomalies = _dedupe_signals(
             anomalies + _signals_from_payload(model_payload.get("anomalies"))
