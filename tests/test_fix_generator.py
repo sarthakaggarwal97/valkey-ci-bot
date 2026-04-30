@@ -224,6 +224,35 @@ class TestPatchValidation:
         assert success is True
         assert error_output == ""
 
+    def test_generation_preserves_required_patch_trailing_newline(self):
+        original = "void handle_request(Request *req) {\n    process(req->data);\n}\n"
+        patched = (
+            "void handle_request(Request *req) {\n"
+            "    if (req == NULL) return;\n"
+            "    process(req->data);\n"
+            "}\n"
+        )
+        diff_without_final_newline = "\n".join(
+            difflib.unified_diff(
+                original.splitlines(),
+                patched.splitlines(),
+                fromfile="a/src/server.c",
+                tofile="b/src/server.c",
+                lineterm="",
+            )
+        )
+
+        gen, _ = _make_generator(
+            bedrock_return=diff_without_final_newline,
+            config=BotConfig(max_retries_fix=0),
+        )
+        rc = _make_root_cause(files_to_change=["src/server.c"])
+
+        result = gen.generate(rc, {"src/server.c": original})
+
+        assert result is not None
+        assert result.endswith("\n")
+
     def test_returns_diff_on_clean_apply(self):
         gen, _ = _make_generator()
         rc = _make_root_cause()
@@ -367,6 +396,44 @@ class TestAgenticGeneration:
             )
 
         assert result is None
+
+    def test_agentic_generation_validates_against_tool_fetched_files(self):
+        original = "void handle_request(Request *req) {\n    process(req->data);\n}\n"
+        patched = (
+            "void handle_request(Request *req) {\n"
+            "    if (req == NULL) return;\n"
+            "    process(req->data);\n"
+            "}\n"
+        )
+        diff = "\n".join(
+            difflib.unified_diff(
+                original.splitlines(),
+                patched.splitlines(),
+                fromfile="a/src/server.c",
+                tofile="b/src/server.c",
+                lineterm="",
+            )
+        ) + "\n"
+
+        mock_bedrock = MagicMock()
+        mock_bedrock.converse_with_tools.return_value = json.dumps({
+            "diff": diff,
+        })
+        handler = MagicMock()
+        handler.fetched_file_texts.return_value = {"src/server.c": original}
+        gen = FixGenerator(
+            mock_bedrock,
+            BotConfig(),
+            github_client=MagicMock(),
+            repo_full_name="owner/repo",
+        )
+        rc = _make_root_cause(files_to_change=["src/server.c"])
+
+        with patch("scripts.code_reviewer.ReviewToolHandler", return_value=handler):
+            result = gen._generate_agentic(rc, {}, repo_ref="abc123")
+
+        assert result == diff
+        handler.fetched_file_texts.assert_called()
 
 
 # ---------------------------------------------------------------------------

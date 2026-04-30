@@ -1414,6 +1414,17 @@ class ReviewToolHandler:
         """Return changed files explicitly fetched during tool use."""
         return sorted(self._file_inspected_paths)
 
+    def fetched_file_texts(self) -> dict[str, str]:
+        """Return HEAD file contents fetched during tool use."""
+        fetched: dict[str, str] = {}
+        for path in self._file_inspected_paths:
+            cached = self._cache.get(f"head:{path}")
+            if isinstance(cached, str) and not cached.startswith(
+                f"{path} is a directory. Contents:\n"
+            ):
+                fetched[path] = cached
+        return fetched
+
     def remaining_required_paths(self) -> list[str]:
         """Return required changed files that still need explicit inspection."""
         return [

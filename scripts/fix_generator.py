@@ -83,6 +83,14 @@ _DIFF_FILE_RE = re.compile(r"^(?:---|\+\+\+) [ab]/(.+)$", re.MULTILINE)
 from scripts.text_utils import strip_markdown_fences as _strip_markdown_fences
 
 
+def _clean_generated_diff(diff: str) -> str:
+    """Strip wrapper text while preserving patch parser requirements."""
+    cleaned = _strip_markdown_fences(diff)
+    if cleaned and not cleaned.endswith("\n"):
+        cleaned += "\n"
+    return cleaned
+
+
 def _count_patch_files(diff: str) -> set[str]:
     """Extract the set of files modified in a unified diff."""
     files = set(_DIFF_FILE_RE.findall(diff))
@@ -115,7 +123,7 @@ def _validate_generated_patch(
     build_commands: list[str] | None = None,
 ) -> tuple[bool, str, set[str]]:
     """Validate a generated patch before the model leaves the loop."""
-    cleaned = _strip_markdown_fences(diff)
+    cleaned = _clean_generated_diff(diff)
     if not cleaned:
         return False, "Empty diff returned.", set()
 
@@ -427,7 +435,7 @@ class FixGenerator:
                 return None
 
             # Parse diff from response
-            diff = _strip_markdown_fences(raw_response)
+            diff = _clean_generated_diff(raw_response)
             if not diff:
                 logger.warning(
                     "Empty diff from Bedrock (attempt %d/%d).",
@@ -529,7 +537,8 @@ class FixGenerator:
         user_prompt += (
             "\n\nYou have tools to fetch additional files from the repository "
             "if you need more context to generate the fix. Use get_file to "
-            "read source files, headers, tests, or configs. Use search_code "
+            "read source files, headers, tests, or configs. Before modifying "
+            "a file, fetch its current contents with get_file. Use search_code "
             "to find function definitions, callers, or usages. When ready, "
             "call submit_fix with the unified diff."
         )
@@ -541,17 +550,26 @@ class FixGenerator:
             max_fetches=8,
         )
 
+        def _validation_source_files() -> dict[str, str]:
+            fetched = getattr(tool_handler, "fetched_file_texts", None)
+            if not callable(fetched):
+                return source_files
+            fetched_files = fetched()
+            if not isinstance(fetched_files, dict):
+                return source_files
+            return {**source_files, **fetched_files}
+
         def _validate_submit_fix(tool_name: str, tool_input: dict) -> tuple[bool, str]:
             if tool_name != "submit_fix":
                 return True, "Tool accepted."
             if not isinstance(tool_input, dict):
                 return False, "submit_fix input must be a JSON object."
-            diff = _strip_markdown_fences(str(tool_input.get("diff", "")))
+            diff = _clean_generated_diff(str(tool_input.get("diff", "")))
             tool_input["diff"] = diff
             success, error_output, modified_files = _validate_generated_patch(
                 diff,
                 root_cause,
-                source_files,
+                _validation_source_files(),
                 self._config,
             )
             if success:
@@ -596,7 +614,7 @@ class FixGenerator:
             payload = {}
 
         diff = payload.get("diff", "") if isinstance(payload, dict) else str(payload)
-        diff = _strip_markdown_fences(diff)
+        diff = _clean_generated_diff(diff)
 
         if not diff:
             return None
@@ -604,7 +622,7 @@ class FixGenerator:
         success, error_output, modified_files = _validate_generated_patch(
             diff,
             root_cause,
-            source_files,
+            _validation_source_files(),
             self._config,
         )
         if success:

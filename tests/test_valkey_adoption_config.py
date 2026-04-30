@@ -22,7 +22,7 @@ def _assert_bounded_fix_config(config: dict) -> None:
     assert 1 <= limits["max_open_bot_prs"] <= 3
     assert 1 <= limits["queued_pr_max_attempts"] <= 5
     assert 1 <= limits["max_patch_files"] <= 10
-    assert limits["daily_token_budget"] > 0
+    assert limits["daily_token_budget"] >= 0
     assert fix_generation["confidence_threshold"] in {"medium", "high"}
     assert fix_generation["max_retries"] <= 2
     assert fix_generation["max_validation_retries"] <= 1

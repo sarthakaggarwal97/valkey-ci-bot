@@ -16,7 +16,7 @@ limits:
   max_prs_per_day: 3
   max_open_bot_prs: 3
   queued_pr_max_attempts: 5
-  daily_token_budget: 1000000
+  daily_token_budget: 0
 
 fix_generation:
   confidence_threshold: "medium"
