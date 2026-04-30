@@ -24,6 +24,7 @@ dev = [
     "mypy>=1.5.0",
     "pytest-mock>=3.11.0",
     "pytest-cov>=4.1.0",
+    "ruff>=0.4.0",
 ]
 
 [tool.mypy]
@@ -41,3 +42,27 @@ testpaths = ["tests"]
 [tool.ruff]
 target-version = "py39"
 line-length = 120
+
+[tool.ruff.lint]
+# Start conservative: just catch obvious bugs (E, F, W) + import ordering (I).
+# Style enforcement (`ruff format`) is deferred — see AGENTS.md.
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501",   # line-length handled by --line-length, not a hard error
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "F401",  # test fixtures often reuse imports
+    "F811",  # test fixtures often rebind names
+    "E402",  # test files frequently set up sys.path before imports
+    "F841",  # test bindings sometimes kept for documentation
+    "E741",  # ambiguous names in tests
+]
+# Scripts with deliberate late imports to avoid circular deps / lazy loading.
+"scripts/code_reviewer.py" = ["E402"]
+"scripts/conflict_resolver.py" = ["E402"]
+"scripts/fix_generator.py" = ["E402"]
+"scripts/fuzzer_run_analyzer.py" = ["E402"]
+# Unused local variable in unrelated code — acceptable for now.
+"scripts/backport_main.py" = ["F841"]
