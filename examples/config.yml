@@ -162,27 +162,6 @@ project:
       source_path: "src/{name}.c"
 
 # ---------------------------------------------------------------------------
-# AI pipeline stages
-# ---------------------------------------------------------------------------
-ai:
-  stages:
-    root_cause_analyst:
-      model: ""  # empty = use bedrock.model_id
-    root_cause_critic:
-      model: ""
-    fix_generator:
-      model: ""
-    rubric_critic:
-      model: ""
-  fixes:
-    candidate_count: 1
-    max_parallel_candidates: 2
-    require_passing_validation: true
-    prefer_smallest_patch: true
-    global_validation_concurrency: 3
-  min_confidence_for_fix: "medium"
-
-# ---------------------------------------------------------------------------
 # Validation profiles
 # ---------------------------------------------------------------------------
 # Each profile maps a CI job (by name pattern and/or matrix parameters) to
