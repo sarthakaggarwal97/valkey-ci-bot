@@ -1,8 +1,8 @@
 """Tests for scripts/publish_guard.py — the upstream-only kill-switch.
 
-The guard has a single job: block writes to valkey-io/valkey and
-valkey-io/valkey-fuzzer unless VALKEY_CI_AGENT_ALLOW_VALKEY_IO_PUBLISH=1.
-Writes to any other repo (including forks) pass through unconditionally.
+The guard has a single job: block writes to valkey-io/valkey unless
+VALKEY_CI_AGENT_ALLOW_VALKEY_IO_PUBLISH=1. Writes to any other repo
+(including forks and valkey-io/valkey-fuzzer) pass through unconditionally.
 """
 
 from __future__ import annotations
@@ -45,9 +45,9 @@ def test_upstream_valkey_write_blocked_by_default(clean_env):
         check_publish_allowed("valkey-io/valkey", action="create_pull")
 
 
-def test_upstream_fuzzer_write_blocked_by_default(clean_env):
-    with pytest.raises(PublishBlocked, match="ALLOW_VALKEY_IO_PUBLISH"):
-        check_publish_allowed("valkey-io/valkey-fuzzer", action="create_issue")
+def test_upstream_fuzzer_write_allowed_by_default(clean_env):
+    """Fuzzer upstream is intentionally allowed without opt-in."""
+    check_publish_allowed("valkey-io/valkey-fuzzer", action="create_issue")
 
 
 # --- Opt-in unblocks upstream ---

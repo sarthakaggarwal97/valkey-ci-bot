@@ -1,11 +1,11 @@
 """Hard block on writes to upstream valkey-io repositories.
 
 The only thing this module protects against is accidentally writing to
-``valkey-io/valkey`` or ``valkey-io/valkey-fuzzer``. Fork publishing is
-allowed without any environment setup — the ``VALKEY_FORK_REPO`` workflow
-variable already controls which repo receives writes.
+``valkey-io/valkey``. Fork publishing is allowed without any environment
+setup, and ``valkey-io/valkey-fuzzer`` is also allowed (the fuzzer monitor
+is meant to publish issues upstream by design).
 
-Writing to an upstream repo requires an explicit opt-in:
+Writing to ``valkey-io/valkey`` requires an explicit opt-in:
 
     export VALKEY_CI_AGENT_ALLOW_VALKEY_IO_PUBLISH=1
 
@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 _TRUTHY = {"1", "true", "yes", "on"}
 _UPSTREAM_REPOS = {
     "valkey-io/valkey",
-    "valkey-io/valkey-fuzzer",
 }
 
 
