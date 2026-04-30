@@ -34,6 +34,8 @@ def fix_from_log(
     target_branch: str,
     run_url: str,
     gh: Github,
+    job_id: int = 0,
+    repo_full_name: str = "",
 ) -> dict[str, Any]:
     """One-shot: analyze the raw CI log + fix the code.
 
@@ -45,6 +47,16 @@ def fix_from_log(
     Returns dict with outcome, issue_url, pr_url, etc.
     """
     result: dict[str, Any] = {"job_name": job_name, "outcome": "error"}
+
+    # Fetch the actual job log if we don't have it
+    if not log_excerpt and job_id and repo_full_name:
+        try:
+            from scripts.log_retriever import LogRetriever
+            retriever = LogRetriever(gh)
+            log_excerpt = retriever.get_job_log(repo_full_name, job_id)
+            logger.info("Fetched %d chars of log for job %s.", len(log_excerpt), job_name)
+        except Exception as exc:
+            logger.warning("Could not fetch log for job %s: %s", job_name, exc)
 
     # Build a useful failure summary from parsed failures (if any)
     failure_summary = ""

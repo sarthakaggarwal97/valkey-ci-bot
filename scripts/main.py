@@ -1299,6 +1299,8 @@ def run_pipeline(
                         target_branch=report.target_branch or "unstable",
                         run_url=run_url,
                         gh=gh,
+                        job_id=job.id,
+                        repo_full_name=report.repo_full_name or repo_name,
                     )
                     summary.add_result(
                         job.name, failure_id, result.get("outcome", "error"),
