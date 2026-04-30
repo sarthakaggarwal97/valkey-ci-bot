@@ -168,6 +168,9 @@ jobs:
           TARGET_TOKEN: ${{ steps.target-token.outputs.token }}
           STATE_TOKEN: ${{ github.token }}
           STATE_REPO: ${{ github.repository }}
+          # Fork token for the issue-first pipeline. Falls back to
+          # VALKEY_FORK_GITHUB_TOKEN, then VALKEY_GITHUB_TOKEN.
+          FORK_TOKEN: ${{ secrets.VALKEY_FORK_GITHUB_TOKEN || secrets.VALKEY_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           args=(
