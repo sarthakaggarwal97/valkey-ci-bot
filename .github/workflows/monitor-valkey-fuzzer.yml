@@ -139,9 +139,7 @@ jobs:
             args+=(--verbose)
           fi
 
-          python "${args[@]}" 2> >(tee fuzzer-monitor-stderr.log >&2) | tee fuzzer-monitor-result.json
-          echo "--- stderr ---"
-          cat fuzzer-monitor-stderr.log || true
+          python "${args[@]}" | tee fuzzer-monitor-result.json
 
       - name: Upload fuzzer analysis result
         if: always()

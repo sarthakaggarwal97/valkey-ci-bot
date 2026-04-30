@@ -819,18 +819,26 @@ def _invoke_claude_code(
         "Claude Code returned for run %s (rc=%d, %d chars).",
         context.run_id, rc, len(stdout),
     )
-    print(f"[FUZZER] Claude returned rc={rc}, stdout={len(stdout)} chars, stderr={len(stderr)} chars", flush=True)
+    # Claude Code with --output-format stream-json returns JSONL.
+    # Extract the final result text from the stream.
+    result_text = ""
+    for line in stdout.strip().splitlines():
+        try:
+            event = json.loads(line)
+            if event.get("type") == "result" and "text" in event:
+                result_text = event["text"]
+        except (json.JSONDecodeError, TypeError):
+            continue
+    if not result_text:
+        logger.warning("No result text found in Claude Code output for run %s", context.run_id)
+        return {}
     try:
-        return _parse_model_payload(stdout)
+        return _parse_model_payload(result_text)
     except Exception as exc:
         logger.warning(
-            "Failed to parse Claude Code output for run %s: %s\nOutput: %s",
-            context.run_id, exc, stdout[:500],
+            "Failed to parse Claude Code result for run %s: %s\nText: %s",
+            context.run_id, exc, result_text[:500],
         )
-        print(f"[FUZZER] Parse failed for run {context.run_id}: {exc}", flush=True)
-        print(f"[FUZZER] Claude stdout ({len(stdout)} chars): {stdout[:500]}", flush=True)
-        print(f"[FUZZER] Claude stderr ({len(stderr)} chars): {stderr[:500]}", flush=True)
-        print(f"[FUZZER] Claude rc: {rc}", flush=True)
         return {}
 
 class FuzzerRunAnalyzer:
@@ -924,7 +932,6 @@ class FuzzerRunAnalyzer:
             import shutil
             import subprocess
             import tempfile
-            print(f"[FUZZER] Starting model call for run {run_id}", flush=True)
             tmpdir = Path(tempfile.mkdtemp(prefix="fuzzer-analysis-"))
             try:
                 # Clone the Valkey source at the exact commit the fuzzer ran against
@@ -975,8 +982,6 @@ class FuzzerRunAnalyzer:
                 shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as exc:
             logger.warning("Fuzzer run analysis model call failed for run %s: %s", run_id, exc)
-            import traceback
-            traceback.print_exc()
 
         merged_anomalies = _dedupe_signals(
             anomalies + _signals_from_payload(model_payload.get("anomalies"))
