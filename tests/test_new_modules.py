@@ -183,21 +183,32 @@ class TestValgrindParser:
 class TestRdmaParser:
 
     def test_can_parse_rdma_err(self) -> None:
-        log = "rdma setup\n[err]: connection timed out in rdma_test.tcl\n"
+        # rdma parser requires the [err]: line to reference an RDMA-flavored
+        # test path — otherwise it would greedily claim unrelated failures.
+        log = (
+            "rdma setup\n"
+            "[err]: connection timed out in tests/integration/rdma_test.tcl\n"
+        )
         assert RdmaParser().can_parse(log)
 
     def test_cannot_parse_no_rdma(self) -> None:
         assert not RdmaParser().can_parse("[err]: something\n")
 
     def test_parse_err_with_file(self) -> None:
-        log = "rdma init\n[err]: replication failed in rdma_repl.tcl\n"
+        log = (
+            "rdma init\n"
+            "[err]: replication failed in tests/integration/rdma_repl.tcl\n"
+        )
         results = RdmaParser().parse(log)
         assert len(results) == 1
-        assert results[0].file_path == "rdma_repl.tcl"
+        assert results[0].file_path == "tests/integration/rdma_repl.tcl"
         assert results[0].parser_type == "rdma"
 
     def test_parse_connection_fallback(self) -> None:
-        log = "rdma test\nconnection refused rdma_connect fail\n"
+        # rdma connection-error fallback now requires explicit RDMA context
+        # (ibv_* failure or 'rdma_connect failed'). Generic 'Connection
+        # refused' messages no longer trigger the parser.
+        log = "rdma test\nrdma_connect failed: ECONNREFUSED\n"
         results = RdmaParser().parse(log)
         assert len(results) == 1
         assert "RDMA" in results[0].error_message
