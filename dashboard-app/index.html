@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Valkey CI Agent Dashboard</title>
+  <meta name="description" content="Community-facing health dashboard for the Valkey CI Agent. Daily CI failures, PR review coverage, fuzzer anomalies, and operator diagnostics.">
+  <meta property="og:title" content="Valkey CI Agent Dashboard">
+  <meta property="og:description" content="Community-facing health dashboard for the Valkey CI Agent.">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;500&family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <div class="site-shell">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <section class="brand" aria-labelledby="brand-title">
+        <div class="brand-logo"><img src="assets/valkey-horizontal.svg" alt="Valkey"></div>
+        <div class="brand-copy">
+          <p>Valkey CI</p>
+          <h1 id="brand-title">Operator Console</h1>
+        </div>
+      </section>
+      <nav class="nav" aria-label="Dashboard pages">
+        <a class="nav-link" href="#/daily" data-nav-link="daily">
+          <strong>Daily CI</strong>
+          <span>Failures and remediation</span>
+        </a>
+        <a class="nav-link" href="#/prs" data-nav-link="prs">
+          <strong>PRs</strong>
+          <span>Review coverage and replay</span>
+        </a>
+        <a class="nav-link" href="#/fuzzer" data-nav-link="fuzzer">
+          <strong>Fuzzer</strong>
+          <span>Anomalies and root causes</span>
+        </a>
+        <a class="nav-link" href="#/diagnostics" data-nav-link="diagnostics">
+          <strong>Diagnostics</strong>
+          <span>Events, watermarks, AI reliability</span>
+        </a>
+      </nav>
+      <section class="sidebar-card" id="status-card" aria-live="polite">
+        <p>Status</p>
+        <strong id="status-value">Loading…</strong>
+        <span class="detail" id="status-detail"></span>
+      </section>
+    </aside>
+    <main id="main-content" class="page">
+      <div id="app" role="region" aria-label="Dashboard content">
+        <div class="loading">Loading dashboard data…</div>
+      </div>
+    </main>
+  </div>
+  <noscript>
+    <div class="error-banner" style="margin: 20px;">
+      <strong>JavaScript is required</strong>
+      <p>This dashboard reads <code>data/dashboard.json</code> and renders interactively in the browser. Please enable JavaScript or view the raw JSON directly.</p>
+    </div>
+  </noscript>
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
