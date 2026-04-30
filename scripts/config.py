@@ -150,6 +150,7 @@ class ReviewerConfig:
     max_input_tokens: int = 190_000
     max_output_tokens: int = 8192
     custom_instructions: str = ""
+    specialist_mode: bool = False
     project: ProjectContext = field(default_factory=ProjectContext)
     models: ReviewerModels = field(default_factory=ReviewerModels)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
@@ -620,6 +621,10 @@ def load_reviewer_config_data(raw: Any, *, source: str = "<memory>") -> Reviewer
         custom_instructions=_coerce_str(
             root.get("custom_instructions"),
             defaults.custom_instructions,
+        ),
+        specialist_mode=_coerce_bool(
+            root.get("specialist_mode"),
+            defaults.specialist_mode,
         ),
         project=_merge_project(project) if project else defaults.project,
         models=_merge_reviewer_models(models),

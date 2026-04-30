@@ -25,7 +25,7 @@ from scripts.comment_publisher import CommentPublisher
 from scripts.config import ReviewerConfig, load_reviewer_config, load_reviewer_config_text
 from scripts.event_ledger import EventLedger
 from scripts.models import DiffScope as _DiffScope
-from scripts.models import PullRequestContext, ReviewState, SummaryResult
+from scripts.models import PullRequestContext, ReviewFinding, ReviewState, SummaryResult
 from scripts.path_filter import PathFilter
 from scripts.permission_gate import PermissionGate
 from scripts.pr_context_fetcher import PRContextFetcher
@@ -527,10 +527,38 @@ def run(argv: list[str] | None = None) -> int:
                             files=triaged_files,
                             incremental=diff_scope.incremental,
                         )
-                        findings = reviewer.review(
-                            review_context, triaged_scope, config,
-                            short_summary=short_summary,
-                        )
+                        if config.specialist_mode:
+                            from scripts.specialist_reviewer import SpecialistReviewer
+
+                            specialist = SpecialistReviewer(bedrock_client)
+                            specialist_result = specialist.review(
+                                review_context,
+                                config,
+                                selected_paths,
+                            )
+                            findings = [
+                                ReviewFinding(
+                                    path=sf.path,
+                                    line=sf.line,
+                                    body=sf.description,
+                                    severity=sf.severity,
+                                    title=sf.title,
+                                )
+                                for sf in specialist_result.findings
+                            ]
+                            # Post the synthesis markdown as the summary comment
+                            if specialist_result.markdown_summary:
+                                summary_comment_id = publisher.upsert_summary(
+                                    repo_name,
+                                    pr_context.number,
+                                    summary_comment_id,
+                                    specialist_result.markdown_summary,
+                                )
+                        else:
+                            findings = reviewer.review(
+                                review_context, triaged_scope, config,
+                                short_summary=short_summary,
+                            )
                         coverage_report: ReviewCoverage | None = None
                         get_coverage = getattr(reviewer, "get_last_review_coverage", None)
                         if callable(get_coverage):
