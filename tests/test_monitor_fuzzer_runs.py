@@ -45,7 +45,7 @@ def _mock_event_ledger():
 
 
 @patch("scripts.monitor_fuzzer_runs.RateLimiter")
-@patch("scripts.monitor_fuzzer_runs._make_bedrock_client")
+@patch("scripts.monitor_fuzzer_runs._make_retriever")
 @patch("scripts.monitor_fuzzer_runs.FuzzerIssuePublisher")
 @patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
 @patch("scripts.monitor_fuzzer_runs.Github")
@@ -55,7 +55,7 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
     mock_github_cls,
     mock_analyzer_cls,
     mock_issue_publisher_cls,
-    mock_make_bedrock_client,
+    mock_make_retriever,
     mock_rate_limiter_cls,
     _mock_event_ledger,
 ) -> None:
@@ -67,7 +67,7 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
     repo = MagicMock()
     repo.get_workflow.return_value = workflow
     mock_github_cls.return_value.get_repo.return_value = repo
-    mock_make_bedrock_client.return_value = (MagicMock(), None)
+    mock_make_retriever.return_value = None
     mock_issue_publisher_cls.return_value.upsert_issue.return_value = (
         "created",
         "https://github.com/valkey-io/valkey-fuzzer/issues/1",
@@ -116,7 +116,7 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
     mock_issue_publisher_cls.return_value.upsert_issue.assert_called_once()
     mock_rate_limiter_cls.return_value.load.assert_called_once()
     mock_rate_limiter_cls.return_value.save.assert_called_once()
-    _, make_kwargs = mock_make_bedrock_client.call_args
+    _, make_kwargs = mock_make_retriever.call_args
     assert make_kwargs["rate_limiter"] is mock_rate_limiter_cls.return_value
     state_store.mark_seen.assert_called_once_with(
         "valkey-io/valkey-fuzzer:fuzzer-run.yml:schedule",
@@ -146,7 +146,7 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
 
 
 @patch("scripts.monitor_fuzzer_runs.RateLimiter")
-@patch("scripts.monitor_fuzzer_runs._make_bedrock_client")
+@patch("scripts.monitor_fuzzer_runs._make_retriever")
 @patch("scripts.monitor_fuzzer_runs.FuzzerIssuePublisher")
 @patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
 @patch("scripts.monitor_fuzzer_runs.Github")
@@ -156,7 +156,7 @@ def test_monitor_continues_after_analysis_error_and_advances_watermark(
     mock_github_cls,
     mock_analyzer_cls,
     mock_issue_publisher_cls,
-    mock_make_bedrock_client,
+    mock_make_retriever,
     mock_rate_limiter_cls,
     _mock_event_ledger,
 ) -> None:
@@ -168,7 +168,7 @@ def test_monitor_continues_after_analysis_error_and_advances_watermark(
     repo = MagicMock()
     repo.get_workflow.return_value = workflow
     mock_github_cls.return_value.get_repo.return_value = repo
-    mock_make_bedrock_client.return_value = (MagicMock(), None)
+    mock_make_retriever.return_value = None
 
     analyzer = mock_analyzer_cls.return_value
     analyzer.analyze_workflow_run.side_effect = [
@@ -209,7 +209,7 @@ def test_monitor_continues_after_analysis_error_and_advances_watermark(
 
 
 @patch("scripts.monitor_fuzzer_runs.RateLimiter")
-@patch("scripts.monitor_fuzzer_runs._make_bedrock_client")
+@patch("scripts.monitor_fuzzer_runs._make_retriever")
 @patch("scripts.monitor_fuzzer_runs.FuzzerIssuePublisher")
 @patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
 @patch("scripts.monitor_fuzzer_runs.Github")
@@ -219,7 +219,7 @@ def test_monitor_dry_run_does_not_analyze_or_advance_state(
     mock_github_cls,
     mock_analyzer_cls,
     mock_issue_publisher_cls,
-    mock_make_bedrock_client,
+    mock_make_retriever,
     mock_rate_limiter_cls,
     _mock_event_ledger,
 ) -> None:
@@ -231,7 +231,7 @@ def test_monitor_dry_run_does_not_analyze_or_advance_state(
     repo = MagicMock()
     repo.get_workflow.return_value = workflow
     mock_github_cls.return_value.get_repo.return_value = repo
-    mock_make_bedrock_client.return_value = (MagicMock(), None)
+    mock_make_retriever.return_value = None
 
     result = monitor(_args(dry_run=True))
 
