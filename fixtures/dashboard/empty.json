@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-04-29T12:00:00+00:00",
+  "snapshot": {
+    "failure_incidents": 0,
+    "queued_failures": 0,
+    "active_flaky_campaigns": 0,
+    "tracked_review_prs": 0,
+    "review_comments": 0,
+    "fuzzer_runs_analyzed": 0,
+    "fuzzer_anomalous_runs": 0,
+    "daily_runs_seen": 0,
+    "ai_token_usage": 0,
+    "agent_events": 0,
+    "instrumentation_gaps": 0
+  },
+  "ci_failures": {
+    "failure_incidents": 0,
+    "entry_status_counts": {},
+    "history_entries": 0,
+    "history_observations": 0,
+    "history_failures": 0,
+    "history_passes": 0,
+    "queued_failures": 0,
+    "queued_failure_fingerprints": [],
+    "daily_result_files": 0,
+    "daily_runs_seen": 0,
+    "daily_action_counts": {},
+    "daily_conclusion_counts": {},
+    "daily_job_outcome_counts": {},
+    "recent_incidents": []
+  },
+  "flaky_tests": {
+    "campaigns": 0,
+    "active_campaigns": 0,
+    "status_counts": {},
+    "proof_counts": {},
+    "subsystem_counts": {},
+    "total_attempts": 0,
+    "failed_hypotheses": 0,
+    "consecutive_full_passes": 0,
+    "recent_campaigns": []
+  },
+  "pr_reviews": {
+    "tracked_prs": 0,
+    "summary_comments": 0,
+    "review_comments": 0,
+    "recent_reviews": [],
+    "acceptance_cases": 0,
+    "acceptance_passed": 0,
+    "acceptance_failed": 0,
+    "acceptance_findings": 0,
+    "coverage_incomplete_cases": 0,
+    "model_followup_counts": {}
+  },
+  "acceptance": {
+    "payloads_seen": 0,
+    "readiness": "unknown",
+    "review_cases": 0,
+    "review_passed": 0,
+    "review_failed": 0,
+    "workflow_cases": 0,
+    "workflow_passed": 0,
+    "workflow_failed": 0,
+    "ci_replay_cases": 0,
+    "backport_replay_cases": 0,
+    "manifest_review_cases": 0,
+    "manifest_workflow_cases": 0,
+    "manifest_ci_cases": 0,
+    "manifest_backport_cases": 0,
+    "finding_count": 0,
+    "model_followup_counts": {},
+    "recent_review_results": [],
+    "recent_workflow_results": []
+  },
+  "fuzzer": {
+    "result_files": 0,
+    "runs_seen": 0,
+    "runs_analyzed": 0,
+    "status_counts": {},
+    "conclusion_counts": {},
+    "issue_action_counts": {},
+    "scenario_counts": {},
+    "root_cause_counts": {},
+    "raw_log_fallbacks": 0,
+    "recent_anomalies": []
+  },
+  "agent_outcomes": {
+    "events": 0,
+    "event_type_counts": {},
+    "subjects": 0,
+    "validation_passed": 0,
+    "validation_failed": 0,
+    "proof_dispatched": 0,
+    "proof_passed": 0,
+    "proof_failed": 0,
+    "prs_created": 0,
+    "prs_merged": 0,
+    "prs_closed_without_merge": 0,
+    "dead_lettered": 0,
+    "recent_events": []
+  },
+  "ai_reliability": {
+    "token_usage": 0,
+    "token_window_start": "unknown",
+    "ai_metrics": {},
+    "schema_calls": 0,
+    "schema_successes": 0,
+    "schema_tool_choice_rejections": 0,
+    "schema_tool_choice_fallback_successes": 0,
+    "tool_loop_calls": 0,
+    "tool_loop_successes": 0,
+    "terminal_validation_rejections": 0,
+    "bedrock_retries": 0,
+    "retry_exhaustions": 0,
+    "non_retryable_errors": 0,
+    "prompt_safety_checked": 0,
+    "prompt_safety_present": 0,
+    "prompt_safety_missing": 0,
+    "prompt_safety_coverage": 0.0,
+    "review_model_followups": {},
+    "fuzzer_raw_log_fallbacks": 0,
+    "instrumentation_gaps": []
+  },
+  "state_health": {
+    "monitor_watermarks": 0,
+    "recent_watermarks": [],
+    "input_warnings": []
+  },
+  "trends": {
+    "labels": [],
+    "window_days": 7,
+    "failure_rate": {
+      "rates": [],
+      "average_rate": 0.0
+    },
+    "review_health": {
+      "scores": [],
+      "degraded_reviews": [],
+      "average_score": 0.0
+    },
+    "flaky_subsystems": {
+      "top_subsystems": [],
+      "series": {}
+    }
+  },
+  "daily_health": {
+    "repo": "",
+    "workflow": "",
+    "branch": "",
+    "dates": [],
+    "total_runs": 0,
+    "failed_runs": 0,
+    "unique_failures": 0,
+    "days_with_runs": 0,
+    "workflows": [],
+    "workflow_reports": [],
+    "heatmap": [],
+    "runs": [],
+    "tests": {},
+    "failure_jobs": {}
+  },
+  "wow_trends": {
+    "has_data": false,
+    "this_week": {
+      "total_failure_hits": 0,
+      "unique_failures": 0,
+      "failed_runs": 0,
+      "total_runs": 0
+    },
+    "last_week": {
+      "total_failure_hits": 0,
+      "unique_failures": 0,
+      "failed_runs": 0,
+      "total_runs": 0
+    },
+    "delta": 0,
+    "pct_change": 0.0,
+    "new_failures": [],
+    "resolved_failures": [],
+    "top_movers": []
+  }
+}

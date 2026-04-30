@@ -1,0 +1,1605 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-04-29T12:00:00+00:00",
+  "snapshot": {
+    "failure_incidents": 8,
+    "queued_failures": 2,
+    "active_flaky_campaigns": 2,
+    "tracked_review_prs": 3,
+    "review_comments": 7,
+    "fuzzer_runs_analyzed": 7,
+    "fuzzer_anomalous_runs": 2,
+    "daily_runs_seen": 14,
+    "ai_token_usage": 185000,
+    "agent_events": 12,
+    "instrumentation_gaps": 0
+  },
+  "ci_failures": {
+    "failure_incidents": 8,
+    "entry_status_counts": {
+      "queued": 2,
+      "abandoned": 3,
+      "merged": 3
+    },
+    "history_entries": 6,
+    "history_observations": 24,
+    "history_failures": 10,
+    "history_passes": 14,
+    "queued_failures": 2,
+    "queued_failure_fingerprints": [
+      "fp-001",
+      "fp-002"
+    ],
+    "daily_result_files": 1,
+    "daily_runs_seen": 14,
+    "daily_action_counts": {
+      "analyzed": 8,
+      "skipped": 6
+    },
+    "daily_conclusion_counts": {
+      "success": 6,
+      "failure": 8
+    },
+    "daily_job_outcome_counts": {
+      "pass": 40,
+      "fail": 12
+    },
+    "recent_incidents": [
+      {
+        "failure_identifier": "jemalloc / sanitize <script>alert(\"xss\")</script>",
+        "status": "queued",
+        "file_path": "src/zmalloc.c",
+        "pr_url": "https://github.com/valkey-io/valkey/pull/99",
+        "updated_at": "2026-04-29T10:00:00+00:00"
+      },
+      {
+        "failure_identifier": "cluster slot migration",
+        "status": "merged",
+        "file_path": "src/cluster.c",
+        "pr_url": "",
+        "updated_at": "2026-04-28T08:00:00+00:00"
+      }
+    ]
+  },
+  "flaky_tests": {
+    "campaigns": 4,
+    "active_campaigns": 2,
+    "status_counts": {
+      "active": 2,
+      "merged": 1,
+      "abandoned": 1
+    },
+    "proof_counts": {
+      "passed": 1,
+      "pending": 1
+    },
+    "subsystem_counts": {
+      "memory": 1,
+      "cluster": 1
+    },
+    "total_attempts": 12,
+    "failed_hypotheses": 3,
+    "consecutive_full_passes": 5,
+    "recent_campaigns": [
+      {
+        "failure_identifier": "jemalloc / sanitize",
+        "subsystem": "memory",
+        "status": "active",
+        "proof_status": "pending",
+        "proof_url": "",
+        "pr_url": "",
+        "job_name": "test-ubuntu-asan",
+        "branch": "unstable",
+        "total_attempts": 5,
+        "consecutive_full_passes": 2,
+        "queued_pr_payload": null,
+        "updated_at": "2026-04-29T09:00:00+00:00",
+        "fingerprint": "fp-001"
+      },
+      {
+        "failure_identifier": "cluster slot migration",
+        "subsystem": "cluster",
+        "status": "merged",
+        "proof_status": "passed",
+        "proof_url": "https://github.com/valkey-io/valkey/actions/runs/11111",
+        "pr_url": "https://github.com/valkey-io/valkey/pull/100",
+        "job_name": "test-cluster",
+        "branch": "unstable",
+        "total_attempts": 7,
+        "consecutive_full_passes": 3,
+        "queued_pr_payload": null,
+        "updated_at": "2026-04-27T12:00:00+00:00",
+        "fingerprint": "fp-003"
+      }
+    ]
+  },
+  "pr_reviews": {
+    "tracked_prs": 3,
+    "summary_comments": 3,
+    "review_comments": 7,
+    "recent_reviews": [
+      {
+        "repo": "valkey-io/valkey",
+        "pr_number": 101,
+        "last_reviewed_head_sha": "aabbcc1122",
+        "summary_comment_id": 5001,
+        "review_comment_ids": [
+          6001,
+          6002
+        ],
+        "updated_at": "2026-04-29T08:00:00+00:00"
+      },
+      {
+        "repo": "valkey-io/valkey",
+        "pr_number": 102,
+        "last_reviewed_head_sha": "ddeeff3344",
+        "summary_comment_id": 5002,
+        "review_comment_ids": [
+          6003
+        ],
+        "updated_at": "2026-04-28T14:00:00+00:00"
+      },
+      {
+        "repo": "valkey-io/valkey",
+        "pr_number": 103,
+        "last_reviewed_head_sha": "112233aabb",
+        "summary_comment_id": 5003,
+        "review_comment_ids": [
+          6004,
+          6005,
+          6006,
+          6007
+        ],
+        "updated_at": "2026-04-27T20:00:00+00:00"
+      }
+    ],
+    "acceptance_cases": 4,
+    "acceptance_passed": 3,
+    "acceptance_failed": 1,
+    "acceptance_findings": 2,
+    "coverage_incomplete_cases": 1,
+    "model_followup_counts": {
+      "docs_needed": 1
+    }
+  },
+  "acceptance": {
+    "payloads_seen": 1,
+    "readiness": "pilot-ready",
+    "review_cases": 3,
+    "review_passed": 2,
+    "review_failed": 1,
+    "workflow_cases": 2,
+    "workflow_passed": 2,
+    "workflow_failed": 0,
+    "ci_replay_cases": 1,
+    "backport_replay_cases": 1,
+    "manifest_review_cases": 3,
+    "manifest_workflow_cases": 2,
+    "manifest_ci_cases": 1,
+    "manifest_backport_cases": 1,
+    "finding_count": 2,
+    "model_followup_counts": {
+      "docs_needed": 1
+    },
+    "recent_review_results": [
+      {
+        "name": "DCO enforcement",
+        "repo": "valkey-io/valkey",
+        "pr_number": "101",
+        "passed": true,
+        "coverage": {
+          "claimed_without_tool": [],
+          "unaccounted_files": []
+        },
+        "findings": [],
+        "model_followups": []
+      },
+      {
+        "name": "Security review <script>alert(\"xss\")</script>",
+        "repo": "valkey-io/valkey",
+        "pr_number": "102",
+        "passed": false,
+        "coverage": {
+          "claimed_without_tool": [
+            "src/acl.c"
+          ],
+          "unaccounted_files": []
+        },
+        "findings": [
+          {
+            "severity": "high",
+            "message": "Missing input validation"
+          }
+        ],
+        "model_followups": [
+          "docs_needed"
+        ]
+      }
+    ],
+    "recent_workflow_results": [
+      {
+        "name": "CI workflow contract",
+        "workflow_path": ".github/workflows/ci.yml",
+        "passed": true,
+        "checks": [
+          {
+            "name": "timeout",
+            "passed": true
+          }
+        ],
+        "notes": ""
+      }
+    ]
+  },
+  "fuzzer": {
+    "result_files": 2,
+    "runs_seen": 8,
+    "runs_analyzed": 7,
+    "status_counts": {
+      "normal": 5,
+      "anomalous": 2
+    },
+    "conclusion_counts": {
+      "success": 6,
+      "failure": 2
+    },
+    "issue_action_counts": {
+      "created": 1,
+      "updated": 1
+    },
+    "scenario_counts": {
+      "chaos-restart": 3,
+      "network-partition": 2,
+      "oom-pressure": 2
+    },
+    "root_cause_counts": {
+      "timeout": 1,
+      "crash": 1
+    },
+    "raw_log_fallbacks": 1,
+    "recent_anomalies": [
+      {
+        "run_id": "fz-001",
+        "run_url": "https://github.com/valkey-io/valkey-fuzzer/actions/runs/501",
+        "status": "anomalous",
+        "triage_verdict": "needs-investigation",
+        "scenario_id": "chaos-restart",
+        "seed": "42",
+        "root_cause_category": "crash",
+        "summary": "Server crash during restart <img onerror=alert(1) src=x>",
+        "issue_url": "https://github.com/valkey-io/valkey-fuzzer/issues/10",
+        "issue_action": "created"
+      },
+      {
+        "run_id": "fz-002",
+        "run_url": "https://github.com/valkey-io/valkey-fuzzer/actions/runs/502",
+        "status": "anomalous",
+        "triage_verdict": "expected-chaos",
+        "scenario_id": "network-partition",
+        "seed": "99",
+        "root_cause_category": "timeout",
+        "summary": "Partition recovery exceeded 30s",
+        "issue_url": "https://github.com/valkey-io/valkey-fuzzer/issues/10",
+        "issue_action": "updated"
+      }
+    ]
+  },
+  "agent_outcomes": {
+    "events": 12,
+    "subjects": 6,
+    "event_type_counts": {
+      "pr.created": 2,
+      "pr.merged": 1,
+      "validation.passed": 3,
+      "validation.failed": 1,
+      "proof.dispatched": 2,
+      "proof.passed": 1,
+      "proof.failed": 1,
+      "fix.dead_lettered": 1
+    },
+    "validation_passed": 3,
+    "validation_failed": 1,
+    "proof_dispatched": 2,
+    "proof_passed": 1,
+    "proof_failed": 1,
+    "prs_created": 2,
+    "prs_merged": 1,
+    "prs_closed_without_merge": 0,
+    "dead_lettered": 1,
+    "recent_events": [
+      {
+        "created_at": "2026-04-29T10:30:00+00:00",
+        "event_type": "pr.created",
+        "subject": "valkey-io/valkey#99",
+        "attributes": {
+          "branch": "unstable"
+        }
+      },
+      {
+        "created_at": "2026-04-29T09:00:00+00:00",
+        "event_type": "validation.passed",
+        "subject": "valkey-io/valkey:daily.yml:12345",
+        "attributes": {
+          "job": "test-ubuntu-asan"
+        }
+      },
+      {
+        "created_at": "2026-04-28T22:00:00+00:00",
+        "event_type": "proof.passed",
+        "subject": "valkey-io/valkey#100",
+        "attributes": {
+          "proof_url": "https://github.com/valkey-io/valkey/actions/runs/11111"
+        }
+      },
+      {
+        "created_at": "2026-04-28T18:00:00+00:00",
+        "event_type": "fix.dead_lettered",
+        "subject": "valkey-io/valkey:daily.yml:12340 <script>alert(\"xss\")</script>",
+        "attributes": {
+          "reason": "max_retries"
+        }
+      },
+      {
+        "created_at": "2026-04-28T12:00:00+00:00",
+        "event_type": "pr.merged",
+        "subject": "valkey-io/valkey#100",
+        "attributes": {}
+      }
+    ]
+  },
+  "ai_reliability": {
+    "token_usage": 185000,
+    "token_window_start": "2026-04-22T00:00:00+00:00",
+    "ai_metrics": {
+      "bedrock.invoke_schema.calls": 42,
+      "bedrock.invoke_schema.success": 40,
+      "bedrock.tool_loop.calls": 15,
+      "bedrock.tool_loop.success": 14,
+      "bedrock.retries": 3,
+      "bedrock.errors.retry_exhausted": 1,
+      "bedrock.prompt_safety_guard.checked": 20,
+      "bedrock.prompt_safety_guard.present": 19,
+      "bedrock.prompt_safety_guard.missing": 1
+    },
+    "schema_calls": 42,
+    "schema_successes": 40,
+    "schema_tool_choice_rejections": 2,
+    "schema_tool_choice_fallback_successes": 1,
+    "tool_loop_calls": 15,
+    "tool_loop_successes": 14,
+    "terminal_validation_rejections": 1,
+    "bedrock_retries": 3,
+    "retry_exhaustions": 1,
+    "non_retryable_errors": 0,
+    "prompt_safety_checked": 20,
+    "prompt_safety_present": 19,
+    "prompt_safety_missing": 1,
+    "prompt_safety_coverage": 0.95,
+    "review_model_followups": {
+      "docs_needed": 1
+    },
+    "fuzzer_raw_log_fallbacks": 1,
+    "instrumentation_gaps": []
+  },
+  "state_health": {
+    "monitor_watermarks": 3,
+    "recent_watermarks": [
+      {
+        "key": "daily:valkey-io/valkey:daily.yml:unstable",
+        "last_seen_run_id": "12345",
+        "target_repo": "valkey-io/valkey",
+        "workflow_file": "daily.yml",
+        "updated_at": "2026-04-29T10:00:00+00:00"
+      },
+      {
+        "key": "weekly:valkey-io/valkey:weekly.yml:unstable",
+        "last_seen_run_id": "12340",
+        "target_repo": "valkey-io/valkey",
+        "workflow_file": "weekly.yml",
+        "updated_at": "2026-04-27T06:00:00+00:00"
+      }
+    ],
+    "input_warnings": [
+      "bot-data/review-state.json was not present"
+    ]
+  },
+  "trends": {
+    "labels": [
+      "04-23",
+      "04-24",
+      "04-25",
+      "04-26",
+      "04-27",
+      "04-28",
+      "04-29"
+    ],
+    "window_days": 7,
+    "failure_rate": {
+      "rates": [
+        0.5,
+        0.3,
+        0.6,
+        0.4,
+        0.2,
+        0.5,
+        0.7
+      ],
+      "average_rate": 0.4571
+    },
+    "review_health": {
+      "scores": [
+        1.0,
+        0.8,
+        1.0,
+        0.9,
+        1.0,
+        0.7,
+        1.0
+      ],
+      "degraded_reviews": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0
+      ],
+      "average_score": 0.9143
+    },
+    "flaky_subsystems": {
+      "top_subsystems": [
+        "memory",
+        "cluster",
+        "replication"
+      ],
+      "series": {
+        "memory": [
+          2,
+          1,
+          3,
+          0,
+          1,
+          2,
+          1
+        ],
+        "cluster": [
+          1,
+          0,
+          1,
+          1,
+          0,
+          0,
+          1
+        ],
+        "replication": [
+          0,
+          1,
+          0,
+          0,
+          1,
+          0,
+          0
+        ]
+      }
+    }
+  },
+  "daily_health": {
+    "repo": "valkey-io/valkey",
+    "workflow": "daily.yml, weekly.yml",
+    "branch": "unstable",
+    "dates": [
+      "2026-04-16",
+      "2026-04-17",
+      "2026-04-18",
+      "2026-04-19",
+      "2026-04-20",
+      "2026-04-21",
+      "2026-04-22",
+      "2026-04-23",
+      "2026-04-24",
+      "2026-04-25",
+      "2026-04-26",
+      "2026-04-27",
+      "2026-04-28",
+      "2026-04-29"
+    ],
+    "total_runs": 14,
+    "failed_runs": 8,
+    "unique_failures": 6,
+    "days_with_runs": 14,
+    "workflows": [
+      "daily.yml",
+      "weekly.yml"
+    ],
+    "workflow_reports": [
+      {
+        "workflow": "daily.yml",
+        "total_runs": 10,
+        "failed_runs": 6,
+        "unique_failures": 4,
+        "dates": [
+          "2026-04-16",
+          "2026-04-17",
+          "2026-04-18",
+          "2026-04-19",
+          "2026-04-20",
+          "2026-04-21",
+          "2026-04-22",
+          "2026-04-23",
+          "2026-04-24",
+          "2026-04-25",
+          "2026-04-26",
+          "2026-04-27",
+          "2026-04-28",
+          "2026-04-29"
+        ],
+        "days_with_runs": 14,
+        "heatmap": [
+          {
+            "name": "jemalloc / sanitize",
+            "days_failed": 6,
+            "total_days": 14,
+            "cells": [
+              {
+                "date": "2026-04-16",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-17",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-18",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-19",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-20",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-21",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-22",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-23",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-24",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-25",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-26",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-27",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-28",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-29",
+                "count": 1,
+                "has_run": true
+              }
+            ]
+          },
+          {
+            "name": "cluster slot migration \"><script>alert(1)</script>",
+            "days_failed": 3,
+            "total_days": 14,
+            "cells": [
+              {
+                "date": "2026-04-16",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-17",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-18",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-19",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-20",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-21",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-22",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-23",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-24",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-25",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-26",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-27",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-28",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-29",
+                "count": 0,
+                "has_run": true
+              }
+            ]
+          },
+          {
+            "name": "replication backlog timeout",
+            "days_failed": 3,
+            "total_days": 14,
+            "cells": [
+              {
+                "date": "2026-04-16",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-17",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-18",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-19",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-20",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-21",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-22",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-23",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-24",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-25",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-26",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-27",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-28",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-29",
+                "count": 0,
+                "has_run": true
+              }
+            ]
+          },
+          {
+            "name": "clients state report follows",
+            "days_failed": 2,
+            "total_days": 14,
+            "cells": [
+              {
+                "date": "2026-04-16",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-17",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-18",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-19",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-20",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-21",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-22",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-23",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-24",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-25",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-26",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-27",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-28",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-29",
+                "count": 0,
+                "has_run": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "workflow": "weekly.yml",
+        "total_runs": 4,
+        "failed_runs": 2,
+        "unique_failures": 2,
+        "dates": [
+          "2026-04-16",
+          "2026-04-17",
+          "2026-04-18",
+          "2026-04-19",
+          "2026-04-20",
+          "2026-04-21",
+          "2026-04-22",
+          "2026-04-23",
+          "2026-04-24",
+          "2026-04-25",
+          "2026-04-26",
+          "2026-04-27",
+          "2026-04-28",
+          "2026-04-29"
+        ],
+        "days_with_runs": 4,
+        "missing_dates": [
+          "2026-04-17",
+          "2026-04-18"
+        ],
+        "heatmap": [
+          {
+            "name": "memory defrag large keys",
+            "days_failed": 2,
+            "total_days": 14,
+            "cells": [
+              {
+                "date": "2026-04-16",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-17",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-18",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-19",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-20",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-21",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-22",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-23",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-24",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-25",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-26",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-27",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-28",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-29",
+                "count": 0,
+                "has_run": true
+              }
+            ]
+          },
+          {
+            "name": "RDMA basic handshake",
+            "days_failed": 1,
+            "total_days": 14,
+            "cells": [
+              {
+                "date": "2026-04-16",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-17",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-18",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-19",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-20",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-21",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-22",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-23",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-24",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-25",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-26",
+                "count": 1,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-27",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-28",
+                "count": 0,
+                "has_run": true
+              },
+              {
+                "date": "2026-04-29",
+                "count": 0,
+                "has_run": true
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "heatmap": [
+      {
+        "name": "jemalloc / sanitize",
+        "days_failed": 6,
+        "total_days": 14,
+        "cells": [
+          {
+            "date": "2026-04-16",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-17",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-18",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-19",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-20",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-21",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-22",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-23",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-24",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-25",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-26",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-27",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-28",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-29",
+            "count": 1,
+            "has_run": true
+          }
+        ]
+      },
+      {
+        "name": "cluster slot migration \"><script>alert(1)</script>",
+        "days_failed": 3,
+        "total_days": 14,
+        "cells": [
+          {
+            "date": "2026-04-16",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-17",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-18",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-19",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-20",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-21",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-22",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-23",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-24",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-25",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-26",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-27",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-28",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-29",
+            "count": 0,
+            "has_run": true
+          }
+        ]
+      },
+      {
+        "name": "replication backlog timeout",
+        "days_failed": 3,
+        "total_days": 14,
+        "cells": [
+          {
+            "date": "2026-04-16",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-17",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-18",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-19",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-20",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-21",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-22",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-23",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-24",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-25",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-26",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-27",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-28",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-29",
+            "count": 0,
+            "has_run": true
+          }
+        ]
+      },
+      {
+        "name": "clients state report follows",
+        "days_failed": 2,
+        "total_days": 14,
+        "cells": [
+          {
+            "date": "2026-04-16",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-17",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-18",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-19",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-20",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-21",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-22",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-23",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-24",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-25",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-26",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-27",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-28",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-29",
+            "count": 0,
+            "has_run": true
+          }
+        ]
+      },
+      {
+        "name": "memory defrag large keys",
+        "days_failed": 2,
+        "total_days": 14,
+        "cells": [
+          {
+            "date": "2026-04-16",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-17",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-18",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-19",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-20",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-21",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-22",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-23",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-24",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-25",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-26",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-27",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-28",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-29",
+            "count": 0,
+            "has_run": true
+          }
+        ]
+      },
+      {
+        "name": "RDMA basic handshake",
+        "days_failed": 1,
+        "total_days": 14,
+        "cells": [
+          {
+            "date": "2026-04-16",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-17",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-18",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-19",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-20",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-21",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-22",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-23",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-24",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-25",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-26",
+            "count": 1,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-27",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-28",
+            "count": 0,
+            "has_run": true
+          },
+          {
+            "date": "2026-04-29",
+            "count": 0,
+            "has_run": true
+          }
+        ]
+      }
+    ],
+    "runs": [
+      {
+        "date": "2026-04-29",
+        "workflow": "daily.yml",
+        "status": "failure",
+        "commit_sha": "abc1234",
+        "full_sha": "abc1234def5678901234567890abcdef12345678",
+        "commit_message": "Fix memory leak <script>alert(\"xss\")</script>",
+        "unique_failures": 2,
+        "failed_jobs": 3,
+        "failed_job_names": [
+          "test-ubuntu-asan \"><script>alert(1)</script>",
+          "test-alpine-valgrind"
+        ],
+        "run_id": "12345",
+        "run_url": "https://github.com/valkey-io/valkey/actions/runs/12345",
+        "failure_names": [
+          "jemalloc / sanitize",
+          "replication backlog timeout"
+        ],
+        "commits_since_prev": [
+          {
+            "sha": "aaa1111",
+            "message": "Refactor allocator",
+            "author": "dev1"
+          },
+          {
+            "sha": "bbb2222",
+            "message": "Update tests <img onerror=alert(1) src=x>",
+            "author": "dev2"
+          }
+        ]
+      },
+      {
+        "date": "2026-04-28",
+        "workflow": "daily.yml",
+        "status": "success",
+        "commit_sha": "def5678",
+        "full_sha": "def5678abc1234567890abcdef1234567890abcd",
+        "commit_message": "Improve cluster stability",
+        "unique_failures": 0,
+        "failed_jobs": 0,
+        "failed_job_names": [],
+        "run_id": "12344",
+        "run_url": "https://github.com/valkey-io/valkey/actions/runs/12344",
+        "failure_names": [],
+        "commits_since_prev": []
+      },
+      {
+        "date": "2026-04-27",
+        "workflow": "weekly.yml",
+        "status": "failure",
+        "commit_sha": "ghi9012",
+        "full_sha": "ghi9012jkl3456789012345678901234567890ab",
+        "commit_message": "Weekly regression check",
+        "unique_failures": 1,
+        "failed_jobs": 1,
+        "failed_job_names": [
+          "test-weekly-full"
+        ],
+        "run_id": "12340",
+        "run_url": "https://github.com/valkey-io/valkey/actions/runs/12340",
+        "failure_names": [
+          "memory defrag large keys"
+        ],
+        "commits_since_prev": []
+      }
+    ],
+    "tests": {},
+    "failure_jobs": {}
+  },
+  "wow_trends": {
+    "has_data": true,
+    "this_week": {
+      "total_failure_hits": 12,
+      "unique_failures": 4,
+      "failed_runs": 5,
+      "total_runs": 7
+    },
+    "last_week": {
+      "total_failure_hits": 8,
+      "unique_failures": 3,
+      "failed_runs": 3,
+      "total_runs": 7
+    },
+    "delta": 4,
+    "pct_change": 50.0,
+    "new_failures": [
+      "RDMA basic handshake"
+    ],
+    "resolved_failures": [
+      "sentinel failover timing"
+    ],
+    "top_movers": [
+      {
+        "name": "jemalloc / sanitize",
+        "this_week": 5,
+        "last_week": 2,
+        "change": 3
+      },
+      {
+        "name": "sentinel failover timing",
+        "this_week": 0,
+        "last_week": 3,
+        "change": -3
+      }
+    ]
+  }
+}

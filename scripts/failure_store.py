@@ -6,8 +6,8 @@ import hashlib
 import json
 import logging
 from base64 import b64decode
-from datetime import datetime, timezone
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 from urllib import parse as urllib_parse
 from urllib import request as urllib_request
@@ -15,17 +15,17 @@ from urllib import request as urllib_request
 from github.GithubException import GithubException
 
 from scripts.models import (
-    FlakyCampaignAttempt,
-    FlakyCampaignState,
     FailureHistoryEntry,
     FailureHistorySummary,
     FailureObservation,
     FailureReport,
     FailureStoreEntry,
+    FlakyCampaignAttempt,
+    FlakyCampaignState,
     RootCauseReport,
+    failure_report_to_dict,
     flaky_campaign_state_from_dict,
     flaky_campaign_state_to_dict,
-    failure_report_to_dict,
     root_cause_report_to_dict,
 )
 
@@ -39,6 +39,16 @@ _STORE_FILE = "failure-store.json"
 _MAX_ERROR_SIGNATURE_CHARS = 10_000
 _ACTIVE_QUEUE_STATUSES = {"queued", "queued-pr-retry"}
 _MAX_PERSIST_ATTEMPTS = 3
+
+# Statuses considered "done" — eligible for compaction.
+_TERMINAL_ENTRY_STATUSES = {"abandoned", "merged", "landed", "superseded"}
+# Statuses considered "done" for campaigns.
+_TERMINAL_CAMPAIGN_STATUSES = {"abandoned", "landed", "merged", "pr-created", "validated"}
+
+# Compaction defaults — keep bounded state. Override per-call if needed.
+_COMPACT_MAX_ENTRIES = 500
+_COMPACT_MAX_HISTORY = 1000
+_COMPACT_MAX_AGE_DAYS = 90
 
 
 @dataclass
@@ -1100,8 +1110,117 @@ class FailureStore:
             self._history.clear()
             self._campaigns.clear()
 
+    def compact(
+        self,
+        *,
+        max_entries: int = _COMPACT_MAX_ENTRIES,
+        max_history_entries: int = _COMPACT_MAX_HISTORY,
+        max_age_days: int = _COMPACT_MAX_AGE_DAYS,
+        now: datetime | None = None,
+    ) -> dict:
+        """Evict old terminal entries to keep the store bounded.
+
+        Removes entries in terminal states (abandoned / merged / landed /
+        superseded) that are older than ``max_age_days``, then enforces
+        ``max_entries`` by evicting the oldest terminal entries. Active
+        entries (any non-terminal status) are always preserved.
+
+        The history dict is trimmed to ``max_history_entries`` by dropping
+        the oldest entries. Terminal campaigns are trimmed the same way as
+        entries.
+
+        Returns a dict with eviction counts.
+        """
+        now = now or datetime.now(timezone.utc)
+        evicted_entries = 0
+        evicted_campaigns = 0
+        evicted_history = 0
+
+        # 1. Age-based eviction of terminal entries.
+        cutoff_ts = now.timestamp() - (max_age_days * 86400)
+        keys_to_drop: list[str] = []
+        for key, entry in self._entries.items():
+            if entry.status not in _TERMINAL_ENTRY_STATUSES:
+                continue
+            try:
+                updated = datetime.fromisoformat(
+                    entry.updated_at.replace("Z", "+00:00")
+                )
+            except (TypeError, ValueError):
+                continue
+            if updated.timestamp() < cutoff_ts:
+                keys_to_drop.append(key)
+        for key in keys_to_drop:
+            del self._entries[key]
+            evicted_entries += 1
+
+        # 2. Size-based eviction: if still over limit, drop oldest terminal
+        # entries until within bounds. Never drop non-terminal entries.
+        if len(self._entries) > max_entries:
+            terminal_pairs: list[tuple[str, str]] = [
+                (k, e.updated_at)
+                for k, e in self._entries.items()
+                if e.status in _TERMINAL_ENTRY_STATUSES
+            ]
+            terminal_pairs.sort(key=lambda p: p[1])  # oldest first
+            overflow = len(self._entries) - max_entries
+            for key, _ in terminal_pairs[:overflow]:
+                del self._entries[key]
+                evicted_entries += 1
+
+        # 3. Campaigns: age-based eviction for terminal campaigns.
+        campaign_keys_to_drop: list[str] = []
+        for key, campaign in self._campaigns.items():
+            if campaign.status not in _TERMINAL_CAMPAIGN_STATUSES:
+                continue
+            try:
+                updated = datetime.fromisoformat(
+                    campaign.updated_at.replace("Z", "+00:00")
+                )
+            except (TypeError, ValueError):
+                continue
+            if updated.timestamp() < cutoff_ts:
+                campaign_keys_to_drop.append(key)
+        for key in campaign_keys_to_drop:
+            del self._campaigns[key]
+            evicted_campaigns += 1
+
+        # 4. History: bounded by count. Use the latest observation
+        # timestamp as the age proxy, falling back to insertion order.
+        if len(self._history) > max_history_entries:
+            def _history_ts(entry) -> str:
+                obs = getattr(entry, "observations", None) or []
+                if not obs:
+                    return ""
+                latest = obs[-1]
+                return getattr(latest, "created_at", "") or ""
+
+            history_pairs = [(k, _history_ts(h)) for k, h in self._history.items()]
+            history_pairs.sort(key=lambda p: p[1])
+            overflow = len(self._history) - max_history_entries
+            for key, _ in history_pairs[:overflow]:
+                del self._history[key]
+                evicted_history += 1
+
+        if evicted_entries or evicted_campaigns or evicted_history:
+            logger.info(
+                "FailureStore compaction: evicted %d entries, %d campaigns, %d history",
+                evicted_entries, evicted_campaigns, evicted_history,
+            )
+        return {
+            "evicted_entries": evicted_entries,
+            "evicted_campaigns": evicted_campaigns,
+            "evicted_history": evicted_history,
+        }
+
     def save(self) -> None:
         """Save the store to the dedicated branch via GitHub API."""
+        # Trim stale terminal entries before persisting.
+        try:
+            self.compact()
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("FailureStore.compact() failed: %s", exc)
+
         if not self._state_gh or not self._state_repo_name:
             logger.warning("Cannot save: no GitHub client or repo configured.")
             return

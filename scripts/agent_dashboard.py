@@ -9,24 +9,33 @@ what the agent is doing instead of inferring it from scattered artifacts.
 from __future__ import annotations
 
 import argparse
-from collections import Counter
-from datetime import datetime, timedelta, timezone
 import html as html_lib
 import json
+from collections import Counter
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from scripts.event_ledger import parse_events
 from scripts.json_helpers import (
     JsonObject,
+)
+from scripts.json_helpers import (
     bool_text as _bool_text,
+)
+from scripts.json_helpers import (
     mapping as _mapping,
+)
+from scripts.json_helpers import (
     safe_int as _int,
+)
+from scripts.json_helpers import (
     safe_list as _list,
+)
+from scripts.json_helpers import (
     safe_str as _str,
 )
 from scripts.valkey_repo_context import infer_valkey_subsystem
-
 
 _TERMINAL_CAMPAIGN_STATUSES = {"abandoned", "landed", "merged", "pr-created", "validated"}
 _SNAPSHOT_LABELS = {
@@ -788,7 +797,7 @@ def _daily_failure_name(job_outcome: JsonObject) -> str:
 def _build_daily_health_fallback(
     daily_results: list[JsonObject],
 ) -> JsonObject:
-    from scripts.daily_health_report import build_report_data
+    from scripts.daily_health_data import build_report_data
 
     normalized_runs: list[JsonObject] = []
     repo_full_name = ""
@@ -955,6 +964,50 @@ def _coalesce_daily_health(
     return merged
 
 
+def _empty_daily_health() -> JsonObject:
+    """Return a valid-but-empty daily_health shape for the frontend contract."""
+    return {
+        "repo": "",
+        "workflow": "",
+        "branch": "",
+        "dates": [],
+        "total_runs": 0,
+        "failed_runs": 0,
+        "unique_failures": 0,
+        "days_with_runs": 0,
+        "workflows": [],
+        "workflow_reports": [],
+        "heatmap": [],
+        "runs": [],
+        "tests": {},
+        "failure_jobs": {},
+    }
+
+
+def _empty_wow_trends() -> JsonObject:
+    """Return a valid-but-empty wow_trends shape for the frontend contract."""
+    return {
+        "has_data": False,
+        "this_week": {
+            "total_failure_hits": 0,
+            "unique_failures": 0,
+            "failed_runs": 0,
+            "total_runs": 0,
+        },
+        "last_week": {
+            "total_failure_hits": 0,
+            "unique_failures": 0,
+            "failed_runs": 0,
+            "total_runs": 0,
+        },
+        "delta": 0,
+        "pct_change": 0.0,
+        "new_failures": [],
+        "resolved_failures": [],
+        "top_movers": [],
+    }
+
+
 def build_dashboard(
     *,
     failure_store: JsonObject | None = None,
@@ -1017,7 +1070,17 @@ def build_dashboard(
         "agent_events": agent_outcomes["events"],
         "instrumentation_gaps": len(ai_reliability["instrumentation_gaps"]),
     }
+    daily_health = _coalesce_daily_health(_mapping(daily_health_data), daily_results)
+    if not daily_health:
+        daily_health = _empty_daily_health()
+    wow_trends = _build_wow_trends(
+        daily_health,
+        generated_at=resolved_generated_at,
+    )
+    if not wow_trends:
+        wow_trends = _empty_wow_trends()
     return {
+        "schema_version": 1,
         "generated_at": resolved_generated_at,
         "snapshot": snapshot,
         "ci_failures": ci_failures,
@@ -1029,11 +1092,8 @@ def build_dashboard(
         "ai_reliability": ai_reliability,
         "state_health": state_health,
         "trends": trend_metrics,
-        "daily_health": _coalesce_daily_health(_mapping(daily_health_data), daily_results),
-        "wow_trends": _build_wow_trends(
-            _coalesce_daily_health(_mapping(daily_health_data), daily_results),
-            generated_at=resolved_generated_at,
-        ),
+        "daily_health": daily_health,
+        "wow_trends": wow_trends,
     }
 
 
