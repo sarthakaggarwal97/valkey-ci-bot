@@ -88,7 +88,7 @@ def fix_from_log(
         )
 
         logger.info("Calling Claude Code for %s (log=%d chars)...", job_name, len(log_text))
-        stdout, stderr, rc = run_claude_code(prompt, cwd=tmpdir, timeout=600)
+        stdout, stderr, rc = run_claude_code(prompt, cwd=tmpdir)
         result["claude_exit_code"] = rc
         logger.info(
             "Claude output for %s (%d chars stdout, %d chars stderr):\n%s",

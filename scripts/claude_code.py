@@ -8,15 +8,19 @@ and diff generation natively.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
 import subprocess
+import threading
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_CLAUDE_MODEL = "opus"
 _DEFAULT_BEDROCK_OPUS_MODEL = "us.anthropic.claude-opus-4-7"
+_DEFAULT_TIMEOUT_SECONDS = 20 * 60
 _DIFF_FENCE_RE = re.compile(
     r"```(?:diff|patch)?\n(---\s.+?)\n```", re.DOTALL
 )
@@ -29,7 +33,7 @@ def run_claude_code(
     prompt: str,
     *,
     cwd: str | None = None,
-    timeout: int = 600,
+    timeout: int = _DEFAULT_TIMEOUT_SECONDS,
     model: str | None = _DEFAULT_CLAUDE_MODEL,
     effort: str | None = "high",
     max_turns: int = 80,
@@ -50,6 +54,8 @@ def run_claude_code(
         "claude", "--print",
         "--max-turns", str(max_turns),
         "--allowedTools", allowed_tools,
+        "--output-format", "stream-json",
+        "--verbose",
     ]
     if model:
         cmd.extend(["--model", model])
@@ -57,24 +63,50 @@ def run_claude_code(
         cmd.extend(["--effort", effort])
 
     logger.info("Running claude: cwd=%s, timeout=%d, prompt=%s…", cwd, timeout, prompt[:120])
+    stdout_parts: list[str] = []
+    process = None
     try:
-        result = subprocess.run(
+        process = subprocess.Popen(
             cmd,
-            input=prompt,
-            capture_output=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
             cwd=cwd,
-            timeout=timeout,
             env=env,
+            bufsize=1,
         )
+
+        def _read_stdout() -> None:
+            if process.stdout is None:
+                return
+            for line in process.stdout:
+                stdout_parts.append(line)
+                _log_stream_event(line)
+
+        reader = threading.Thread(target=_read_stdout, daemon=True)
+        reader.start()
+        if process.stdin is not None:
+            process.stdin.write(prompt)
+            process.stdin.close()
+
+        returncode = process.wait(timeout=timeout)
+        reader.join(timeout=5)
+        stdout = "".join(stdout_parts)
         logger.info(
             "Claude exited %d (%d chars stdout, %d chars stderr).",
-            result.returncode, len(result.stdout), len(result.stderr),
+            returncode, len(stdout), 0,
         )
-        return result.stdout, result.stderr, result.returncode
+        return stdout, "", returncode
     except subprocess.TimeoutExpired:
+        if process is not None:
+            try:
+                process.kill()
+            except Exception:
+                pass
+        stdout = "".join(stdout_parts)
         logger.error("Claude timed out after %ds.", timeout)
-        return "", f"timeout after {timeout}s", 1
+        return stdout, f"timeout after {timeout}s", 1
     except FileNotFoundError:
         logger.error("claude CLI not found on PATH.")
         return "", "claude not found", 127
@@ -97,3 +129,111 @@ def extract_diff(claude_output: str) -> str | None:
         return m.group(1).strip()
 
     return None
+
+
+def _log_stream_event(raw_line: str) -> None:
+    raw_line = raw_line.strip()
+    if not raw_line:
+        return
+    try:
+        event = json.loads(raw_line)
+    except json.JSONDecodeError:
+        logger.info("Claude stream: %s", _truncate(raw_line, 500))
+        return
+
+    summary = _summarize_stream_event(event)
+    if summary:
+        logger.info("Claude stream: %s", summary)
+    else:
+        logger.debug("Claude stream event: %s", _truncate(raw_line, 1000))
+
+
+def _summarize_stream_event(event: dict[str, Any]) -> str:
+    event_type = str(event.get("type") or event.get("event") or "")
+    subtype = str(event.get("subtype") or "")
+
+    if event_type == "system":
+        session_id = event.get("session_id") or event.get("sessionId") or ""
+        model = event.get("model") or ""
+        cwd = event.get("cwd") or ""
+        parts = ["system"]
+        if subtype:
+            parts.append(subtype)
+        if model:
+            parts.append(f"model={model}")
+        if session_id:
+            parts.append(f"session={session_id}")
+        if cwd:
+            parts.append(f"cwd={cwd}")
+        return " ".join(parts)
+
+    if event_type == "assistant":
+        message = event.get("message")
+        if not isinstance(message, dict):
+            return "assistant event"
+        content = message.get("content")
+        summaries: list[str] = []
+        if isinstance(content, list):
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                block_type = block.get("type")
+                if block_type == "text":
+                    text = str(block.get("text") or "").strip()
+                    if text:
+                        summaries.append(f"text={_truncate(text, 240)}")
+                elif block_type == "tool_use":
+                    name = str(block.get("name") or "tool")
+                    summaries.append(f"tool={name} {_summarize_tool_input(block.get('input'))}")
+        return "assistant " + "; ".join(summaries) if summaries else "assistant event"
+
+    if event_type == "user":
+        message = event.get("message")
+        if not isinstance(message, dict):
+            return "user event"
+        content = message.get("content")
+        if isinstance(content, list):
+            result_count = sum(
+                1 for block in content
+                if isinstance(block, dict) and block.get("type") == "tool_result"
+            )
+            if result_count:
+                return f"tool_result count={result_count}"
+        return "user event"
+
+    if event_type == "result":
+        duration = event.get("duration_ms")
+        cost = event.get("total_cost_usd")
+        turns = event.get("num_turns")
+        result = str(event.get("result") or "").strip()
+        parts = ["result"]
+        if subtype:
+            parts.append(subtype)
+        if turns is not None:
+            parts.append(f"turns={turns}")
+        if duration is not None:
+            parts.append(f"duration_ms={duration}")
+        if cost is not None:
+            parts.append(f"cost_usd={cost}")
+        if result:
+            parts.append(f"text={_truncate(result, 300)}")
+        return " ".join(parts)
+
+    return f"{event_type or 'unknown'} event"
+
+
+def _summarize_tool_input(tool_input: Any) -> str:
+    if not isinstance(tool_input, dict):
+        return ""
+    for key in ("file_path", "path", "pattern", "command"):
+        value = tool_input.get(key)
+        if isinstance(value, str) and value:
+            return f"{key}={_truncate(value, 180)}"
+    return _truncate(json.dumps(tool_input, sort_keys=True, default=str), 180)
+
+
+def _truncate(text: str, limit: int) -> str:
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)] + "…"
