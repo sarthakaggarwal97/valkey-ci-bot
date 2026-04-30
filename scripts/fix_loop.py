@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from scripts.ci_validator import dispatch_validation, poll_run
-from scripts.claude_code import extract_diff, run_claude_code
+from scripts.claude_code import run_claude_code
 
 if TYPE_CHECKING:
     from scripts.models import FailureReport, RootCauseReport
@@ -87,12 +87,14 @@ def run_fix_loop(
 
             last_patch = patch
 
-            # 2. Push the patch to a branch on the fork
+            # 2. Commit and push the edited files directly from the checkout
             try:
-                _push_patch_to_branch(
-                    fork_repo, fork_token, branch_name, base_sha, patch,
-                    commit_message=f"[bot-fix] Fix {report.job_name} (attempt {attempt})",
-                )
+                msg = f"[bot-fix] Fix {report.job_name} (attempt {attempt})"
+                _run(["git", "checkout", "-B", branch_name], cwd=repo_checkout)
+                _run(["git", "add", "-A"], cwd=repo_checkout)
+                _run(["git", "commit", "-m", msg, "--allow-empty"], cwd=repo_checkout)
+                _run(["git", "push", "--force", "origin", branch_name], cwd=repo_checkout)
+                logger.info("Pushed fix to %s/%s.", fork_repo, branch_name)
             except Exception as exc:
                 logger.error("Push failed (attempt %d): %s", attempt, exc)
                 _comment_on_issue(
@@ -176,7 +178,12 @@ def _generate_fix(
     validation_error: str,
     cwd: str,
 ) -> str | None:
-    """Call Claude Code to generate a fix patch."""
+    """Call Claude Code to edit files directly, then capture git diff.
+
+    Instead of asking Claude to output a diff (which often has formatting
+    issues), we let Claude use its Write tool to edit files in the checkout,
+    then run ``git diff`` to get a clean, apply-compatible patch.
+    """
     failure_desc = ""
     if report.parsed_failures:
         pf = report.parsed_failures[0]
@@ -198,16 +205,29 @@ def _generate_fix(
     if validation_error:
         prompt += f"\nPrevious attempt failed:\n{validation_error}\n"
     prompt += (
-        "\nRead the relevant source files, find the root cause, and generate "
-        "a minimal unified diff patch to fix it. Follow Valkey C coding style. "
-        "Output ONLY the unified diff (--- a/file, +++ b/file format)."
+        "\nRead the relevant source files, find the root cause, and EDIT "
+        "the files directly to fix the issue. Use the Write tool to modify "
+        "files in place. Make minimal changes following Valkey C coding style. "
+        "Do NOT output a diff — just edit the files."
     )
 
     try:
+        # Reset any previous changes
+        _run(["git", "checkout", "."], cwd=cwd)
+
+        # Let Claude edit files
         stdout, stderr, rc = run_claude_code(prompt, cwd=cwd)
-        patch = extract_diff(stdout)
-        if not patch and stdout.strip().startswith("---"):
-            patch = stdout.strip()
+
+        # Capture the diff from git
+        result = subprocess.run(
+            ["git", "diff"], cwd=cwd, capture_output=True, text=True,
+        )
+        patch = result.stdout.strip()
+        if not patch:
+            logger.warning("Claude edited no files (git diff empty).")
+            return None
+        logger.info("Claude produced a %d-line diff.", patch.count("\n"))
+        return patch
         return patch
     except Exception as exc:
         logger.error("Claude Code failed: %s", exc)

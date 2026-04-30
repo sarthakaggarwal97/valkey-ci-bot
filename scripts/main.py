@@ -1310,7 +1310,7 @@ def run_pipeline(
                         f'"is_flaky": false}}'
                     )
                     import json as _json
-                    rc_stdout, _, rc_rc = run_claude_code(rc_prompt, timeout=120)
+                    rc_stdout, _, rc_rc = run_claude_code(rc_prompt, timeout=300)
                     # Try to parse JSON from the output
                     rc_text = rc_stdout.strip()
                     if "```" in rc_text:
