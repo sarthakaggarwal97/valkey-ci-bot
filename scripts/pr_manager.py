@@ -93,11 +93,17 @@ def _build_pr_body(
     report: FailureReport,
     root_cause: RootCauseReport,
     workflow_run_url: str,
+    *,
+    unvalidated: bool = False,
 ) -> str:
     """Build the PR body per Requirement 6.4.
 
     Includes: link to failing CI run, parsed failure summary,
     root cause analysis, confidence level, and AI disclaimer.
+
+    When ``unvalidated=True`` (no matching validation profile), prepends
+    a prominent UNVALIDATED warning so reviewers know they must verify
+    the fix locally before merging.
     """
     lines: list[str] = []
     primary_failure = (
@@ -106,6 +112,18 @@ def _build_pr_body(
         else report.job_name
     )
 
+    if unvalidated:
+        lines.append("> [!WARNING]")
+        lines.append("> **UNVALIDATED — this patch was NOT validated by the agent.**")
+        lines.append(">")
+        lines.append(
+            "> No validation profile matched this job "
+            f"(`{report.job_name}`), so the agent could not locally build or "
+            "test the fix. **A maintainer must manually verify this patch "
+            "before merging** by reproducing the failing job locally, "
+            "applying the patch, and confirming the failure is resolved."
+        )
+        lines.append("")
     lines.append("## Fix Summary\n")
     lines.append(
         "This PR proposes an automated fix for "
@@ -318,6 +336,7 @@ class PRManager:
         target_branch: str,
         *,
         draft: bool = False,
+        unvalidated: bool = False,
     ) -> str:
         """Create a branch, apply patch, commit, open PR, apply label.
 
@@ -389,14 +408,20 @@ class PRManager:
             workflow_run_url = _build_workflow_run_url(
                 failure_report, self._repo_name,
             )
-            pr_body = _build_pr_body(failure_report, root_cause, workflow_run_url)
+            pr_body = _build_pr_body(
+                failure_report, root_cause, workflow_run_url,
+                unvalidated=unvalidated,
+            )
 
             # PR title
+            title_prefix = "[bot-fix]"
+            if unvalidated:
+                title_prefix = "[bot-fix][UNVALIDATED]"
             if failure_report.parsed_failures:
                 pf = failure_report.parsed_failures[0]
-                title = f"[bot-fix] Fix {pf.test_name or pf.failure_identifier} in {failure_report.job_name}"
+                title = f"{title_prefix} Fix {pf.test_name or pf.failure_identifier} in {failure_report.job_name}"
             else:
-                title = f"[bot-fix] Fix failure in {failure_report.job_name}"
+                title = f"{title_prefix} Fix failure in {failure_report.job_name}"
 
             # 4. Open PR
             pr = upsert_pull_request(

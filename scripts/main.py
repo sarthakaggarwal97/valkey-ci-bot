@@ -755,10 +755,16 @@ def _validate_fix(
     failure_store: FailureStore | None = None,
     fingerprint: str | None = None,
     metrics: dict[str, float | int] | None = None,
-) -> str | None:
+) -> tuple[str | None, bool]:
     """Run validation with retry-driven fix regeneration.
 
-    Returns the validated diff on success, or ``None`` if validation fails.
+    Returns ``(validated_diff, validated_ok)``:
+      - ``(diff, True)``  on validation pass
+      - ``(diff, False)`` when no validation profile matches — the diff is
+        returned unvalidated so the pipeline can still open a draft PR
+        with an explicit UNVALIDATED marker; maintainers verify locally.
+      - ``(None, False)`` when validation actually failed (test/build
+        error against a real profile) or an exception was raised.
     """
     use_flaky_campaign = root_cause.is_flaky and config.flaky_campaign_enabled
     max_validation_attempts = config.max_retries_validation + 1
@@ -792,7 +798,7 @@ def _validate_fix(
                 "Validation error for job %s (attempt %d/%d): %s",
                 report.job_name, attempt + 1, max_validation_attempts, exc,
             )
-            return None
+            return None, False
         finally:
             if metrics is not None:
                 metrics["validation_duration"] = metrics.get("validation_duration", 0.0) + (
@@ -826,6 +832,20 @@ def _validate_fix(
                 report.job_name, attempt + 1, max_validation_attempts,
             )
             break
+
+        # No validation profile matched — the agent can't locally validate
+        # this job (e.g. valgrind, TLS-module jobs without a configured
+        # profile). Return the candidate diff as UNVALIDATED so the
+        # pipeline can still open a draft PR for maintainer review.
+        # Retrying the fix generator wouldn't help — the blocker is
+        # config, not the patch.
+        if result.strategy == "missing-validation-profile":
+            logger.warning(
+                "No validation profile for job %s; returning diff as "
+                "UNVALIDATED so the pipeline can still open a draft PR.",
+                report.job_name,
+            )
+            return current_diff, False
 
         # Validation failed
         logger.warning(
@@ -872,7 +892,7 @@ def _validate_fix(
                     )
             except Exception as exc:
                 logger.error("Fix regeneration failed for job %s: %s", report.job_name, exc)
-                return None
+                return None, False
             finally:
                 if metrics is not None:
                     metrics["generation_duration"] = metrics.get("generation_duration", 0.0) + (
@@ -887,7 +907,7 @@ def _validate_fix(
                     "Fix regeneration returned None for job %s, abandoning.",
                     report.job_name,
                 )
-                return None
+                return None, False
             current_diff = new_diff
         else:
             # Retries exhausted — abandon the fix
@@ -895,12 +915,12 @@ def _validate_fix(
                 "Validation failed after %d attempts for job %s, abandoning fix.",
                 max_validation_attempts, report.job_name,
             )
-            return None
+            return None, False
     # Note: the for/else is intentionally omitted here — every loop
     # iteration either breaks (on pass) or returns None (on exhausted
     # retries / errors), so the else clause is unreachable.
 
-    return current_diff
+    return current_diff, True
 
 
 def _create_pr_from_validated_fix(
@@ -909,16 +929,32 @@ def _create_pr_from_validated_fix(
     validated_diff: str,
     pr_manager: PRManager,
     rate_limiter: RateLimiter,
+    *,
+    validated_ok: bool = True,
 ) -> str | None:
-    """Create a PR from a validated patch."""
+    """Create a PR from a (possibly unvalidated) patch.
+
+    When ``validated_ok`` is False (no validation profile matched), the PR
+    is opened as a draft with an UNVALIDATED warning prepended to the body.
+    """
     target_branch = report.target_branch or "unstable"
 
     try:
         pr_url = pr_manager.create_pr(
-            validated_diff, report, root_cause, target_branch,
+            validated_diff,
+            report,
+            root_cause,
+            target_branch,
+            draft=not validated_ok,
+            unvalidated=not validated_ok,
         )
         rate_limiter.record_pr_created()
-        logger.info("PR created for job %s: %s", report.job_name, pr_url)
+        logger.info(
+            "PR created for job %s%s: %s",
+            report.job_name,
+            " (UNVALIDATED, draft)" if not validated_ok else "",
+            pr_url,
+        )
         return pr_url
     except ValueError:
         # fork-pr-no-write-access
@@ -944,7 +980,7 @@ def _validate_and_create_pr(
 ) -> str | None:
     """Run Validate → PR stages with validation-failure retry loop."""
     del failure_store
-    validated_diff = _validate_fix(
+    validated_diff, validated_ok = _validate_fix(
         report,
         root_cause,
         diff,
@@ -962,6 +998,7 @@ def _validate_and_create_pr(
         validated_diff,
         pr_manager,
         rate_limiter,
+        validated_ok=validated_ok,
     )
 
 
@@ -1333,7 +1370,7 @@ def run_pipeline(
             )
 
             # Validate → PR (only if we have a diff)
-            validated_diff = _validate_fix(
+            validated_diff, validated_ok = _validate_fix(
                 report,
                 root_cause,
                 diff,
@@ -1359,7 +1396,7 @@ def run_pipeline(
                 continue
 
             event_ledger.record(
-                "validation.passed",
+                "validation.passed" if validated_ok else "validation.unvalidated",
                 fingerprint or job.name,
                 job_name=job.name,
                 failure_identifier=failure_id,
@@ -1441,6 +1478,7 @@ def run_pipeline(
                     validated_diff,
                     pr_manager,
                     rate_limiter,
+                    validated_ok=validated_ok,
                 )
                 pr_creation_duration = time.perf_counter() - pr_creation_start
                 if pr_url:
