@@ -1,0 +1,81 @@
+{
+  "captured_at": "2026-04-30T08:54:52.505914+00:00",
+  "date": "2026-04-30",
+  "repo": "valkey-io/valkey",
+  "run": {
+    "commit_message": "Update provenance action to refine layer2 exemption policies (#3593)",
+    "commit_sha": "98724dd",
+    "commits_since_prev": [
+      {
+        "author": "Binbin",
+        "date": "2026-04-29T02:27:04+00:00",
+        "message": "Skip cluster resharding test under valgrind (#3574)",
+        "sha": "bef46dacc1a4ffbd1c983d75b1a5eee00982fd6c"
+      },
+      {
+        "author": "Jim Brunner",
+        "date": "2026-04-29T06:13:56+00:00",
+        "message": "fix LTO compilation warning in eval (#3584)",
+        "sha": "16ed690fec06ddfb32f3da863e1201cc5cc9c9d6"
+      },
+      {
+        "author": "VoletiRam",
+        "date": "2026-04-29T16:18:37+00:00",
+        "message": "Add structured datasets loading capability in valkey benchmark (#2823)",
+        "sha": "39036c7c06f4ac1942aa7a36058cc79e555c9fde"
+      },
+      {
+        "author": "Jim Brunner",
+        "date": "2026-04-29T16:31:04+00:00",
+        "message": "fix compile warning in util.c (#3585)",
+        "sha": "ad404cd266e15add51007e38e75c0648a021198d"
+      },
+      {
+        "author": "bandalgomsu",
+        "date": "2026-04-29T17:39:12+00:00",
+        "message": "Fix GEOSEARCH BYPOLYGON leak on invalid COUNT (#3568)",
+        "sha": "7817ca8a736e70ed1205839d3a701342d348eac9"
+      },
+      {
+        "author": "abmathur-ie",
+        "date": "2026-04-29T21:13:40+00:00",
+        "message": "Set errno on EOF in syncRead and propagate it in logs (#3580)",
+        "sha": "678a06d21638e5a48e382a0a2193f32e870568d2"
+      },
+      {
+        "author": "Ping Xie",
+        "date": "2026-04-30T00:06:57+00:00",
+        "message": "Update provenance action to refine layer2 exemption policies (#3593)",
+        "sha": "98724dda089a279cc503974658a96d5a24ad4df0"
+      }
+    ],
+    "date": "2026-04-30",
+    "failed_job_names": [
+      "test-fedoralatest-tls-module",
+      "test-sanitizer-force-defrag",
+      "test-ubuntu-jemalloc-fortify",
+      "test-valgrind-no-malloc-usable-size-test"
+    ],
+    "failed_jobs": 4,
+    "failure_jobs": {
+      "test": [
+        73690738840,
+        73690738983,
+        73690739045,
+        73690739050
+      ]
+    },
+    "failure_names": [
+      "test"
+    ],
+    "full_sha": "98724dda089a279cc503974658a96d5a24ad4df0",
+    "run_id": 25141089135,
+    "run_url": "https://github.com/valkey-io/valkey/actions/runs/25141089135",
+    "status": "failure",
+    "total_jobs": 49,
+    "unique_failures": 1,
+    "workflow": "daily.yml"
+  },
+  "schema_version": 1,
+  "workflow": "daily.yml"
+}
