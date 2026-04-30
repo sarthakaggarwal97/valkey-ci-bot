@@ -819,6 +819,7 @@ def _invoke_claude_code(
         "Claude Code returned for run %s (rc=%d, %d chars).",
         context.run_id, rc, len(stdout),
     )
+    print(f"[FUZZER] Claude returned rc={rc}, stdout={len(stdout)} chars, stderr={len(stderr)} chars", flush=True)
     try:
         return _parse_model_payload(stdout)
     except Exception as exc:
@@ -826,6 +827,10 @@ def _invoke_claude_code(
             "Failed to parse Claude Code output for run %s: %s\nOutput: %s",
             context.run_id, exc, stdout[:500],
         )
+        print(f"[FUZZER] Parse failed for run {context.run_id}: {exc}", flush=True)
+        print(f"[FUZZER] Claude stdout ({len(stdout)} chars): {stdout[:500]}", flush=True)
+        print(f"[FUZZER] Claude stderr ({len(stderr)} chars): {stderr[:500]}", flush=True)
+        print(f"[FUZZER] Claude rc: {rc}", flush=True)
         return {}
 
 class FuzzerRunAnalyzer:
