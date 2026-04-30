@@ -1275,104 +1275,44 @@ def run_pipeline(
 
             reports.append(report)
 
-            # --- Issue-first pipeline (new flow) ---
-            # When VALKEY_FORK_REPO is set and we have parsed failures,
-            # use the new issue-first pipeline that opens a tracking issue,
-            # generates a fix, validates via daily.yml on the fork (when a
-            # test file is available), and opens a PR with validation evidence.
-            # For crash/valgrind failures without a test file, the pipeline
-            # still creates the issue and attempts a fix but skips CI
-            # validation (opens as a draft PR instead).
+            # --- Claude Code pipeline: one call with raw log ---
+            # When VALKEY_FORK_REPO is set, give Claude the raw CI log and
+            # let it figure out what failed + fix it in one shot.
             fork_repo = os.environ.get("VALKEY_FORK_REPO", "")
             fork_token_env = os.environ.get("FORK_TOKEN", "")
-            if (
-                fork_repo
-                and fork_token_env
-                and report.parsed_failures
-            ):
-                from scripts.pipeline_issue_first import process_failure_issue_first
-                pf = report.parsed_failures[0]
-                failure_id = pf.failure_identifier
-
-                # Root cause analysis via Claude Code CLI (fast, no custom tool-use loop)
-                try:
-                    from scripts.claude_code import run_claude_code
-                    pf = report.parsed_failures[0]
-                    rc_prompt = (
-                        f"Analyze this CI test failure in the Valkey project.\n\n"
-                        f"Test: {pf.test_name or pf.failure_identifier}\n"
-                        f"File: {pf.file_path}\n"
-                        f"Error: {pf.error_message}\n"
-                        f"Job: {report.job_name}\n\n"
-                        f"Respond with JSON only:\n"
-                        f'{{"description": "...", "files_to_change": ["file1.c"], '
-                        f'"confidence": "high|medium|low", "rationale": "...", '
-                        f'"is_flaky": false}}'
-                    )
-                    import json as _json
-                    rc_stdout, _, rc_rc = run_claude_code(rc_prompt, timeout=300)
-                    logger.info(
-                        "Claude root cause raw output for %s:\n%s",
-                        job.name, rc_stdout[:2000],
-                    )
-                    # Try to parse JSON from the output
-                    rc_text = rc_stdout.strip()
-                    if "```" in rc_text:
-                        # Strip markdown fences
-                        import re
-                        m = re.search(r"```(?:json)?\n(.+?)\n```", rc_text, re.DOTALL)
-                        if m:
-                            rc_text = m.group(1)
-                    rc_data = _json.loads(rc_text)
-                    root_cause = RootCauseReport(
-                        description=str(rc_data.get("description", "")),
-                        files_to_change=list(rc_data.get("files_to_change", [])),
-                        confidence=str(rc_data.get("confidence", "medium")),
-                        rationale=str(rc_data.get("rationale", "")),
-                        is_flaky=bool(rc_data.get("is_flaky", False)),
-                    )
-                    logger.info(
-                        "Root cause for %s: confidence=%s, description=%s, "
-                        "files=%s, is_flaky=%s",
-                        job.name, root_cause.confidence,
-                        root_cause.description[:200],
-                        root_cause.files_to_change,
-                        root_cause.is_flaky,
-                    )
-                except Exception as exc:
-                    logger.error("Root cause analysis failed for %s: %s", job.name, exc)
-                    summary.add_result(job.name, failure_id, "analysis-failed")
-                    continue
-
-                if not root_cause or not root_cause.description:
-                    summary.add_result(job.name, failure_id, "analysis-failed")
-                    continue
-
+            if fork_repo and fork_token_env:
+                failure_id = (
+                    report.parsed_failures[0].failure_identifier
+                    if report.parsed_failures else report.job_name
+                )
                 run_url = _build_workflow_run_url(report)
-                outcome = process_failure_issue_first(
-                    report=report,
-                    parsed_failure=pf,
-                    root_cause=root_cause,
-                    fix_generator=fix_generator,
-                    gh=gh,
-                    fork_repo=fork_repo,
-                    fork_token=fork_token_env,
-                    run_url=run_url,
-                    max_fix_attempts=config.max_retries_validation + 1,
-                    loop_count=100,
-                )
-                summary.add_result(
-                    job.name, failure_id, outcome.get("outcome", "error"),
-                )
-                if outcome.get("pr_url"):
-                    event_ledger.record(
-                        "pr.created",
-                        fingerprint or job.name,
-                        pr_url=outcome["pr_url"],
-                        job_name=job.name,
+
+                try:
+                    from scripts.claude_fix import fix_from_log
+                    result = fix_from_log(
+                        job_name=report.job_name,
+                        log_excerpt=report.raw_log_excerpt or "",
+                        parsed_failures=report.parsed_failures,
+                        fork_repo=fork_repo,
+                        fork_token=fork_token_env,
+                        base_sha=report.commit_sha,
+                        target_branch=report.target_branch or "unstable",
+                        run_url=run_url,
+                        gh=gh,
                     )
+                    summary.add_result(
+                        job.name, failure_id, result.get("outcome", "error"),
+                    )
+                    if result.get("pr_url"):
+                        event_ledger.record(
+                            "pr.created", fingerprint or job.name,
+                            pr_url=result["pr_url"], job_name=job.name,
+                        )
+                except Exception as exc:
+                    logger.error("Claude fix pipeline failed for %s: %s", job.name, exc)
+                    summary.add_result(job.name, failure_id, "error")
                 continue
-            # --- End issue-first pipeline ---
+            # --- End Claude Code pipeline ---
 
             existing_campaign = (
                 failure_store.get_flaky_campaign(fingerprint)
