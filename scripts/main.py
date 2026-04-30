@@ -1311,6 +1311,10 @@ def run_pipeline(
                     )
                     import json as _json
                     rc_stdout, _, rc_rc = run_claude_code(rc_prompt, timeout=300)
+                    logger.info(
+                        "Claude root cause raw output for %s:\n%s",
+                        job.name, rc_stdout[:2000],
+                    )
                     # Try to parse JSON from the output
                     rc_text = rc_stdout.strip()
                     if "```" in rc_text:
@@ -1326,6 +1330,14 @@ def run_pipeline(
                         confidence=str(rc_data.get("confidence", "medium")),
                         rationale=str(rc_data.get("rationale", "")),
                         is_flaky=bool(rc_data.get("is_flaky", False)),
+                    )
+                    logger.info(
+                        "Root cause for %s: confidence=%s, description=%s, "
+                        "files=%s, is_flaky=%s",
+                        job.name, root_cause.confidence,
+                        root_cause.description[:200],
+                        root_cause.files_to_change,
+                        root_cause.is_flaky,
                     )
                 except Exception as exc:
                     logger.error("Root cause analysis failed for %s: %s", job.name, exc)

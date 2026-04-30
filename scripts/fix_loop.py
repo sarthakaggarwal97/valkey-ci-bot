@@ -219,6 +219,7 @@ def _generate_fix(
 
         # Let Claude edit files
         stdout, stderr, rc = run_claude_code(prompt, cwd=cwd)
+        logger.info("Claude fix generation output (%d chars):\n%s", len(stdout), stdout[:1500])
 
         # Capture the diff from git
         result = subprocess.run(
@@ -228,8 +229,7 @@ def _generate_fix(
         if not patch:
             logger.warning("Claude edited no files (git diff empty).")
             return None
-        logger.info("Claude produced a %d-line diff.", patch.count("\n"))
-        return patch
+        logger.info("Claude produced a %d-line diff:\n%s", patch.count("\n"), patch[:1000])
         return patch
     except Exception as exc:
         logger.error("Claude Code failed: %s", exc)
