@@ -789,6 +789,7 @@ def _invoke_claude_code(
 
     prompt = "\n".join(prompt_parts)
     logger.info("Calling Claude Code for fuzzer run %s...", context.run_id)
+    print(f"[FUZZER] Calling Claude Code for run {context.run_id}...", flush=True)
     stdout, stderr, rc = run_claude_code(
         prompt, cwd=str(artifact_dir), timeout=300,
         allowed_tools="Read,Grep,Glob",
@@ -910,6 +911,7 @@ class FuzzerRunAnalyzer:
                 shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as exc:
             logger.warning("Fuzzer run analysis model call failed for run %s: %s", run_id, exc)
+            print(f"[FUZZER] Model call failed for run {run_id}: {exc}", flush=True)
 
         merged_anomalies = _dedupe_signals(
             anomalies + _signals_from_payload(model_payload.get("anomalies"))
