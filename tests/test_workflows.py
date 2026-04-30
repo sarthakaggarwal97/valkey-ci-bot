@@ -126,6 +126,31 @@ def test_backport_workflow_contract_and_token_handling() -> None:
     assert '--aws-region "${AWS_REGION_INPUT}"' in run_step["run"]
 
 
+def test_weekly_backport_sweep_workflow_contract() -> None:
+    workflow = _load_yaml(REPO_ROOT / ".github/workflows/weekly-backport-sweep.yml")
+    on_block = _get_on_block(workflow)
+
+    assert "schedule" in on_block
+    assert "workflow_dispatch" in on_block
+    assert workflow["env"]["FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"] is True
+    assert workflow["permissions"]["id-token"] == "write"
+
+    job = workflow["jobs"]["sweep"]
+    assert job["timeout-minutes"] == 360
+
+    run_step = next(
+        step
+        for step in job["steps"]
+        if step["name"] == "Run weekly backport sweep"
+    )
+    assert "-m scripts.backport_sweep" in run_step["run"]
+    assert run_step["env"]["BACKPORT_GITHUB_TOKEN"] == (
+        "${{ secrets.VALKEY_GITHUB_TOKEN || github.token }}"
+    )
+    assert "VALKEY_BACKPORT_PROJECT_NUMBER" in run_step["env"]["PROJECT_NUMBER"]
+    assert "--test-command" in run_step["run"]
+
+
 def test_example_caller_passes_bot_checkout_inputs() -> None:
     workflow = _load_yaml(REPO_ROOT / "examples/caller-workflow.yml")
 

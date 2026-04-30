@@ -270,3 +270,58 @@ class BackportPRCreator:
 
         logger.info("No duplicate backport PR found for %s", branch_name)
         return None
+
+    def find_existing_backport(
+        self,
+        source_pr_number: int,
+        target_branch: str,
+        source_pr_url: str,
+    ) -> str | None:
+        """Return an open or merged backport PR for a source PR if one exists."""
+        repo = retry_github_call(
+            lambda: self._github.get_repo(self._repo_full_name),
+            retries=3,
+            description=f"get repo {self._repo_full_name}",
+        )
+        branch_name = build_branch_name(source_pr_number, target_branch)
+        head = f"{repo.owner.login}:{branch_name}"
+        for state in ("open", "closed"):
+            pulls = retry_github_call(
+                lambda state=state: list(repo.get_pulls(state=state, head=head)),
+                retries=3,
+                description=f"search {state} backport PRs for duplicate",
+            )
+            for pr in pulls:
+                if getattr(pr, "state", "") == "open" or bool(getattr(pr, "merged", False)):
+                    logger.info("Found existing backport PR for #%d: %s", source_pr_number, pr.html_url)
+                    return pr.html_url
+
+        query = (
+            f"repo:{self._repo_full_name} is:pr base:{target_branch} "
+            f'"{source_pr_url}"'
+        )
+        try:
+            matches = retry_github_call(
+                lambda: list(self._github.search_issues(query=query)),
+                retries=3,
+                description="search existing backport PR bodies",
+            )
+        except Exception as exc:
+            logger.warning("Could not search for existing backport PRs: %s", exc)
+            return None
+
+        for issue in matches:
+            try:
+                pr = retry_github_call(
+                    lambda issue_number=issue.number: repo.get_pull(issue_number),
+                    retries=3,
+                    description=f"get candidate backport PR #{issue.number}",
+                )
+            except Exception as exc:
+                logger.warning("Could not inspect candidate backport PR #%s: %s", issue.number, exc)
+                continue
+            if getattr(pr, "state", "") == "open" or bool(getattr(pr, "merged", False)):
+                logger.info("Found existing backport PR for #%d: %s", source_pr_number, pr.html_url)
+                return pr.html_url
+
+        return None

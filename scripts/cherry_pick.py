@@ -42,6 +42,10 @@ class CherryPickExecutor:
         self._run_git("checkout", target_branch)
 
         if merge_commit_sha:
+            if not self._is_merge_commit(merge_commit_sha):
+                if merge_commit_sha in commit_shas:
+                    return self._cherry_pick_sequential(target_branch, commit_shas)
+                return self._cherry_pick_sequential(target_branch, [merge_commit_sha])
             return self._cherry_pick_merge(target_branch, merge_commit_sha)
         return self._cherry_pick_sequential(target_branch, commit_shas)
 
@@ -115,6 +119,12 @@ class CherryPickExecutor:
             success=True,
             applied_commits=[merge_commit_sha],
         )
+
+    def _is_merge_commit(self, commit_sha: str) -> bool:
+        """Return whether *commit_sha* has more than one parent."""
+        result = self._run_git("rev-list", "--parents", "-n", "1", commit_sha)
+        parts = result.stdout.strip().split()
+        return len(parts) > 2
 
     def _cherry_pick_sequential(
         self,

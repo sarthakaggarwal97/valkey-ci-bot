@@ -1,0 +1,154 @@
+name: Weekly Backport Sweep
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: "Repository to backport into"
+        required: false
+        type: string
+        default: "valkey-io/valkey"
+      project_owner:
+        description: "GitHub Project v2 owner"
+        required: false
+        type: string
+        default: "valkey-io"
+      project_owner_type:
+        description: "Project owner type"
+        required: false
+        type: choice
+        options:
+          - organization
+          - user
+        default: organization
+      project_number:
+        description: "GitHub Project v2 number"
+        required: false
+        type: string
+      status_field:
+        description: "Project field that contains the backport status"
+        required: false
+        type: string
+        default: "Status"
+      status_value:
+        description: "Project status value to sweep"
+        required: false
+        type: string
+        default: "To be backported"
+      branch_fields:
+        description: "Comma-separated project fields that can contain the release branch"
+        required: false
+        type: string
+        default: "Backport Branch,Target Branch,Release Branch,Branch,Version,Release,Folder"
+      test_commands:
+        description: "Newline-separated commands to run after each cherry-pick"
+        required: false
+        type: string
+        default: "make test"
+      push_repo:
+        description: "Push backport PRs to this fork instead of repo"
+        required: false
+        type: string
+        default: ""
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    concurrency:
+      group: weekly-backport-sweep-${{ inputs.repo || 'valkey-io/valkey' }}
+      cancel-in-progress: false
+    env:
+      CI_BOT_COMMIT_NAME: ${{ vars.CI_BOT_COMMIT_NAME || '' }}
+      CI_BOT_COMMIT_EMAIL: ${{ vars.CI_BOT_COMMIT_EMAIL || '' }}
+      CI_BOT_REQUIRE_DCO_SIGNOFF: ${{ vars.CI_BOT_REQUIRE_DCO_SIGNOFF || 'false' }}
+    steps:
+      - name: Checkout agent repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Configure AWS credentials from OIDC role
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: valkey-backport-sweep-${{ github.run_id }}
+          aws-region: ${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}
+
+      - name: Run weekly backport sweep
+        env:
+          AWS_DEFAULT_REGION: ${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}
+          BACKPORT_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN || github.token }}
+          REPO_FULL_NAME: ${{ inputs.repo || 'valkey-io/valkey' }}
+          PROJECT_OWNER: ${{ inputs.project_owner || 'valkey-io' }}
+          PROJECT_OWNER_TYPE: ${{ inputs.project_owner_type || 'organization' }}
+          PROJECT_NUMBER: ${{ inputs.project_number || vars.VALKEY_BACKPORT_PROJECT_NUMBER }}
+          STATUS_FIELD: ${{ inputs.status_field || 'Status' }}
+          STATUS_VALUE: ${{ inputs.status_value || 'To be backported' }}
+          BRANCH_FIELDS: ${{ inputs.branch_fields || vars.VALKEY_BACKPORT_BRANCH_FIELDS || 'Backport Branch,Target Branch,Release Branch,Branch,Version,Release,Folder' }}
+          TEST_COMMANDS: ${{ inputs.test_commands || vars.VALKEY_BACKPORT_TEST_COMMANDS || 'make test' }}
+          PUSH_REPO: ${{ inputs.push_repo || vars.VALKEY_BACKPORT_PUSH_REPO || '' }}
+          AWS_REGION_INPUT: ${{ vars.CI_BOT_AWS_REGION || 'us-east-1' }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${REPO_FULL_NAME}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "Invalid repo: ${REPO_FULL_NAME}" >&2
+            exit 1
+          fi
+          if [[ ! "${PROJECT_OWNER}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+            echo "Invalid project_owner: ${PROJECT_OWNER}" >&2
+            exit 1
+          fi
+          if [[ "${PROJECT_OWNER_TYPE}" != "organization" && "${PROJECT_OWNER_TYPE}" != "user" ]]; then
+            echo "Invalid project_owner_type: ${PROJECT_OWNER_TYPE}" >&2
+            exit 1
+          fi
+          if [[ ! "${PROJECT_NUMBER}" =~ ^[0-9]+$ ]]; then
+            echo "VALKEY_BACKPORT_PROJECT_NUMBER or project_number is required." >&2
+            exit 1
+          fi
+          if [[ -n "${PUSH_REPO}" && ! "${PUSH_REPO}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "Invalid push_repo: ${PUSH_REPO}" >&2
+            exit 1
+          fi
+
+          args=(
+            -m scripts.backport_sweep
+            --repo "${REPO_FULL_NAME}"
+            --project-owner "${PROJECT_OWNER}"
+            --project-owner-type "${PROJECT_OWNER_TYPE}"
+            --project-number "${PROJECT_NUMBER}"
+            --status-field "${STATUS_FIELD}"
+            --status-value "${STATUS_VALUE}"
+            --branch-fields "${BRANCH_FIELDS}"
+            --aws-region "${AWS_REGION_INPUT}"
+          )
+          if [[ -n "${PUSH_REPO}" ]]; then
+            args+=(--push-repo "${PUSH_REPO}")
+          fi
+          while IFS= read -r command; do
+            if [[ -n "${command}" ]]; then
+              args+=(--test-command "${command}")
+            fi
+          done <<< "${TEST_COMMANDS}"
+          python "${args[@]}"

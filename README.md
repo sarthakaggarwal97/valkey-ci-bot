@@ -317,6 +317,16 @@ Example consumer-repo files:
 - `examples/backport-caller-workflow.yml` — caller workflow triggered on `pull_request_target` `labeled` events
 - `examples/backport-config.yml` — configuration with all available settings and defaults
 
+The scheduled workflow at `.github/workflows/weekly-backport-sweep.yml` handles
+the project-board flow. Once `VALKEY_BACKPORT_PROJECT_NUMBER` points at the
+Valkey GitHub Project, the weekly run scans release branches matching
+`<major>.<minor>`, finds merged PRs in the `To be backported` status for each
+branch field/folder, skips PRs with an existing open or merged backport, batches
+the remaining cherry-picks per release branch, runs the configured test command
+after each cherry-pick, and opens one release-branch PR listing every source PR
+and commit included. The GitHub token used by this workflow must be able to read
+Projects v2 data; a PAT or app token with project read access is recommended.
+
 Required GitHub configuration in the consumer repo:
 
 - caller workflow permission: `id-token: write`

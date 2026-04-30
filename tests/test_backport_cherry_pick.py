@@ -28,13 +28,23 @@ def _fail(stdout: str = "", stderr: str = "") -> subprocess.CompletedProcess[str
     )
 
 
+def _merge_commit() -> subprocess.CompletedProcess[str]:
+    """Return rev-list output for a two-parent merge commit."""
+    return _ok(stdout="merge_sha parent_a parent_b\n")
+
+
+def _single_parent_commit() -> subprocess.CompletedProcess[str]:
+    """Return rev-list output for a normal single-parent commit."""
+    return _ok(stdout="commit_sha parent_a\n")
+
+
 class TestCleanCherryPickWithMergeCommit:
     """Scenario 1: Clean cherry-pick using merge commit SHA."""
 
     @patch("scripts.cherry_pick.subprocess.run")
     def test_returns_success(self, mock_run: MagicMock) -> None:
         # checkout succeeds, cherry-pick -m 1 succeeds
-        mock_run.side_effect = [_ok(), _ok()]
+        mock_run.side_effect = [_ok(), _merge_commit(), _ok()]
 
         executor = CherryPickExecutor("/repo")
         result = executor.execute("8.1", "abc123merge", ["sha1", "sha2"])
@@ -45,7 +55,7 @@ class TestCleanCherryPickWithMergeCommit:
 
     @patch("scripts.cherry_pick.subprocess.run")
     def test_calls_checkout_then_cherry_pick(self, mock_run: MagicMock) -> None:
-        mock_run.side_effect = [_ok(), _ok()]
+        mock_run.side_effect = [_ok(), _merge_commit(), _ok()]
 
         executor = CherryPickExecutor("/repo")
         executor.execute("8.1", "abc123merge", ["sha1"])
@@ -53,8 +63,8 @@ class TestCleanCherryPickWithMergeCommit:
         calls = mock_run.call_args_list
         # First call: git checkout 8.1
         assert calls[0][0][0] == ["git", "checkout", "8.1"]
-        # Second call: git cherry-pick -m 1 <merge_sha>
-        assert calls[1][0][0] == ["git", "cherry-pick", "-m", "1", "abc123merge"]
+        # Third call: git cherry-pick -m 1 <merge_sha>
+        assert calls[2][0][0] == ["git", "cherry-pick", "-m", "1", "abc123merge"]
 
 
 class TestCleanCherryPickSequential:
@@ -95,6 +105,7 @@ class TestConflictDetection:
     ) -> None:
         mock_run.side_effect = [
             _ok(),                                      # checkout
+            _merge_commit(),                            # rev-list parents
             _fail(stderr="conflict"),                    # cherry-pick -m 1 fails
             _ok(stdout="src/server.c\nsrc/config.c\n"), # git diff --name-only --diff-filter=U
             _ok(stdout="target content"),                # git show 8.1:src/server.c
@@ -141,6 +152,7 @@ class TestConflictDetection:
     ) -> None:
         mock_run.side_effect = [
             _ok(),                                  # checkout
+            _merge_commit(),                        # rev-list parents
             _fail(),                                # cherry-pick fails
             _ok(stdout="src/main.c\n"),             # git diff
             _ok(stdout="target branch content"),    # git show 8.1:src/main.c
@@ -163,6 +175,7 @@ class TestConflictDetection:
     ) -> None:
         mock_run.side_effect = [
             _ok(),                          # checkout
+            _merge_commit(),                # rev-list parents
             _fail(),                        # cherry-pick fails
             _ok(stdout="new_file.c\n"),     # git diff
             _fail(stderr="not found"),      # git show target branch fails
@@ -182,12 +195,12 @@ class TestMergeCommitPreference:
 
     @patch("scripts.cherry_pick.subprocess.run")
     def test_uses_m1_flag_when_merge_sha_provided(self, mock_run: MagicMock) -> None:
-        mock_run.side_effect = [_ok(), _ok()]
+        mock_run.side_effect = [_ok(), _merge_commit(), _ok()]
 
         executor = CherryPickExecutor("/repo")
         executor.execute("8.1", "merge_sha_abc", ["sha1", "sha2"])
 
-        cherry_pick_call = mock_run.call_args_list[1]
+        cherry_pick_call = mock_run.call_args_list[2]
         cmd = cherry_pick_call[0][0]
         assert cmd == ["git", "cherry-pick", "-m", "1", "merge_sha_abc"]
 
@@ -195,14 +208,39 @@ class TestMergeCommitPreference:
     def test_ignores_individual_commits_when_merge_sha_provided(
         self, mock_run: MagicMock,
     ) -> None:
-        mock_run.side_effect = [_ok(), _ok()]
+        mock_run.side_effect = [_ok(), _merge_commit(), _ok()]
 
         executor = CherryPickExecutor("/repo")
         result = executor.execute("8.1", "merge_sha", ["sha1", "sha2", "sha3"])
 
-        # Only 2 subprocess calls: checkout + single cherry-pick
-        assert mock_run.call_count == 2
+        # checkout + parent inspection + single cherry-pick
+        assert mock_run.call_count == 3
         assert result.applied_commits == ["merge_sha"]
+
+    @patch("scripts.cherry_pick.subprocess.run")
+    def test_cherry_picks_squash_merge_commit_without_m1(
+        self, mock_run: MagicMock,
+    ) -> None:
+        mock_run.side_effect = [_ok(), _single_parent_commit(), _ok()]
+
+        executor = CherryPickExecutor("/repo")
+        result = executor.execute("8.1", "squash_sha", ["sha1", "sha2"])
+
+        assert mock_run.call_args_list[2][0][0] == ["git", "cherry-pick", "squash_sha"]
+        assert result.applied_commits == ["squash_sha"]
+
+    @patch("scripts.cherry_pick.subprocess.run")
+    def test_rebase_merge_cherry_picks_each_pr_commit(
+        self, mock_run: MagicMock,
+    ) -> None:
+        mock_run.side_effect = [_ok(), _single_parent_commit(), _ok(), _ok()]
+
+        executor = CherryPickExecutor("/repo")
+        result = executor.execute("8.1", "sha2", ["sha1", "sha2"])
+
+        assert mock_run.call_args_list[2][0][0] == ["git", "cherry-pick", "sha1"]
+        assert mock_run.call_args_list[3][0][0] == ["git", "cherry-pick", "sha2"]
+        assert result.applied_commits == ["sha1", "sha2"]
 
     @patch("scripts.cherry_pick.subprocess.run")
     def test_falls_back_to_sequential_when_no_merge_sha(
@@ -241,7 +279,7 @@ class TestSubprocessCwd:
 
     @patch("scripts.cherry_pick.subprocess.run")
     def test_all_calls_use_repo_dir(self, mock_run: MagicMock) -> None:
-        mock_run.side_effect = [_ok(), _ok()]
+        mock_run.side_effect = [_ok(), _merge_commit(), _ok()]
 
         executor = CherryPickExecutor("/my/repo/path")
         executor.execute("8.1", "sha", [])

@@ -249,6 +249,60 @@ def test_create_backport_pr_uses_configured_labels() -> None:
     )
 
 
+def test_find_existing_backport_finds_open_batch_pr_from_source_url() -> None:
+    mock_github = MagicMock()
+    mock_repo = MagicMock()
+    mock_github.get_repo.return_value = mock_repo
+    type(mock_repo.owner).login = PropertyMock(return_value="valkey-io")
+    mock_repo.get_pulls.side_effect = [[], []]
+
+    mock_issue = MagicMock()
+    mock_issue.number = 456
+    mock_github.search_issues.return_value = [mock_issue]
+
+    mock_pr = MagicMock()
+    mock_pr.state = "open"
+    mock_pr.merged = False
+    mock_pr.html_url = "https://github.com/valkey-io/valkey/pull/456"
+    mock_repo.get_pull.return_value = mock_pr
+
+    creator = BackportPRCreator(mock_github, "valkey-io/valkey")
+    existing = creator.find_existing_backport(
+        123,
+        "8.1",
+        "https://github.com/valkey-io/valkey/pull/123",
+    )
+
+    assert existing == mock_pr.html_url
+    mock_github.search_issues.assert_called_once_with(
+        query=(
+            'repo:valkey-io/valkey is:pr base:8.1 '
+            '"https://github.com/valkey-io/valkey/pull/123"'
+        )
+    )
+
+
+def test_find_existing_backport_ignores_closed_unmerged_attempt() -> None:
+    mock_github = MagicMock()
+    mock_repo = MagicMock()
+    mock_github.get_repo.return_value = mock_repo
+    type(mock_repo.owner).login = PropertyMock(return_value="valkey-io")
+
+    closed_unmerged = MagicMock()
+    closed_unmerged.state = "closed"
+    closed_unmerged.merged = False
+    mock_repo.get_pulls.side_effect = [[], [closed_unmerged]]
+    mock_github.search_issues.return_value = []
+
+    creator = BackportPRCreator(mock_github, "valkey-io/valkey")
+
+    assert creator.find_existing_backport(
+        123,
+        "8.1",
+        "https://github.com/valkey-io/valkey/pull/123",
+    ) is None
+
+
 # ---------------------------------------------------------------------------
 # Feature: backport-agent, Property 13: Duplicate detection uses branch naming convention
 # ---------------------------------------------------------------------------
