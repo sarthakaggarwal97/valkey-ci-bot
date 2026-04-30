@@ -1033,6 +1033,9 @@ def run_pipeline(
         gh, repo_name, config_path, ref=workflow_run.head_sha,
     )
     config = apply_valkey_runtime_defaults(config, valkey_context)
+    fork_repo = os.environ.get("VALKEY_FORK_REPO", "")
+    fork_token_env = os.environ.get("FORK_TOKEN", "")
+    use_claude_fix = bool(fork_repo and fork_token_env)
     if (
         config.monitored_workflows
         and workflow_run.workflow_file
@@ -1090,7 +1093,9 @@ def run_pipeline(
     # Wire the AI fallback parser: invoked only when deterministic parsers
     # fail to extract any structured failure. Default enabled; operators
     # can disable via config.ai_fallback_parser_enabled=false.
-    if getattr(config, "ai_fallback_parser_enabled", True):
+    if use_claude_fix:
+        logger.info("Claude Code remediation enabled; skipping AI fallback parser.")
+    elif getattr(config, "ai_fallback_parser_enabled", True):
         from scripts.parsers.ai_fallback_parser import AIFallbackParser
         parser_router.set_fallback(AIFallbackParser(bedrock_client))
 
@@ -1220,13 +1225,19 @@ def run_pipeline(
         )
 
         if report.is_unparseable or not report.parsed_failures:
-            logger.info(
-                "Skipping job %s from analysis: unparseable failures do not consume "
-                "the per-run analysis cap.",
-                job.name,
-            )
-            summary.add_result(job.name, "", "unparseable")
-            continue
+            if use_claude_fix:
+                logger.info(
+                    "Keeping job %s for Claude Code remediation despite unparseable parser output.",
+                    job.name,
+                )
+            else:
+                logger.info(
+                    "Skipping job %s from analysis: unparseable failures do not consume "
+                    "the per-run analysis cap.",
+                    job.name,
+                )
+                summary.add_result(job.name, "", "unparseable")
+                continue
 
         prepared_candidates.append(
             PreparedFailureCandidate(
@@ -1240,14 +1251,14 @@ def run_pipeline(
     if config.max_failures_per_run > 0 and len(prepared_candidates) > config.max_failures_per_run:
         skipped = prepared_candidates[config.max_failures_per_run:]
         for candidate in skipped:
-            logger.warning(
-                "Skipping job %s: skipped-rate-limit (max %d structured failures per run exceeded).",
+            logger.info(
+                "Skipping job %s: skipped-rate-limit (max %d failures per run exceeded).",
                 candidate.job.name, config.max_failures_per_run,
             )
             summary.add_result(candidate.job.name, "", "skipped-rate-limit")
         prepared_candidates = prepared_candidates[: config.max_failures_per_run]
 
-    # Process each selected structured failure through Analyze → Fix → Validate → PR
+    # Process each selected failure through Claude Code or the legacy Analyze → Fix → Validate → PR flow.
     # Cache root cause results so correlated failures (same commit + error
     # signature) share a single analysis instead of redundant Bedrock calls.
     _root_cause_cache: dict[str, tuple[RootCauseReport | None, str]] = {}
@@ -1265,21 +1276,11 @@ def run_pipeline(
                 "fix_retries": 0,
                 "validation_retries": 0,
             }
-            # Check token budget before Bedrock-backed stages
-            if not rate_limiter.can_use_tokens(1):
-                logger.warning(
-                    "Skipping job %s: token-budget-exhausted.", job.name,
-                )
-                summary.add_result(job.name, "", "skipped-token-budget-exhausted")
-                continue
-
             reports.append(report)
 
             # --- Claude Code pipeline: one call with raw log ---
             # When VALKEY_FORK_REPO is set, give Claude the raw CI log and
             # let it figure out what failed + fix it in one shot.
-            fork_repo = os.environ.get("VALKEY_FORK_REPO", "")
-            fork_token_env = os.environ.get("FORK_TOKEN", "")
             if fork_repo and fork_token_env:
                 failure_id = (
                     report.parsed_failures[0].failure_identifier
@@ -1301,6 +1302,7 @@ def run_pipeline(
                         gh=gh,
                         job_id=job.id,
                         repo_full_name=report.repo_full_name or repo_name,
+                        target_token=github_token,
                     )
                     summary.add_result(
                         job.name, failure_id, result.get("outcome", "error"),
@@ -1315,6 +1317,15 @@ def run_pipeline(
                     summary.add_result(job.name, failure_id, "error")
                 continue
             # --- End Claude Code pipeline ---
+
+            # Check token budget before Bedrock-backed stages. Claude Code is not
+            # metered by this limiter, so it runs before this guard.
+            if not rate_limiter.can_use_tokens(1):
+                logger.warning(
+                    "Skipping job %s: token-budget-exhausted.", job.name,
+                )
+                summary.add_result(job.name, "", "skipped-token-budget-exhausted")
+                continue
 
             existing_campaign = (
                 failure_store.get_flaky_campaign(fingerprint)

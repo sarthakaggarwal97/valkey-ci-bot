@@ -29,8 +29,8 @@ def run_claude_code(
     cwd: str | None = None,
     timeout: int = 600,
     model: str | None = None,
-    max_turns: int = 30,
-    allowed_tools: str = "Read,Write,Bash,Glob,Grep",
+    max_turns: int = 80,
+    allowed_tools: str = "Read,Edit,MultiEdit,Write,Bash,Glob,Grep",
 ) -> tuple[str, str, int]:
     """Run claude CLI and return (stdout, stderr, exit_code).
 

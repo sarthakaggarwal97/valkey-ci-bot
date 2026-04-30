@@ -8,7 +8,7 @@ failure identifier, adds a comment instead of creating a duplicate.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from scripts.github_client import retry_github_call
 from scripts.publish_guard import check_publish_allowed
@@ -74,7 +74,7 @@ def _build_issue_body(
 
 def _find_existing_issue(
     repo, failure_identifier: str,
-) -> object | None:
+) -> Any | None:
     """Search open issues for one matching this failure identifier."""
     marker = f"{_ISSUE_MARKER_PREFIX}{failure_identifier}"
     try:
