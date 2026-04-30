@@ -5,10 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import time
+from base64 import b64decode
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict
+from urllib import request as urllib_request
 
 if TYPE_CHECKING:
     from github import Github
@@ -33,7 +36,29 @@ def _is_write_conflict(exc: Exception) -> bool:
     if status in {409, 422}:
         return True
     message = str(exc).lower()
-    return "sha" in message or "already exists" in message or "conflict" in message
+    if "sha" in message or "already exists" in message or "conflict" in message:
+        return True
+    return status == 403 and "unable to validate" in message
+
+
+def _read_contents_text(contents: Any) -> str:
+    try:
+        return contents.decoded_content.decode("utf-8")
+    except AssertionError:
+        encoding = getattr(contents, "encoding", None)
+        content = getattr(contents, "content", None)
+        if isinstance(content, str) and encoding == "base64":
+            return b64decode(content.encode("utf-8")).decode("utf-8")
+
+        download_url = getattr(contents, "download_url", None)
+        if isinstance(download_url, str) and download_url:
+            request = urllib_request.Request(
+                download_url,
+                headers={"Accept": "application/vnd.github.raw+json"},
+            )
+            with urllib_request.urlopen(request, timeout=30) as response:
+                return response.read().decode("utf-8")
+        raise
 
 
 @dataclass
@@ -198,6 +223,7 @@ class EventLedger:
                             attempt,
                             _MAX_PERSIST_ATTEMPTS,
                         )
+                        time.sleep(attempt * 2)
                         continue
                     raise
         except Exception as exc:
@@ -215,7 +241,7 @@ class EventLedger:
 
         if isinstance(contents, list):
             raise ValueError("Event ledger path resolved to a directory.")
-        return contents.decoded_content.decode("utf-8"), contents
+        return _read_contents_text(contents), contents
 
     def _merge(self, remote_text: str) -> str:
         existing_ids = {

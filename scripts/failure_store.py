@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import time
 from base64 import b64decode
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -73,13 +74,15 @@ def _is_missing_store_error(exc: Exception) -> bool:
 
 
 def _is_write_conflict(exc: Exception) -> bool:
-    """Return True when a GitHub write failed due to a stale file SHA."""
+    """Return True when a GitHub write failed due to a retryable remote condition."""
     if not isinstance(exc, GithubException):
         return False
     if exc.status in {409, 422}:
         return True
     message = str(exc).lower()
-    return "sha" in message or "already exists" in message or "conflict" in message
+    if "sha" in message or "already exists" in message or "conflict" in message:
+        return True
+    return exc.status == 403 and "unable to validate" in message
 
 
 def _parse_pr_url(pr_url: str) -> tuple[str, int] | None:
@@ -1252,6 +1255,7 @@ class FailureStore:
                             attempt,
                             _MAX_PERSIST_ATTEMPTS,
                         )
+                        time.sleep(attempt * 2)
                         continue
                     raise
         except Exception as exc:
