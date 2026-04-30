@@ -825,8 +825,8 @@ def _invoke_claude_code(
     for line in stdout.strip().splitlines():
         try:
             event = json.loads(line)
-            if event.get("type") == "result" and "text" in event:
-                result_text = event["text"]
+            if event.get("type") == "result" and "result" in event:
+                result_text = event["result"]
         except (json.JSONDecodeError, TypeError):
             continue
     if not result_text:
