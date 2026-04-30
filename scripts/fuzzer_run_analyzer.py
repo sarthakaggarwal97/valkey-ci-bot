@@ -758,9 +758,14 @@ def _invoke_claude_code(
         f"Seed: {context.seed or 'unknown'}",
         "",
         "## Source code",
-        "The Valkey source code at the tested commit is in the current directory.",
-        "Key files: src/cluster.c, src/cluster_legacy.c, src/replication.c, src/server.c, src/debug.c",
+        "The Valkey source code at the tested commit is in valkey/ directory.",
+        "Key files: valkey/src/cluster.c, valkey/src/cluster_legacy.c, valkey/src/replication.c, valkey/src/server.c",
         "Use Grep to look up assertions, crash handlers, or specific functions referenced in logs.",
+        "",
+        "## Fuzzer source code",
+        "The valkey-fuzzer source is in valkey-fuzzer/ directory.",
+        "Check valkey-fuzzer/src/ for validation logic, chaos operations, and scenario execution.",
+        "Use this to determine if a failure is a Valkey bug or a fuzzer validation bug.",
         "",
         "## Fuzzer artifacts",
         "Fuzzer run artifacts are in _fuzzer_artifacts/ subdirectory.",
@@ -789,7 +794,9 @@ def _invoke_claude_code(
     prompt_parts.extend([
         "## Your task",
         "Analyze this fuzzer run. Read the artifact files and source code as needed.",
-        "If you see a crash or assertion, grep the source code to understand the root cause.",
+        "If you see a crash or assertion, grep the Valkey source to understand the root cause.",
+        "If a validation check failed, read the fuzzer source to verify the check is correct.",
+        "Distinguish between: (1) real Valkey bugs, (2) fuzzer validation bugs, (3) expected chaos noise.",
         "Return ONLY valid JSON matching this schema:",
         '{',
         '  "overall_status": "normal|warning|anomalous",',
@@ -805,7 +812,7 @@ def _invoke_claude_code(
     prompt = "\n".join(prompt_parts)
     logger.info("Calling Claude Code for fuzzer run %s...", context.run_id)
     stdout, stderr, rc = run_claude_code(
-        prompt, cwd=str(artifact_dir), timeout=300,
+        prompt, cwd=str(artifact_dir), timeout=1200,
         allowed_tools="Read,Grep,Glob",
     )
     logger.info(
@@ -919,24 +926,36 @@ class FuzzerRunAnalyzer:
                 source_repo = context.repo.replace("valkey-fuzzer", "valkey")
                 if "/" not in source_repo:
                     source_repo = "valkey-io/valkey"
+                valkey_dir = tmpdir / "valkey"
                 clone_result = subprocess.run(
                     ["git", "clone", "--depth", "1",
                      f"https://github.com/{source_repo}.git",
-                     str(tmpdir), "--branch", "unstable"],
+                     str(valkey_dir), "--branch", "unstable"],
                     capture_output=True, text=True, timeout=60,
                 )
                 if clone_result.returncode != 0:
-                    logger.warning("Shallow clone failed, continuing without source: %s",
-                                   clone_result.stderr[:200])
+                    logger.warning("Valkey clone failed: %s", clone_result.stderr[:200])
                 elif context.head_sha:
                     subprocess.run(
                         ["git", "fetch", "--depth", "1", "origin", context.head_sha],
-                        cwd=str(tmpdir), capture_output=True, text=True, timeout=30,
+                        cwd=str(valkey_dir), capture_output=True, text=True, timeout=30,
                     )
                     subprocess.run(
                         ["git", "checkout", context.head_sha],
-                        cwd=str(tmpdir), capture_output=True, text=True, timeout=10,
+                        cwd=str(valkey_dir), capture_output=True, text=True, timeout=10,
                     )
+
+                # Clone the fuzzer source so Claude can check if a failure is
+                # a fuzzer bug (wrong validation) vs a real Valkey bug.
+                fuzzer_dir = tmpdir / "valkey-fuzzer"
+                fuzzer_clone = subprocess.run(
+                    ["git", "clone", "--depth", "1",
+                     f"https://github.com/{context.repo}.git",
+                     str(fuzzer_dir)],
+                    capture_output=True, text=True, timeout=60,
+                )
+                if fuzzer_clone.returncode != 0:
+                    logger.warning("Fuzzer clone failed: %s", fuzzer_clone.stderr[:200])
 
                 det_summary = _format_deterministic_summary(anomalies, normal_signals)
                 model_payload = _invoke_claude_code(
