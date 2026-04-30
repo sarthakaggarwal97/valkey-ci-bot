@@ -25,7 +25,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_MAX_LOG_CHARS = 120_000
+_MAX_LOG_CHARS = 45_000
+_LOG_TAIL_CHARS = 22_000
+_LOG_MARKER_CONTEXT_LINES = 12
 _FAILURE_MARKER_RE = re.compile(
     r"(error|fail|failed|failure|assert|crash|signal|sanitizer|valgrind|timeout|panic|exception)",
     re.IGNORECASE,
@@ -216,31 +218,37 @@ def _compact_log_for_prompt(log_text: str, max_chars: int = _MAX_LOG_CHARS) -> s
     lines = log_text.splitlines()
     marker_blocks: list[str] = []
     used_ranges: list[tuple[int, int]] = []
-    marker_budget = max_chars // 3
+    tail_budget = min(_LOG_TAIL_CHARS, max_chars // 2)
+    marker_budget = max(0, max_chars - tail_budget - 200)
     marker_chars = 0
 
-    for index, line in enumerate(lines):
+    for index in range(len(lines) - 1, -1, -1):
+        line = lines[index]
         if not _FAILURE_MARKER_RE.search(line):
             continue
-        start = max(0, index - 25)
-        end = min(len(lines), index + 26)
+        start = max(0, index - _LOG_MARKER_CONTEXT_LINES)
+        end = min(len(lines), index + _LOG_MARKER_CONTEXT_LINES + 1)
         if any(start <= old_end and end >= old_start for old_start, old_end in used_ranges):
             continue
         block = "\n".join(lines[start:end])
+        if marker_chars + len(block) > marker_budget:
+            block = block[: max(0, marker_budget - marker_chars)]
+        if not block:
+            break
         marker_blocks.append(block)
         used_ranges.append((start, end))
         marker_chars += len(block)
         if marker_chars >= marker_budget:
             break
 
-    marker_text = "\n\n[...]\n\n".join(marker_blocks)
+    marker_text = "\n\n[...]\n\n".join(reversed(marker_blocks))
     if marker_text:
         prefix = f"[selected failure-context lines]\n{marker_text}\n\n[tail of job log]\n"
     else:
         prefix = "[tail of job log]\n"
     if len(prefix) >= max_chars:
         return prefix[:max_chars]
-    tail_budget = max(0, max_chars - len(prefix))
+    tail_budget = min(tail_budget, max_chars - len(prefix))
     tail_text = log_text[-tail_budget:] if tail_budget else ""
     return prefix + tail_text
 

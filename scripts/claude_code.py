@@ -31,6 +31,7 @@ def run_claude_code(
     cwd: str | None = None,
     timeout: int = 600,
     model: str | None = _DEFAULT_CLAUDE_MODEL,
+    effort: str | None = "high",
     max_turns: int = 80,
     allowed_tools: str = "Read,Edit,MultiEdit,Write,Bash,Glob,Grep",
 ) -> tuple[str, str, int]:
@@ -52,6 +53,8 @@ def run_claude_code(
     ]
     if model:
         cmd.extend(["--model", model])
+    if effort:
+        cmd.extend(["--effort", effort])
 
     logger.info("Running claude: cwd=%s, timeout=%d, prompt=%s…", cwd, timeout, prompt[:120])
     try:

@@ -20,7 +20,8 @@ def test_run_claude_code_uses_edit_tools_and_bedrock_env(monkeypatch):
 
     assert (stdout, stderr, rc) == ("done", "", 0)
     assert captured["cmd"][:4] == ["claude", "--print", "--max-turns", "80"]
-    assert captured["cmd"][-2:] == ["--model", "opus"]
+    assert captured["cmd"][captured["cmd"].index("--model") + 1] == "opus"
+    assert captured["cmd"][captured["cmd"].index("--effort") + 1] == "high"
     allowed_tools = captured["cmd"][captured["cmd"].index("--allowedTools") + 1]
     assert "Edit" in allowed_tools
     assert "MultiEdit" in allowed_tools
@@ -45,7 +46,7 @@ def test_run_claude_code_preserves_existing_region_and_model(monkeypatch):
     stdout, stderr, rc = claude_code.run_claude_code("prompt", model="model-id")
 
     assert (stdout, stderr, rc) == ("ok", "warn", 0)
-    assert captured["cmd"][-2:] == ["--model", "model-id"]
+    assert captured["cmd"][captured["cmd"].index("--model") + 1] == "model-id"
     assert captured["env"]["AWS_REGION"] == "us-west-2"
 
 
