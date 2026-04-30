@@ -20,12 +20,14 @@ def test_run_claude_code_uses_edit_tools_and_bedrock_env(monkeypatch):
 
     assert (stdout, stderr, rc) == ("done", "", 0)
     assert captured["cmd"][:4] == ["claude", "--print", "--max-turns", "80"]
+    assert captured["cmd"][-2:] == ["--model", "opus"]
     allowed_tools = captured["cmd"][captured["cmd"].index("--allowedTools") + 1]
     assert "Edit" in allowed_tools
     assert "MultiEdit" in allowed_tools
     assert captured["kwargs"]["input"] == "fix this"
     assert captured["kwargs"]["cwd"] == "/tmp/checkout"
     assert captured["kwargs"]["env"]["CLAUDE_CODE_USE_BEDROCK"] == "1"
+    assert captured["kwargs"]["env"]["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "us.anthropic.claude-opus-4-7"
     assert captured["kwargs"]["env"]["AWS_REGION"] == "us-east-1"
 
 

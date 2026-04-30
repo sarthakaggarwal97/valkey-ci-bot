@@ -15,6 +15,8 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_CLAUDE_MODEL = "opus"
+_DEFAULT_BEDROCK_OPUS_MODEL = "us.anthropic.claude-opus-4-7"
 _DIFF_FENCE_RE = re.compile(
     r"```(?:diff|patch)?\n(---\s.+?)\n```", re.DOTALL
 )
@@ -28,7 +30,7 @@ def run_claude_code(
     *,
     cwd: str | None = None,
     timeout: int = 600,
-    model: str | None = None,
+    model: str | None = _DEFAULT_CLAUDE_MODEL,
     max_turns: int = 80,
     allowed_tools: str = "Read,Edit,MultiEdit,Write,Bash,Glob,Grep",
 ) -> tuple[str, str, int]:
@@ -39,6 +41,7 @@ def run_claude_code(
     """
     env = {**os.environ}
     env["CLAUDE_CODE_USE_BEDROCK"] = "1"
+    env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = _DEFAULT_BEDROCK_OPUS_MODEL
     if "AWS_REGION" not in env:
         env["AWS_REGION"] = "us-east-1"
 
