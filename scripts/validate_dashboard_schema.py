@@ -93,7 +93,7 @@ def validate(data: Any) -> List[str]:
     return errors
 
 
-def main(argv: list = None) -> int:
+def main(argv: list | None = None) -> int:
     args = argv if argv is not None else sys.argv[1:]
     if not args:
         print("usage: python -m scripts.validate_dashboard_schema <path>")
