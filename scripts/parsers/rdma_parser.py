@@ -9,17 +9,24 @@ from scripts.models import ParsedFailure
 # Optional ISO-8601 timestamp that GitHub Actions prepends to every log line.
 _TS_PREFIX = r"(?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\s+)?"
 
-# RDMA-specific patterns from runtest-rdma
+# RDMA-specific [err]: lines. Require the path to be RDMA-flavored
+# (tests/**/rdma* or tests/**/*rdma*.tcl) so this parser doesn't grab
+# generic TCL failures just because the log mentions RDMA in passing.
 _RDMA_ERR_RE = re.compile(
-    rf"^{_TS_PREFIX}\[err\]:\s+(.+?)(?:\s+in\s+(\S+))?\s*(?:\(\d+\s*ms\))?\s*$",
+    rf"^{_TS_PREFIX}\[err\]:\s+(.+?)"
+    rf"\s+in\s+(tests/\S*rdma[^/\s]*\.tcl|tests/\S*/rdma[-_]\S*\.tcl)"
+    rf"\s*(?:\(\d+\s*ms\))?\s*$",
     re.MULTILINE | re.IGNORECASE,
 )
 _RDMA_FAIL_RE = re.compile(
     r"(?:RDMA|rdma).*(?:failed|error|timeout|refused)", re.IGNORECASE,
 )
-# Match just the RDMA connection error phrase, not the whole line
+# Match RDMA connection errors. Require the error phrase to mention
+# RDMA/InfiniBand ('ibv_*' / 'rdma_*') explicitly, so generic TCP
+# 'Connection refused' messages don't trigger this parser.
 _RDMA_CONN_RE = re.compile(
-    r"((?:connection\s+refused|rdma_connect\s+failed|ibv_\w+\s+(?:failed|error)))",
+    r"(rdma_connect\s+failed|ibv_\w+\s+(?:failed|error)"
+    r"|(?:RDMA|InfiniBand)[^\n]*?connection\s+refused)",
     re.IGNORECASE,
 )
 
@@ -28,9 +35,13 @@ class RdmaParser:
     """Parses RDMA test failure output from runtest-rdma."""
 
     def can_parse(self, log_content: str) -> bool:
-        # Require actual RDMA protocol/connection errors, not just "rdma" in a job name
+        # Only claim the log if we have either (a) an [err]: line with an
+        # RDMA-specific test path, or (b) an actual RDMA protocol/connection
+        # error phrase. Merely mentioning "rdma" elsewhere in a large test
+        # log is not enough — generic TCL failures should fall through to
+        # TclTestParser.
         return bool(
-            ("rdma" in log_content.lower() and _RDMA_ERR_RE.search(log_content))
+            _RDMA_ERR_RE.search(log_content)
             or _RDMA_CONN_RE.search(log_content)
         )
 

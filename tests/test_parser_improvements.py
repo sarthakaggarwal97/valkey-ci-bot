@@ -236,10 +236,24 @@ def test_sentinel_cluster_parser_timestamped_cluster_err():
 def test_sentinel_cluster_parser_plain_err_still_works():
     """Untimestamped logs should keep working."""
     from scripts.parsers.sentinel_cluster_parser import SentinelClusterParser
-    log = "[err]: Cluster split brain in tests/unit/cluster/basic.tcl\n"
+    log = "[err]: Cluster split brain in tests/cluster/basic.tcl\n"
     parser = SentinelClusterParser()
     assert parser.can_parse(log)
     assert len(parser.parse(log)) == 1
+
+
+def test_sentinel_cluster_parser_rejects_non_sentinel_cluster_path():
+    """A [err]: line with an unrelated test path should NOT be claimed by this parser.
+
+    Generic TCL tests under tests/unit/ (or similar) should fall through
+    to TclTestParser instead. This regression check ensures the parser
+    does not greedily swallow every [err]: line.
+    """
+    from scripts.parsers.sentinel_cluster_parser import SentinelClusterParser
+    log = "[err]: Some unit test fails in tests/unit/type/hash.tcl\n"
+    parser = SentinelClusterParser()
+    assert not parser.can_parse(log)
+    assert parser.parse(log) == []
 
 
 def test_module_api_parser_timestamped_err():
@@ -258,7 +272,6 @@ def test_module_api_parser_timestamped_err():
 def test_rdma_parser_timestamped_err():
     from scripts.parsers.rdma_parser import RdmaParser
     log = (
-        "rdma some context text to pass can_parse guard\n"
         "2026-03-24T05:30:40.12Z [err]: RDMA connection timeout "
         "in tests/integration/rdma-test.tcl\n"
     )
@@ -267,6 +280,47 @@ def test_rdma_parser_timestamped_err():
     results = parser.parse(log)
     assert len(results) >= 1
     assert any(r.parser_type == "rdma" for r in results)
+
+
+def test_rdma_parser_does_not_match_generic_connection_refused():
+    """Generic TCP 'Connection refused' from cluster tests should NOT match.
+
+    Real Valkey cluster failover logs emit 'Connection refused' frequently
+    during normal operation. Requiring RDMA/InfiniBand context avoids
+    false positives.
+    """
+    from scripts.parsers.rdma_parser import RdmaParser
+    log = (
+        "2026-04-30T01:27:32.3451271Z 35041:M 30 Apr 2026 "
+        "Connection with Node abc at 127.0.0.1:34164 failed: Connection refused\n"
+        "2026-04-30T01:27:32.4665720Z [err]: Replica failover in tests/unit/cluster/failover.tcl\n"
+    )
+    parser = RdmaParser()
+    assert not parser.can_parse(log)
+
+
+def test_rdma_parser_matches_ibv_errors():
+    from scripts.parsers.rdma_parser import RdmaParser
+    log = "ibv_reg_mr failed: Cannot allocate memory\n"
+    parser = RdmaParser()
+    assert parser.can_parse(log)
+
+
+def test_module_parser_rejects_non_module_path():
+    """Regression: a [err]: line from a non-module test must not be
+    claimed by the module parser."""
+    from scripts.parsers.module_api_parser import ModuleApiParser
+    log = "[err]: Cluster failover test in tests/unit/cluster/failover.tcl\n"
+    parser = ModuleApiParser()
+    # Module parser should not match this — tcl_parser handles it
+    assert not parser.can_parse(log)
+
+
+def test_module_parser_matches_module_path():
+    from scripts.parsers.module_api_parser import ModuleApiParser
+    log = "[err]: Module foo fails in tests/modules/test.tcl\n"
+    parser = ModuleApiParser()
+    assert parser.can_parse(log)
 
 
 # -----------------------------------------------------------------------------

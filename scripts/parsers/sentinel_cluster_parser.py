@@ -11,16 +11,21 @@ _TS_PREFIX = r"(?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\s+)?"
 
 # Sentinel/cluster tests use the same Tcl [err] pattern but may also have:
 # Caught [err]: ... in tests/sentinel/foo.tcl
-# or cluster-specific patterns
+# or cluster-specific patterns.
+# IMPORTANT: we require the "in tests/(sentinel|cluster|integration)/..." path
+# to actually be present — otherwise this parser would greedily match any
+# [err]: line and claim failures it can't correctly categorize. Generic TCL
+# failures should fall through to TclTestParser.
 _SENTINEL_ERR_RE = re.compile(
     rf"^{_TS_PREFIX}\[err\]:\s+(.+?)"
-    rf"(?:\s+in\s+(tests/(?:sentinel|cluster|integration)/\S+\.tcl))?"
+    rf"\s+in\s+(tests/(?:sentinel|cluster|integration)/\S+\.tcl)"
     rf"\s*(?:\(\d+\s*ms\))?\s*$",
     re.MULTILINE | re.IGNORECASE,
 )
-# Cluster test specific: "FAIL: <test description>"
+# Cluster test specific: "FAIL: <test description> in tests/<path>.tcl".
+# Again, require the path to anchor the match.
 _CLUSTER_FAIL_RE = re.compile(
-    rf"^{_TS_PREFIX}FAIL:\s+(.+?)(?:\s+in\s+(\S+\.tcl))?\s*$", re.MULTILINE
+    rf"^{_TS_PREFIX}FAIL:\s+(.+?)\s+in\s+(\S+\.tcl)\s*$", re.MULTILINE
 )
 
 

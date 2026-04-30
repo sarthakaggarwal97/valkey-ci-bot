@@ -20,10 +20,13 @@ _MODULE_ASSERT_RE = re.compile(
     r"(?:\s+in\s+(\S+?):(\d+))?",
     re.IGNORECASE,
 )
-# Module test [err] patterns (Tcl-based but module-specific paths)
+# Module test [err] patterns (Tcl-based but module-specific paths).
+# IMPORTANT: path is required so this parser doesn't greedily swallow
+# any [err]: line and claim it as a module failure. Generic TCL failures
+# should fall through to TclTestParser.
 _MODULE_ERR_RE = re.compile(
     rf"^{_TS_PREFIX}\[err\]:\s+(.+?)"
-    rf"(?:\s+in\s+(tests/(?:modules|unit/moduleapi)/\S+\.tcl))?"
+    rf"\s+in\s+(tests/(?:modules|unit/moduleapi)/\S+\.tcl)"
     rf"\s*(?:\(\d+\s*ms\))?\s*$",
     re.MULTILINE | re.IGNORECASE,
 )
