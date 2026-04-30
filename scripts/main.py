@@ -27,7 +27,6 @@ from scripts.failure_store import FailureStore
 from scripts.fix_generator import FixGenerator
 from scripts.log_parser import LogParserRouter
 from scripts.log_retriever import LogRetriever
-from scripts.publish_guard import check_publish_allowed
 from scripts.models import (
     FailedJob,
     FailureHistorySummary,
@@ -48,6 +47,7 @@ from scripts.parsers.sentinel_cluster_parser import SentinelClusterParser
 from scripts.parsers.tcl_parser import TclTestParser
 from scripts.parsers.valgrind_parser import ValgrindParser
 from scripts.pr_manager import PRManager
+from scripts.publish_guard import check_publish_allowed
 from scripts.rate_limiter import RateLimiter
 from scripts.root_cause_analyzer import RootCauseAnalyzer
 from scripts.summary import ApprovalCandidate, ApprovalSummary, PRSummaryComment, WorkflowSummary

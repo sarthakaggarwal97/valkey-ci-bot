@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from scripts.models import CommitInfo, EvidencePack, InspectedFile, LogExcerpt, ParsedFailure
 from scripts.stages.rubric import (
@@ -244,7 +245,7 @@ def test_check_dco_signoff_fail():
 
 def test_vicinity_passes_when_patch_touches_failure_file():
     # Failure is in tests/unit/type/hash.tcl:42, patch touches src/t_hash.c:42
-    # The file is different, but src/t_hash.c is a "related" file... 
+    # The file is different, but src/t_hash.c is a "related" file...
     # Actually the check looks for same file. Let me use a patch that touches tests/unit/type/hash.tcl
     patch = """--- a/tests/unit/type/hash.tcl
 +++ b/tests/unit/type/hash.tcl
@@ -400,7 +401,7 @@ def test_rubric_security_regression_blocks():
 
 
 def test_rubric_too_big_patch_blocks():
-    patch = "\n".join([f"--- a/x.c\n+++ b/x.c"] + [f"+line {i}" for i in range(500)])
+    patch = "\n".join(["--- a/x.c\n+++ b/x.c"] + [f"+line {i}" for i in range(500)])
     ev = _make_evidence()
     verdict = run_deterministic_rubric(patch, ev, "x\nSigned-off-by: D <d@x>", is_bug_fix=True)
     assert "patch_size" in verdict.blocking_checks

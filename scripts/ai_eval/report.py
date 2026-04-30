@@ -13,7 +13,6 @@ import json
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
 
 
 def report_needs_human(store_data: dict, as_json: bool = False) -> str:

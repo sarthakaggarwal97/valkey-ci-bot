@@ -216,6 +216,7 @@ def main(argv: list[str] | None = None) -> int:
     if needs_bedrock:
         try:
             import boto3
+
             from scripts.bedrock_client import BedrockClient
             from scripts.config import BotConfig, ProjectContext
             runtime = boto3.client("bedrock-runtime", region_name=args.region)

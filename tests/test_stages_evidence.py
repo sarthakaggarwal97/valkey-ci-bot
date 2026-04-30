@@ -10,7 +10,6 @@ from scripts.stages.evidence import (
     build_for_pr_review,
 )
 
-
 # --- helpers ---
 
 def test_extract_file_refs_finds_source_paths():

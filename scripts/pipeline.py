@@ -14,7 +14,6 @@ from typing import Any
 
 from scripts.models import (
     EvidencePack,
-    FailureStoreEntry,
     RejectionReason,
     RootCauseResult,
     RubricVerdict,

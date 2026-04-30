@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from scripts.models import ReviewFinding
-from scripts.pipeline_review import process_pr_review, _gate_findings
+from scripts.pipeline_review import _gate_findings, process_pr_review
 from scripts.stages.evidence import build_for_pr_review
 
 
@@ -120,7 +120,7 @@ def test_process_pr_review_uses_adapter_when_config_supplied():
     call = code_reviewer.review.call_args
     args = call[0]
     assert len(args) == 3
-    from scripts.models import PullRequestContext, DiffScope
+    from scripts.models import DiffScope, PullRequestContext
     assert isinstance(args[0], PullRequestContext)
     assert isinstance(args[1], DiffScope)
     assert args[0].number == 5

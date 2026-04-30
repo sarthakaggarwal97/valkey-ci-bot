@@ -195,7 +195,7 @@ class RootCauseCritic:
             except Exception as exc:
                 logger.error("RootCauseCritic model call failed: %s", exc)
                 # Fall through to pick highest-confidence
-        
+
         if accepted is None and passed:
             # Pick highest confidence
             conf_order = {"high": 3, "medium": 2, "low": 1}

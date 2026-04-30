@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from scripts.ai_eval.scoring import score_fix_patch, score_rejection, score_root_cause
 
-
 # --- score_root_cause ---
 
 def test_score_root_cause_all_keywords_match():

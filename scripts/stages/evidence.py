@@ -19,8 +19,7 @@ from scripts.models import (
 )
 
 if TYPE_CHECKING:
-    from scripts.log_retriever import LogRetriever
-    from scripts.valkey_repo_context import ValkeyRepoContext
+    pass
 
 logger = logging.getLogger(__name__)
 

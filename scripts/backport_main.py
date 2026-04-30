@@ -23,8 +23,6 @@ import boto3
 from github import Auth, Github
 from github.GithubException import GithubException
 
-from scripts.publish_guard import check_publish_allowed
-
 from scripts.backport_config import load_backport_config_from_repo
 from scripts.backport_models import (
     BackportConfig,
@@ -45,6 +43,7 @@ from scripts.config import BotConfig, ProjectContext
 from scripts.conflict_resolver import ConflictResolver
 from scripts.event_ledger import EventLedger
 from scripts.github_client import retry_github_call
+from scripts.publish_guard import check_publish_allowed
 from scripts.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)

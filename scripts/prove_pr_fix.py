@@ -18,14 +18,13 @@ if __package__ in {None, ""}:
 from github import Auth, Github
 from github.GithubException import GithubException
 
-from scripts.publish_guard import check_publish_allowed
-
 from scripts.config import load_config
 from scripts.event_ledger import EventLedger
 from scripts.failure_store import FailureStore
 from scripts.github_client import retry_github_call
 from scripts.models import FailureReport, ValidationResult, failure_report_from_dict
 from scripts.pr_manager import upsert_pull_request
+from scripts.publish_guard import check_publish_allowed
 from scripts.validation_runner import ValidationRunner
 
 logger = logging.getLogger(__name__)
