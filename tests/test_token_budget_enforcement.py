@@ -13,12 +13,11 @@ stop processing new failures when a configurable token budget is exhausted.
 
 from __future__ import annotations
 
-from hypothesis import given, settings, assume
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from scripts.config import BotConfig
 from scripts.rate_limiter import RateLimiter
-
 
 # --- Strategies ---
 

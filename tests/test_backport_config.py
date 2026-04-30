@@ -19,7 +19,6 @@ from hypothesis import strategies as st
 from scripts.backport_config import load_backport_config
 from scripts.backport_models import BackportConfig
 
-
 # --- Strategies ---
 
 safe_text = st.text(

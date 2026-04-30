@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
 import logging
 import re
+from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 from scripts.bedrock_client import BedrockClient, PromptClient
-from scripts.config import ProjectContext
 from scripts.bedrock_retriever import BedrockRetriever
-from scripts.config import RetrievalConfig, ReviewerConfig
+from scripts.config import ProjectContext, RetrievalConfig, ReviewerConfig
 from scripts.github_client import retry_github_call
 from scripts.models import ChangedFile, DiffScope, PullRequestContext, ReviewFinding
 

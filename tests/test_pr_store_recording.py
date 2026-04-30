@@ -19,7 +19,6 @@ from scripts.failure_store import FailureStore
 from scripts.models import FailureReport, ParsedFailure, RootCauseReport
 from scripts.pr_manager import PRManager, _compute_fingerprint
 
-
 # ---------------------------------------------------------------------------
 # Strategies
 # ---------------------------------------------------------------------------

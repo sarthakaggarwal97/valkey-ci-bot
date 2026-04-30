@@ -9,7 +9,7 @@ failure queuing, and serialization round-trip.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -17,7 +17,6 @@ from github.GithubException import GithubException
 
 from scripts.config import BotConfig
 from scripts.rate_limiter import RateLimiter
-
 
 # --- Fixtures ---
 

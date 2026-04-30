@@ -10,14 +10,14 @@ last 200 lines of the log.
 
 from __future__ import annotations
 
-from hypothesis import given, settings, HealthCheck
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from scripts.log_parser import LogParserRouter, RAW_EXCERPT_LINES
-from scripts.parsers.gtest_parser import GTestParser
-from scripts.parsers.tcl_parser import TclTestParser
+from scripts.log_parser import RAW_EXCERPT_LINES, LogParserRouter
 from scripts.parsers.build_error_parser import BuildErrorParser
+from scripts.parsers.gtest_parser import GTestParser
 from scripts.parsers.sentinel_cluster_parser import SentinelClusterParser
+from scripts.parsers.tcl_parser import TclTestParser
 
 
 def _make_router() -> LogParserRouter:

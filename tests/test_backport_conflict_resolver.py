@@ -13,7 +13,6 @@ from scripts.backport_models import (
 )
 from scripts.conflict_resolver import ConflictResolver
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────
 
 
@@ -315,7 +314,6 @@ class TestBuildPrompt:
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
-
 
 # -- Strategies for generating test data --
 

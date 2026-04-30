@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import re
 from datetime import datetime, timezone
 from pathlib import Path
-import re
 from typing import TYPE_CHECKING, Any
 
-from github import Auth, Github
 import yaml  # type: ignore[import-untyped]
+from github import Auth, Github
 
 from scripts.pr_context_fetcher import PRContextFetcher
 from scripts.review_policy import collect_review_policy_note

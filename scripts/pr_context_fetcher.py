@@ -11,8 +11,8 @@ from scripts.models import (
     ChangedFile,
     DiffScope,
     ExistingReviewComment,
-    PullRequestContext,
     PullRequestCommit,
+    PullRequestContext,
     ReviewThread,
 )
 from scripts.path_filter import is_unsupported_review_path

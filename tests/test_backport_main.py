@@ -8,12 +8,13 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from scripts.backport_main import build_summary, run_backport
 from scripts.backport_models import (
     BackportConfig,
     BackportPRContext,
@@ -22,7 +23,6 @@ from scripts.backport_models import (
     ConflictedFile,
     ResolutionResult,
 )
-from scripts.backport_main import build_summary, run_backport
 from scripts.config import BotConfig
 from scripts.rate_limiter import RateLimiter
 

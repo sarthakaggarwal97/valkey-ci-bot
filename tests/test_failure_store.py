@@ -14,14 +14,14 @@ import json
 from unittest.mock import MagicMock
 
 import pytest
+from github.GithubException import GithubException
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
-from github.GithubException import GithubException
 
 from scripts.failure_store import FailureStore
 from scripts.models import (
-    FailureStoreEntry,
     FailureReport,
+    FailureStoreEntry,
     FlakyCampaignState,
     ParsedFailure,
     RootCauseReport,

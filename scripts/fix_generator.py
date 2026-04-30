@@ -479,10 +479,10 @@ class FixGenerator:
             return None
 
         from scripts.code_reviewer import (
-            ReviewToolHandler,
             _GET_FILE_TOOL,
             _LIST_FILES_TOOL,
             _SEARCH_CODE_TOOL,
+            ReviewToolHandler,
         )
 
         _SUBMIT_FIX_TOOL: dict = {

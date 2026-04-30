@@ -15,14 +15,15 @@ from scripts.commit_signoff import (
     load_signer_from_env,
     require_dco_signoff_from_env,
 )
-from scripts.github_client import retry_github_call
 from scripts.failure_store import FailureStore
+from scripts.github_client import retry_github_call
 from scripts.models import FailureReport, RootCauseReport
 
 if TYPE_CHECKING:
     from github import Github
     from github.PullRequest import PullRequest
     from github.Repository import Repository
+
     from scripts.summary import PRSummaryComment
 
 logger = logging.getLogger(__name__)
@@ -511,7 +512,6 @@ class PRManager:
             pr_url: The HTML URL of the PR (e.g. https://github.com/owner/repo/pull/42).
             summary_comment: A ``PRSummaryComment`` with collected step data.
         """
-        from scripts.summary import PRSummaryComment  # noqa: F811
 
         body = summary_comment.render()
         try:

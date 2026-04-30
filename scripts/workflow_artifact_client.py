@@ -7,7 +7,7 @@ import logging
 import zipfile
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from scripts.github_client import retry_github_call
 

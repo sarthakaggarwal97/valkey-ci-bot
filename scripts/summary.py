@@ -12,9 +12,9 @@ Requirements: 11.2, 11.4
 
 from __future__ import annotations
 
-from collections import Counter
 import logging
 import os
+from collections import Counter
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)

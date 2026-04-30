@@ -9,8 +9,7 @@ import re
 import sys
 from dataclasses import replace
 from datetime import datetime, timezone
-from pathlib import Path
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -25,8 +24,8 @@ from scripts.code_reviewer import CodeReviewer, ReviewCoverage
 from scripts.comment_publisher import CommentPublisher
 from scripts.config import ReviewerConfig, load_reviewer_config, load_reviewer_config_text
 from scripts.event_ledger import EventLedger
-from scripts.models import PullRequestContext, ReviewState, SummaryResult
 from scripts.models import DiffScope as _DiffScope
+from scripts.models import PullRequestContext, ReviewState, SummaryResult
 from scripts.path_filter import PathFilter
 from scripts.permission_gate import PermissionGate
 from scripts.pr_context_fetcher import PRContextFetcher

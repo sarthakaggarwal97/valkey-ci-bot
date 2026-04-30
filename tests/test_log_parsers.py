@@ -11,15 +11,14 @@ should correctly identify the source format.
 
 from __future__ import annotations
 
-from hypothesis import given, settings, assume
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from scripts.models import ParsedFailure
-from scripts.parsers.gtest_parser import GTestParser
-from scripts.parsers.tcl_parser import TclTestParser
 from scripts.parsers.build_error_parser import BuildErrorParser
+from scripts.parsers.gtest_parser import GTestParser
 from scripts.parsers.sentinel_cluster_parser import SentinelClusterParser
-
+from scripts.parsers.tcl_parser import TclTestParser
 
 # ---------------------------------------------------------------------------
 # Strategies: generate log strings matching each parser's format grammar

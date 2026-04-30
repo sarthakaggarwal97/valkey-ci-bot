@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict, dataclass, field
 import json
 import logging
-from pathlib import Path
 import re
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
 import boto3
+import yaml  # type: ignore[import-untyped]
 from botocore.config import Config as BotocoreConfig
 from github import Auth, Github
-import yaml  # type: ignore[import-untyped]
 
 from scripts.bedrock_client import BedrockClient, PromptClient
 from scripts.bedrock_retriever import BedrockRetriever

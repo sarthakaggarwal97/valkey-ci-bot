@@ -171,10 +171,10 @@ Relevant file context:
     ) -> str | None:
         """Try to answer using the agentic tool-use loop."""
         from scripts.code_reviewer import (
-            ReviewToolHandler,
             _GET_FILE_TOOL,
             _LIST_FILES_TOOL,
             _SEARCH_CODE_TOOL,
+            ReviewToolHandler,
         )
 
         _SUBMIT_REPLY_TOOL: dict = {

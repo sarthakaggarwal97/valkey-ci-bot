@@ -11,7 +11,7 @@ import hashlib
 import logging
 import os
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from difflib import SequenceMatcher
 
 from scripts.models import FailureReport

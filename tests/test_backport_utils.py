@@ -11,7 +11,6 @@ from scripts.backport_utils import (
     validate_c_syntax,
 )
 
-
 # --- parse_backport_labels ---
 
 

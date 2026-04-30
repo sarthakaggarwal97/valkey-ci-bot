@@ -13,12 +13,11 @@ from __future__ import annotations
 
 import re
 
-from hypothesis import given, settings, assume
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from scripts.config import ValidationProfile
 from scripts.validation_runner import _match_profile
-
 
 # ---------------------------------------------------------------------------
 # Strategies

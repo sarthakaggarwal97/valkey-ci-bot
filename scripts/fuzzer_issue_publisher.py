@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
-from datetime import timezone
 
 from scripts.github_client import retry_github_call
 from scripts.models import FuzzerRunAnalysis, FuzzerSignal
@@ -171,7 +170,7 @@ def _render_issue_body(
         lines.extend([
             "",
             "**Reproduction**",
-            f"```",
+            "```",
             analysis.reproduction_hint,
             "```",
         ])

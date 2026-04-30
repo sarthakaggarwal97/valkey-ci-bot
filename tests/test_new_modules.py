@@ -9,31 +9,36 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from scripts.models import ParsedFailure, FailureReport
+from scripts.alerting import Alert, AlertConfig, AlertDispatcher
+from scripts.config import BotConfig, ReviewerConfig
+from scripts.correlation_engine import CorrelatedFailureGroup, correlate_failures
+from scripts.exceptions import (
+    AnalysisError,
+    CIAgentError,
+    ConfigurationError,
+    GitHubAPIError,
+    ParseError,
+    RateLimitExceeded,
+    StoreConflictError,
+    StoreError,
+    ValidationError,
+)
+from scripts.fuzzer_trends import FuzzerTrendTracker, ScenarioTrend
+from scripts.html_helpers import SafeHtml, html_attr, html_cell, html_escape, safe_html
+from scripts.json_helpers import bool_text, mapping, safe_float, safe_int, safe_list, safe_str
+from scripts.log_parser import LogParserRouter
+from scripts.models import FailureReport, ParsedFailure
+from scripts.parsers.module_api_parser import ModuleApiParser
+from scripts.parsers.rdma_parser import RdmaParser
 from scripts.parsers.sanitizer_parser import SanitizerParser
 from scripts.parsers.valgrind_parser import ValgrindParser
-from scripts.parsers.rdma_parser import RdmaParser
-from scripts.parsers.module_api_parser import ModuleApiParser
-from scripts.correlation_engine import correlate_failures, CorrelatedFailureGroup
 from scripts.review_feedback import FeedbackTracker, ReviewFinding
-from scripts.fuzzer_trends import FuzzerTrendTracker, ScenarioTrend
-from scripts.alerting import AlertConfig, Alert, AlertDispatcher
 from scripts.sla_metrics import MetricsTracker, OperationMetric, SLAMetrics
-from scripts.json_helpers import mapping, safe_list, safe_str, safe_int, safe_float, bool_text
-from scripts.html_helpers import html_escape, html_attr, html_cell, safe_html, SafeHtml
-from scripts.text_utils import strip_markdown_fences, strip_ansi
-from scripts.exceptions import (
-    CIAgentError, GitHubAPIError, ConfigurationError, StoreError,
-    StoreConflictError, ParseError, ValidationError, RateLimitExceeded,
-    AnalysisError,
-)
-from scripts.log_parser import LogParserRouter
-from scripts.config import BotConfig, ReviewerConfig
-
+from scripts.text_utils import strip_ansi, strip_markdown_fences
 
 # ── helpers ──────────────────────────────────────────────────────────
 

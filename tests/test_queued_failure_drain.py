@@ -14,14 +14,13 @@ failures after rate limits reset, even if no new CI failure occurs.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-from hypothesis import given, settings, assume
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from scripts.config import BotConfig
 from scripts.rate_limiter import RateLimiter
-
 
 # --- Strategies ---
 

@@ -479,10 +479,10 @@ class RootCauseAnalyzer:
             return None
 
         from scripts.code_reviewer import (
-            ReviewToolHandler,
             _GET_FILE_TOOL,
             _LIST_FILES_TOOL,
             _SEARCH_CODE_TOOL,
+            ReviewToolHandler,
         )
 
         converse_fn = getattr(self._bedrock, "converse_with_tools", None)

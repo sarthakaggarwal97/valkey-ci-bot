@@ -24,7 +24,6 @@ from scripts.config import BotConfig
 from scripts.fix_generator import FixGenerator
 from scripts.models import RootCauseReport, ValidationResult
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

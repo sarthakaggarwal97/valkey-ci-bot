@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from scripts.comment_publisher import CommentPublisher, SUMMARY_MARKER
+from scripts.comment_publisher import SUMMARY_MARKER, CommentPublisher
 from scripts.models import ReviewFinding
 
 

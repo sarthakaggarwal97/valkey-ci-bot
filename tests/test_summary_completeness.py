@@ -19,7 +19,6 @@ from hypothesis import strategies as st
 
 from scripts.summary import WorkflowSummary
 
-
 # ---------------------------------------------------------------------------
 # Strategies
 # ---------------------------------------------------------------------------

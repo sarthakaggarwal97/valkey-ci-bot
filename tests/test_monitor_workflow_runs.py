@@ -5,7 +5,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from github.GithubException import GithubException
 
 from scripts.main import PipelineResult

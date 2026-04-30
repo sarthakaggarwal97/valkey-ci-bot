@@ -19,7 +19,6 @@ from scripts.root_cause_analyzer import (
     _parse_bedrock_response,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -462,7 +461,7 @@ class TestAnalyze:
 # ---------------------------------------------------------------------------
 # Feature: valkey-ci-agent, Property 6: Relevant file identification from failure data
 
-from hypothesis import given, settings, HealthCheck
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 # Valid root directories that _FILE_PATH_RE recognises

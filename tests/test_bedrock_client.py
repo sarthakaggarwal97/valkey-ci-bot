@@ -17,7 +17,6 @@ from scripts.bedrock_client import (
 )
 from scripts.config import BotConfig, ProjectContext
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -614,7 +613,7 @@ class TestBedrockClientInvoke:
 # Feature: valkey-ci-agent, Property 15: Bedrock error handling
 # ---------------------------------------------------------------------------
 
-from hypothesis import given, settings, assume
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 # Strategy: draw from the known retryable error codes

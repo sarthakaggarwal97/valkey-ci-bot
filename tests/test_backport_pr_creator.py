@@ -11,7 +11,6 @@ from scripts.backport_models import BackportPRContext, CherryPickResult, Resolut
 from scripts.backport_pr_creator import BackportPRCreator
 from scripts.backport_utils import build_branch_name
 
-
 # ── Shared strategies ─────────────────────────────────────────────────
 
 _safe_text = st.text(
@@ -296,7 +295,7 @@ class TestDuplicateDetectionProperty:
 
         # Mock an open PR with matching head branch
         mock_pr = MagicMock()
-        mock_pr.html_url = f"https://github.com/valkey-io/valkey/pull/999"
+        mock_pr.html_url = "https://github.com/valkey-io/valkey/pull/999"
 
         mock_repo.get_pulls.return_value = [mock_pr]
 

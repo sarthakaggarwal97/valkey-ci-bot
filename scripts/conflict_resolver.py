@@ -7,7 +7,6 @@ whitespace-only conflict detection, retry logic, and C syntax validation.
 from __future__ import annotations
 
 import logging
-import re
 
 from scripts.backport_models import (
     BackportConfig,
@@ -28,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 
 from scripts.text_utils import strip_markdown_fences as _strip_code_fences
-
 
 _SYSTEM_PROMPT = (
     "You are a code merge conflict resolver for the Valkey project "

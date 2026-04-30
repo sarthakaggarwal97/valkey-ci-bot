@@ -19,7 +19,6 @@ from scripts.fix_generator import (
 )
 from scripts.models import RootCauseReport
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -461,7 +460,6 @@ class TestMarkdownFenceStripping:
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
-
 
 # Strategy: generate RootCauseReport instances with varying confidence levels
 _confidence_strategy = st.sampled_from(["high", "medium", "low"])

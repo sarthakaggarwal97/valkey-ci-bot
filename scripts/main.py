@@ -7,7 +7,7 @@ import json
 import logging
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from urllib import error as urllib_error
 from urllib import request as urllib_request
@@ -18,7 +18,7 @@ if __package__ in {None, ""}:
 import boto3
 from github import Auth, Github
 
-from scripts.bedrock_client import BedrockClient, BedrockError
+from scripts.bedrock_client import BedrockClient
 from scripts.bedrock_retriever import BedrockRetriever
 from scripts.config import BotConfig, ProjectContext, load_config, load_config_text
 from scripts.event_ledger import EventLedger
@@ -29,13 +29,13 @@ from scripts.log_parser import LogParserRouter
 from scripts.log_retriever import LogRetriever
 from scripts.models import (
     FailedJob,
-    FailureReport,
     FailureHistorySummary,
+    FailureReport,
     RootCauseReport,
     ValidationResult,
     WorkflowRun,
-    failure_report_to_dict,
     failure_report_from_dict,
+    failure_report_to_dict,
     root_cause_report_from_dict,
 )
 from scripts.parsers.build_error_parser import BuildErrorParser

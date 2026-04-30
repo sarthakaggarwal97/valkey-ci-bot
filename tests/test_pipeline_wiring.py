@@ -8,6 +8,7 @@ import pytest
 from github.GithubException import GithubException
 
 from scripts.config import BotConfig, ProjectContext
+from scripts.main import _analyze_and_fix, _load_runtime_config, _process_failure, run_pipeline
 from scripts.models import (
     FailedJob,
     FailureReport,
@@ -17,7 +18,6 @@ from scripts.models import (
     failure_report_to_dict,
     root_cause_report_to_dict,
 )
-from scripts.main import _analyze_and_fix, _load_runtime_config, _process_failure, run_pipeline
 
 
 def _make_report(**overrides) -> FailureReport:
@@ -275,9 +275,9 @@ class TestAnalyzeAndFix:
         assert diff == "some diff"
 
 
-from scripts.models import ValidationResult
-from scripts.main import _validate_and_create_pr, run_reconciliation
 from scripts.failure_store import FailureStore
+from scripts.main import _validate_and_create_pr, run_reconciliation
+from scripts.models import ValidationResult
 from scripts.rate_limiter import RateLimiter
 
 

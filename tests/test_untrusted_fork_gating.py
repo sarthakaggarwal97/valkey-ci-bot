@@ -34,7 +34,6 @@ from scripts.models import (
 from scripts.pr_manager import PRManager
 from scripts.validation_runner import ValidationRunner
 
-
 # ---------------------------------------------------------------------------
 # Strategies
 # ---------------------------------------------------------------------------
