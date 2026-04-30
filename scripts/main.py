@@ -25,7 +25,7 @@ from scripts.event_ledger import EventLedger
 from scripts.failure_detector import FailureDetector
 from scripts.failure_store import FailureStore
 from scripts.fix_generator import FixGenerator
-from scripts.log_parser import LogParserRouter
+from scripts.log_parser import LogParserRouter, is_workflow_condition_only
 from scripts.log_retriever import LogRetriever
 from scripts.models import (
     FailedJob,
@@ -465,6 +465,17 @@ def _retrieve_failure_report(
 
     if not log_content:
         logger.warning("Empty log for job %s, skipping.", job.name)
+        return None
+
+    # Detect GitHub Actions step-skip noise: when a job's steps were all
+    # skipped via an `if:` condition, the log contains only the condition
+    # evaluation text, not a real failure. Skip these.
+    if is_workflow_condition_only(log_content):
+        logger.info(
+            "Skipping job %s: log is only workflow-condition evaluation, "
+            "no real failure output.",
+            job.name,
+        )
         return None
 
     # Parse log

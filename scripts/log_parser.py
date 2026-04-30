@@ -10,11 +10,15 @@ from scripts.models import ParsedFailure
 
 logger = logging.getLogger(__name__)
 
-RAW_EXCERPT_LINES = 500
+RAW_EXCERPT_LINES = 2000
 
 _ERROR_MARKERS = re.compile(
     r"(?:error:|Error:|FAILED|fatal:|FATAL|assertion failed|Traceback"
-    r"|==\d+==ERROR|runtime error:|Invalid (?:read|write)|definitely lost)",
+    r"|==\d+==ERROR|runtime error:|Invalid (?:read|write)|definitely lost"
+    r"|\[err\]:|\[exception\]:|\[timeout\]:|Tcl error"
+    r"|panic:|Aborted|Segmentation fault|SIGSEGV"
+    r"|make(?:\[\d+\])?:\s+\*\*\*|undefined reference"
+    r"|Process completed with exit code [1-9])",
     re.IGNORECASE,
 )
 
@@ -61,6 +65,34 @@ class LogParser(Protocol):
 
     def can_parse(self, log_content: str) -> bool: ...
     def parse(self, log_content: str) -> list[ParsedFailure]: ...
+
+
+_CONDITION_EVAL_RE = re.compile(
+    r"^Evaluating\s*(?::|[\w.-]+\.if)"
+    r"|^\(success\(\)",
+)
+_TS_LINE_PREFIX_RE = re.compile(
+    r"(?m)^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\s*",
+)
+
+
+def is_workflow_condition_only(log_content: str) -> bool:
+    """Return True when the log is only GitHub Actions workflow-condition evaluation.
+
+    When a job's steps are all skipped via an ``if:`` condition, the log
+    contains only the condition-evaluation text ("Evaluating: ...",
+    "Evaluating <job>.if" etc.) without any real failure output. Such logs
+    are not actionable failures and should be filtered upstream of parsing.
+    """
+    if not log_content:
+        return True
+    stripped = _TS_LINE_PREFIX_RE.sub("", log_content)
+    lines = [ln.strip() for ln in stripped.splitlines() if ln.strip()]
+    if not lines:
+        return True
+    matched = sum(1 for ln in lines if _CONDITION_EVAL_RE.search(ln))
+    # Treat as noise if ≥80% of non-empty lines are evaluation text.
+    return matched >= max(1, int(len(lines) * 0.8))
 
 
 class LogParserRouter:
