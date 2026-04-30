@@ -34,7 +34,23 @@ from urllib import request as urllib_request
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.agent_dashboard_site import _site_css
+
+def _site_css() -> str:
+    """Return the concatenated dashboard CSS for self-contained demo pages.
+
+    The demo bundle is a single standalone HTML file, so we inline the
+    checked-in stylesheets from dashboard-app/assets/css/ at render time.
+    This keeps the demo visually consistent with the live dashboard.
+    """
+    css_dir = Path(__file__).resolve().parent.parent / "dashboard-app" / "assets" / "css"
+    files = ["tokens.css", "base.css", "components.css"]
+    chunks = []
+    for name in files:
+        path = css_dir / name
+        if path.is_file():
+            chunks.append(path.read_text(encoding="utf-8"))
+    return "\n".join(chunks)
+
 
 logger = logging.getLogger(__name__)
 
