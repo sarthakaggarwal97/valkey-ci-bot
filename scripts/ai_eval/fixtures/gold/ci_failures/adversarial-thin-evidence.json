@@ -1,0 +1,45 @@
+{
+  "fixture_id": "adversarial-thin-evidence",
+  "description": "Adversarial: failure log is truncated and stack trace points nowhere. Evidence is thin — agent should refuse to propose a fix and route to needs-human with LOW_CONFIDENCE_ROOT_CAUSE or THIN_EVIDENCE.",
+  "evidence_pack": {
+    "failure_id": "mystery-001",
+    "run_id": 99999,
+    "job_ids": ["test-something"],
+    "workflow": "daily.yml",
+    "parsed_failures": [
+      {
+        "failure_identifier": "unknown_test",
+        "test_name": null,
+        "file_path": "",
+        "error_message": "Test failed (reason unknown)",
+        "assertion_details": null,
+        "line_number": null,
+        "stack_trace": null,
+        "parser_type": "unknown"
+      }
+    ],
+    "log_excerpts": [
+      {
+        "source": "job-log-tail",
+        "content": "... log truncated ...\nsomething went wrong\nexit 1",
+        "line_start": 0,
+        "line_end": 3
+      }
+    ],
+    "source_files_inspected": [],
+    "test_files_inspected": [],
+    "valkey_guidance_used": [],
+    "recent_commits": [],
+    "linked_urls": [
+      "https://github.com/valkey-io/valkey/actions/runs/99999"
+    ],
+    "unknowns": ["log_fetch_partial", "no_parser_matched", "no_stack_trace"],
+    "built_at": "2025-01-15T11:00:00Z"
+  },
+  "expected_root_cause_keywords": [],
+  "expected_fix_properties": null,
+  "expected_rejection": {
+    "reason": "low_confidence_root_cause",
+    "at_stage": "root_cause"
+  }
+}
