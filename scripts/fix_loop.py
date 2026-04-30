@@ -90,6 +90,8 @@ def run_fix_loop(
             # 2. Commit and push the edited files directly from the checkout
             try:
                 msg = f"[bot-fix] Fix {report.job_name} (attempt {attempt})"
+                _run(["git", "config", "user.name", "valkey-ci-agent"], cwd=repo_checkout)
+                _run(["git", "config", "user.email", "ci-agent@valkey.io"], cwd=repo_checkout)
                 _run(["git", "checkout", "-B", branch_name], cwd=repo_checkout)
                 _run(["git", "add", "-A"], cwd=repo_checkout)
                 _run(["git", "commit", "-m", msg, "--allow-empty"], cwd=repo_checkout)
