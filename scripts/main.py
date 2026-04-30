@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 import time
 from dataclasses import dataclass
@@ -1273,6 +1274,69 @@ def run_pipeline(
                 continue
 
             reports.append(report)
+
+            # --- Issue-first pipeline (new flow) ---
+            # When VALKEY_FORK_REPO is set and we have parsed failures with
+            # a test file, use the new issue-first pipeline that opens a
+            # tracking issue, generates a fix, validates via daily.yml on
+            # the fork, and opens a PR with validation evidence.
+            fork_repo = os.environ.get("VALKEY_FORK_REPO", "")
+            fork_token_env = os.environ.get("FORK_TOKEN", "")
+            if (
+                fork_repo
+                and fork_token_env
+                and report.parsed_failures
+                and not report.parsed_failures[0].failure_identifier.startswith("crash:")
+            ):
+                from scripts.pipeline_issue_first import process_failure_issue_first
+                pf = report.parsed_failures[0]
+                failure_id = pf.failure_identifier
+
+                # Quick root cause analysis (existing code)
+                domain_context = (
+                    valkey_context.render_failure_guidance(report)
+                    if valkey_context is not None
+                    else ""
+                )
+                root_cause_analyzer.with_domain_context(domain_context)
+                fix_generator.with_domain_context(domain_context)
+                try:
+                    root_cause = root_cause_analyzer.analyze(report)
+                except Exception as exc:
+                    logger.error("Root cause analysis failed for %s: %s", job.name, exc)
+                    summary.add_result(job.name, failure_id, "analysis-failed")
+                    continue
+
+                if not root_cause:
+                    summary.add_result(job.name, failure_id, "analysis-failed")
+                    continue
+
+                run_url = _build_workflow_run_url(report, repo_name)
+                outcome = process_failure_issue_first(
+                    report=report,
+                    parsed_failure=pf,
+                    root_cause=root_cause,
+                    fix_generator=fix_generator,
+                    gh=gh,
+                    fork_repo=fork_repo,
+                    fork_token=fork_token_env,
+                    run_url=run_url,
+                    max_fix_attempts=config.max_retries_validation + 1,
+                    loop_count=100,
+                )
+                summary.add_result(
+                    job.name, failure_id, outcome.get("outcome", "error"),
+                )
+                if outcome.get("pr_url"):
+                    event_ledger.record(
+                        "pr.created",
+                        fingerprint or job.name,
+                        pr_url=outcome["pr_url"],
+                        job_name=job.name,
+                    )
+                continue
+            # --- End issue-first pipeline ---
+
             existing_campaign = (
                 failure_store.get_flaky_campaign(fingerprint)
                 if fingerprint
