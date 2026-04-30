@@ -924,6 +924,7 @@ class FuzzerRunAnalyzer:
             import shutil
             import subprocess
             import tempfile
+            print(f"[FUZZER] Starting model call for run {run_id}", flush=True)
             tmpdir = Path(tempfile.mkdtemp(prefix="fuzzer-analysis-"))
             try:
                 # Clone the Valkey source at the exact commit the fuzzer ran against
