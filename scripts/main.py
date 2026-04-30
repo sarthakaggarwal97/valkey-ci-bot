@@ -1276,17 +1276,19 @@ def run_pipeline(
             reports.append(report)
 
             # --- Issue-first pipeline (new flow) ---
-            # When VALKEY_FORK_REPO is set and we have parsed failures with
-            # a test file, use the new issue-first pipeline that opens a
-            # tracking issue, generates a fix, validates via daily.yml on
-            # the fork, and opens a PR with validation evidence.
+            # When VALKEY_FORK_REPO is set and we have parsed failures,
+            # use the new issue-first pipeline that opens a tracking issue,
+            # generates a fix, validates via daily.yml on the fork (when a
+            # test file is available), and opens a PR with validation evidence.
+            # For crash/valgrind failures without a test file, the pipeline
+            # still creates the issue and attempts a fix but skips CI
+            # validation (opens as a draft PR instead).
             fork_repo = os.environ.get("VALKEY_FORK_REPO", "")
             fork_token_env = os.environ.get("FORK_TOKEN", "")
             if (
                 fork_repo
                 and fork_token_env
                 and report.parsed_failures
-                and not report.parsed_failures[0].failure_identifier.startswith("crash:")
             ):
                 from scripts.pipeline_issue_first import process_failure_issue_first
                 pf = report.parsed_failures[0]

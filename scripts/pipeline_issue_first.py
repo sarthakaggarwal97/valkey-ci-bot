@@ -117,6 +117,10 @@ def process_failure_issue_first(
             description=f"get repo {fork_repo}",
         )
 
+        # Open as draft if the fix was not CI-validated (no test file).
+        is_validated = bool(fix_result.validation_run_url)
+        title_prefix = "[bot-fix]" if is_validated else "[bot-fix][UNVALIDATED]"
+
         pr_body = build_validated_pr_body(
             report, root_cause, run_url,
             issue_number=issue_number,
@@ -127,7 +131,7 @@ def process_failure_issue_first(
 
         branch_name = f"bot/fix/{report.job_name[:40]}/{report.commit_sha[:8]}"
         test_name = parsed_failure.test_name or parsed_failure.failure_identifier
-        title = f"[bot-fix] Fix {test_name} in {report.job_name}"
+        title = f"{title_prefix} Fix {test_name} in {report.job_name}"
 
         from scripts.pr_manager import upsert_pull_request
         pr = upsert_pull_request(
@@ -136,7 +140,7 @@ def process_failure_issue_first(
             base=report.target_branch or "unstable",
             title=title[:256],
             body=pr_body,
-            draft=False,
+            draft=not is_validated,
             labels=("bot-fix",),
         )
         pr_url = str(getattr(pr, "html_url", ""))

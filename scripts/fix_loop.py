@@ -119,7 +119,27 @@ def run_fix_loop(
             )
             continue
 
-        # 3. Dispatch validation
+        # 3. Dispatch validation (only if we have a test file to run)
+        if not test_file:
+            # No test file — can't validate via CI. Return the fix as
+            # unvalidated so the pipeline can still open a draft PR.
+            logger.info(
+                "No test file for %s; returning fix as unvalidated (attempt %d).",
+                report.job_name, attempt,
+            )
+            _comment_on_issue(
+                issue_gh, issue_repo, issue_number,
+                f"**Attempt {attempt}/{max_attempts}:** Fix generated but no test file "
+                f"available for CI validation. Opening as unvalidated draft PR.\n"
+                f"- Branch: `{branch_name}`",
+            )
+            return FixResult(
+                succeeded=True,
+                patch=last_patch,
+                validation_run_url="",
+                attempts=attempt,
+            )
+
         run_id = dispatch_validation(
             token=fork_token,
             fork_repo=fork_repo,
