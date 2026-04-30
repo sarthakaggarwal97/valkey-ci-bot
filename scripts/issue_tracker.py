@@ -81,7 +81,7 @@ def _find_existing_issue(
         issues = retry_github_call(
             lambda: list(repo.get_issues(state="open", labels=["test-failure"])),
             retries=2,
-            description=f"list open test-failure issues",
+            description="list open test-failure issues",
         )
         for issue in issues:
             if marker in (issue.body or ""):
