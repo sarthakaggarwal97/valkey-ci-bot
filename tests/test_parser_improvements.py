@@ -10,7 +10,6 @@ Covers:
 
 from __future__ import annotations
 
-import sys
 import typing
 
 # Python 3.7 typing.Protocol backfill so the test can run in older local envs.
@@ -22,11 +21,8 @@ if not hasattr(typing, "Protocol"):
     except ImportError:
         pass
 
-import pytest
-
 from scripts.log_parser import _ERROR_MARKERS, _extract_marker_excerpt
 from scripts.parsers.tcl_parser import TclTestParser
-
 
 # --- TclTestParser: handles timestamped [err]: ---
 
