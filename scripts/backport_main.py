@@ -23,6 +23,8 @@ import boto3
 from github import Auth, Github
 from github.GithubException import GithubException
 
+from scripts.publish_guard import check_publish_allowed
+
 from scripts.backport_config import load_backport_config_from_repo
 from scripts.backport_models import (
     BackportConfig,
@@ -524,6 +526,11 @@ def _post_comment(repo: object, pr_number: int, body: str) -> None:
             lambda: repo.get_pull(pr_number),  # type: ignore[attr-defined]
             retries=3,
             description=f"get PR #{pr_number} for comment",
+        )
+        check_publish_allowed(
+            target_repo=str(getattr(repo, "full_name", "") or ""),
+            action="create_issue_comment",
+            context=f"backport PR #{pr_number}",
         )
         retry_github_call(
             lambda: pr.create_issue_comment(body),

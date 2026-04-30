@@ -34,6 +34,8 @@ from urllib import request as urllib_request
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from scripts.publish_guard import check_publish_allowed
+
 
 def _site_css() -> str:
     """Return the concatenated dashboard CSS for self-contained demo pages.
@@ -168,6 +170,11 @@ def _dispatch_workflow(
     token: str,
     inputs: dict[str, str],
 ) -> None:
+    check_publish_allowed(
+        target_repo=repo_full_name,
+        action="workflow_dispatch",
+        context=f"{workflow_file}@{ref}",
+    )
     url = (
         f"https://api.github.com/repos/{repo_full_name}/actions/workflows/"
         f"{workflow_file}/dispatches"

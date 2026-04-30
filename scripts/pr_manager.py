@@ -18,6 +18,7 @@ from scripts.commit_signoff import (
 from scripts.failure_store import FailureStore
 from scripts.github_client import retry_github_call
 from scripts.models import FailureReport, RootCauseReport
+from scripts.publish_guard import check_publish_allowed
 
 if TYPE_CHECKING:
     from github import Github
@@ -249,6 +250,11 @@ def upsert_pull_request(
     )
     pr = next(iter(pulls), None)
     if pr is None:
+        check_publish_allowed(
+            target_repo=str(getattr(repo, "full_name", "") or ""),
+            action="create_pull",
+            context=f"{head}->{base}",
+        )
         pr = retry_github_call(
             lambda: repo.create_pull(
                 title=title,
@@ -519,6 +525,11 @@ class PRManager:
             # Extract PR number from URL
             pr_number = int(pr_url.rstrip("/").split("/")[-1])
             pr = repo.get_pull(pr_number)
+            check_publish_allowed(
+                target_repo=self._repo_name,
+                action="create_issue_comment",
+                context=f"PR #{pr_number}",
+            )
             pr.create_issue_comment(body=body)
             logger.info("Posted summary comment on PR #%d.", pr_number)
         except Exception as exc:

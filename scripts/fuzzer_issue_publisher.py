@@ -8,6 +8,7 @@ import re
 
 from scripts.github_client import retry_github_call
 from scripts.models import FuzzerRunAnalysis, FuzzerSignal
+from scripts.publish_guard import check_publish_allowed
 
 logger = logging.getLogger(__name__)
 
@@ -336,6 +337,11 @@ class FuzzerIssuePublisher:
 
         if existing is None:
             body = _render_issue_body(analysis, fingerprint=fingerprint, occurrences=1)
+            check_publish_allowed(
+                target_repo=repo_full_name,
+                action="create_issue",
+                context=f"fuzzer anomaly: {issue_title[:60]}",
+            )
             issue = retry_github_call(
                 lambda: repo.create_issue(
                     title=issue_title,
@@ -359,6 +365,11 @@ class FuzzerIssuePublisher:
         current_title = getattr(existing, "title", None)
         if not isinstance(current_title, str) or current_title != issue_title:
             edit_kwargs["title"] = issue_title
+        check_publish_allowed(
+            target_repo=repo_full_name,
+            action="edit_issue",
+            context=f"issue #{existing.number}",
+        )
         retry_github_call(
             lambda: existing.edit(**edit_kwargs),
             retries=self._retries,
@@ -368,6 +379,11 @@ class FuzzerIssuePublisher:
 
         # Post a comment with the new run's full details.
         comment_body = _render_occurrence_comment(analysis, occurrences=occurrences)
+        check_publish_allowed(
+            target_repo=repo_full_name,
+            action="create_comment",
+            context=f"issue #{existing.number}",
+        )
         retry_github_call(
             lambda: existing.create_comment(body=comment_body),
             retries=self._retries,

@@ -18,6 +18,8 @@ if __package__ in {None, ""}:
 from github import Auth, Github
 from github.GithubException import GithubException
 
+from scripts.publish_guard import check_publish_allowed
+
 from scripts.config import load_config
 from scripts.event_ledger import EventLedger
 from scripts.failure_store import FailureStore
@@ -123,11 +125,20 @@ def _upsert_proof_comment(repo, pr_number: int, fingerprint: str, body: str) -> 
     """Create or update the persistent proof comment on a pull request."""
     issue = repo.get_issue(number=pr_number)
     marker = _proof_marker(fingerprint)
+    repo_full_name = str(getattr(repo, "full_name", "") or "")
     for comment in issue.get_comments():
         existing = (comment.body or "").strip()
         if marker in existing:
+            check_publish_allowed(
+                target_repo=repo_full_name, action="edit_comment",
+                context=f"proof comment on PR #{pr_number}",
+            )
             comment.edit(body)
             return str(comment.html_url or "")
+    check_publish_allowed(
+        target_repo=repo_full_name, action="create_comment",
+        context=f"proof comment on PR #{pr_number}",
+    )
     created = issue.create_comment(body)
     return str(created.html_url or "")
 
@@ -155,6 +166,11 @@ def _github_post(url: str, token: str) -> tuple[int, str]:
 
 def _mark_ready_for_review(repo_full_name: str, pr_number: int, token: str) -> bool:
     """Mark a draft pull request ready for review when GitHub accepts it."""
+    check_publish_allowed(
+        target_repo=repo_full_name,
+        action="mark_ready_for_review",
+        context=f"PR #{pr_number}",
+    )
     status, _ = _github_post(
         (
             f"https://api.github.com/repos/{repo_full_name}/pulls/"

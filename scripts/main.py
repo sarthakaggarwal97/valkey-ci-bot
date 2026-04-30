@@ -27,6 +27,7 @@ from scripts.failure_store import FailureStore
 from scripts.fix_generator import FixGenerator
 from scripts.log_parser import LogParserRouter
 from scripts.log_retriever import LogRetriever
+from scripts.publish_guard import check_publish_allowed
 from scripts.models import (
     FailedJob,
     FailureHistorySummary,
@@ -374,6 +375,11 @@ def _dispatch_workflow(
     inputs: dict[str, str],
 ) -> None:
     """Dispatch a GitHub Actions workflow using the REST API."""
+    check_publish_allowed(
+        target_repo=repo_full_name,
+        action="workflow_dispatch",
+        context=f"{workflow_file}@{ref}",
+    )
     url = (
         f"https://api.github.com/repos/{repo_full_name}/actions/workflows/"
         f"{workflow_file}/dispatches"

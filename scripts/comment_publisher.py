@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from scripts.github_client import retry_github_call
 from scripts.models import ReviewFinding
+from scripts.publish_guard import check_publish_allowed
 
 if TYPE_CHECKING:
     from github import Github
@@ -33,6 +34,10 @@ class CommentPublisher:
         body: str,
     ) -> int:
         """Create or update the PR summary comment and return its comment id."""
+        check_publish_allowed(
+            target_repo=repo, action="upsert_summary",
+            context=f"PR #{pr_number}",
+        )
         pr = retry_github_call(
             lambda: self._gh.get_repo(repo).get_pull(pr_number),
             retries=self._github_retries,
@@ -95,6 +100,9 @@ class CommentPublisher:
 
         Returns the review ID on success, or ``None`` on failure.
         """
+        check_publish_allowed(
+            target_repo=repo, action="approve_pr", context=f"PR #{pr_number}",
+        )
         pr = retry_github_call(
             lambda: self._gh.get_repo(repo).get_pull(pr_number),
             retries=self._github_retries,
@@ -144,6 +152,10 @@ class CommentPublisher:
         if not findings:
             return []
 
+        check_publish_allowed(
+            target_repo=repo, action="publish_review_comments",
+            context=f"PR #{pr_number} ({len(findings)} findings)",
+        )
         pr = retry_github_call(
             lambda: self._gh.get_repo(repo).get_pull(pr_number),
             retries=self._github_retries,
@@ -211,6 +223,10 @@ class CommentPublisher:
         commit_sha: str | None = None,
     ) -> int | None:
         """Publish a top-level COMMENT review without inline findings."""
+        check_publish_allowed(
+            target_repo=repo, action="publish_review_note",
+            context=f"PR #{pr_number}",
+        )
         pr = retry_github_call(
             lambda: self._gh.get_repo(repo).get_pull(pr_number),
             retries=self._github_retries,
@@ -324,6 +340,10 @@ class CommentPublisher:
         review_comment: bool,
     ) -> int:
         """Publish a chat reply to a review thread or as a PR issue comment."""
+        check_publish_allowed(
+            target_repo=repo, action="publish_chat_reply",
+            context=f"PR #{pr_number} comment #{comment_id}",
+        )
         pr = retry_github_call(
             lambda: self._gh.get_repo(repo).get_pull(pr_number),
             retries=self._github_retries,
