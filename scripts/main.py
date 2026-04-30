@@ -1313,7 +1313,7 @@ def run_pipeline(
                     summary.add_result(job.name, failure_id, "analysis-failed")
                     continue
 
-                run_url = _build_workflow_run_url(report, repo_name)
+                run_url = _build_workflow_run_url(report)
                 outcome = process_failure_issue_first(
                     report=report,
                     parsed_failure=pf,
