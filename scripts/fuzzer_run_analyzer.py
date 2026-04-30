@@ -740,6 +740,15 @@ def _invoke_claude_code(
     prompt_parts = [
         system_prompt,
         "",
+        "## Valkey Fuzzer Context",
+        "This is a chaos testing tool for Valkey (Redis-compatible) clusters.",
+        "Chaos operations: process_kill (SIGKILL a node), forced_failover (CLUSTER FAILOVER FORCE),",
+        "non_forced_failover (CLUSTER FAILOVER), network_partition.",
+        "Expected after chaos: cluster recovers to OK, failover elects new primary,",
+        "slot coverage restored (16384/16384), data consistency maintained.",
+        "Anomalous: crashes on non-targeted nodes, split-brain, permanent slot loss,",
+        "data inconsistency, nodes stuck in FAIL state after recovery window.",
+        "",
         "## Run Metadata",
         f"Repository: {context.repo}",
         f"Run URL: {context.run_url}",
@@ -748,17 +757,22 @@ def _invoke_claude_code(
         f"Scenario ID: {context.scenario_id or 'unknown'}",
         f"Seed: {context.seed or 'unknown'}",
         "",
-        "## Artifacts on disk",
-        "Read the files in the current directory to understand the run.",
-        "Use Grep to search for crash patterns, assertions, or errors across log files.",
+        "## Source code",
+        "The Valkey source code at the tested commit is in the current directory.",
+        "Key files: src/cluster.c, src/cluster_legacy.c, src/replication.c, src/server.c, src/debug.c",
+        "Use Grep to look up assertions, crash handlers, or specific functions referenced in logs.",
         "",
+        "## Fuzzer artifacts",
+        "Fuzzer run artifacts are in _fuzzer_artifacts/ subdirectory.",
     ]
-    # List files written
-    file_list = _write_context_to_dir(context, artifact_dir)
+    # Write artifacts to a subdirectory so they don't mix with source
+    artifacts_dir = artifact_dir / "_fuzzer_artifacts"
+    artifacts_dir.mkdir(exist_ok=True)
+    file_list = _write_context_to_dir(context, artifacts_dir)
     if file_list:
-        prompt_parts.append("Available files:")
+        prompt_parts.append("Available artifact files:")
         for desc in file_list:
-            prompt_parts.append(f"- {desc}")
+            prompt_parts.append(f"- _fuzzer_artifacts/{desc}")
     else:
         prompt_parts.append("No artifact files available — use the metadata and deterministic findings only.")
     prompt_parts.append("")
@@ -774,7 +788,8 @@ def _invoke_claude_code(
 
     prompt_parts.extend([
         "## Your task",
-        "Analyze this fuzzer run. Read the artifact files as needed.",
+        "Analyze this fuzzer run. Read the artifact files and source code as needed.",
+        "If you see a crash or assertion, grep the source code to understand the root cause.",
         "Return ONLY valid JSON matching this schema:",
         '{',
         '  "overall_status": "normal|warning|anomalous",',
@@ -895,9 +910,34 @@ class FuzzerRunAnalyzer:
         model_payload: dict[str, Any] = {}
         try:
             import shutil
+            import subprocess
             import tempfile
             tmpdir = Path(tempfile.mkdtemp(prefix="fuzzer-analysis-"))
             try:
+                # Clone the Valkey source at the exact commit the fuzzer ran against
+                # so Claude Code can cross-reference crashes with actual code.
+                source_repo = context.repo.replace("valkey-fuzzer", "valkey")
+                if "/" not in source_repo:
+                    source_repo = "valkey-io/valkey"
+                clone_result = subprocess.run(
+                    ["git", "clone", "--depth", "1",
+                     f"https://github.com/{source_repo}.git",
+                     str(tmpdir), "--branch", "unstable"],
+                    capture_output=True, text=True, timeout=60,
+                )
+                if clone_result.returncode != 0:
+                    logger.warning("Shallow clone failed, continuing without source: %s",
+                                   clone_result.stderr[:200])
+                elif context.head_sha:
+                    subprocess.run(
+                        ["git", "fetch", "--depth", "1", "origin", context.head_sha],
+                        cwd=str(tmpdir), capture_output=True, text=True, timeout=30,
+                    )
+                    subprocess.run(
+                        ["git", "checkout", context.head_sha],
+                        cwd=str(tmpdir), capture_output=True, text=True, timeout=10,
+                    )
+
                 det_summary = _format_deterministic_summary(anomalies, normal_signals)
                 model_payload = _invoke_claude_code(
                     system_prompt=_SYSTEM_PROMPT,
