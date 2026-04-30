@@ -5,7 +5,7 @@ Validates: Requirements 2.5
 
 For any log content that does not match any supported parser format, the parser
 router should return a result flagged as "unparseable" containing exactly the
-last 200 lines of the log.
+last RAW_EXCERPT_LINES lines of the log.
 """
 
 from __future__ import annotations
@@ -43,12 +43,14 @@ _safe_line = st.text(alphabet=_SAFE_ALPHABET, min_size=1, max_size=80)
 
 
 @st.composite
-def unparseable_log(draw: st.DrawFn, min_lines: int = 0, max_lines: int = 500) -> str:
+def unparseable_log(draw: st.DrawFn, min_lines: int = 0, max_lines: int | None = None) -> str:
     """Generate a multi-line log that no parser can match.
 
     Each line has at least 1 character so that splitlines() returns the
     expected number of items regardless of trailing-newline edge cases.
     """
+    if max_lines is None:
+        max_lines = RAW_EXCERPT_LINES * 2
     num_lines = draw(st.integers(min_value=min_lines, max_value=max_lines))
     lines = draw(st.lists(_safe_line, min_size=num_lines, max_size=num_lines))
     return "\n".join(lines)
@@ -63,22 +65,22 @@ class TestUnparseableLogsProperty:
     @given(log=unparseable_log(min_lines=0, max_lines=RAW_EXCERPT_LINES - 1))
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     def test_short_log_returns_all_lines_as_excerpt(self, log: str) -> None:
-        """Logs with fewer than 200 lines return the entire log as excerpt."""
+        """Logs shorter than RAW_EXCERPT_LINES return the entire log as excerpt."""
         router = _make_router()
         failures, excerpt, is_unparseable = router.parse(log)
 
         assert failures == [], "No parsed failures expected for unparseable log"
         assert is_unparseable is True, "Should be flagged as unparseable"
 
-        # The router joins all lines with "\n" (since fewer than 200)
+        # The router joins all lines with "\n"
         original_lines = log.splitlines()
         expected_excerpt = "\n".join(original_lines)
         assert excerpt == expected_excerpt
 
-    @given(log=unparseable_log(min_lines=RAW_EXCERPT_LINES, max_lines=500))
+    @given(log=unparseable_log(min_lines=RAW_EXCERPT_LINES, max_lines=RAW_EXCERPT_LINES + 500))
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
-    def test_long_log_returns_last_200_lines(self, log: str) -> None:
-        """Logs with 200+ lines return exactly the last 200 lines."""
+    def test_long_log_returns_last_N_lines(self, log: str) -> None:
+        """Logs with RAW_EXCERPT_LINES+ lines return exactly the last N lines."""
         router = _make_router()
         failures, excerpt, is_unparseable = router.parse(log)
 
