@@ -340,16 +340,46 @@ def _apply_candidate(
     try:
         # Fetch the merge commit
         _run_git(repo_dir, "fetch", "origin", sha)
-        cp_result = cherry_picker.execute(candidate.target_branch, sha, candidate.commit_shas)
+        # Cherry-pick directly without re-checkout (we're already on the backport branch)
+        result = subprocess.run(
+            ["git", "cherry-pick", "-m", "1", sha],
+            cwd=repo_dir, capture_output=True, text=True,
+        )
     except Exception as exc:
         return CandidateResult(candidate.source_pr_number, candidate.source_pr_title, "error", str(exc))
 
-    if cp_result.success:
+    if result.returncode == 0:
         return CandidateResult(candidate.source_pr_number, candidate.source_pr_title, "applied")
 
-    # Conflicts — resolve with Claude Code
-    if not cp_result.conflicting_files:
-        return CandidateResult(candidate.source_pr_number, candidate.source_pr_title, "error", "cherry-pick failed without conflict info")
+    # Detect conflicts — look at cherry-pick state
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=repo_dir, capture_output=True, text=True,
+    )
+    conflicting_paths: list[str] = []
+    for line in status.stdout.splitlines():
+        if line.startswith("UU ") or line.startswith("AA ") or line.startswith("DD "):
+            conflicting_paths.append(line[3:].strip())
+    if not conflicting_paths:
+        return CandidateResult(candidate.source_pr_number, candidate.source_pr_title, "error", f"cherry-pick failed: {result.stderr[:300]}")
+
+    logger.info("Found %d conflicting file(s): %s", len(conflicting_paths), conflicting_paths)
+    # Build ConflictedFile list
+    from scripts.backport_models import ConflictedFile
+    conflicting_files = []
+    for path in conflicting_paths:
+        try:
+            content_with_markers = Path(os.path.join(repo_dir, path)).read_text()
+        except OSError:
+            content_with_markers = ""
+        conflicting_files.append(ConflictedFile(
+            path=path,
+            content_with_markers=content_with_markers,
+            target_branch_content="",
+            source_branch_content="",
+        ))
+
+    cp_result = None  # Unused; using conflicting_files directly
 
     pr_context = BackportPRContext(
         source_pr_number=candidate.source_pr_number,
@@ -362,7 +392,7 @@ def _apply_candidate(
         repo_full_name=repo_full_name,
     )
 
-    resolutions = resolve_conflicts_with_claude(repo_dir, cp_result.conflicting_files, pr_context)
+    resolutions = resolve_conflicts_with_claude(repo_dir, conflicting_files, pr_context)
     unresolved = [r for r in resolutions if r.resolved_content is None]
     if unresolved:
         # Abort cherry-pick
