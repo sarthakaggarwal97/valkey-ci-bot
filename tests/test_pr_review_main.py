@@ -364,6 +364,42 @@ def test_run_review_mode_preserves_state_when_review_generation_fails(tmp_path) 
     assert saved_state.last_reviewed_head_sha == "oldsha"
 
 
+def test_run_review_mode_honors_ignore_keyword_before_checkout(tmp_path) -> None:
+    payload = {
+        "repository": {"full_name": "owner/repo"},
+        "sender": {"login": "alice"},
+        "pull_request": {"number": 11, "body": "Details"},
+    }
+    event_path = _event_file(tmp_path, payload)
+    ignored_context = _context()
+    ignored_context.body = "Details\n/reviewbot: ignore"
+
+    with _patched_run_dependencies() as deps:
+        deps.fetcher.fetch.return_value = ignored_context
+
+        exit_code = run(
+            [
+                "--repo",
+                "owner/repo",
+                "--mode",
+                "review",
+                "--token",
+                "token",
+                "--event-name",
+                "pull_request_target",
+                "--event-path",
+                str(event_path),
+            ]
+        )
+
+    assert exit_code == 0
+    deps.clone_checkout.assert_not_called()
+    deps.summarize.assert_not_called()
+    deps.review.assert_not_called()
+    deps.publisher.upsert_summary.assert_not_called()
+    deps.state_store.save.assert_not_called()
+
+
 def test_run_review_mode_fails_closed_when_checkout_is_unavailable(tmp_path) -> None:
     payload = {
         "repository": {"full_name": "owner/repo"},

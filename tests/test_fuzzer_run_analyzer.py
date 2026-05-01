@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -171,6 +172,92 @@ def test_analyzer_falls_back_to_job_log_when_artifacts_are_missing() -> None:
     assert analysis.evidence_quality == "degraded"
     assert "tested_valkey_sha" in analysis.missing_artifact_fields
     assert analysis.summary.startswith("Run 11")
+
+
+def test_analyzer_falls_back_to_job_log_when_bundle_has_no_logs() -> None:
+    github_client = MagicMock()
+    repo = github_client.get_repo.return_value
+    repo.get_workflow_run.return_value = _make_run(run_id=13, conclusion="failure")
+
+    artifact_client = MagicMock()
+    artifact_client.list_run_artifacts.return_value = [
+        WorkflowArtifact(
+            artifact_id=9,
+            name="fuzzer-run-artifacts-13",
+            size_in_bytes=1,
+            expired=False,
+        )
+    ]
+    artifact_client.download_artifact_files.return_value = {
+        "bundle/manifest.json": json.dumps(
+            {"scenario_id": "partial", "seed": 13}
+        ).encode("utf-8"),
+        "bundle/results.json": json.dumps(
+            {
+                "results": [
+                    {
+                        "scenario_id": "partial",
+                        "seed": 13,
+                        "success": False,
+                        "final_validation": {
+                            "failed_checks": ["topology"],
+                            "checks": {},
+                        },
+                    }
+                ]
+            }
+        ).encode("utf-8"),
+    }
+    artifact_client.download_run_log_files.return_value = {
+        "job.txt": (
+            b"Scenario: partial\n"
+            b"Seed: 13\n"
+            b"Status: FAILED\n"
+            b"Failed Checks: topology\n"
+        )
+    }
+    subprocess_calls: list[list[str]] = []
+
+    def fake_run(cmd, **_kwargs):
+        subprocess_calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    import unittest.mock
+    with unittest.mock.patch("subprocess.run", side_effect=fake_run), \
+        unittest.mock.patch(
+            "scripts.fuzzer_run_analyzer.run_agent",
+            side_effect=RuntimeError("claude unavailable"),
+        ):
+        analyzer = FuzzerRunAnalyzer(
+            github_client,
+            artifact_client=artifact_client,
+            log_retriever=MagicMock(),
+        )
+        analysis = analyzer.analyze_workflow_run(
+            "valkey-io/valkey-fuzzer",
+            13,
+            workflow_file="fuzzer-run.yml",
+        )
+
+    artifact_client.download_run_log_files.assert_called_once_with(
+        "valkey-io/valkey-fuzzer",
+        13,
+    )
+    assert analysis.raw_log_fallback_used is True
+    assert "logs" not in analysis.missing_artifact_fields
+    assert analysis.scenario_id == "partial"
+    assert analysis.seed == "13"
+    valkey_clone = subprocess_calls[0]
+    assert valkey_clone[:6] == [
+        "git",
+        "clone",
+        "--filter=blob:none",
+        "--branch",
+        "unstable",
+        "--depth",
+    ]
+    assert valkey_clone[6] == "1"
+    assert valkey_clone[-2] == "https://github.com/valkey-io/valkey.git"
 
 
 def test_analyzer_does_not_treat_serverassert_object_name_as_crash() -> None:

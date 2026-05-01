@@ -346,6 +346,24 @@ def run_backport(
                 # ---- Step 6: Conflict resolution ----
                 resolution_results = None
                 total_tokens = 0
+                if not cherry_result.success and not cherry_result.conflicting_files:
+                    msg = (
+                        "Cherry-pick failed without conflicted files; refusing to "
+                        "push an unresolved or unchanged backport branch."
+                    )
+                    logger.error(msg)
+                    _post_comment(repo, source_pr_number, f"Backport failed: {msg}")
+                    event_ledger.record(
+                        "backport.failed",
+                        subject,
+                        phase="cherry-pick",
+                        error=msg,
+                    )
+                    return BackportResult(
+                        outcome="error",
+                        commits_cherry_picked=len(cherry_result.applied_commits),
+                        error_message=msg,
+                    )
                 if not cherry_result.success and cherry_result.conflicting_files:
                     logger.info(
                         "Cherry-pick produced %d conflict(s). Invoking conflict resolver.",
