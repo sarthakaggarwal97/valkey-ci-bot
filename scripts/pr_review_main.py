@@ -317,7 +317,7 @@ def run(argv: list[str] | None = None) -> int:
         try:
             clone_url = f"https://x-access-token:{args.token}@github.com/{repo_name}.git"
             subprocess.run(
-                ["git", "clone", "--filter=blob:none", "--branch", pr_context.base_branch or "unstable", clone_url, review_repo_dir],
+                ["git", "clone", "--filter=blob:none", "--branch", pr_context.base_ref or "unstable", clone_url, review_repo_dir],
                 capture_output=True, text=True, timeout=120, check=True,
             )
             subprocess.run(
