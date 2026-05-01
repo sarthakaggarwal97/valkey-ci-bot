@@ -47,6 +47,11 @@ on:
         required: false
         type: string
         default: ""
+      max_candidates:
+        description: "Cap candidates per branch (0 = unlimited)"
+        required: false
+        type: string
+        default: "0"
       test_commands:
         description: "Test commands to run after cherry-pick (newline-separated)"
         required: false
@@ -83,6 +88,7 @@ jobs:
       PUSH_REPO: ${{ inputs.push_repo || vars.VALKEY_BACKPORT_PUSH_REPO || '' }}
       ONLY_BRANCH: ${{ inputs.only_branch || '' }}
       IMPLICIT_TARGET_BRANCH: ${{ inputs.implicit_target_branch || '' }}
+      MAX_CANDIDATES: ${{ inputs.max_candidates || '0' }}
       TEST_COMMANDS: ${{ inputs.test_commands || 'make test' }}
       DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || inputs.dry_run || 'true' }}
     steps:
@@ -159,6 +165,10 @@ jobs:
 
           if [[ -n "${IMPLICIT_TARGET_BRANCH}" ]]; then
             args+=(--implicit-target-branch "${IMPLICIT_TARGET_BRANCH}")
+          fi
+
+          if [[ "${MAX_CANDIDATES}" != "0" ]]; then
+            args+=(--max-candidates "${MAX_CANDIDATES}")
           fi
 
           if [[ -n "${TEST_COMMANDS}" ]]; then

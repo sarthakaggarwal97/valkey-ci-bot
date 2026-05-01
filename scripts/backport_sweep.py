@@ -208,6 +208,7 @@ def run_backport_sweep(
     test_commands: list[str] | None = None,
     discover_only: bool = False,
     implicit_target_branch: str | None = None,
+    max_candidates: int = 0,
 ) -> list[BranchSweepResult]:
     gh = Github(auth=Auth.Token(github_token))
     repo = retry_github_call(lambda: gh.get_repo(repo_full_name), retries=3, description=f"get {repo_full_name}")
@@ -230,6 +231,9 @@ def run_backport_sweep(
     results: list[BranchSweepResult] = []
     for branch in release_branches:
         candidates = candidates_by_branch.get(branch, [])
+        if max_candidates > 0 and len(candidates) > max_candidates:
+            logger.info("Branch %s: limiting from %d to %d candidates", branch, len(candidates), max_candidates)
+            candidates = candidates[:max_candidates]
         logger.info("Branch %s: %d candidate(s)", branch, len(candidates))
         if discover_only:
             for c in candidates:
@@ -567,6 +571,8 @@ def main() -> None:
     parser.add_argument("--only-branch", default="")
     parser.add_argument("--implicit-target-branch", default="",
                         help="When the project implies the branch (e.g., project 14 → 8.1), set this to override the field-based lookup")
+    parser.add_argument("--max-candidates", type=int, default=0,
+                        help="Cap the number of candidates per branch (0 = unlimited)")
     parser.add_argument("--aws-region", default="us-east-1")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--discover-only", action="store_true")
@@ -589,6 +595,7 @@ def main() -> None:
         test_commands=[c.strip() for c in args.test_commands.split("\n") if c.strip()] or None,
         discover_only=args.discover_only or args.dry_run,
         implicit_target_branch=args.implicit_target_branch or None,
+        max_candidates=args.max_candidates,
     )
 
     print(json.dumps([{"branch": r.target_branch, "found": r.candidates_found, "applied": sum(1 for c in r.results if c.outcome == "applied"), "pr": r.pr_url} for r in results], indent=2))
