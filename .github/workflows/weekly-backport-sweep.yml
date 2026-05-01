@@ -1,0 +1,170 @@
+name: Weekly Backport Sweep
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: "Source repository to backport from"
+        required: false
+        type: string
+        default: "valkey-io/valkey"
+      project_owner:
+        description: "GitHub Project v2 owner"
+        required: false
+        type: string
+        default: "valkey-io"
+      project_owner_type:
+        description: "Project owner type"
+        required: false
+        type: choice
+        options:
+          - organization
+          - user
+        default: organization
+      project_number:
+        description: "GitHub Project v2 number"
+        required: false
+        type: string
+      status_value:
+        description: "Project status value to sweep"
+        required: false
+        type: string
+        default: "To be backported"
+      push_repo:
+        description: "Push backport PRs to this repo (default: fork from repo var)"
+        required: false
+        type: string
+        default: ""
+      only_branch:
+        description: "Only sweep this release branch (empty = all)"
+        required: false
+        type: string
+        default: ""
+      test_commands:
+        description: "Test commands to run after cherry-pick (newline-separated)"
+        required: false
+        type: string
+        default: "make test"
+      dry_run:
+        description: "Discovery only — don't cherry-pick or push"
+        required: false
+        default: true
+        type: boolean
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    concurrency:
+      group: weekly-backport-sweep-${{ inputs.repo || 'valkey-io/valkey' }}
+      cancel-in-progress: false
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      CLAUDE_CODE_USE_BEDROCK: "1"
+      REPO_FULL_NAME: ${{ inputs.repo || 'valkey-io/valkey' }}
+      PROJECT_OWNER: ${{ inputs.project_owner || 'valkey-io' }}
+      PROJECT_OWNER_TYPE: ${{ inputs.project_owner_type || 'organization' }}
+      PROJECT_NUMBER: ${{ inputs.project_number || vars.VALKEY_BACKPORT_PROJECT_NUMBER || '' }}
+      STATUS_VALUE: ${{ inputs.status_value || 'To be backported' }}
+      PUSH_REPO: ${{ inputs.push_repo || vars.VALKEY_BACKPORT_PUSH_REPO || '' }}
+      ONLY_BRANCH: ${{ inputs.only_branch || '' }}
+      TEST_COMMANDS: ${{ inputs.test_commands || 'make test' }}
+      DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || inputs.dry_run || 'true' }}
+    steps:
+      - name: Check out agent repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          npm install -g @anthropic-ai/claude-code
+
+      - name: Resolve target repository token
+        id: token
+        shell: bash
+        env:
+          VALKEY_GITHUB_TOKEN: ${{ secrets.VALKEY_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${VALKEY_GITHUB_TOKEN}" ]]; then
+            echo "VALKEY_GITHUB_TOKEN secret is required (needs read:project scope)" >&2
+            exit 1
+          fi
+          echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate project number
+        shell: bash
+        run: |
+          if [[ -z "${PROJECT_NUMBER}" ]]; then
+            echo "Project number is required. Set VALKEY_BACKPORT_PROJECT_NUMBER repo var or pass project_number input." >&2
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: backport-sweep-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run backport sweep
+        shell: bash
+        env:
+          TARGET_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          set -euo pipefail
+          args=(
+            -m scripts.backport_sweep
+            --repo "${REPO_FULL_NAME}"
+            --target-token "${TARGET_TOKEN}"
+            --project-owner "${PROJECT_OWNER}"
+            --project-number "${PROJECT_NUMBER}"
+            --project-owner-type "${PROJECT_OWNER_TYPE}"
+            --status-value "${STATUS_VALUE}"
+            --aws-region "${AWS_REGION}"
+            --verbose
+          )
+
+          if [[ -n "${PUSH_REPO}" ]]; then
+            args+=(--push-repo "${PUSH_REPO}")
+          fi
+
+          if [[ -n "${ONLY_BRANCH}" ]]; then
+            args+=(--only-branch "${ONLY_BRANCH}")
+          fi
+
+          if [[ -n "${TEST_COMMANDS}" ]]; then
+            args+=(--test-commands "${TEST_COMMANDS}")
+          fi
+
+          if [[ "${DRY_RUN}" == "true" ]]; then
+            args+=(--discover-only)
+          fi
+
+          python "${args[@]}" | tee backport-sweep-result.json
+
+      - name: Upload result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backport-sweep-result-${{ github.run_id }}
+          path: backport-sweep-result.json
+          retention-days: 30
