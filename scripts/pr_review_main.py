@@ -474,11 +474,17 @@ def run(argv: list[str] | None = None) -> int:
                     review_context,
                     last_reviewed_head_sha,
                 )
+                logger.info("Diff scope: %d files, incremental=%s, base=%s, head=%s",
+                            len(diff_scope.files), diff_scope.incremental,
+                            diff_scope.base_sha[:10] if diff_scope.base_sha else "none",
+                            diff_scope.head_sha[:10] if diff_scope.head_sha else "none")
                 reviewer_is_simple = (
                     not diff_scope.files
                     or (sum(f.additions + f.deletions for f in diff_scope.files) <= 5)
                     or all(not f.path.endswith(('.c', '.h', '.py', '.tcl', '.yml', '.yaml', '.sh', '.json')) for f in diff_scope.files)
                 )
+                logger.info("reviewer_is_simple=%s, review_simple_changes=%s, disable_review=%s",
+                            reviewer_is_simple, config.review_simple_changes, config.disable_review)
                 if reviewer_is_simple and not config.review_simple_changes:
                     detail = "simple-change" if diff_scope.files else "no-new-files"
                     summary.add_result("review", "skipped", detail)
@@ -555,9 +561,10 @@ def run(argv: list[str] | None = None) -> int:
             except Exception as exc:
                 had_failure = True
                 logger.exception("PR review failed for %s#%d: %s", repo_name, pr_context.number, exc)
-                print(f"[REVIEW] Review failed: {exc}", flush=True)
+                import sys
+                print(f"[REVIEW-ERROR] Review failed: {type(exc).__name__}: {exc}", file=sys.stdout, flush=True)
                 import traceback
-                traceback.print_exc()
+                traceback.print_exc(file=sys.stdout)
                 summary.add_result("review", "failed", str(exc))
                 event_ledger.record(
                     "review.failed",
