@@ -292,7 +292,7 @@ def _process_branch(
         already_applied = _list_already_applied(tmpdir, target_branch, backport_branch)
         logger.info("Already applied on %s: %s", backport_branch, already_applied)
 
-        cherry_picker = CherryPickExecutor()
+        cherry_picker = CherryPickExecutor(tmpdir)
         signer, _ = _resolve_commit_signer()
 
         for candidate in candidates:
@@ -320,7 +320,7 @@ def _process_branch(
             result.pr_url = pr_url
 
     except Exception as exc:
-        logger.error("Error processing branch %s: %s", target_branch, exc)
+        logger.exception("Error processing branch %s: %s", target_branch, exc)
     finally:
         import shutil
         shutil.rmtree(tmpdir, ignore_errors=True)
@@ -340,7 +340,7 @@ def _apply_candidate(
     try:
         # Fetch the merge commit
         _run_git(repo_dir, "fetch", "origin", sha)
-        cp_result = cherry_picker.cherry_pick(repo_dir, sha)
+        cp_result = cherry_picker.execute(candidate.target_branch, sha, candidate.commit_shas)
     except Exception as exc:
         return CandidateResult(candidate.source_pr_number, candidate.source_pr_title, "error", str(exc))
 
