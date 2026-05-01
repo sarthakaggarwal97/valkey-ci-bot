@@ -379,8 +379,6 @@ def _apply_candidate(
             source_branch_content="",
         ))
 
-    cp_result = None  # Unused; using conflicting_files directly
-
     pr_context = BackportPRContext(
         source_pr_number=candidate.source_pr_number,
         source_pr_title=candidate.source_pr_title,
