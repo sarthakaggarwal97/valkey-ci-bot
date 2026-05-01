@@ -364,7 +364,7 @@ def _apply_candidate(
         return CandidateResult(candidate.source_pr_number, candidate.source_pr_title, "error", f"cherry-pick failed: {result.stderr[:300]}")
 
     logger.info("Found %d conflicting file(s): %s", len(conflicting_paths), conflicting_paths)
-    # Build ConflictedFile list
+    # Build ConflictedFile list with real target/source content for the whitespace-only fast path
     from scripts.backport_models import ConflictedFile
     conflicting_files = []
     for path in conflicting_paths:
@@ -372,11 +372,15 @@ def _apply_candidate(
             content_with_markers = Path(os.path.join(repo_dir, path)).read_text()
         except OSError:
             content_with_markers = ""
+        # :2:<path> = ours (target branch, where we're cherry-picking TO)
+        # :3:<path> = theirs (source commit being cherry-picked)
+        target_content = _read_index_stage(repo_dir, path, 2)
+        source_content = _read_index_stage(repo_dir, path, 3)
         conflicting_files.append(ConflictedFile(
             path=path,
             content_with_markers=content_with_markers,
-            target_branch_content="",
-            source_branch_content="",
+            target_branch_content=target_content,
+            source_branch_content=source_content,
         ))
 
     pr_context = BackportPRContext(
@@ -409,6 +413,23 @@ def _apply_candidate(
 
 
 # ── PR management ─────────────────────────────────────────────────────
+
+def _read_index_stage(repo_dir: str, path: str, stage: int) -> str:
+    """Read the content of a file from a specific merge stage.
+    Stage 1 = common ancestor, 2 = ours (target), 3 = theirs (source).
+    Returns empty string if the stage doesn't exist (e.g., add/add conflict).
+    """
+    try:
+        result = subprocess.run(
+            ["git", "show", f":{stage}:{path}"],
+            cwd=repo_dir, capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            return result.stdout
+    except Exception:
+        pass
+    return ""
+
 
 def _find_existing_pr(gh: object, push_repo: str, branch: str) -> object | None:
     try:

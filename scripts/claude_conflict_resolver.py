@@ -44,9 +44,13 @@ def resolve_conflicts_with_claude(
     results: list[ResolutionResult] = []
     llm_files: list[ConflictedFile] = []
 
-    # Fast path: whitespace-only conflicts
+    # Fast path: whitespace-only conflicts (only when we have real content to compare)
     for cf in conflicting_files:
-        if is_whitespace_only_conflict(cf.target_branch_content, cf.source_branch_content):
+        if (
+            cf.target_branch_content
+            and cf.source_branch_content
+            and is_whitespace_only_conflict(cf.target_branch_content, cf.source_branch_content)
+        ):
             results.append(ResolutionResult(
                 path=cf.path,
                 resolved_content=cf.source_branch_content,
