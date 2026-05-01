@@ -22,7 +22,6 @@ from scripts.claude_reviewer import summarize_pr as claude_summarize_pr
 from scripts.comment_publisher import CommentPublisher
 from scripts.config import ReviewerConfig, load_reviewer_config, load_reviewer_config_text
 from scripts.event_ledger import EventLedger
-from scripts.models import DiffScope as _DiffScope
 from scripts.models import PullRequestContext, ReviewState, SummaryResult
 from scripts.path_filter import PathFilter
 from scripts.permission_gate import PermissionGate
@@ -423,9 +422,9 @@ def run(argv: list[str] | None = None) -> int:
                 )
             summary_text = claude_summarize_pr(
                 review_context,
-                fetcher.build_diff_scope(review_context, None) if review_repo_dir else _DiffScope(base_sha="", head_sha="", files=[]),
+                fetcher.build_diff_scope(review_context, None),
                 review_repo_dir,
-            )
+            ) if review_repo_dir else "Summary unavailable (repo checkout failed)."
             summary_result = SummaryResult(
                 walkthrough=summary_text,
                 file_groups_markdown="",
