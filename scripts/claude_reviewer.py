@@ -150,39 +150,68 @@ def review_pr(
         )
 
     prompt = (
-        f"You are reviewing PR #{pr_context.number} on the Valkey project (C codebase).\n\n"
-        f"**Title**: {pr_context.title}\n"
+        f"You are a senior Valkey maintainer doing a thorough code review of PR #{pr_context.number}.\n"
+        f"Valkey is a C Redis-compatible database. You know the codebase intimately.\n\n"
+        f"**PR Title**: {pr_context.title}\n"
         f"**Base branch**: {pr_context.base_ref}\n"
         f"**Description**:\n{pr_context.body[:3000]}\n\n"
         f"{incremental_note}"
         f"## Changed files\n{diff_text}\n\n"
-        f"## Your task\n"
-        f"The repo is checked out at the PR's HEAD in the current directory. "
-        f"Base branch is `{pr_context.base_ref}`.\n\n"
-        f"1. Read the changed files and their surrounding context\n"
-        f"2. Use Grep/Glob to find callers, related code, type definitions\n"
-        f"3. Use `git diff {pr_context.base_ref}..HEAD` or `git log` as needed\n"
-        f"4. Identify real bugs, logic errors, memory issues, race conditions, "
-        f"missing error handling, security issues\n"
-        f"5. Do NOT flag style nits, naming preferences, or trivial formatting\n"
-        f"6. For each finding, verify it's a real issue by reading the code\n\n"
-        f"Return a JSON array of findings:\n"
+        f"## How to review\n"
+        f"The repo is checked out at the PR's HEAD in the current directory.\n"
+        f"Base branch is `{pr_context.base_ref}`. Compare HEAD against it with `git diff {pr_context.base_ref}..HEAD`.\n\n"
+        f"For EACH changed file:\n"
+        f"1. Read the file with Read, not just the diff. Understand the full function context.\n"
+        f"2. Grep for callers of any modified function: `grep -rn 'funcName(' src/`\n"
+        f"3. Grep for the variables/types used: understand their lifecycle\n"
+        f"4. Check nearby error paths: does this code handle NULL, OOM, partial writes, disconnects?\n"
+        f"5. Check concurrency: is data accessed from io-threads, main thread, BIO threads? Are locks held?\n"
+        f"6. Check memory: every `zmalloc()` needs a `zfree()`, every `sdsnew()` needs `sdsfree()`, every `createObject()` needs `decrRefCount()`\n"
+        f"7. Check the tests: does the test actually trigger the changed code path? Are edge cases covered?\n"
+        f"8. Cross-reference with the PR description: does the code match the stated intent?\n\n"
+        f"## What to flag (high priority)\n"
+        f"- Memory leaks, double-frees, use-after-free\n"
+        f"- NULL dereferences, uninitialized variables\n"
+        f"- Race conditions on shared state\n"
+        f"- Missing error handling after allocations/syscalls\n"
+        f"- Protocol violations (RESP, cluster gossip, replication)\n"
+        f"- Incorrect locking (missing mutex, wrong lock order)\n"
+        f"- Broken invariants (checkType, object type mismatches)\n"
+        f"- Tests that don't actually test the changed code\n"
+        f"- Security issues (buffer overflows, integer overflows, format string bugs)\n"
+        f"- Backward incompatibility (AOF/RDB format, client protocol)\n\n"
+        f"## What NOT to flag\n"
+        f"- Style nits (spacing, naming preferences)\n"
+        f"- Personal preferences on code structure\n"
+        f"- Things already handled elsewhere in the codebase\n"
+        f"- Low-severity issues that don't materially affect correctness or safety\n\n"
+        f"## Line numbers for inline comments\n"
+        f"For each finding, use the line number **in the NEW version of the file** (the HEAD version after the PR's changes).\n"
+        f"GitHub posts inline comments at these line numbers, so they must point to lines present in the diff.\n"
+        f"Verify by running `git diff {pr_context.base_ref}..HEAD -- <file>` and picking a line that's a `+` or context line near your finding.\n\n"
+        f"## Output format\n"
+        f"Return a JSON array of findings. Each finding must correspond to a REAL issue you verified by reading code.\n"
         f"```json\n"
-        f'[{{"path": "src/file.c", "line": 42, "severity": "high", '
-        f'"title": "Brief title", "body": "Detailed explanation of the issue", '
-        f'"confidence": "high", "impact": "What could go wrong", '
-        f'"supporting_paths": ["src/other.c"]}}]\n'
+        f"[\n"
+        f'  {{"path": "src/file.c", "line": 42, "severity": "high", "title": "Brief title",\n'
+        f'    "body": "Detailed explanation: what the bug is, how it triggers, what could go wrong. '
+        f'Quote the relevant code. Suggest the fix.", "confidence": "high",\n'
+        f'    "impact": "One sentence on real-world impact",\n'
+        f'    "supporting_paths": ["src/caller.c"]}}\n'
+        f"]\n"
         f"```\n\n"
-        f"Severities: info, low, medium, high, critical\n"
-        f"Confidence: low, medium, high\n"
-        f"If no issues found, return an empty array: `[]`"
+        f"Severities: `info` (nitpick), `low` (minor), `medium` (bug in edge case), `high` (likely bug in common path), `critical` (data loss/crash/security)\n"
+        f"Confidence: `low` (maybe), `medium` (probably), `high` (verified by reading code)\n\n"
+        f"Prefer FEWER findings with HIGH confidence over MORE findings with LOW confidence.\n"
+        f"A thorough review on a 500-line PR usually has 3-10 findings. Target that range.\n"
+        f"If after deep reading you genuinely find no issues, return `[]` (empty array)."
     )
 
     logger.info("Reviewing PR #%d (%d files)...", pr_context.number, len(diff_scope.files))
     stdout, stderr, rc = run_claude_code(
         prompt, cwd=repo_dir, timeout=1800,
         allowed_tools="Read,Grep,Glob,Bash",
-        effort="extra-high",
+        effort="max",
     )
 
     result_text = _extract_result_text(stdout)
