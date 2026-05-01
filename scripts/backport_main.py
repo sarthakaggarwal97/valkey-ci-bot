@@ -13,13 +13,11 @@ import stat
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import boto3
 from github import Auth, Github
 from github.GithubException import GithubException
 
@@ -32,15 +30,14 @@ from scripts.backport_models import (
 )
 from scripts.backport_pr_creator import BackportPRCreator
 from scripts.backport_utils import build_branch_name
-from scripts.bedrock_client import BedrockClient
 from scripts.cherry_pick import CherryPickExecutor
+from scripts.claude_conflict_resolver import resolve_conflicts_with_claude
 from scripts.commit_signoff import (
     CommitSigner,
     load_signer_from_env,
     require_dco_signoff_from_env,
 )
-from scripts.config import BotConfig, ProjectContext
-from scripts.conflict_resolver import ConflictResolver
+from scripts.config import BotConfig
 from scripts.event_ledger import EventLedger
 from scripts.github_client import retry_github_call
 from scripts.publish_guard import check_publish_allowed
@@ -59,38 +56,6 @@ def _resolve_commit_signer() -> tuple[CommitSigner, bool]:
             "CI_BOT_COMMIT_EMAIL is not configured."
         )
     return signer, require_dco
-
-
-@dataclass
-class _BedrockConfigAdapter:
-    """Adapts :class:`BackportConfig` to the :class:`BedrockConfig` protocol.
-
-    Provides sensible defaults for fields that ``BackportConfig`` does not
-    carry (``max_input_tokens``, ``max_output_tokens``, ``max_retries_bedrock``,
-    ``project``).
-    """
-
-    _backport_config: BackportConfig
-
-    @property
-    def bedrock_model_id(self) -> str:
-        return self._backport_config.bedrock_model_id
-
-    @property
-    def max_input_tokens(self) -> int:
-        return 200_000
-
-    @property
-    def max_output_tokens(self) -> int:
-        return 4096
-
-    @property
-    def max_retries_bedrock(self) -> int:
-        return 3
-
-    @property
-    def project(self) -> ProjectContext:
-        return ProjectContext()
 
 
 # ------------------------------------------------------------------
@@ -384,24 +349,12 @@ def run_backport(
                     subject,
                     conflicting_files=len(cherry_result.conflicting_files),
                 )
-                bedrock_adapter = _BedrockConfigAdapter(_backport_config=config)
-                bedrock_client = BedrockClient(
-                    bedrock_adapter,
-                    client=boto3.client("bedrock-runtime", region_name=aws_region),
-                    rate_limiter=rate_limiter,
-                )
-                resolver = ConflictResolver(
-                    bedrock_client, config,
-                    github_client=gh,
-                    repo_full_name=repo_full_name,
-                    head_sha=merge_commit_sha or "",
-                )
-                resolution_results = resolver.resolve_conflicts(
+                resolution_results = resolve_conflicts_with_claude(
+                    tmp_dir,
                     cherry_result.conflicting_files,
                     pr_context,
-                    token_budget=config.per_backport_token_budget,
                 )
-                total_tokens = sum(r.tokens_used for r in resolution_results)
+                total_tokens = 0  # Claude Code manages its own budget
 
                 # Apply resolved files to the working tree and commit
                 _apply_resolutions(
