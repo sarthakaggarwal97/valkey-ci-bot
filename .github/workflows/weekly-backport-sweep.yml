@@ -42,6 +42,11 @@ on:
         required: false
         type: string
         default: ""
+      implicit_target_branch:
+        description: "Target branch implied by this project (e.g., '8.1' for project 14)"
+        required: false
+        type: string
+        default: ""
       test_commands:
         description: "Test commands to run after cherry-pick (newline-separated)"
         required: false
@@ -77,6 +82,7 @@ jobs:
       STATUS_VALUE: ${{ inputs.status_value || 'To be backported' }}
       PUSH_REPO: ${{ inputs.push_repo || vars.VALKEY_BACKPORT_PUSH_REPO || '' }}
       ONLY_BRANCH: ${{ inputs.only_branch || '' }}
+      IMPLICIT_TARGET_BRANCH: ${{ inputs.implicit_target_branch || '' }}
       TEST_COMMANDS: ${{ inputs.test_commands || 'make test' }}
       DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || inputs.dry_run || 'true' }}
     steps:
@@ -149,6 +155,10 @@ jobs:
 
           if [[ -n "${ONLY_BRANCH}" ]]; then
             args+=(--only-branch "${ONLY_BRANCH}")
+          fi
+
+          if [[ -n "${IMPLICIT_TARGET_BRANCH}" ]]; then
+            args+=(--implicit-target-branch "${IMPLICIT_TARGET_BRANCH}")
           fi
 
           if [[ -n "${TEST_COMMANDS}" ]]; then

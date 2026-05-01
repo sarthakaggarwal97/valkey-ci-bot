@@ -119,7 +119,8 @@ class ProjectBackportDiscovery:
                  project_number: int, project_owner_type: str = "organization",
                  status_field: str = _DEFAULT_STATUS_FIELD,
                  status_value: str = _DEFAULT_STATUS_VALUE,
-                 branch_fields: list[str] | None = None) -> None:
+                 branch_fields: list[str] | None = None,
+                 implicit_target_branch: str | None = None) -> None:
         self._gql = gql
         self._owner = project_owner
         self._number = project_number
@@ -127,6 +128,9 @@ class ProjectBackportDiscovery:
         self._status_field = status_field
         self._status_value = status_value
         self._branch_fields = branch_fields or list(_DEFAULT_BRANCH_FIELDS)
+        # If set, every candidate on this project goes to this branch
+        # (used for per-release-version project boards like valkey-io/projects/14 → 8.1)
+        self._implicit_target = implicit_target_branch
 
     def discover(self, release_branches: list[str]) -> dict[str, list[ProjectBackportCandidate]]:
         by_branch: dict[str, list[ProjectBackportCandidate]] = {b: [] for b in release_branches}
@@ -160,9 +164,13 @@ class ProjectBackportDiscovery:
         fields = _extract_field_values(item)
         if not _field_has_value(fields, self._status_field, self._status_value):
             return None
-        target = _matching_release_branch(fields, self._branch_fields, branches)
-        if not target:
-            return None
+        # Determine target branch: either from project (implicit) or from a field
+        if self._implicit_target:
+            target = self._implicit_target
+        else:
+            target = _matching_release_branch(fields, self._branch_fields, branches)
+            if not target:
+                return None
         commits = [n.get("commit", {}).get("oid", "") for n in (content.get("commits", {}).get("nodes") or [])]
         merge_sha = (content.get("mergeCommit") or {}).get("oid")
         return ProjectBackportCandidate(
@@ -199,18 +207,23 @@ def run_backport_sweep(
     only_branch: str | None = None,
     test_commands: list[str] | None = None,
     discover_only: bool = False,
+    implicit_target_branch: str | None = None,
 ) -> list[BranchSweepResult]:
     gh = Github(auth=Auth.Token(github_token))
     repo = retry_github_call(lambda: gh.get_repo(repo_full_name), retries=3, description=f"get {repo_full_name}")
     release_branches = discover_release_branches(repo, _DEFAULT_RELEASE_BRANCH_PATTERN)
     if only_branch:
         release_branches = [b for b in release_branches if b == only_branch]
+    if implicit_target_branch and implicit_target_branch not in release_branches:
+        # User-specified target takes precedence even if not in pattern match
+        release_branches = [implicit_target_branch]
 
     discovery = ProjectBackportDiscovery(
         GitHubGraphQLClient(github_token),
         project_owner=project_owner, project_number=project_number,
         project_owner_type=project_owner_type, status_field=status_field,
         status_value=status_value, branch_fields=branch_fields,
+        implicit_target_branch=implicit_target_branch,
     )
     candidates_by_branch = discovery.discover(release_branches)
 
@@ -552,6 +565,8 @@ def main() -> None:
     parser.add_argument("--branch-fields", default=",".join(_DEFAULT_BRANCH_FIELDS))
     parser.add_argument("--test-commands", default="")
     parser.add_argument("--only-branch", default="")
+    parser.add_argument("--implicit-target-branch", default="",
+                        help="When the project implies the branch (e.g., project 14 → 8.1), set this to override the field-based lookup")
     parser.add_argument("--aws-region", default="us-east-1")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--discover-only", action="store_true")
@@ -573,6 +588,7 @@ def main() -> None:
         only_branch=args.only_branch or None,
         test_commands=[c.strip() for c in args.test_commands.split("\n") if c.strip()] or None,
         discover_only=args.discover_only or args.dry_run,
+        implicit_target_branch=args.implicit_target_branch or None,
     )
 
     print(json.dumps([{"branch": r.target_branch, "found": r.candidates_found, "applied": sum(1 for c in r.results if c.outcome == "applied"), "pr": r.pr_url} for r in results], indent=2))
