@@ -14,13 +14,11 @@ from pathlib import Path, PurePosixPath
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import boto3
-from botocore.config import Config as BotocoreConfig
 from github import Auth, Github
 
-from scripts.bedrock_client import BedrockClient, PromptClient
-from scripts.bedrock_retriever import BedrockRetriever
-from scripts.code_reviewer import CodeReviewer, ReviewCoverage
+from scripts.claude_reviewer import reply_to_review_comment as claude_reply_to_comment
+from scripts.claude_reviewer import review_pr as claude_review_pr
+from scripts.claude_reviewer import summarize_pr as claude_summarize_pr
 from scripts.comment_publisher import CommentPublisher
 from scripts.config import ReviewerConfig, load_reviewer_config, load_reviewer_config_text
 from scripts.event_ledger import EventLedger
@@ -30,9 +28,7 @@ from scripts.path_filter import PathFilter
 from scripts.permission_gate import PermissionGate
 from scripts.pr_context_fetcher import PRContextFetcher
 from scripts.pr_event_router import PREventRouter, load_event_from_path
-from scripts.pr_summarizer import PRSummarizer
 from scripts.rate_limiter import RateLimiter
-from scripts.review_chat import ReviewChat
 from scripts.review_policy import collect_review_policy_note, render_review_policy_note
 from scripts.review_state_store import ReviewStateStore
 from scripts.summary import ReviewWorkflowSummary
@@ -298,35 +294,11 @@ def run(argv: list[str] | None = None) -> int:
     )
     rate_limiter.load()
 
-    bedrock_timeout_seconds = max(60, int(config.bedrock_timeout_ms / 1000))
-    bedrock_client_config = BotocoreConfig(
-        read_timeout=bedrock_timeout_seconds,
-        connect_timeout=60,
-    )
-    bedrock_runtime = boto3.client(
-        "bedrock-runtime",
-        region_name=args.aws_region or None,
-        config=bedrock_client_config,
-    )
-    bedrock_client: PromptClient = BedrockClient(
-        config=config,
-        client=bedrock_runtime,
-        rate_limiter=rate_limiter,
-    )
-    retriever = None
-    retrieval_enabled = config.retrieval.enabled and any([
-        config.retrieval.code_knowledge_base_id,
-        config.retrieval.docs_knowledge_base_id,
-    ])
-    if retrieval_enabled:
-        retriever = BedrockRetriever(
-            boto3.client(
-                "bedrock-agent-runtime",
-                region_name=args.aws_region or None,
-                config=bedrock_client_config,
-            ),
-            metric_recorder=rate_limiter.record_ai_metric,
-        )
+    # Clone the repo for Claude Code to read
+    import shutil
+    import subprocess
+    import tempfile
+    review_repo_dir = tempfile.mkdtemp(prefix="pr-review-")
     fetcher = PRContextFetcher(gh, github_retries=config.github_retries)
     publisher = CommentPublisher(gh, github_retries=config.github_retries)
     state_store = ReviewStateStore(state_gh, args.state_repo or repo_name)
@@ -340,6 +312,27 @@ def run(argv: list[str] | None = None) -> int:
             assert event is not None
             pr_number = event.pr_number or 0
         pr_context = fetcher.fetch(repo_name, pr_number)
+
+        # Clone the repo and check out the PR branch for Claude Code
+        try:
+            clone_url = f"https://x-access-token:{args.token}@github.com/{repo_name}.git"
+            subprocess.run(
+                ["git", "clone", "--filter=blob:none", "--branch", pr_context.base_branch or "unstable", clone_url, review_repo_dir],
+                capture_output=True, text=True, timeout=120, check=True,
+            )
+            subprocess.run(
+                ["git", "fetch", "origin", f"pull/{pr_number}/head:pr-head"],
+                cwd=review_repo_dir, capture_output=True, text=True, timeout=60, check=True,
+            )
+            subprocess.run(
+                ["git", "checkout", "pr-head"],
+                cwd=review_repo_dir, capture_output=True, text=True, timeout=30, check=True,
+            )
+            logger.info("Cloned %s and checked out PR #%d at %s", repo_name, pr_number, review_repo_dir)
+        except Exception as exc:
+            logger.error("Failed to clone repo for review: %s", exc)
+            review_repo_dir = ""  # Fall back to no-repo mode
+
         valkey_context = load_valkey_repo_context(gh, repo_name, ref=pr_context.base_sha)
         config = augment_reviewer_config_for_valkey(config, pr_context, valkey_context)
         review_subject = _review_subject(repo_name, pr_context.number)
@@ -398,21 +391,10 @@ def run(argv: list[str] | None = None) -> int:
                 thread.conversation,
                 event.body or "",
             )
-            chat_context = _filtered_context(
-                fetcher.hydrate_contents(pr_context, relevant_paths),
-                relevant_paths,
-            )
-            reply = ReviewChat(
-                bedrock_client,
-                retriever=retriever,
-                retrieval_config=config.retrieval,
-                github_client=gh,
-                ).reply(
-                    chat_context,
+            reply = claude_reply_to_comment(
+                    review_context,
                     thread,
-                    event.body or "",
-                    config,
-                    requester=event.actor,
+                    review_repo_dir,
                 )
             publisher.publish_chat_reply(
                 repo_name,
@@ -433,22 +415,23 @@ def run(argv: list[str] | None = None) -> int:
             return 0
 
         summary_comment_id = current_state.summary_comment_id if current_state else None
-        short_summary = ""
         try:
             policy_note = ""
             if config.post_policy_notes:
                 policy_note = render_review_policy_note(
                     collect_review_policy_note(pr_context)
                 )
-            summary_result = PRSummarizer(
-                bedrock_client,
-                retriever=retriever,
-                retrieval_config=config.retrieval,
-            ).summarize(
+            summary_text = claude_summarize_pr(
                 review_context,
-                config,
+                fetcher.build_diff_scope(review_context, None) if review_repo_dir else _DiffScope(base_sha="", head_sha="", files=[]),
+                review_repo_dir,
             )
-            short_summary = summary_result.short_summary
+            summary_result = SummaryResult(
+                walkthrough=summary_text,
+                file_groups_markdown="",
+                release_notes=None,
+                short_summary=summary_text[:200] if summary_text else "",
+            )
             summary_comment_id = publisher.upsert_summary(
                 repo_name,
                 pr_context.number,
@@ -490,13 +473,12 @@ def run(argv: list[str] | None = None) -> int:
                     review_context,
                     last_reviewed_head_sha,
                 )
-                reviewer = CodeReviewer(
-                    bedrock_client,
-                    retriever=retriever,
-                    retrieval_config=config.retrieval,
-                    github_client=gh,
+                reviewer_is_simple = (
+                    not diff_scope.files
+                    or (sum(f.additions + f.deletions for f in diff_scope.files) <= 5)
+                    or all(not f.path.endswith(('.c', '.h', '.py', '.tcl', '.yml', '.yaml', '.sh', '.json')) for f in diff_scope.files)
                 )
-                if reviewer.classify_simple_change(diff_scope.files) and not config.review_simple_changes:
+                if reviewer_is_simple and not config.review_simple_changes:
                     detail = "simple-change" if diff_scope.files else "no-new-files"
                     summary.add_result("review", "skipped", detail)
                     event_ledger.record(
@@ -507,160 +489,68 @@ def run(argv: list[str] | None = None) -> int:
                     )
                     review_completed_for_head = True
                 else:
-                    # Per-file triage: use light model to skip trivial files
-                    triaged_files = reviewer.triage_files(
-                        diff_scope.files, review_context, config,
-                    )
-                    if not triaged_files:
-                        summary.add_result("review", "skipped", "all-files-approved-by-triage")
-                        event_ledger.record(
-                            "review.skipped",
-                            review_subject,
-                            reason="all-files-approved-by-triage",
-                            file_count=len(diff_scope.files),
+                    if review_repo_dir:
+                        findings = claude_review_pr(
+                            review_context, diff_scope, review_repo_dir,
+                            previous_reviewed_sha=last_reviewed_head_sha if diff_scope.incremental else None,
                         )
+                    else:
+                        findings = []
+                        logger.warning("No repo checkout available, skipping review")
+                    if findings:
+                        published_ids = publisher.publish_review_comments(
+                            repo_name,
+                            pr_context.number,
+                            findings,
+                            commit_sha=pr_context.head_sha,
+                        )
+                        review_comment_ids.extend(
+                            comment_id
+                            for comment_id in published_ids
+                            if comment_id not in review_comment_ids
+                        )
+                        comments_published = bool(published_ids)
+                        summary.add_result(
+                            "review",
+                            "performed" if comments_published else "failed",
+                            (
+                                f"{len(published_ids)} comment(s), "
+                                f"{len(diff_scope.files)} "
+                                "file(s) reviewed"
+                            ),
+                        )
+                        event_ledger.record(
+                            "review.comments_posted" if comments_published else "review.failed",
+                            review_subject,
+                            comments=len(published_ids),
+                            file_count=len(diff_scope.files),
+                            reason=(
+                                "publish-review-comments-returned-no-comment-ids"
+                                if not comments_published
+                                else ""
+                            ),
+                        )
+                        if not comments_published:
+                            had_failure = True
                         review_completed_for_head = True
                     else:
-                        triaged_scope = _DiffScope(
-                            base_sha=diff_scope.base_sha,
-                            head_sha=diff_scope.head_sha,
-                            files=triaged_files,
-                            incremental=diff_scope.incremental,
-                        )
-                        findings = reviewer.review(
-                            review_context, triaged_scope, config,
-                            short_summary=short_summary,
-                        )
-                        coverage_report: ReviewCoverage | None = None
-                        get_coverage = getattr(reviewer, "get_last_review_coverage", None)
-                        if callable(get_coverage):
-                            candidate = get_coverage()
-                            if isinstance(candidate, ReviewCoverage):
-                                coverage_report = candidate
-                        if findings:
-                            published_ids = publisher.publish_review_comments(
+                        if config.approve_on_no_findings:
+                            publisher.approve_pr(
                                 repo_name,
                                 pr_context.number,
-                                findings,
+                                body="LGTM",
                                 commit_sha=pr_context.head_sha,
                             )
-                            review_comment_ids.extend(
-                                comment_id
-                                for comment_id in published_ids
-                                if comment_id not in review_comment_ids
-                            )
-                            comments_published = bool(published_ids)
-                            summary.add_result(
-                                "review",
-                                "performed" if comments_published else "failed",
-                                (
-                                    f"{len(published_ids)} comment(s), "
-                                    f"{len(diff_scope.files) - len(triaged_files)} "
-                                    "file(s) auto-approved"
-                                ),
-                            )
-                            event_ledger.record(
-                                "review.comments_posted" if comments_published else "review.failed",
-                                review_subject,
-                                comments=len(published_ids),
-                                triaged_file_count=len(triaged_files),
-                                auto_approved_file_count=len(diff_scope.files) - len(triaged_files),
-                                reason=(
-                                    "publish-review-comments-returned-no-comment-ids"
-                                    if not comments_published
-                                    else ""
-                                ),
-                            )
-                            if not comments_published:
-                                had_failure = True
-                            if coverage_report is not None and not coverage_report.complete:
-                                review_id = publisher.publish_review_note(
-                                    repo_name,
-                                    pr_context.number,
-                                    coverage_report.render_review_note(),
-                                    commit_sha=pr_context.head_sha,
-                                )
-                                if review_id and review_id not in review_comment_ids:
-                                    review_comment_ids.append(review_id)
-                                event_ledger.record(
-                                    "review.note_posted",
-                                    review_subject,
-                                    note_kind="coverage-incomplete",
-                                    review_id=review_id or 0,
-                                    unaccounted_files=len(coverage_report.unaccounted_files),
-                                )
-                            review_completed_for_head = (
-                                comments_published
-                                and (
-                                    coverage_report.complete
-                                    if coverage_report is not None
-                                    else True
-                                )
-                            )
+                            detail = "approved (no issues found)"
                         else:
-                            if coverage_report is not None and not coverage_report.approvable:
-                                review_id = publisher.publish_review_note(
-                                    repo_name,
-                                    pr_context.number,
-                                    coverage_report.render_review_note(),
-                                    commit_sha=pr_context.head_sha,
-                                )
-                                if review_id and review_id not in review_comment_ids:
-                                    review_comment_ids.append(review_id)
-                                summary.add_result(
-                                    "review",
-                                    "performed",
-                                    "approval withheld (incomplete review coverage)",
-                                )
-                                event_ledger.record(
-                                    "review.note_posted",
-                                    review_subject,
-                                    note_kind="approval-withheld",
-                                    review_id=review_id or 0,
-                                    unaccounted_files=len(coverage_report.unaccounted_files),
-                                )
-                            else:
-                                if config.approve_on_no_findings:
-                                    publisher.approve_pr(
-                                        repo_name,
-                                        pr_context.number,
-                                        body="LGTM",
-                                        commit_sha=pr_context.head_sha,
-                                    )
-                                    detail = "approved (no issues found)"
-                                    event_ledger.record(
-                                        "review.approved",
-                                        review_subject,
-                                        reason="no-issues-found",
-                                        reviewed_file_count=len(triaged_files),
-                                    )
-                                else:
-                                    review_id = publisher.publish_review_note(
-                                        repo_name,
-                                        pr_context.number,
-                                        (
-                                            "Automated review found no actionable "
-                                            "issues in this pass. It is not approving "
-                                            "automatically."
-                                        ),
-                                        commit_sha=pr_context.head_sha,
-                                    )
-                                    if review_id and review_id not in review_comment_ids:
-                                        review_comment_ids.append(review_id)
-                                    detail = "no actionable issues (approval disabled)"
-                                    event_ledger.record(
-                                        "review.note_posted",
-                                        review_subject,
-                                        note_kind="no-findings-approval-disabled",
-                                        review_id=review_id or 0,
-                                        reviewed_file_count=len(triaged_files),
-                                    )
-                                review_completed_for_head = True
-                                summary.add_result(
-                                    "review",
-                                    "performed",
-                                    detail,
-                                )
+                            detail = "no actionable issues found"
+                        review_completed_for_head = True
+                        summary.add_result("review", "performed", detail)
+                        event_ledger.record(
+                            "review.no_findings",
+                            review_subject,
+                            reviewed_file_count=len(diff_scope.files),
+                        )
             except Exception as exc:
                 had_failure = True
                 logger.warning("PR review failed for %s#%d: %s", repo_name, pr_context.number, exc)
@@ -716,6 +606,8 @@ def run(argv: list[str] | None = None) -> int:
         rate_limiter.save()
         if event_ledger is not None:
             event_ledger.save()
+        if review_repo_dir:
+            shutil.rmtree(review_repo_dir, ignore_errors=True)
 
 
 def main() -> None:
