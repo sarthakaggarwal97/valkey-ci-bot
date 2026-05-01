@@ -21,6 +21,30 @@ logger = logging.getLogger(__name__)
 _DEFAULT_CLAUDE_MODEL = "opus"
 _DEFAULT_BEDROCK_OPUS_MODEL = "us.anthropic.claude-opus-4-7"
 _DEFAULT_TIMEOUT_SECONDS = 20 * 60
+_PASSTHROUGH_ENV_VARS = {
+    "PATH",
+    "HOME",
+    "TMPDIR",
+    "TMP",
+    "TEMP",
+    "USER",
+    "LOGNAME",
+    "LANG",
+    "LC_ALL",
+    "SSL_CERT_FILE",
+    "REQUESTS_CA_BUNDLE",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AWS_REGION",
+    "AWS_DEFAULT_REGION",
+    "AWS_PROFILE",
+    "AWS_SHARED_CREDENTIALS_FILE",
+    "AWS_CONFIG_FILE",
+    "AWS_WEB_IDENTITY_TOKEN_FILE",
+    "AWS_ROLE_ARN",
+    "AWS_ROLE_SESSION_NAME",
+}
 _DIFF_FENCE_RE = re.compile(
     r"```(?:diff|patch)?\n(---\s.+?)\n```", re.DOTALL
 )
@@ -44,11 +68,15 @@ def run_claude_code(
     Requires ``claude`` on PATH and Bedrock credentials in the
     environment (CLAUDE_CODE_USE_BEDROCK=1 + AWS creds).
     """
-    env = {**os.environ}
+    env = _build_claude_env()
     env["CLAUDE_CODE_USE_BEDROCK"] = "1"
     env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = _DEFAULT_BEDROCK_OPUS_MODEL
-    if "AWS_REGION" not in env:
+    if "AWS_REGION" not in env and "AWS_DEFAULT_REGION" not in env:
         env["AWS_REGION"] = "us-east-1"
+    elif "AWS_REGION" not in env and "AWS_DEFAULT_REGION" in env:
+        env["AWS_REGION"] = env["AWS_DEFAULT_REGION"]
+    elif "AWS_DEFAULT_REGION" not in env and "AWS_REGION" in env:
+        env["AWS_DEFAULT_REGION"] = env["AWS_REGION"]
 
     cmd = [
         "claude", "--print",
@@ -110,6 +138,24 @@ def run_claude_code(
     except FileNotFoundError:
         logger.error("claude CLI not found on PATH.")
         return "", "claude not found", 127
+
+
+def _build_claude_env() -> dict[str, str]:
+    """Return the minimal environment Claude Code needs for Bedrock.
+
+    GitHub tokens and other workflow secrets are intentionally not inherited.
+    Tool-using prompts may contain untrusted PR or artifact content, so the
+    subprocess gets only process/runtime basics plus AWS credentials required
+    by the Bedrock provider.
+    """
+    env = {
+        name: value
+        for name, value in os.environ.items()
+        if name in _PASSTHROUGH_ENV_VARS and value
+    }
+    env["CLAUDE_CODE_USE_BEDROCK"] = "1"
+    env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = _DEFAULT_BEDROCK_OPUS_MODEL
+    return env
 
 
 def extract_diff(claude_output: str) -> str | None:

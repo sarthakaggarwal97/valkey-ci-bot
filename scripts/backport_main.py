@@ -139,6 +139,7 @@ def run_backport(
         target_branch=target_branch,
     )
     rate_limiter: RateLimiter | None = None
+    git_auth_paths: set[str] = set()
     try:
         try:
             signer, require_dco_signoff = _resolve_commit_signer()
@@ -314,6 +315,7 @@ def run_backport(
                 target_branch,
                 signer=signer,
             )
+            git_auth_paths.add(git_env["GIT_ASKPASS"])
 
             # Create the backport branch locally from target branch HEAD
             _run_git(tmp_dir, "checkout", "-b", branch_name)
@@ -355,6 +357,47 @@ def run_backport(
                     pr_context,
                 )
                 total_tokens = 0  # Claude Code manages its own budget
+                unresolved = [
+                    r for r in resolution_results
+                    if r.resolved_content is None
+                ]
+                if unresolved:
+                    files_resolved = len(resolution_results) - len(unresolved)
+                    files_unresolved = len(unresolved)
+                    result = BackportResult(
+                        outcome="conflicts-unresolved",
+                        commits_cherry_picked=len(cherry_result.applied_commits),
+                        files_conflicted=len(cherry_result.conflicting_files),
+                        files_resolved=files_resolved,
+                        files_unresolved=files_unresolved,
+                        total_tokens_used=total_tokens,
+                        error_message=(
+                            "Unresolved conflict(s): "
+                            + ", ".join(r.path for r in unresolved)
+                        ),
+                    )
+                    summary_text = build_summary(result)
+                    _post_comment(
+                        repo,
+                        source_pr_number,
+                        "## Backport Result\n\n"
+                        "Backport could not be completed automatically.\n\n"
+                        f"### Overview\n{summary_text}",
+                    )
+                    event_ledger.record(
+                        "backport.conflicts_unresolved",
+                        subject,
+                        files_resolved=files_resolved,
+                        files_unresolved=files_unresolved,
+                        unresolved_files=",".join(r.path for r in unresolved),
+                    )
+                    emit_job_summary(
+                        f"## Backport Result: conflicts-unresolved\n\n"
+                        f"- Source PR: #{source_pr_number}\n"
+                        f"- Target branch: `{target_branch}`\n\n"
+                        f"### Overview\n{summary_text}"
+                    )
+                    return result
 
                 # Apply resolved files to the working tree and commit
                 _apply_resolutions(
@@ -461,6 +504,11 @@ def run_backport(
         )
         return BackportResult(outcome="error", error_message=str(exc))
     finally:
+        for auth_path in git_auth_paths:
+            try:
+                os.unlink(auth_path)
+            except OSError:
+                pass
         if rate_limiter is not None:
             rate_limiter.save()
         event_ledger.save()
@@ -513,8 +561,10 @@ def _clone_repo(
     # Write a small credential-helper script that supplies the token.
     # This keeps the token out of .git/config remote URLs while still
     # allowing subsequent git operations (push, fetch) to authenticate.
-    askpass_script = os.path.join(dest_dir, ".git-askpass.sh")
-    with open(askpass_script, "w") as f:
+    askpass_script = str(
+        Path(dest_dir).with_name(f"{Path(dest_dir).name}.git-askpass.sh")
+    )
+    with open(askpass_script, "w", encoding="utf-8") as f:
         f.write('#!/bin/sh\necho "$GIT_PASSWORD"\n')
     os.chmod(askpass_script, stat.S_IRWXU)
 
@@ -526,14 +576,21 @@ def _clone_repo(
     }
 
     clone_url = f"https://x-access-token@github.com/{repo_full_name}.git"
-    subprocess.run(
-        ["git", "clone", "--no-single-branch", "--branch", target_branch, clone_url, "."],
-        cwd=dest_dir,
-        check=True,
-        capture_output=True,
-        text=True,
-        env=env,
-    )
+    try:
+        subprocess.run(
+            ["git", "clone", "--no-single-branch", "--branch", target_branch, clone_url, "."],
+            cwd=dest_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+    except Exception:
+        try:
+            os.unlink(askpass_script)
+        except OSError:
+            pass
+        raise
     # Configure git identity for cherry-pick commits
     user_name = signer.name if signer.configured else "valkey-ci-agent"
     user_email = (
@@ -585,19 +642,15 @@ def _apply_resolutions(
     for result in resolution_results:
         if result.resolved_content is not None:
             file_path = os.path.join(repo_dir, result.path)
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            parent = os.path.dirname(file_path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
             with open(file_path, "w", encoding="utf-8") as fh:
                 fh.write(result.resolved_content)
             _run_git(repo_dir, "add", result.path)
             any_resolved = True
-
-    # Also stage any unresolved files (they keep conflict markers)
-    for result in resolution_results:
-        if result.resolved_content is None:
-            try:
-                _run_git(repo_dir, "add", result.path)
-            except Exception:
-                logger.warning("Could not stage unresolved file %s", result.path)
+        else:
+            raise ValueError(f"Cannot apply unresolved conflict for {result.path}")
 
     if any_resolved or resolution_results:
         # Complete the cherry-pick with resolved content.

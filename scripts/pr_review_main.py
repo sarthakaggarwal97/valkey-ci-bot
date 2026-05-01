@@ -6,6 +6,7 @@ import argparse
 import logging
 import os
 import re
+import stat
 import sys
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -16,6 +17,7 @@ if __package__ in {None, ""}:
 
 from github import Auth, Github
 
+from scripts.claude_reviewer import ReviewGenerationError
 from scripts.claude_reviewer import reply_to_review_comment as claude_reply_to_comment
 from scripts.claude_reviewer import review_pr as claude_review_pr
 from scripts.claude_reviewer import summarize_pr as claude_summarize_pr
@@ -166,6 +168,59 @@ def _select_chat_paths(
     return set(selected_paths[: min(5, len(selected_paths))])
 
 
+def _git_auth_env(token: str, askpass_path: Path) -> dict[str, str]:
+    """Build git auth env without embedding the token in remote URLs."""
+    askpass_path.write_text(
+        "#!/bin/sh\n"
+        "case \"$1\" in\n"
+        "  *Username*) echo x-access-token ;;\n"
+        "  *) echo \"$GIT_PASSWORD\" ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    askpass_path.chmod(stat.S_IRWXU)
+    return {
+        **os.environ,
+        "GIT_ASKPASS": str(askpass_path),
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_PASSWORD": token,
+    }
+
+
+def _clone_pr_checkout(
+    *,
+    repo_name: str,
+    token: str,
+    base_ref: str,
+    pr_number: int,
+    dest_dir: str,
+) -> None:
+    """Clone the target repository and check out the PR head."""
+    import subprocess
+
+    askpass_path = Path(dest_dir).with_name(f"{Path(dest_dir).name}.askpass.sh")
+    env = _git_auth_env(token, askpass_path)
+    try:
+        clone_url = f"https://github.com/{repo_name}.git"
+        subprocess.run(
+            ["git", "clone", "--filter=blob:none", "--branch", base_ref or "unstable", clone_url, dest_dir],
+            capture_output=True, text=True, timeout=120, check=True, env=env,
+        )
+        subprocess.run(
+            ["git", "fetch", "origin", f"pull/{pr_number}/head:pr-head"],
+            cwd=dest_dir, capture_output=True, text=True, timeout=60, check=True, env=env,
+        )
+        subprocess.run(
+            ["git", "checkout", "pr-head"],
+            cwd=dest_dir, capture_output=True, text=True, timeout=30, check=True, env=env,
+        )
+    finally:
+        try:
+            askpass_path.unlink()
+        except OSError:
+            pass
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Review a pull request with Bedrock.")
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
@@ -293,11 +348,10 @@ def run(argv: list[str] | None = None) -> int:
     )
     rate_limiter.load()
 
-    # Clone the repo for Claude Code to read
     import shutil
-    import subprocess
     import tempfile
     review_repo_dir = tempfile.mkdtemp(prefix="pr-review-")
+    review_checkout_available = False
     fetcher = PRContextFetcher(gh, github_retries=config.github_retries)
     publisher = CommentPublisher(gh, github_retries=config.github_retries)
     state_store = ReviewStateStore(state_gh, args.state_repo or repo_name)
@@ -314,23 +368,18 @@ def run(argv: list[str] | None = None) -> int:
 
         # Clone the repo and check out the PR branch for Claude Code
         try:
-            clone_url = f"https://x-access-token:{args.token}@github.com/{repo_name}.git"
-            subprocess.run(
-                ["git", "clone", "--filter=blob:none", "--branch", pr_context.base_ref or "unstable", clone_url, review_repo_dir],
-                capture_output=True, text=True, timeout=120, check=True,
+            _clone_pr_checkout(
+                repo_name=repo_name,
+                token=args.token,
+                base_ref=pr_context.base_ref or "unstable",
+                pr_number=pr_number,
+                dest_dir=review_repo_dir,
             )
-            subprocess.run(
-                ["git", "fetch", "origin", f"pull/{pr_number}/head:pr-head"],
-                cwd=review_repo_dir, capture_output=True, text=True, timeout=60, check=True,
-            )
-            subprocess.run(
-                ["git", "checkout", "pr-head"],
-                cwd=review_repo_dir, capture_output=True, text=True, timeout=30, check=True,
-            )
+            review_checkout_available = True
             logger.info("Cloned %s and checked out PR #%d at %s", repo_name, pr_number, review_repo_dir)
         except Exception as exc:
             logger.error("Failed to clone repo for review: %s", exc)
-            review_repo_dir = ""  # Fall back to no-repo mode
+            review_checkout_available = False
 
         valkey_context = load_valkey_repo_context(gh, repo_name, ref=pr_context.base_sha)
         config = augment_reviewer_config_for_valkey(config, pr_context, valkey_context)
@@ -390,11 +439,15 @@ def run(argv: list[str] | None = None) -> int:
                 thread.conversation,
                 event.body or "",
             )
+            if not review_checkout_available:
+                raise ReviewGenerationError("repo checkout failed")
+            chat_context = _filtered_context(pr_context, relevant_paths)
             reply = claude_reply_to_comment(
-                    review_context,
-                    thread,
-                    review_repo_dir,
-                )
+                chat_context,
+                thread,
+                review_repo_dir,
+                config=config,
+            )
             publisher.publish_chat_reply(
                 repo_name,
                 pr_context.number,
@@ -420,11 +473,14 @@ def run(argv: list[str] | None = None) -> int:
                 policy_note = render_review_policy_note(
                     collect_review_policy_note(pr_context)
                 )
+            if not review_checkout_available:
+                raise RuntimeError("repo checkout failed")
             summary_text = claude_summarize_pr(
                 review_context,
                 fetcher.build_diff_scope(review_context, None),
                 review_repo_dir,
-            ) if review_repo_dir else "Summary unavailable (repo checkout failed)."
+                config=config,
+            )
             summary_result = SummaryResult(
                 walkthrough=summary_text,
                 file_groups_markdown="",
@@ -496,14 +552,14 @@ def run(argv: list[str] | None = None) -> int:
                     )
                     review_completed_for_head = True
                 else:
-                    if review_repo_dir:
+                    if review_checkout_available:
                         findings = claude_review_pr(
                             review_context, diff_scope, review_repo_dir,
                             previous_reviewed_sha=last_reviewed_head_sha if diff_scope.incremental else None,
+                            config=config,
                         )
                     else:
-                        findings = []
-                        logger.warning("No repo checkout available, skipping review")
+                        raise ReviewGenerationError("repo checkout failed")
                     if findings:
                         published_ids = publisher.publish_review_comments(
                             repo_name,
@@ -566,6 +622,25 @@ def run(argv: list[str] | None = None) -> int:
                 import traceback
                 traceback.print_exc(file=sys.stdout)
                 summary.add_result("review", "failed", str(exc))
+                try:
+                    note_id = publisher.publish_review_note(
+                        repo_name,
+                        pr_context.number,
+                        (
+                            "Reviewer could not complete this run, so no approval or "
+                            f"incremental state advance was recorded.\n\n`{type(exc).__name__}: {exc}`"
+                        ),
+                        commit_sha=pr_context.head_sha,
+                    )
+                    if note_id:
+                        event_ledger.record(
+                            "review.note_posted",
+                            review_subject,
+                            note_kind="review-failure",
+                            review_id=note_id,
+                        )
+                except Exception as note_exc:
+                    logger.warning("Failed to publish review failure note: %s", note_exc)
                 event_ledger.record(
                     "review.failed",
                     review_subject,

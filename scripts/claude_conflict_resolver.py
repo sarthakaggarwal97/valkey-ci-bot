@@ -88,7 +88,7 @@ def resolve_conflicts_with_claude(
     )
     stdout, stderr, rc = run_claude_code(
         prompt, cwd=repo_dir, timeout=1200,
-        allowed_tools="Read,Edit,Grep,Glob,Bash",
+        allowed_tools="Read,Edit,MultiEdit,Grep,Glob",
     )
 
     # Extract result from JSONL stream
@@ -105,6 +105,18 @@ def resolve_conflicts_with_claude(
         "Claude Code finished (rc=%d). Result: %s",
         rc, result_text[:200] if result_text else "(no result text)",
     )
+    if rc != 0:
+        detail = stderr or result_text or "Claude Code returned non-zero"
+        return [
+            ResolutionResult(
+                path=cf.path,
+                resolved_content=None,
+                resolution_summary=f"Claude Code failed: {detail[:300]}",
+                tokens_used=0,
+                attempts=1,
+            )
+            for cf in llm_files
+        ]
 
     # Check each file for successful resolution
     for cf in llm_files:
@@ -128,10 +140,19 @@ def resolve_conflicts_with_claude(
             continue
 
         valid = validate_resolved_content(cf.path, resolved)
+        if not valid:
+            results.append(ResolutionResult(
+                path=cf.path,
+                resolved_content=None,
+                resolution_summary="resolved content failed validation",
+                tokens_used=0,
+                attempts=1,
+            ))
+            continue
         results.append(ResolutionResult(
             path=cf.path,
             resolved_content=resolved,
-            resolution_summary="resolved by Claude Code" + ("" if valid else " (validation warning)"),
+            resolution_summary="resolved by Claude Code",
             tokens_used=0,
             attempts=1,
         ))

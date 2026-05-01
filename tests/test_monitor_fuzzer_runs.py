@@ -151,7 +151,7 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
 @patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
 @patch("scripts.monitor_fuzzer_runs.Github")
 @patch("scripts.monitor_fuzzer_runs.MonitorStateStore")
-def test_monitor_continues_after_analysis_error_and_advances_watermark(
+def test_monitor_stops_after_analysis_error_and_preserves_watermark(
     mock_state_store_cls,
     mock_github_cls,
     mock_analyzer_cls,
@@ -171,36 +171,14 @@ def test_monitor_continues_after_analysis_error_and_advances_watermark(
     mock_make_retriever.return_value = None
 
     analyzer = mock_analyzer_cls.return_value
-    analyzer.analyze_workflow_run.side_effect = [
-        RuntimeError("bad artifact"),
-        MagicMock(
-            run_id=102,
-            run_url="https://example.com/102",
-            conclusion="success",
-            overall_status="normal",
-            triage_verdict="expected-chaos-noise",
-            suggested_labels=[],
-            scenario_id="seed-102",
-            seed="102",
-            anomalies=[],
-            normal_signals=["ok"],
-            summary="Healthy run.",
-            reproduction_hint="valkey-fuzzer cluster --seed 102",
-        ),
-    ]
+    analyzer.analyze_workflow_run.side_effect = RuntimeError("bad artifact")
 
     result = monitor(_args())
 
-    assert [item["action"] for item in result["runs"]] == ["analysis-error", "analyzed"]
-    assert analyzer.analyze_workflow_run.call_count == 2
+    assert [item["action"] for item in result["runs"]] == ["analysis-error"]
+    assert analyzer.analyze_workflow_run.call_count == 1
     mock_issue_publisher_cls.return_value.upsert_issue.assert_not_called()
-    state_store.mark_seen.assert_called_once_with(
-        "valkey-io/valkey-fuzzer:fuzzer-run.yml:schedule",
-        last_seen_run_id=102,
-        target_repo="valkey-io/valkey-fuzzer",
-        workflow_file="fuzzer-run.yml",
-        event="schedule",
-    )
+    state_store.mark_seen.assert_not_called()
     _mock_event_ledger.record.assert_any_call(
         "fuzzer.analysis_failed",
         "valkey-io/valkey-fuzzer:fuzzer-run:101",

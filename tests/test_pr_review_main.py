@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from scripts.code_reviewer import ReviewCoverage
-from scripts.config import RetrievalConfig, ReviewerConfig
+from scripts.claude_reviewer import ReviewGenerationError
+from scripts.config import ReviewerConfig
 from scripts.models import (
     ChangedFile,
+    DiffScope,
     PullRequestContext,
+    ReviewFinding,
     ReviewState,
     SummaryResult,
 )
@@ -34,7 +38,7 @@ def _mock_event_ledger():
 
 def _event_file(tmp_path: Path, payload: dict) -> Path:
     path = tmp_path / "event.json"
-    path.write_text(json.dumps(payload))
+    path.write_text(json.dumps(payload), encoding="utf-8")
     return path
 
 
@@ -47,6 +51,7 @@ def _context() -> PullRequestContext:
         base_sha="base123",
         head_sha="head456",
         author="alice",
+        base_ref="unstable",
         files=[
             ChangedFile(
                 path="src/failover.c",
@@ -75,6 +80,72 @@ def _multi_file_context() -> PullRequestContext:
         )
     )
     return context
+
+
+def _diff_scope(context: PullRequestContext, incremental: bool = False) -> DiffScope:
+    return DiffScope(
+        base_sha=context.base_sha,
+        head_sha=context.head_sha,
+        files=context.files,
+        incremental=incremental,
+    )
+
+
+@contextmanager
+def _patched_run_dependencies(
+    *,
+    config: ReviewerConfig | None = None,
+    clone_error: Exception | None = None,
+):
+    config = config or ReviewerConfig()
+    target_gh = MagicMock(name="target_gh")
+    state_gh = MagicMock(name="state_gh")
+    with patch("scripts.pr_review_main.PRContextFetcher") as mock_fetcher_cls, \
+        patch("scripts.pr_review_main.CommentPublisher") as mock_publisher_cls, \
+        patch("scripts.pr_review_main.ReviewStateStore") as mock_state_store_cls, \
+        patch("scripts.pr_review_main.RateLimiter") as mock_rate_limiter_cls, \
+        patch("scripts.pr_review_main.Github") as mock_github_cls, \
+        patch("scripts.pr_review_main._clone_pr_checkout") as mock_clone_checkout, \
+        patch("scripts.pr_review_main._load_runtime_reviewer_config", return_value=config), \
+        patch("scripts.pr_review_main.load_valkey_repo_context", return_value=MagicMock()), \
+        patch("scripts.pr_review_main.augment_reviewer_config_for_valkey", side_effect=lambda cfg, *_args: cfg), \
+        patch("scripts.pr_review_main.claude_summarize_pr", return_value="This PR improves failover timing.") as mock_summarize, \
+        patch("scripts.pr_review_main.claude_review_pr", return_value=[]) as mock_review, \
+        patch("scripts.pr_review_main.claude_reply_to_comment", return_value="Add a focused timeout test.") as mock_reply:
+        mock_github_cls.side_effect = [target_gh, state_gh]
+        if clone_error is not None:
+            mock_clone_checkout.side_effect = clone_error
+
+        fetcher = mock_fetcher_cls.return_value
+        fetcher.fetch.return_value = _context()
+        fetcher.hydrate_contents.side_effect = lambda context, _paths: context
+        fetcher.build_diff_scope.side_effect = lambda context, _sha: _diff_scope(context)
+
+        publisher = mock_publisher_cls.return_value
+        publisher.upsert_summary.return_value = 99
+        publisher.publish_review_comments.return_value = [1001]
+        publisher.publish_review_note.return_value = 1002
+        publisher.publish_chat_reply.return_value = 88
+
+        state_store = mock_state_store_cls.return_value
+        state_store.load.return_value = None
+
+        mock_rate_limiter_cls.return_value.load.return_value = None
+        mock_rate_limiter_cls.return_value.save.return_value = None
+
+        yield SimpleNamespace(
+            target_gh=target_gh,
+            state_gh=state_gh,
+            fetcher=fetcher,
+            publisher=publisher,
+            state_store=state_store,
+            rate_limiter_cls=mock_rate_limiter_cls,
+            state_store_cls=mock_state_store_cls,
+            clone_checkout=mock_clone_checkout,
+            summarize=mock_summarize,
+            review=mock_review,
+            reply=mock_reply,
+        )
 
 
 def test_select_review_files_applies_path_filters() -> None:
@@ -193,22 +264,7 @@ def test_load_runtime_reviewer_config_falls_back_to_local_file(tmp_path) -> None
     assert config.enabled is False
 
 
-@patch("scripts.pr_review_main.boto3.client")
-@patch("scripts.pr_review_main.Github")
-@patch("scripts.pr_review_main.RateLimiter")
-@patch("scripts.pr_review_main.ReviewStateStore")
-@patch("scripts.pr_review_main.CommentPublisher")
-@patch("scripts.pr_review_main.PRContextFetcher")
-def test_run_review_mode_posts_summary_and_review(
-    mock_fetcher_cls,
-    mock_publisher_cls,
-    mock_state_store_cls,
-    mock_rate_limiter_cls,
-    mock_github_cls,
-    _mock_boto_client,
-    _mock_event_ledger,
-    tmp_path,
-) -> None:
+def test_run_review_mode_posts_summary_and_review(_mock_event_ledger, tmp_path) -> None:
     payload = {
         "repository": {"full_name": "owner/repo"},
         "sender": {"login": "alice"},
@@ -216,47 +272,22 @@ def test_run_review_mode_posts_summary_and_review(
     }
     event_path = _event_file(tmp_path, payload)
 
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.fetch.return_value = _context()
-    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
-    fetcher.build_diff_scope.return_value = MagicMock(files=_context().files)
-
-    publisher = mock_publisher_cls.return_value
-    publisher.upsert_summary.return_value = 99
-    publisher.publish_review_comments.return_value = [1001]
-
-    state_store = mock_state_store_cls.return_value
-    state_store.load.return_value = ReviewState(
-        repo="owner/repo",
-        pr_number=11,
-        last_reviewed_head_sha="oldsha",
-        summary_comment_id=55,
-        review_comment_ids=[],
-        updated_at="2026-03-12T00:00:00+00:00",
-    )
-
-    mock_rate_limiter_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.save.return_value = None
-    mock_github_cls.return_value = MagicMock()
-
-    with patch(
-        "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=ReviewerConfig(),
-    ), patch(
-        "scripts.pr_review_main.PRSummarizer"
-    ) as mock_summarizer_cls, patch(
-        "scripts.pr_review_main.CodeReviewer"
-    ) as mock_reviewer_cls:
-        mock_summarizer_cls.return_value.summarize.return_value = SummaryResult(
-            walkthrough="Summary",
-            file_groups_markdown="- Core",
-            release_notes="Release note",
+    with _patched_run_dependencies() as deps:
+        deps.state_store.load.return_value = ReviewState(
+            repo="owner/repo",
+            pr_number=11,
+            last_reviewed_head_sha="oldsha",
+            summary_comment_id=55,
+            review_comment_ids=[],
+            updated_at="2026-03-12T00:00:00+00:00",
         )
-        mock_reviewer = mock_reviewer_cls.return_value
-        mock_reviewer.classify_simple_change.return_value = False
-        mock_reviewer.triage_files.return_value = _context().files
-        mock_reviewer.review.return_value = [
-            MagicMock(path="src/failover.c", line=12, body="Risk", severity="high")
+        deps.review.return_value = [
+            ReviewFinding(
+                path="src/failover.c",
+                line=1,
+                body="Risk",
+                severity="high",
+            )
         ]
 
         exit_code = run(
@@ -275,78 +306,104 @@ def test_run_review_mode_posts_summary_and_review(
         )
 
     assert exit_code == 0
-    publisher.upsert_summary.assert_called_once()
-    publisher.publish_review_comments.assert_called_once()
-    state_store.save.assert_called_once()
-    _mock_event_ledger.record.assert_any_call(
-        "review.summary_posted",
-        "owner/repo#11",
-        summary_comment_id=99,
-        release_notes=True,
-        has_short_summary=False,
-    )
+    deps.publisher.upsert_summary.assert_called_once()
+    deps.publisher.publish_review_comments.assert_called_once()
+    deps.summarize.assert_called_once()
+    deps.review.assert_called_once()
+    assert deps.summarize.call_args.kwargs["config"] is not None
+    assert deps.review.call_args.kwargs["config"] is not None
+    saved_state = deps.state_store.save.call_args.args[0]
+    assert saved_state.last_reviewed_head_sha == "head456"
     _mock_event_ledger.record.assert_any_call(
         "review.comments_posted",
         "owner/repo#11",
         comments=1,
-        triaged_file_count=1,
-        auto_approved_file_count=0,
+        file_count=1,
         reason="",
     )
-    _mock_event_ledger.save.assert_called_once()
-    saved_state = state_store.save.call_args.args[0]
-    assert saved_state.last_reviewed_head_sha == "head456"
 
 
-@patch("scripts.pr_review_main.boto3.client")
-@patch("scripts.pr_review_main.Github")
-@patch("scripts.pr_review_main.RateLimiter")
-@patch("scripts.pr_review_main.ReviewStateStore")
-@patch("scripts.pr_review_main.CommentPublisher")
-@patch("scripts.pr_review_main.PRContextFetcher")
-def test_run_manual_review_mode_uses_bot_repo_state(
-    mock_fetcher_cls,
-    mock_publisher_cls,
-    mock_state_store_cls,
-    mock_rate_limiter_cls,
-    mock_github_cls,
-    _mock_boto_client,
-) -> None:
+def test_run_review_mode_preserves_state_when_review_generation_fails(tmp_path) -> None:
+    payload = {
+        "repository": {"full_name": "owner/repo"},
+        "sender": {"login": "alice"},
+        "pull_request": {"number": 11, "body": "Details"},
+    }
+    event_path = _event_file(tmp_path, payload)
+
+    with _patched_run_dependencies() as deps:
+        deps.state_store.load.return_value = ReviewState(
+            repo="owner/repo",
+            pr_number=11,
+            last_reviewed_head_sha="oldsha",
+            summary_comment_id=55,
+            review_comment_ids=[],
+            updated_at="2026-03-12T00:00:00+00:00",
+        )
+        deps.review.side_effect = ReviewGenerationError("unparseable review response")
+
+        exit_code = run(
+            [
+                "--repo",
+                "owner/repo",
+                "--mode",
+                "review",
+                "--token",
+                "token",
+                "--event-name",
+                "pull_request_target",
+                "--event-path",
+                str(event_path),
+            ]
+        )
+
+    assert exit_code == 1
+    deps.publisher.publish_review_comments.assert_not_called()
+    deps.publisher.publish_review_note.assert_called_once()
+    saved_state = deps.state_store.save.call_args.args[0]
+    assert saved_state.last_reviewed_head_sha == "oldsha"
+
+
+def test_run_review_mode_fails_closed_when_checkout_is_unavailable(tmp_path) -> None:
+    payload = {
+        "repository": {"full_name": "owner/repo"},
+        "sender": {"login": "alice"},
+        "pull_request": {"number": 11, "body": "Details"},
+    }
+    event_path = _event_file(tmp_path, payload)
+
+    with _patched_run_dependencies(clone_error=RuntimeError("clone failed")) as deps:
+        exit_code = run(
+            [
+                "--repo",
+                "owner/repo",
+                "--mode",
+                "review",
+                "--token",
+                "token",
+                "--event-name",
+                "pull_request_target",
+                "--event-path",
+                str(event_path),
+            ]
+        )
+
+    assert exit_code == 1
+    deps.summarize.assert_not_called()
+    deps.review.assert_not_called()
+    deps.publisher.upsert_summary.assert_not_called()
+    deps.publisher.publish_review_comments.assert_not_called()
+    deps.publisher.publish_review_note.assert_called_once()
+    saved_state = deps.state_store.save.call_args.args[0]
+    assert saved_state.last_reviewed_head_sha is None
+
+
+def test_run_manual_review_mode_uses_bot_repo_state() -> None:
     context = _context()
     context.repo = "fork-owner/valkey"
 
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.fetch.return_value = context
-    fetcher.hydrate_contents.side_effect = lambda hydrated_context, _paths: hydrated_context
-    fetcher.build_diff_scope.return_value = MagicMock(files=context.files)
-
-    publisher = mock_publisher_cls.return_value
-    publisher.upsert_summary.return_value = 99
-    publisher.publish_review_comments.return_value = []
-
-    mock_state_store_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.save.return_value = None
-
-    target_gh = MagicMock()
-    state_gh = MagicMock()
-    mock_github_cls.side_effect = [target_gh, state_gh]
-
-    with patch(
-        "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=ReviewerConfig(),
-    ), patch(
-        "scripts.pr_review_main.PRSummarizer"
-    ) as mock_summarizer_cls, patch(
-        "scripts.pr_review_main.CodeReviewer"
-    ) as mock_reviewer_cls:
-        mock_summarizer_cls.return_value.summarize.return_value = SummaryResult(
-            walkthrough="Summary",
-            file_groups_markdown="- Core",
-            release_notes="Release note",
-        )
-        mock_reviewer_cls.return_value.classify_simple_change.return_value = False
-        mock_reviewer_cls.return_value.review.return_value = []
+    with _patched_run_dependencies() as deps:
+        deps.fetcher.fetch.return_value = context
 
         exit_code = run(
             [
@@ -366,441 +423,19 @@ def test_run_manual_review_mode_uses_bot_repo_state(
         )
 
     assert exit_code == 0
-    fetcher.fetch.assert_called_once_with("fork-owner/valkey", 17)
-    mock_state_store_cls.assert_called_once_with(
-        state_gh,
+    deps.fetcher.fetch.assert_called_once_with("fork-owner/valkey", 17)
+    deps.state_store_cls.assert_called_once_with(
+        deps.state_gh,
         "sarthakaggarwal97/valkey-ci-agent",
     )
-    rate_kwargs = mock_rate_limiter_cls.call_args.kwargs
-    assert rate_kwargs["github_client"] is target_gh
-    assert rate_kwargs["state_github_client"] is state_gh
+    rate_kwargs = deps.rate_limiter_cls.call_args.kwargs
+    assert rate_kwargs["github_client"] is deps.target_gh
+    assert rate_kwargs["state_github_client"] is deps.state_gh
     assert rate_kwargs["state_repo_full_name"] == "sarthakaggarwal97/valkey-ci-agent"
-    publisher.upsert_summary.assert_called_once()
-    publisher.approve_pr.assert_not_called()
-    publisher.publish_review_note.assert_called_once()
-    saved_state = mock_state_store_cls.return_value.save.call_args.args[0]
-    assert saved_state.last_reviewed_head_sha == "head456"
+    deps.publisher.upsert_summary.assert_called_once()
 
 
-@patch("scripts.pr_review_main.boto3.client")
-@patch("scripts.pr_review_main.Github")
-@patch("scripts.pr_review_main.RateLimiter")
-@patch("scripts.pr_review_main.ReviewStateStore")
-@patch("scripts.pr_review_main.CommentPublisher")
-@patch("scripts.pr_review_main.PRContextFetcher")
-def test_run_review_mode_withholds_approval_when_coverage_is_incomplete(
-    mock_fetcher_cls,
-    mock_publisher_cls,
-    mock_state_store_cls,
-    mock_rate_limiter_cls,
-    mock_github_cls,
-    _mock_boto_client,
-    tmp_path,
-) -> None:
-    payload = {
-        "repository": {"full_name": "owner/repo"},
-        "sender": {"login": "alice"},
-        "pull_request": {"number": 11, "body": "Details"},
-    }
-    event_path = _event_file(tmp_path, payload)
-
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.fetch.return_value = _context()
-    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
-    fetcher.build_diff_scope.return_value = MagicMock(files=_context().files)
-
-    publisher = mock_publisher_cls.return_value
-    publisher.upsert_summary.return_value = 99
-    publisher.publish_review_note.return_value = 1234
-
-    mock_state_store_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.save.return_value = None
-    mock_github_cls.return_value = MagicMock()
-
-    with patch(
-        "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=ReviewerConfig(),
-    ), patch(
-        "scripts.pr_review_main.PRSummarizer"
-    ) as mock_summarizer_cls, patch(
-        "scripts.pr_review_main.CodeReviewer"
-    ) as mock_reviewer_cls:
-        mock_summarizer_cls.return_value.summarize.return_value = SummaryResult(
-            walkthrough="Summary",
-            file_groups_markdown="- Core",
-            release_notes="Release note",
-        )
-        mock_reviewer = mock_reviewer_cls.return_value
-        mock_reviewer.classify_simple_change.return_value = False
-        mock_reviewer.review.return_value = []
-        mock_reviewer.get_last_review_coverage.return_value = ReviewCoverage(
-            requested_lgtm=True,
-            checked_files=[],
-            skipped_files=[],
-            unaccounted_files=["src/failover.c"],
-        )
-
-        exit_code = run(
-            [
-                "--repo",
-                "owner/repo",
-                "--mode",
-                "review",
-                "--token",
-                "token",
-                "--event-name",
-                "pull_request_target",
-                "--event-path",
-                str(event_path),
-            ]
-        )
-
-    assert exit_code == 0
-    publisher.approve_pr.assert_not_called()
-    publisher.publish_review_note.assert_called_once()
-    saved_state = mock_state_store_cls.return_value.save.call_args.args[0]
-    assert saved_state.last_reviewed_head_sha is None
-
-
-@patch("scripts.pr_review_main.boto3.client")
-@patch("scripts.pr_review_main.Github")
-@patch("scripts.pr_review_main.RateLimiter")
-@patch("scripts.pr_review_main.ReviewStateStore")
-@patch("scripts.pr_review_main.CommentPublisher")
-@patch("scripts.pr_review_main.PRContextFetcher")
-def test_run_review_mode_does_not_advance_state_when_findings_have_incomplete_coverage(
-    mock_fetcher_cls,
-    mock_publisher_cls,
-    mock_state_store_cls,
-    mock_rate_limiter_cls,
-    mock_github_cls,
-    _mock_boto_client,
-    tmp_path,
-) -> None:
-    payload = {
-        "repository": {"full_name": "owner/repo"},
-        "sender": {"login": "alice"},
-        "pull_request": {"number": 11, "body": "Details"},
-    }
-    event_path = _event_file(tmp_path, payload)
-
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.fetch.return_value = _context()
-    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
-    fetcher.build_diff_scope.return_value = MagicMock(files=_context().files)
-
-    publisher = mock_publisher_cls.return_value
-    publisher.upsert_summary.return_value = 99
-    publisher.publish_review_comments.return_value = [1001]
-    publisher.publish_review_note.return_value = 1002
-    mock_state_store_cls.return_value.load.return_value = ReviewState(
-        repo="owner/repo",
-        pr_number=11,
-        last_reviewed_head_sha="oldsha",
-        summary_comment_id=55,
-        review_comment_ids=[],
-        updated_at="2026-03-12T00:00:00+00:00",
-    )
-    mock_rate_limiter_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.save.return_value = None
-    mock_github_cls.return_value = MagicMock()
-
-    with patch(
-        "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=ReviewerConfig(),
-    ), patch(
-        "scripts.pr_review_main.PRSummarizer"
-    ) as mock_summarizer_cls, patch(
-        "scripts.pr_review_main.CodeReviewer"
-    ) as mock_reviewer_cls:
-        mock_summarizer_cls.return_value.summarize.return_value = SummaryResult(
-            walkthrough="Summary",
-            file_groups_markdown="- Core",
-            release_notes="Release note",
-        )
-        mock_reviewer = mock_reviewer_cls.return_value
-        mock_reviewer.classify_simple_change.return_value = False
-        mock_reviewer.review.return_value = [
-            MagicMock(path="src/failover.c", line=12, body="Risk", severity="high")
-        ]
-        mock_reviewer.get_last_review_coverage.return_value = ReviewCoverage(
-            requested_lgtm=False,
-            checked_files=[],
-            skipped_files=[],
-            unaccounted_files=["src/failover.c"],
-        )
-
-        exit_code = run(
-            [
-                "--repo",
-                "owner/repo",
-                "--mode",
-                "review",
-                "--token",
-                "token",
-                "--event-name",
-                "pull_request_target",
-                "--event-path",
-                str(event_path),
-            ]
-        )
-
-    assert exit_code == 0
-    publisher.publish_review_comments.assert_called_once()
-    publisher.publish_review_note.assert_called_once()
-    saved_state = mock_state_store_cls.return_value.save.call_args.args[0]
-    assert saved_state.last_reviewed_head_sha == "oldsha"
-
-
-@patch("scripts.pr_review_main.boto3.client")
-@patch("scripts.pr_review_main.Github")
-@patch("scripts.pr_review_main.RateLimiter")
-@patch("scripts.pr_review_main.ReviewStateStore")
-@patch("scripts.pr_review_main.CommentPublisher")
-@patch("scripts.pr_review_main.PRContextFetcher")
-def test_run_review_mode_wires_retriever_when_enabled(
-    mock_fetcher_cls,
-    mock_publisher_cls,
-    mock_state_store_cls,
-    mock_rate_limiter_cls,
-    mock_github_cls,
-    mock_boto_client,
-    tmp_path,
-) -> None:
-    payload = {
-        "repository": {"full_name": "owner/repo"},
-        "sender": {"login": "alice"},
-        "pull_request": {"number": 11, "body": "Details"},
-    }
-    event_path = _event_file(tmp_path, payload)
-
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.fetch.return_value = _context()
-    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
-    fetcher.build_diff_scope.return_value = MagicMock(files=_context().files)
-
-    mock_publisher_cls.return_value.upsert_summary.return_value = 99
-    mock_publisher_cls.return_value.publish_review_comments.return_value = []
-    mock_state_store_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.save.return_value = None
-    mock_github_cls.return_value = MagicMock()
-    mock_boto_client.side_effect = [MagicMock(), MagicMock()]
-
-    config = ReviewerConfig()
-    config.retrieval = RetrievalConfig(enabled=True, code_knowledge_base_id="CODEKB")
-
-    with patch(
-        "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=config,
-    ), patch(
-        "scripts.pr_review_main.PRSummarizer"
-    ) as mock_summarizer_cls, patch(
-        "scripts.pr_review_main.CodeReviewer"
-    ) as mock_reviewer_cls:
-        mock_summarizer_cls.return_value.summarize.return_value = SummaryResult(
-            walkthrough="Summary",
-            file_groups_markdown="- Core",
-            release_notes="Release note",
-        )
-        mock_reviewer_cls.return_value.classify_simple_change.return_value = False
-        mock_reviewer_cls.return_value.review.return_value = []
-
-        exit_code = run(
-            [
-                "--repo",
-                "owner/repo",
-                "--mode",
-                "review",
-                "--token",
-                "token",
-                "--event-name",
-                "pull_request_target",
-                "--event-path",
-                str(event_path),
-                "--aws-region",
-                "us-east-1",
-            ]
-        )
-
-    assert exit_code == 0
-    runtime_call = mock_boto_client.call_args_list[0]
-    retriever_call = mock_boto_client.call_args_list[1]
-    assert runtime_call.args == ("bedrock-runtime",)
-    assert runtime_call.kwargs["region_name"] == "us-east-1"
-    assert runtime_call.kwargs["config"].read_timeout == config.bedrock_timeout_ms // 1000
-    assert retriever_call.args == ("bedrock-agent-runtime",)
-    assert retriever_call.kwargs["region_name"] == "us-east-1"
-    assert retriever_call.kwargs["config"].read_timeout == config.bedrock_timeout_ms // 1000
-    assert mock_summarizer_cls.call_args.kwargs["retriever"] is not None
-    assert mock_reviewer_cls.call_args.kwargs["retriever"] is not None
-
-
-@patch("scripts.pr_review_main.boto3.client")
-@patch("scripts.pr_review_main.Github")
-@patch("scripts.pr_review_main.RateLimiter")
-@patch("scripts.pr_review_main.ReviewStateStore")
-@patch("scripts.pr_review_main.CommentPublisher")
-@patch("scripts.pr_review_main.PRContextFetcher")
-def test_run_review_mode_skips_retriever_client_without_kb_ids(
-    mock_fetcher_cls,
-    mock_publisher_cls,
-    mock_state_store_cls,
-    mock_rate_limiter_cls,
-    mock_github_cls,
-    mock_boto_client,
-    tmp_path,
-) -> None:
-    payload = {
-        "repository": {"full_name": "owner/repo"},
-        "sender": {"login": "alice"},
-        "pull_request": {"number": 11, "body": "Details"},
-    }
-    event_path = _event_file(tmp_path, payload)
-
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.fetch.return_value = _context()
-    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
-    fetcher.build_diff_scope.return_value = MagicMock(files=_context().files)
-
-    mock_publisher_cls.return_value.upsert_summary.return_value = 99
-    mock_publisher_cls.return_value.publish_review_comments.return_value = []
-    mock_state_store_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.save.return_value = None
-    mock_github_cls.return_value = MagicMock()
-    mock_boto_client.return_value = MagicMock()
-
-    config = ReviewerConfig()
-    config.retrieval.enabled = True
-
-    with patch(
-        "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=config,
-    ), patch(
-        "scripts.pr_review_main.PRSummarizer"
-    ) as mock_summarizer_cls, patch(
-        "scripts.pr_review_main.CodeReviewer"
-    ) as mock_reviewer_cls:
-        mock_summarizer_cls.return_value.summarize.return_value = SummaryResult(
-            walkthrough="Summary",
-            file_groups_markdown="- Core",
-            release_notes="Release note",
-        )
-        mock_reviewer_cls.return_value.classify_simple_change.return_value = False
-        mock_reviewer_cls.return_value.review.return_value = []
-
-        exit_code = run(
-            [
-                "--repo",
-                "owner/repo",
-                "--mode",
-                "review",
-                "--token",
-                "token",
-                "--event-name",
-                "pull_request_target",
-                "--event-path",
-                str(event_path),
-                "--aws-region",
-                "us-east-1",
-            ]
-        )
-
-    assert exit_code == 0
-    runtime_call = mock_boto_client.call_args_list[0]
-    assert runtime_call.args == ("bedrock-runtime",)
-    assert runtime_call.kwargs["region_name"] == "us-east-1"
-    assert runtime_call.kwargs["config"].read_timeout == config.bedrock_timeout_ms // 1000
-
-
-@patch("scripts.pr_review_main.boto3.client")
-@patch("scripts.pr_review_main.Github")
-@patch("scripts.pr_review_main.RateLimiter")
-@patch("scripts.pr_review_main.ReviewStateStore")
-@patch("scripts.pr_review_main.CommentPublisher")
-@patch("scripts.pr_review_main.PRContextFetcher")
-def test_run_review_mode_returns_nonzero_when_review_generation_is_unparseable(
-    mock_fetcher_cls,
-    mock_publisher_cls,
-    mock_state_store_cls,
-    mock_rate_limiter_cls,
-    mock_github_cls,
-    _mock_boto_client,
-    tmp_path,
-) -> None:
-    payload = {
-        "repository": {"full_name": "owner/repo"},
-        "sender": {"login": "alice"},
-        "pull_request": {"number": 11, "body": "Details"},
-    }
-    event_path = _event_file(tmp_path, payload)
-
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.fetch.return_value = _context()
-    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
-    fetcher.build_diff_scope.return_value = MagicMock(files=_context().files)
-
-    mock_publisher_cls.return_value.upsert_summary.return_value = 99
-    mock_state_store_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.save.return_value = None
-    mock_github_cls.return_value = MagicMock()
-
-    with patch(
-        "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=ReviewerConfig(),
-    ), patch(
-        "scripts.pr_review_main.PRSummarizer"
-    ) as mock_summarizer_cls, patch(
-        "scripts.pr_review_main.CodeReviewer"
-    ) as mock_reviewer_cls:
-        mock_summarizer_cls.return_value.summarize.return_value = SummaryResult(
-            walkthrough="Summary",
-            file_groups_markdown="- Core",
-            release_notes="Release note",
-        )
-        mock_reviewer = mock_reviewer_cls.return_value
-        mock_reviewer.classify_simple_change.return_value = False
-        mock_reviewer.review.side_effect = ValueError("Unparseable review response")
-
-        exit_code = run(
-            [
-                "--repo",
-                "owner/repo",
-                "--mode",
-                "review",
-                "--token",
-                "token",
-                "--event-name",
-                "pull_request_target",
-                "--event-path",
-                str(event_path),
-            ]
-        )
-
-    assert exit_code == 1
-    mock_publisher_cls.return_value.publish_review_comments.assert_not_called()
-    saved_state = mock_state_store_cls.return_value.save.call_args.args[0]
-    assert saved_state.last_reviewed_head_sha is None
-
-
-@patch("scripts.pr_review_main.boto3.client")
-@patch("scripts.pr_review_main.Github")
-@patch("scripts.pr_review_main.RateLimiter")
-@patch("scripts.pr_review_main.ReviewStateStore")
-@patch("scripts.pr_review_main.CommentPublisher")
-@patch("scripts.pr_review_main.PRContextFetcher")
-def test_run_chat_mode_replies_to_review_comment(
-    mock_fetcher_cls,
-    mock_publisher_cls,
-    mock_state_store_cls,
-    mock_rate_limiter_cls,
-    mock_github_cls,
-    _mock_boto_client,
-    tmp_path,
-) -> None:
+def test_run_chat_mode_replies_to_review_comment_with_relevant_context(tmp_path) -> None:
     payload = {
         "repository": {"full_name": "owner/repo"},
         "sender": {"login": "alice"},
@@ -814,31 +449,16 @@ def test_run_chat_mode_replies_to_review_comment(
         },
     }
     event_path = _event_file(tmp_path, payload)
+    config = ReviewerConfig(chat_collaborator_only=False)
 
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.fetch.return_value = _context()
-    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
-    fetcher.fetch_review_thread.return_value = MagicMock(
-        comment_id=77,
-        path="src/failover.c",
-        line=12,
-        conversation=["Can you suggest a test?"],
-        reply_to_bot=True,
-    )
-
-    mock_publisher_cls.return_value.publish_chat_reply.return_value = 88
-    mock_state_store_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.save.return_value = None
-    mock_github_cls.return_value = MagicMock()
-
-    with patch(
-        "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=ReviewerConfig(chat_collaborator_only=False),
-    ), patch(
-        "scripts.pr_review_main.ReviewChat"
-    ) as mock_chat_cls:
-        mock_chat_cls.return_value.reply.return_value = "Add a focused timeout test."
+    with _patched_run_dependencies(config=config) as deps:
+        deps.fetcher.fetch_review_thread.return_value = MagicMock(
+            comment_id=77,
+            path="src/failover.c",
+            line=12,
+            conversation=["Can you suggest a test?"],
+            reply_to_bot=True,
+        )
 
         exit_code = run(
             [
@@ -856,24 +476,12 @@ def test_run_chat_mode_replies_to_review_comment(
         )
 
     assert exit_code == 0
-    mock_publisher_cls.return_value.publish_chat_reply.assert_called_once()
+    deps.publisher.publish_chat_reply.assert_called_once()
+    chat_context = deps.reply.call_args.args[0]
+    assert [changed_file.path for changed_file in chat_context.files] == ["src/failover.c"]
 
 
-@patch("scripts.pr_review_main.boto3.client")
-@patch("scripts.pr_review_main.Github")
-@patch("scripts.pr_review_main.RateLimiter")
-@patch("scripts.pr_review_main.ReviewStateStore")
-@patch("scripts.pr_review_main.CommentPublisher")
-@patch("scripts.pr_review_main.PRContextFetcher")
-def test_run_chat_mode_skips_non_bot_review_thread(
-    mock_fetcher_cls,
-    mock_publisher_cls,
-    mock_state_store_cls,
-    mock_rate_limiter_cls,
-    mock_github_cls,
-    _mock_boto_client,
-    tmp_path,
-) -> None:
+def test_run_chat_mode_skips_non_bot_review_thread(tmp_path) -> None:
     payload = {
         "repository": {"full_name": "owner/repo"},
         "sender": {"login": "alice"},
@@ -887,29 +495,17 @@ def test_run_chat_mode_skips_non_bot_review_thread(
         },
     }
     event_path = _event_file(tmp_path, payload)
+    config = ReviewerConfig(chat_collaborator_only=False)
 
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.fetch.return_value = _context()
-    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
-    fetcher.fetch_review_thread.return_value = MagicMock(
-        comment_id=77,
-        path="src/failover.c",
-        line=12,
-        conversation=["Can you suggest a test?"],
-        reply_to_bot=False,
-    )
+    with _patched_run_dependencies(config=config) as deps:
+        deps.fetcher.fetch_review_thread.return_value = MagicMock(
+            comment_id=77,
+            path="src/failover.c",
+            line=12,
+            conversation=["Can you suggest a test?"],
+            reply_to_bot=False,
+        )
 
-    mock_state_store_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.save.return_value = None
-    mock_github_cls.return_value = MagicMock()
-
-    with patch(
-        "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=ReviewerConfig(chat_collaborator_only=False),
-    ), patch(
-        "scripts.pr_review_main.ReviewChat"
-    ) as mock_chat_cls:
         exit_code = run(
             [
                 "--repo",
@@ -926,25 +522,11 @@ def test_run_chat_mode_skips_non_bot_review_thread(
         )
 
     assert exit_code == 0
-    mock_chat_cls.return_value.reply.assert_not_called()
-    mock_publisher_cls.return_value.publish_chat_reply.assert_not_called()
+    deps.reply.assert_not_called()
+    deps.publisher.publish_chat_reply.assert_not_called()
 
 
-@patch("scripts.pr_review_main.boto3.client")
-@patch("scripts.pr_review_main.Github")
-@patch("scripts.pr_review_main.RateLimiter")
-@patch("scripts.pr_review_main.ReviewStateStore")
-@patch("scripts.pr_review_main.CommentPublisher")
-@patch("scripts.pr_review_main.PRContextFetcher")
-def test_run_chat_mode_does_not_use_unrelated_file_context_for_filtered_thread(
-    mock_fetcher_cls,
-    mock_publisher_cls,
-    mock_state_store_cls,
-    mock_rate_limiter_cls,
-    mock_github_cls,
-    _mock_boto_client,
-    tmp_path,
-) -> None:
+def test_run_chat_mode_does_not_use_unrelated_file_context_for_filtered_thread(tmp_path) -> None:
     payload = {
         "repository": {"full_name": "owner/repo"},
         "sender": {"login": "alice"},
@@ -958,31 +540,16 @@ def test_run_chat_mode_does_not_use_unrelated_file_context_for_filtered_thread(
         },
     }
     event_path = _event_file(tmp_path, payload)
+    config = ReviewerConfig(path_filters=["src/**"], chat_collaborator_only=False)
 
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.fetch.return_value = _context()
-    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
-    fetcher.fetch_review_thread.return_value = MagicMock(
-        comment_id=77,
-        path="docs/readme.md",
-        line=12,
-        conversation=["Can you suggest a test?"],
-        reply_to_bot=True,
-    )
-
-    mock_publisher_cls.return_value.publish_chat_reply.return_value = 88
-    mock_state_store_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.save.return_value = None
-    mock_github_cls.return_value = MagicMock()
-
-    with patch(
-        "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=ReviewerConfig(path_filters=["src/**"], chat_collaborator_only=False),
-    ), patch(
-        "scripts.pr_review_main.ReviewChat"
-    ) as mock_chat_cls:
-        mock_chat_cls.return_value.reply.return_value = "Answer"
+    with _patched_run_dependencies(config=config) as deps:
+        deps.fetcher.fetch_review_thread.return_value = MagicMock(
+            comment_id=77,
+            path="docs/readme.md",
+            line=12,
+            conversation=["Can you suggest a test?"],
+            reply_to_bot=True,
+        )
 
         exit_code = run(
             [
@@ -1000,25 +567,12 @@ def test_run_chat_mode_does_not_use_unrelated_file_context_for_filtered_thread(
         )
 
     assert exit_code == 0
-    assert fetcher.hydrate_contents.call_args_list[-1].args[1] == set()
-    mock_publisher_cls.return_value.publish_chat_reply.assert_called_once()
+    chat_context = deps.reply.call_args.args[0]
+    assert chat_context.files == []
+    deps.publisher.publish_chat_reply.assert_called_once()
 
 
-@patch("scripts.pr_review_main.boto3.client")
-@patch("scripts.pr_review_main.Github")
-@patch("scripts.pr_review_main.RateLimiter")
-@patch("scripts.pr_review_main.ReviewStateStore")
-@patch("scripts.pr_review_main.CommentPublisher")
-@patch("scripts.pr_review_main.PRContextFetcher")
-def test_run_issue_comment_chat_mode_prefers_mentioned_file_context(
-    mock_fetcher_cls,
-    mock_publisher_cls,
-    mock_state_store_cls,
-    mock_rate_limiter_cls,
-    mock_github_cls,
-    _mock_boto_client,
-    tmp_path,
-) -> None:
+def test_run_issue_comment_chat_mode_prefers_mentioned_file_context(tmp_path) -> None:
     payload = {
         "repository": {"full_name": "owner/repo"},
         "sender": {"login": "alice"},
@@ -1029,31 +583,17 @@ def test_run_issue_comment_chat_mode_prefers_mentioned_file_context(
         },
     }
     event_path = _event_file(tmp_path, payload)
+    config = ReviewerConfig(chat_collaborator_only=False)
 
-    fetcher = mock_fetcher_cls.return_value
-    fetcher.fetch.return_value = _multi_file_context()
-    fetcher.hydrate_contents.side_effect = lambda context, _paths: context
-    fetcher.fetch_review_thread.return_value = MagicMock(
-        comment_id=77,
-        path=None,
-        line=None,
-        conversation=["/reviewbot what changed in tests/failover_timeout.tcl?"],
-        reply_to_bot=False,
-    )
-
-    mock_publisher_cls.return_value.publish_chat_reply.return_value = 88
-    mock_state_store_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.load.return_value = None
-    mock_rate_limiter_cls.return_value.save.return_value = None
-    mock_github_cls.return_value = MagicMock()
-
-    with patch(
-        "scripts.pr_review_main._load_runtime_reviewer_config",
-        return_value=ReviewerConfig(chat_collaborator_only=False),
-    ), patch(
-        "scripts.pr_review_main.ReviewChat"
-    ) as mock_chat_cls:
-        mock_chat_cls.return_value.reply.return_value = "Answer"
+    with _patched_run_dependencies(config=config) as deps:
+        deps.fetcher.fetch.return_value = _multi_file_context()
+        deps.fetcher.fetch_review_thread.return_value = MagicMock(
+            comment_id=77,
+            path=None,
+            line=None,
+            conversation=["/reviewbot what changed in tests/failover_timeout.tcl?"],
+            reply_to_bot=True,
+        )
 
         exit_code = run(
             [
@@ -1071,7 +611,8 @@ def test_run_issue_comment_chat_mode_prefers_mentioned_file_context(
         )
 
     assert exit_code == 0
-    assert fetcher.hydrate_contents.call_args_list[-1].args[1] == {
-        "tests/failover_timeout.tcl",
-    }
-    mock_publisher_cls.return_value.publish_chat_reply.assert_called_once()
+    chat_context = deps.reply.call_args.args[0]
+    assert [changed_file.path for changed_file in chat_context.files] == [
+        "tests/failover_timeout.tcl"
+    ]
+    deps.publisher.publish_chat_reply.assert_called_once()

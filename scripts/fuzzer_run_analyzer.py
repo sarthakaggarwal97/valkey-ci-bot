@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.bedrock_retriever import BedrockRetriever
+from scripts.claude_code import run_claude_code
 from scripts.config import RetrievalConfig
 from scripts.log_retriever import LogRetriever
 from scripts.models import FuzzerRunAnalysis, FuzzerRunContext, FuzzerSignal
@@ -63,6 +64,20 @@ _FAILED_CHECKS_RE = re.compile(r"Failed Checks:\s*([^\n]+)")
 _VALIDATION_ERROR_RE = re.compile(r"^\s*[•→-]\s*(.+)$", re.MULTILINE)
 _PASSING_CHECK_RE = re.compile(r"^\s*([A-Za-z ]+): PASS$", re.MULTILINE)
 _PASSING_CHAOS_RE = re.compile(r"^\s*\[PASS\]\s+(.+)$", re.MULTILINE)
+_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$", re.IGNORECASE)
+_VALKEY_SHA_KEYS = {
+    "valkey_sha",
+    "valkey_commit",
+    "valkey_commit_sha",
+    "valkey_ref",
+    "server_sha",
+    "server_commit",
+    "server_commit_sha",
+    "tested_valkey_sha",
+    "tested_commit",
+    "target_sha",
+    "target_commit",
+}
 
 _ANOMALY_PATTERNS: tuple[tuple[str, str, str], ...] = (
     # Always-bad: these indicate real bugs regardless of chaos activity.
@@ -220,6 +235,25 @@ def _extract_result_entry(results_payload: dict[str, Any] | None) -> dict[str, A
         return None
     result = results[0]
     return result if isinstance(result, dict) else None
+
+
+def _find_valkey_sha(payload: Any) -> str | None:
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            lowered = str(key).strip().lower()
+            if lowered in _VALKEY_SHA_KEYS and isinstance(value, str):
+                candidate = value.strip()
+                if _SHA_RE.fullmatch(candidate):
+                    return candidate
+            nested = _find_valkey_sha(value)
+            if nested:
+                return nested
+    if isinstance(payload, list):
+        for item in payload:
+            nested = _find_valkey_sha(item)
+            if nested:
+                return nested
+    return None
 
 
 def _select_bundle_artifact(artifacts: list[WorkflowArtifact]) -> WorkflowArtifact | None:
@@ -551,6 +585,11 @@ def _load_context_from_artifacts(
             context.node_logs[name] = text
 
     manifest = context.manifest or {}
+    context.tested_valkey_sha = (
+        context.tested_valkey_sha
+        or _find_valkey_sha(context.results)
+        or _find_valkey_sha(context.manifest)
+    )
     if context.scenario_id is None:
         scenario_id = manifest.get("scenario_id")
         if isinstance(scenario_id, str) and scenario_id.strip():
@@ -735,8 +774,15 @@ def _invoke_claude_code(
     context: FuzzerRunContext,
 ) -> dict[str, Any]:
     """Call Claude Code CLI to analyze a fuzzer run from files on disk."""
-    from scripts.claude_code import run_claude_code
-
+    source_note = (
+        f"The Valkey source code at tested commit {context.tested_valkey_sha} is in valkey/ directory."
+        if context.tested_valkey_sha
+        else (
+            "The Valkey source code in valkey/ is a best-effort default-branch checkout. "
+            "The fuzzer artifacts did not expose the tested Valkey commit, so do not treat "
+            "source line numbers as exact commit evidence."
+        )
+    )
     prompt_parts = [
         system_prompt,
         "",
@@ -756,9 +802,10 @@ def _invoke_claude_code(
         f"Commit: {context.head_sha}",
         f"Scenario ID: {context.scenario_id or 'unknown'}",
         f"Seed: {context.seed or 'unknown'}",
+        f"Tested Valkey commit: {context.tested_valkey_sha or 'unknown'}",
         "",
         "## Source code",
-        "The Valkey source code at the tested commit is in valkey/ directory.",
+        source_note,
         "Key files: valkey/src/cluster.c, valkey/src/cluster_legacy.c, valkey/src/replication.c, valkey/src/server.c",
         "Use Grep to look up assertions, crash handlers, or specific functions referenced in logs.",
         "",
@@ -829,6 +876,10 @@ def _invoke_claude_code(
                 result_text = event["result"]
         except (json.JSONDecodeError, TypeError):
             continue
+    if not result_text:
+        # Unit tests and some CLI versions may return the final JSON directly
+        # instead of a stream-json result event.
+        result_text = stdout.strip()
     if not result_text:
         logger.warning("No result text found in Claude Code output for run %s", context.run_id)
         return {}
@@ -934,27 +985,31 @@ class FuzzerRunAnalyzer:
             import tempfile
             tmpdir = Path(tempfile.mkdtemp(prefix="fuzzer-analysis-"))
             try:
-                # Clone the Valkey source at the exact commit the fuzzer ran against
-                # so Claude Code can cross-reference crashes with actual code.
+                # Clone Valkey source at the tested commit when artifacts expose it.
                 source_repo = context.repo.replace("valkey-fuzzer", "valkey")
                 if "/" not in source_repo:
                     source_repo = "valkey-io/valkey"
                 valkey_dir = tmpdir / "valkey"
+                clone_args = [
+                    "git", "clone", "--filter=blob:none",
+                    f"https://github.com/{source_repo}.git",
+                    str(valkey_dir),
+                ]
+                if not context.tested_valkey_sha:
+                    clone_args.extend(["--branch", "unstable", "--depth", "1"])
                 clone_result = subprocess.run(
-                    ["git", "clone", "--depth", "1",
-                     f"https://github.com/{source_repo}.git",
-                     str(valkey_dir), "--branch", "unstable"],
+                    clone_args,
                     capture_output=True, text=True, timeout=60,
                 )
                 if clone_result.returncode != 0:
                     logger.warning("Valkey clone failed: %s", clone_result.stderr[:200])
-                elif context.head_sha:
+                elif context.tested_valkey_sha:
                     subprocess.run(
-                        ["git", "fetch", "--depth", "1", "origin", context.head_sha],
+                        ["git", "fetch", "--depth", "1", "origin", context.tested_valkey_sha],
                         cwd=str(valkey_dir), capture_output=True, text=True, timeout=30,
                     )
                     subprocess.run(
-                        ["git", "checkout", context.head_sha],
+                        ["git", "checkout", context.tested_valkey_sha],
                         cwd=str(valkey_dir), capture_output=True, text=True, timeout=10,
                     )
 
@@ -969,6 +1024,15 @@ class FuzzerRunAnalyzer:
                 )
                 if fuzzer_clone.returncode != 0:
                     logger.warning("Fuzzer clone failed: %s", fuzzer_clone.stderr[:200])
+                elif context.head_sha:
+                    subprocess.run(
+                        ["git", "fetch", "--depth", "1", "origin", context.head_sha],
+                        cwd=str(fuzzer_dir), capture_output=True, text=True, timeout=30,
+                    )
+                    subprocess.run(
+                        ["git", "checkout", context.head_sha],
+                        cwd=str(fuzzer_dir), capture_output=True, text=True, timeout=10,
+                    )
 
                 det_summary = _format_deterministic_summary(anomalies, normal_signals)
                 model_payload = _invoke_claude_code(
@@ -1042,5 +1106,3 @@ class FuzzerRunAnalyzer:
             triage_verdict=triage_verdict,
             suggested_labels=_suggested_labels_for_triage(triage_verdict),
         )
-
-

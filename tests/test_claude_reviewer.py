@@ -98,7 +98,7 @@ def test_validate_finding_rejects_empty_body():
 
 def test_review_pr_returns_findings(tmp_path):
     findings_json = json.dumps([
-        {"path": "src/server.c", "line": 5, "body": "Memory leak", "severity": "high", "title": "Leak", "confidence": "high"},
+        {"path": "src/server.c", "line": 1, "body": "Memory leak", "severity": "high", "title": "Leak", "confidence": "high"},
     ])
     result_event = json.dumps({"type": "result", "result": findings_json})
     stream = f'{{"type":"system","subtype":"init"}}\n{result_event}'

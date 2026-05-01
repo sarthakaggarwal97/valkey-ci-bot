@@ -399,6 +399,7 @@ class FuzzerRunContext:
     node_logs: dict[str, str] = field(default_factory=dict)
     raw_job_log: str | None = None
     raw_log_fallback_used: bool = False
+    tested_valkey_sha: str | None = None
 
 
 @dataclass

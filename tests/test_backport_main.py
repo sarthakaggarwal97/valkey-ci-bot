@@ -199,12 +199,10 @@ _PATCH_PREFIX = "scripts.backport_main"
 class TestRunBackportCleanCherryPick:
     """Test clean cherry-pick flow — no conflicts, PR created successfully."""
 
-    @patch(f"{_PATCH_PREFIX}.boto3")
     @patch(f"{_PATCH_PREFIX}._clone_repo")
     @patch(f"{_PATCH_PREFIX}._run_git")
     @patch(f"{_PATCH_PREFIX}.RateLimiter")
     @patch(f"{_PATCH_PREFIX}.BackportPRCreator")
-    @patch(f"{_PATCH_PREFIX}.ConflictResolver")
     @patch(f"{_PATCH_PREFIX}.CherryPickExecutor")
     @patch(f"{_PATCH_PREFIX}.load_backport_config_from_repo")
     @patch(f"{_PATCH_PREFIX}.Github")
@@ -213,12 +211,10 @@ class TestRunBackportCleanCherryPick:
         mock_gh_cls: MagicMock,
         mock_load_config: MagicMock,
         mock_executor_cls: MagicMock,
-        mock_resolver_cls: MagicMock,
         mock_pr_creator_cls: MagicMock,
         mock_rate_limiter_cls: MagicMock,
         mock_run_git: MagicMock,
         mock_clone: MagicMock,
-        mock_boto3: MagicMock,
         _mock_event_ledger: MagicMock,
     ) -> None:
         # Setup GitHub mock
@@ -248,7 +244,7 @@ class TestRunBackportCleanCherryPick:
         # Rate limiter allows
         mock_rate_limiter = MagicMock()
         mock_rate_limiter_cls.return_value = mock_rate_limiter
-        mock_rate_limiter.can_create_pr.return_value = True
+        mock_rate_limiter.reserve_pr_creation.return_value = True
 
         # Clean cherry-pick
         mock_executor = MagicMock()
@@ -299,14 +295,12 @@ class TestRunBackportCleanCherryPick:
 class TestRunBackportConflictedCherryPick:
     """Test conflicted cherry-pick flow with LLM resolution."""
 
-    @patch(f"{_PATCH_PREFIX}.boto3")
     @patch(f"{_PATCH_PREFIX}._clone_repo")
     @patch(f"{_PATCH_PREFIX}._run_git")
     @patch(f"{_PATCH_PREFIX}._apply_resolutions")
     @patch(f"{_PATCH_PREFIX}.RateLimiter")
     @patch(f"{_PATCH_PREFIX}.BackportPRCreator")
-    @patch(f"{_PATCH_PREFIX}.ConflictResolver")
-    @patch(f"{_PATCH_PREFIX}.BedrockClient")
+    @patch(f"{_PATCH_PREFIX}.resolve_conflicts_with_claude")
     @patch(f"{_PATCH_PREFIX}.CherryPickExecutor")
     @patch(f"{_PATCH_PREFIX}.load_backport_config_from_repo")
     @patch(f"{_PATCH_PREFIX}.Github")
@@ -315,14 +309,12 @@ class TestRunBackportConflictedCherryPick:
         mock_gh_cls: MagicMock,
         mock_load_config: MagicMock,
         mock_executor_cls: MagicMock,
-        mock_bedrock_client_cls: MagicMock,
-        mock_resolver_cls: MagicMock,
+        mock_resolve_conflicts: MagicMock,
         mock_pr_creator_cls: MagicMock,
         mock_rate_limiter_cls: MagicMock,
         mock_apply_resolutions: MagicMock,
         mock_run_git: MagicMock,
         mock_clone: MagicMock,
-        mock_boto3: MagicMock,
         _mock_event_ledger: MagicMock,
     ) -> None:
         # Setup GitHub mock
@@ -347,7 +339,7 @@ class TestRunBackportConflictedCherryPick:
         # Rate limiter allows
         mock_rate_limiter = MagicMock()
         mock_rate_limiter_cls.return_value = mock_rate_limiter
-        mock_rate_limiter.can_create_pr.return_value = True
+        mock_rate_limiter.reserve_pr_creation.return_value = True
 
         # Cherry-pick with conflicts
         conflicted_file = ConflictedFile(
@@ -365,9 +357,7 @@ class TestRunBackportConflictedCherryPick:
         )
 
         # Resolver resolves the file
-        mock_resolver = MagicMock()
-        mock_resolver_cls.return_value = mock_resolver
-        mock_resolver.resolve_conflicts.return_value = [
+        mock_resolve_conflicts.return_value = [
             ResolutionResult(
                 path="src/server.c",
                 resolved_content="resolved content",
@@ -376,8 +366,6 @@ class TestRunBackportConflictedCherryPick:
                 attempts=1,
             ),
         ]
-
-        mock_boto3.client.return_value = MagicMock()
 
         result = run_backport(
             repo_full_name="valkey-io/valkey",
@@ -392,10 +380,9 @@ class TestRunBackportConflictedCherryPick:
         assert result.files_conflicted == 1
         assert result.files_resolved == 1
         assert result.files_unresolved == 0
-        assert result.total_tokens_used == 500
-        mock_resolver.resolve_conflicts.assert_called_once()
-        _, bedrock_kwargs = mock_bedrock_client_cls.call_args
-        assert bedrock_kwargs["rate_limiter"] is mock_rate_limiter
+        assert result.total_tokens_used == 0
+        mock_resolve_conflicts.assert_called_once()
+        mock_apply_resolutions.assert_called_once()
         _mock_event_ledger.record.assert_any_call(
             "backport.conflicts_detected",
             "valkey-io/valkey#100->8.1",
@@ -406,11 +393,9 @@ class TestRunBackportConflictedCherryPick:
 class TestRunBackportDuplicateDetection:
     """Test duplicate detection skip."""
 
-    @patch(f"{_PATCH_PREFIX}.boto3")
     @patch(f"{_PATCH_PREFIX}._clone_repo")
     @patch(f"{_PATCH_PREFIX}.RateLimiter")
     @patch(f"{_PATCH_PREFIX}.BackportPRCreator")
-    @patch(f"{_PATCH_PREFIX}.ConflictResolver")
     @patch(f"{_PATCH_PREFIX}.CherryPickExecutor")
     @patch(f"{_PATCH_PREFIX}.load_backport_config_from_repo")
     @patch(f"{_PATCH_PREFIX}.Github")
@@ -419,11 +404,9 @@ class TestRunBackportDuplicateDetection:
         mock_gh_cls: MagicMock,
         mock_load_config: MagicMock,
         mock_executor_cls: MagicMock,
-        mock_resolver_cls: MagicMock,
         mock_pr_creator_cls: MagicMock,
         mock_rate_limiter_cls: MagicMock,
         mock_clone: MagicMock,
-        mock_boto3: MagicMock,
     ) -> None:
         mock_gh = MagicMock()
         mock_gh_cls.return_value = mock_gh
@@ -454,11 +437,9 @@ class TestRunBackportDuplicateDetection:
 class TestRunBackportRateLimitSkip:
     """Test rate limit skip."""
 
-    @patch(f"{_PATCH_PREFIX}.boto3")
     @patch(f"{_PATCH_PREFIX}._clone_repo")
     @patch(f"{_PATCH_PREFIX}.RateLimiter")
     @patch(f"{_PATCH_PREFIX}.BackportPRCreator")
-    @patch(f"{_PATCH_PREFIX}.ConflictResolver")
     @patch(f"{_PATCH_PREFIX}.CherryPickExecutor")
     @patch(f"{_PATCH_PREFIX}.load_backport_config_from_repo")
     @patch(f"{_PATCH_PREFIX}.Github")
@@ -467,11 +448,9 @@ class TestRunBackportRateLimitSkip:
         mock_gh_cls: MagicMock,
         mock_load_config: MagicMock,
         mock_executor_cls: MagicMock,
-        mock_resolver_cls: MagicMock,
         mock_pr_creator_cls: MagicMock,
         mock_rate_limiter_cls: MagicMock,
         mock_clone: MagicMock,
-        mock_boto3: MagicMock,
     ) -> None:
         mock_gh = MagicMock()
         mock_gh_cls.return_value = mock_gh
@@ -506,11 +485,9 @@ class TestRunBackportRateLimitSkip:
 class TestRunBackportMergedPrValidation:
     """Test unmerged source PR skip."""
 
-    @patch(f"{_PATCH_PREFIX}.boto3")
     @patch(f"{_PATCH_PREFIX}._clone_repo")
     @patch(f"{_PATCH_PREFIX}.RateLimiter")
     @patch(f"{_PATCH_PREFIX}.BackportPRCreator")
-    @patch(f"{_PATCH_PREFIX}.ConflictResolver")
     @patch(f"{_PATCH_PREFIX}.CherryPickExecutor")
     @patch(f"{_PATCH_PREFIX}.load_backport_config_from_repo")
     @patch(f"{_PATCH_PREFIX}.Github")
@@ -519,11 +496,9 @@ class TestRunBackportMergedPrValidation:
         mock_gh_cls: MagicMock,
         mock_load_config: MagicMock,
         mock_executor_cls: MagicMock,
-        mock_resolver_cls: MagicMock,
         mock_pr_creator_cls: MagicMock,
         mock_rate_limiter_cls: MagicMock,
         mock_clone: MagicMock,
-        mock_boto3: MagicMock,
     ) -> None:
         mock_gh = MagicMock()
         mock_gh_cls.return_value = mock_gh
@@ -538,7 +513,7 @@ class TestRunBackportMergedPrValidation:
 
         mock_rate_limiter = MagicMock()
         mock_rate_limiter_cls.return_value = mock_rate_limiter
-        mock_rate_limiter.can_create_pr.return_value = True
+        mock_rate_limiter.reserve_pr_creation.return_value = True
 
         result = run_backport(
             repo_full_name="valkey-io/valkey",
@@ -559,11 +534,9 @@ class TestRunBackportMergedPrValidation:
 class TestRunBackportMissingBranch:
     """Test missing branch skip."""
 
-    @patch(f"{_PATCH_PREFIX}.boto3")
     @patch(f"{_PATCH_PREFIX}._clone_repo")
     @patch(f"{_PATCH_PREFIX}.RateLimiter")
     @patch(f"{_PATCH_PREFIX}.BackportPRCreator")
-    @patch(f"{_PATCH_PREFIX}.ConflictResolver")
     @patch(f"{_PATCH_PREFIX}.CherryPickExecutor")
     @patch(f"{_PATCH_PREFIX}.load_backport_config_from_repo")
     @patch(f"{_PATCH_PREFIX}.Github")
@@ -572,11 +545,9 @@ class TestRunBackportMissingBranch:
         mock_gh_cls: MagicMock,
         mock_load_config: MagicMock,
         mock_executor_cls: MagicMock,
-        mock_resolver_cls: MagicMock,
         mock_pr_creator_cls: MagicMock,
         mock_rate_limiter_cls: MagicMock,
         mock_clone: MagicMock,
-        mock_boto3: MagicMock,
     ) -> None:
         from github.GithubException import GithubException
 
@@ -607,12 +578,10 @@ class TestRunBackportMissingBranch:
 class TestRunBackportGitHubAPIError:
     """Test GitHub API error handling."""
 
-    @patch(f"{_PATCH_PREFIX}.boto3")
     @patch(f"{_PATCH_PREFIX}._clone_repo")
     @patch(f"{_PATCH_PREFIX}._run_git")
     @patch(f"{_PATCH_PREFIX}.RateLimiter")
     @patch(f"{_PATCH_PREFIX}.BackportPRCreator")
-    @patch(f"{_PATCH_PREFIX}.ConflictResolver")
     @patch(f"{_PATCH_PREFIX}.CherryPickExecutor")
     @patch(f"{_PATCH_PREFIX}.load_backport_config_from_repo")
     @patch(f"{_PATCH_PREFIX}.Github")
@@ -621,12 +590,10 @@ class TestRunBackportGitHubAPIError:
         mock_gh_cls: MagicMock,
         mock_load_config: MagicMock,
         mock_executor_cls: MagicMock,
-        mock_resolver_cls: MagicMock,
         mock_pr_creator_cls: MagicMock,
         mock_rate_limiter_cls: MagicMock,
         mock_run_git: MagicMock,
         mock_clone: MagicMock,
-        mock_boto3: MagicMock,
     ) -> None:
         mock_gh = MagicMock()
         mock_gh_cls.return_value = mock_gh
@@ -649,7 +616,7 @@ class TestRunBackportGitHubAPIError:
         # Rate limiter allows
         mock_rate_limiter = MagicMock()
         mock_rate_limiter_cls.return_value = mock_rate_limiter
-        mock_rate_limiter.can_create_pr.return_value = True
+        mock_rate_limiter.reserve_pr_creation.return_value = True
 
         # Clean cherry-pick
         mock_executor = MagicMock()

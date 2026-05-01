@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -82,6 +83,7 @@ class BranchSweepResult:
     candidates_found: int = 0
     results: list[CandidateResult] = field(default_factory=list)
     pr_url: str = ""
+    error: str = ""
 
 
 # ── GraphQL client ────────────────────────────────────────────────────
@@ -264,11 +266,13 @@ def _process_branch(
 ) -> BranchSweepResult:
     result = BranchSweepResult(target_branch=target_branch, candidates_found=len(candidates))
     tmpdir = tempfile.mkdtemp(prefix=f"backport-{target_branch}-")
+    git_env = _git_auth_env(tmpdir, github_token)
 
     try:
+        check_publish_allowed(target_repo=push_repo, action="git_push", context=f"{_BRANCH_PREFIX}/{target_branch}")
         # Clone
-        clone_url = f"https://x-access-token:{github_token}@github.com/{repo_full_name}.git"
-        _run_git(tmpdir, "clone", "--branch", target_branch, clone_url, tmpdir)
+        clone_url = f"https://github.com/{repo_full_name}.git"
+        _run_git(tmpdir, "clone", "--branch", target_branch, clone_url, tmpdir, env=git_env)
         _run_git(tmpdir, "config", "user.name", "valkey-ci-agent")
         _run_git(tmpdir, "config", "user.email", "ci-agent@valkey.io")
 
@@ -278,14 +282,14 @@ def _process_branch(
 
         if existing_pr:
             logger.info("Found existing PR #%d for %s, fetching branch...", existing_pr.number, target_branch)
-            push_url = f"https://x-access-token:{github_token}@github.com/{push_repo}.git"
+            push_url = f"https://github.com/{push_repo}.git"
             _run_git(tmpdir, "remote", "add", "push_target", push_url)
-            _run_git(tmpdir, "fetch", "push_target", backport_branch)
+            _run_git(tmpdir, "fetch", "push_target", backport_branch, env=git_env)
             _run_git(tmpdir, "checkout", f"push_target/{backport_branch}")
             _run_git(tmpdir, "checkout", "-B", backport_branch)
         else:
             _run_git(tmpdir, "checkout", "-b", backport_branch)
-            push_url = f"https://x-access-token:{github_token}@github.com/{push_repo}.git"
+            push_url = f"https://github.com/{push_repo}.git"
             _run_git(tmpdir, "remote", "add", "push_target", push_url)
 
         # Find already-applied PRs
@@ -305,14 +309,21 @@ def _process_branch(
                 ))
                 continue
 
-            cr = _apply_candidate(tmpdir, candidate, cherry_picker, signer, repo_full_name, github_token)
+            cr = _apply_candidate(tmpdir, candidate, cherry_picker, signer, repo_full_name, git_env)
             result.results.append(cr)
 
-        # Push if we applied anything
+        # Push if we applied anything and validation passes.
         applied = [r for r in result.results if r.outcome == "applied"]
         if applied:
+            ok, output = _run_test_commands(tmpdir, test_commands)
+            if not ok:
+                for item in applied:
+                    item.outcome = "skipped-test"
+                    item.detail = output[:500]
+                logger.warning("Validation failed for %s; not pushing branch.", target_branch)
+                return result
             check_publish_allowed(target_repo=push_repo, action="git_push", context=backport_branch)
-            _run_git(tmpdir, "push", "push_target", backport_branch)
+            _run_git(tmpdir, "push", "push_target", backport_branch, env=git_env)
             logger.info("Pushed %d commit(s) to %s/%s", len(applied), push_repo, backport_branch)
 
             # Upsert PR
@@ -321,7 +332,20 @@ def _process_branch(
 
     except Exception as exc:
         logger.exception("Error processing branch %s: %s", target_branch, exc)
+        result.error = str(exc)
+        result.results.append(CandidateResult(
+            source_pr_number=0,
+            source_pr_title=f"Branch {target_branch}",
+            outcome="error",
+            detail=str(exc),
+        ))
     finally:
+        askpass_script = git_env.get("GIT_ASKPASS")
+        if askpass_script:
+            try:
+                os.unlink(askpass_script)
+            except OSError:
+                pass
         import shutil
         shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -331,7 +355,7 @@ def _process_branch(
 def _apply_candidate(
     repo_dir: str, candidate: ProjectBackportCandidate,
     cherry_picker: CherryPickExecutor, signer: object,
-    repo_full_name: str, github_token: str,
+    repo_full_name: str, git_env: dict[str, str],
 ) -> CandidateResult:
     sha = candidate.merge_commit_sha
     if not sha:
@@ -339,7 +363,7 @@ def _apply_candidate(
 
     try:
         # Fetch the merge commit
-        _run_git(repo_dir, "fetch", "origin", sha)
+        _run_git(repo_dir, "fetch", "origin", sha, env=git_env)
         # Cherry-pick directly without re-checkout (we're already on the backport branch)
         result = subprocess.run(
             ["git", "cherry-pick", "-m", "1", sha],
@@ -351,17 +375,34 @@ def _apply_candidate(
     if result.returncode == 0:
         return CandidateResult(candidate.source_pr_number, candidate.source_pr_title, "applied")
 
-    # Detect conflicts — look at cherry-pick state
-    status = subprocess.run(
-        ["git", "status", "--porcelain"],
+    # Detect every unmerged path. Porcelain status has several conflict
+    # forms (UU, DU, UD, AU, UA, AA, DD); diff-filter=U covers all of them
+    # without depending on two-letter status parsing.
+    conflict_result = subprocess.run(
+        ["git", "diff", "--name-only", "--diff-filter=U"],
         cwd=repo_dir, capture_output=True, text=True,
     )
-    conflicting_paths: list[str] = []
-    for line in status.stdout.splitlines():
-        if line.startswith("UU ") or line.startswith("AA ") or line.startswith("DD "):
-            conflicting_paths.append(line[3:].strip())
+    conflicting_paths = [
+        line.strip()
+        for line in conflict_result.stdout.splitlines()
+        if line.strip()
+    ]
     if not conflicting_paths:
-        return CandidateResult(candidate.source_pr_number, candidate.source_pr_title, "error", f"cherry-pick failed: {result.stderr[:300]}")
+        subprocess.run(["git", "cherry-pick", "--abort"], cwd=repo_dir, capture_output=True)
+        stderr = result.stderr[:500]
+        if "cherry-pick is now empty" in result.stderr or "nothing to commit" in result.stderr:
+            return CandidateResult(
+                candidate.source_pr_number,
+                candidate.source_pr_title,
+                "skipped-existing",
+                "already applied or empty cherry-pick",
+            )
+        return CandidateResult(
+            candidate.source_pr_number,
+            candidate.source_pr_title,
+            "error",
+            f"cherry-pick failed: {stderr}",
+        )
 
     logger.info("Found %d conflicting file(s): %s", len(conflicting_paths), conflicting_paths)
     # Build ConflictedFile list with real target/source content for the whitespace-only fast path
@@ -405,8 +446,10 @@ def _apply_candidate(
     # Apply resolutions and commit
     for r in resolutions:
         if r.resolved_content is not None:
-            Path(os.path.join(repo_dir, r.path)).write_text(r.resolved_content)
-    _run_git(repo_dir, "add", "-A")
+            resolved_path = Path(repo_dir, r.path)
+            resolved_path.parent.mkdir(parents=True, exist_ok=True)
+            resolved_path.write_text(r.resolved_content, encoding="utf-8")
+            _run_git(repo_dir, "add", r.path)
     _run_git(repo_dir, "commit", "--no-edit")
 
     return CandidateResult(candidate.source_pr_number, candidate.source_pr_title, "applied", "conflicts resolved by Claude Code")
@@ -429,6 +472,50 @@ def _read_index_stage(repo_dir: str, path: str, stage: int) -> str:
     except Exception:
         pass
     return ""
+
+
+def _git_auth_env(repo_dir: str, github_token: str) -> dict[str, str]:
+    fd, askpass_script = tempfile.mkstemp(
+        prefix=f"{Path(repo_dir).name}.git-askpass-",
+        suffix=".sh",
+    )
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(
+            "#!/bin/sh\n"
+            "case \"$1\" in\n"
+            "  *Username*) echo x-access-token ;;\n"
+            "  *) echo \"$GIT_PASSWORD\" ;;\n"
+            "esac\n"
+        )
+    os.chmod(askpass_script, stat.S_IRWXU)
+    return {
+        **os.environ,
+        "GIT_ASKPASS": askpass_script,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_PASSWORD": github_token,
+    }
+
+
+def _run_test_commands(repo_dir: str, test_commands: list[str]) -> tuple[bool, str]:
+    if not test_commands:
+        return True, ""
+    for command in test_commands:
+        logger.info("Running backport validation command: %s", command)
+        result = subprocess.run(
+            command,
+            cwd=repo_dir,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=1800,
+        )
+        if result.returncode != 0:
+            output = "\n".join(
+                part for part in [result.stdout[-2000:], result.stderr[-2000:]]
+                if part
+            ).strip()
+            return False, output or f"`{command}` failed with exit code {result.returncode}"
+    return True, ""
 
 
 def _find_existing_pr(gh: object, push_repo: str, branch: str) -> object | None:
@@ -511,7 +598,10 @@ def _build_summary(results: list[BranchSweepResult]) -> str:
     lines = ["## Weekly Backport Sweep", ""]
     for r in results:
         applied = sum(1 for c in r.results if c.outcome == "applied")
-        lines.append(f"- `{r.target_branch}`: {applied}/{r.candidates_found} applied" + (f" — [PR]({r.pr_url})" if r.pr_url else ""))
+        suffix = f" — [PR]({r.pr_url})" if r.pr_url else ""
+        if r.error:
+            suffix += f" — error: {r.error}"
+        lines.append(f"- `{r.target_branch}`: {applied}/{r.candidates_found} applied" + suffix)
     return "\n".join(lines)
 
 
@@ -650,6 +740,8 @@ def main() -> None:
     )
 
     print(json.dumps([{"branch": r.target_branch, "found": r.candidates_found, "applied": sum(1 for c in r.results if c.outcome == "applied"), "pr": r.pr_url} for r in results], indent=2))
+    if not args.discover_only and not args.dry_run and any(r.error for r in results):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

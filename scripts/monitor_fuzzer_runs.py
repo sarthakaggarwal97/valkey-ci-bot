@@ -106,15 +106,13 @@ def _fetch_recent_completed_runs(args: MonitorArgs, last_seen_run_id: int) -> li
     runs = workflow.get_runs(event=args.event, status="completed")
 
     fresh_runs: list[Any] = []
-    for index, run in enumerate(runs):
-        if index >= args.max_runs:
-            break
+    for run in runs:
         if run.id <= last_seen_run_id:
             break
         fresh_runs.append(run)
 
     fresh_runs.sort(key=lambda run: run.id)
-    return fresh_runs
+    return fresh_runs[: args.max_runs]
 
 
 def _load_local_bot_config(config_path: str) -> BotConfig:
@@ -239,8 +237,9 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                     subject,
                     error=str(exc),
                 )
-                new_last_seen = max(new_last_seen, run.id)
-                continue
+                # Preserve the watermark so the failed run is retried next
+                # time instead of being skipped forever.
+                break
 
             run_result["action"] = "analyzed"
             run_result["analysis"] = fuzzer_run_analysis_to_dict(analysis)
