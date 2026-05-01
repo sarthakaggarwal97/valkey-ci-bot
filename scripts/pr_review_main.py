@@ -554,7 +554,10 @@ def run(argv: list[str] | None = None) -> int:
                         )
             except Exception as exc:
                 had_failure = True
-                logger.warning("PR review failed for %s#%d: %s", repo_name, pr_context.number, exc)
+                logger.exception("PR review failed for %s#%d: %s", repo_name, pr_context.number, exc)
+                print(f"[REVIEW] Review failed: {exc}", flush=True)
+                import traceback
+                traceback.print_exc()
                 summary.add_result("review", "failed", str(exc))
                 event_ledger.record(
                     "review.failed",
