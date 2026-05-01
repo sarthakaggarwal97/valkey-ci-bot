@@ -48,6 +48,8 @@ _DEFAULT_BRANCH_FIELDS = (
     "Backport Branch", "Target Branch", "Release Branch",
     "Branch", "Version", "Release", "Folder",
 )
+# Only sweep these release branches, even if other N.N branches exist in the repo
+_SUPPORTED_RELEASE_BRANCHES = ("7.2", "8.0", "8.1", "9.0", "9.1")
 _DEFAULT_RELEASE_BRANCH_PATTERN = r"\d+\.\d+"
 _DEFAULT_STATUS_FIELD = "Status"
 _DEFAULT_STATUS_VALUE = "To be backported"
@@ -186,7 +188,7 @@ class ProjectBackportDiscovery:
 def discover_release_branches(repo: object, pattern: str) -> list[str]:
     regex = re.compile(pattern)
     branches = [b.name for b in retry_github_call(lambda: list(repo.get_branches()), retries=3, description="list branches")]
-    matched = sorted([b for b in branches if regex.fullmatch(b)], key=_release_branch_sort_key)
+    matched = sorted([b for b in branches if regex.fullmatch(b) and b in _SUPPORTED_RELEASE_BRANCHES], key=_release_branch_sort_key)
     logger.info("Discovered release branches: %s", matched)
     return matched
 

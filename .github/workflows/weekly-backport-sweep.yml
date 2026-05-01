@@ -90,7 +90,7 @@ jobs:
       IMPLICIT_TARGET_BRANCH: ${{ inputs.implicit_target_branch || '' }}
       MAX_CANDIDATES: ${{ inputs.max_candidates || '0' }}
       TEST_COMMANDS: ${{ inputs.test_commands || 'make test' }}
-      DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || inputs.dry_run || 'true' }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true && 'true' || 'false' }}
     steps:
       - name: Check out agent repository
         uses: actions/checkout@v6
