@@ -132,6 +132,31 @@ class CherryPickExecutor:
                 )
                 conflicts = self._collect_conflicts(target_branch)
                 applied.append(sha)
+                if not conflicts:
+                    logger.info(
+                        "No conflicting files; cherry-pick is empty. "
+                        "Retrying with --allow-empty.",
+                    )
+                    logger.debug(
+                        "Original cherry-pick stderr: %s",
+                        result.stderr.strip(),
+                    )
+                    self._run_git("cherry-pick", "--abort", check=False)
+                    retry = self._run_git(
+                        "cherry-pick", "--allow-empty", sha, check=False,
+                    )
+                    if retry.returncode == 0:
+                        logger.info(
+                            "Empty cherry-pick of %s succeeded with --allow-empty",
+                            sha,
+                        )
+                        continue
+                    logger.warning(
+                        "Retry with --allow-empty also failed for %s: %s",
+                        sha,
+                        retry.stderr.strip(),
+                    )
+                    conflicts = self._collect_conflicts(target_branch)
                 return CherryPickResult(
                     success=False,
                     conflicting_files=conflicts,

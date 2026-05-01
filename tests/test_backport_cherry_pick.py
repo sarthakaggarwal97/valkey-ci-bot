@@ -84,6 +84,28 @@ class TestCleanCherryPickSequential:
         assert calls[1][0][0] == ["git", "cherry-pick", "sha1"]
         assert calls[2][0][0] == ["git", "cherry-pick", "sha2"]
 
+    @patch("scripts.cherry_pick.subprocess.run")
+    def test_empty_sequential_cherry_pick_retries_with_allow_empty(
+        self, mock_run: MagicMock,
+    ) -> None:
+        mock_run.side_effect = [
+            _ok(),
+            _fail(stderr="The previous cherry-pick is now empty"),
+            _ok(stdout=""),
+            _ok(),
+            _ok(),
+        ]
+
+        executor = CherryPickExecutor("/repo")
+        result = executor.execute("8.1", None, ["sha1"])
+
+        assert result.success is True
+        assert result.applied_commits == ["sha1"]
+        assert result.conflicting_files == []
+        calls = [call_args[0][0] for call_args in mock_run.call_args_list]
+        assert ["git", "cherry-pick", "--abort"] in calls
+        assert ["git", "cherry-pick", "--allow-empty", "sha1"] in calls
+
 
 class TestConflictDetection:
     """Scenario 3: Cherry-pick with conflicts — conflict detection and file parsing."""

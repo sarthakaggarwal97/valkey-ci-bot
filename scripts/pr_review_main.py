@@ -340,6 +340,17 @@ def run(argv: list[str] | None = None) -> int:
             assert event is not None
             pr_number = event.pr_number or 0
         pr_context = fetcher.fetch(repo_name, pr_number)
+        review_subject = _review_subject(repo_name, pr_context.number)
+        if config.ignore_keyword and config.ignore_keyword in (pr_context.body or ""):
+            summary.add_result("preflight", "skipped", "ignored-by-keyword")
+            event_ledger.record(
+                "review.preflight_skipped",
+                review_subject,
+                reason="ignored-by-keyword",
+                mode=resolved_mode,
+            )
+            summary.write()
+            return 0
 
         # Clone the repo and check out the PR branch for Claude Code
         try:
@@ -358,17 +369,6 @@ def run(argv: list[str] | None = None) -> int:
 
         valkey_context = load_valkey_repo_context(gh, repo_name, ref=pr_context.base_sha)
         config = augment_reviewer_config_for_valkey(config, pr_context, valkey_context)
-        review_subject = _review_subject(repo_name, pr_context.number)
-        if config.ignore_keyword and config.ignore_keyword in (pr_context.body or ""):
-            summary.add_result("preflight", "skipped", "ignored-by-keyword")
-            event_ledger.record(
-                "review.preflight_skipped",
-                review_subject,
-                reason="ignored-by-keyword",
-                mode=resolved_mode,
-            )
-            summary.write()
-            return 0
 
         selected_paths = _select_review_files(pr_context, config)
         selected_path_set = set(selected_paths)

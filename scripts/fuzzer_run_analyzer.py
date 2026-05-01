@@ -981,7 +981,11 @@ class FuzzerRunAnalyzer:
             )
             _load_context_from_artifacts(context, artifact_files)
 
-        if context.results is None and not context.node_logs:
+        needs_log_fallback = context.raw_job_log is None and (
+            context.results is None
+            or (not context.structured_logs and not context.node_logs)
+        )
+        if needs_log_fallback:
             run_log_files = self._artifact_client.download_run_log_files(
                 repo_full_name,
                 run_id,
@@ -1027,11 +1031,13 @@ class FuzzerRunAnalyzer:
                 valkey_dir = tmpdir / "valkey"
                 clone_args = [
                     "git", "clone", "--filter=blob:none",
-                    f"https://github.com/{source_repo}.git",
-                    str(valkey_dir),
                 ]
                 if not context.tested_valkey_sha:
                     clone_args.extend(["--branch", "unstable", "--depth", "1"])
+                clone_args.extend([
+                    f"https://github.com/{source_repo}.git",
+                    str(valkey_dir),
+                ])
                 clone_result = subprocess.run(
                     clone_args,
                     capture_output=True, text=True, timeout=60,

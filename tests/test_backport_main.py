@@ -642,6 +642,65 @@ class TestRunBackportGitHubAPIError:
         assert "GitHub API error" in (result.error_message or "")
 
 
+class TestRunBackportCherryPickFailure:
+    """Test cherry-pick failures that do not expose conflicts."""
+
+    @patch(f"{_PATCH_PREFIX}._clone_repo")
+    @patch(f"{_PATCH_PREFIX}._run_git")
+    @patch(f"{_PATCH_PREFIX}.RateLimiter")
+    @patch(f"{_PATCH_PREFIX}.BackportPRCreator")
+    @patch(f"{_PATCH_PREFIX}.CherryPickExecutor")
+    @patch(f"{_PATCH_PREFIX}.Github")
+    def test_cherry_pick_failure_without_conflicts_does_not_push_or_create_pr(
+        self,
+        mock_gh_cls: MagicMock,
+        mock_executor_cls: MagicMock,
+        mock_pr_creator_cls: MagicMock,
+        mock_rate_limiter_cls: MagicMock,
+        mock_run_git: MagicMock,
+        mock_clone: MagicMock,
+    ) -> None:
+        mock_gh = MagicMock()
+        mock_gh_cls.return_value = mock_gh
+        mock_repo = MagicMock()
+        mock_gh.get_repo.return_value = mock_repo
+        mock_repo.get_branch.return_value = MagicMock()
+        mock_repo.get_pull.return_value = _make_mock_pr()
+
+        mock_pr_creator = MagicMock()
+        mock_pr_creator_cls.return_value = mock_pr_creator
+        mock_pr_creator.check_duplicate.return_value = None
+
+        mock_rate_limiter = MagicMock()
+        mock_rate_limiter_cls.return_value = mock_rate_limiter
+        mock_rate_limiter.reserve_pr_creation.return_value = True
+
+        mock_executor = MagicMock()
+        mock_executor_cls.return_value = mock_executor
+        mock_executor.execute.return_value = CherryPickResult(
+            success=False,
+            conflicting_files=[],
+            applied_commits=["sha1"],
+        )
+
+        result = run_backport(
+            repo_full_name="valkey-io/valkey",
+            source_pr_number=100,
+            target_branch="8.1",
+            config=_default_config(),
+            github_token="fake-token",
+            aws_region="us-east-1",
+        )
+
+        assert result.outcome == "error"
+        assert "without conflicted files" in (result.error_message or "")
+        mock_pr_creator.create_backport_pr.assert_not_called()
+        assert not any(
+            len(call_args.args) > 1 and call_args.args[1] == "push"
+            for call_args in mock_run_git.call_args_list
+        )
+
+
 def test_run_backport_requires_commit_identity_when_dco_is_enabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
