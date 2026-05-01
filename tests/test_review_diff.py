@@ -22,6 +22,32 @@ def test_parse_diff_map_allows_added_and_context_lines_only() -> None:
     assert not diff_map.is_commentable(9)
 
 
+def test_parse_diff_map_ignores_no_newline_marker() -> None:
+    """`\\ No newline at end of file` markers must not advance new_line.
+
+    Regression: previously the marker fell into the context branch and
+    bumped new_line, pushing every subsequent hunk's line numbers off by
+    one for every marker present.
+    """
+    patch = "\n".join([
+        "@@ -1,2 +1,2 @@",
+        " context line",
+        "-old tail",
+        "+new tail",
+        "\\ No newline at end of file",
+        "@@ -10,1 +10,2 @@",
+        " another context",
+        "+appended",
+    ])
+    diff_map = parse_diff_map("src/a.c", patch)
+
+    # First hunk: context at 1, added at 2. The marker must NOT become line 3.
+    assert diff_map.added_lines == {2, 11}
+    assert diff_map.context_lines == {1, 10}
+    assert not diff_map.is_commentable(3)
+    assert not diff_map.is_commentable(12)
+
+
 def test_validate_review_finding_rejects_methodology_and_off_diff_paths() -> None:
     diff_maps = {"src/server.c": parse_diff_map("src/server.c", "@@ -1 +1 @@\n+new")}
     ok = ReviewFinding(

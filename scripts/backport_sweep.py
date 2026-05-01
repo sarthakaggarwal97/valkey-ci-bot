@@ -169,6 +169,7 @@ class ProjectBackportDiscovery:
         if not _field_has_value(fields, self._status_field, self._status_value):
             return None
         # Determine target branch: either from project (implicit) or from a field
+        target: str | None
         if self._implicit_target:
             target = self._implicit_target
         else:
@@ -187,7 +188,7 @@ class ProjectBackportDiscovery:
         )
 
 
-def discover_release_branches(repo: object, pattern: str) -> list[str]:
+def discover_release_branches(repo: Any, pattern: str) -> list[str]:
     regex = re.compile(pattern)
     branches = [b.name for b in retry_github_call(lambda: list(repo.get_branches()), retries=3, description="list branches")]
     matched = sorted([b for b in branches if regex.fullmatch(b) and b in _SUPPORTED_RELEASE_BRANCHES], key=_release_branch_sort_key)
@@ -260,7 +261,7 @@ def run_backport_sweep(
 
 
 def _process_branch(
-    *, gh: object, repo: object, repo_full_name: str, github_token: str,
+    *, gh: Any, repo: Any, repo_full_name: str, github_token: str,
     target_branch: str, candidates: list[ProjectBackportCandidate],
     push_repo: str, test_commands: list[str],
 ) -> BranchSweepResult:
@@ -491,7 +492,7 @@ def _run_test_commands(repo_dir: str, test_commands: list[str]) -> tuple[bool, s
     return True, ""
 
 
-def _find_existing_pr(gh: object, push_repo: str, branch: str) -> object | None:
+def _find_existing_pr(gh: Any, push_repo: str, branch: str) -> Any | None:
     try:
         repo = retry_github_call(lambda: gh.get_repo(push_repo), retries=2, description=f"get {push_repo}")
         pulls = retry_github_call(lambda: list(repo.get_pulls(state="open", head=f"{push_repo.split('/')[0]}:{branch}")), retries=2, description="list PRs")
@@ -500,8 +501,8 @@ def _find_existing_pr(gh: object, push_repo: str, branch: str) -> object | None:
         return None
 
 
-def _upsert_pr(gh: object, push_repo: str, target_branch: str, head_branch: str,
-               result: BranchSweepResult, existing_pr: object | None) -> str:
+def _upsert_pr(gh: Any, push_repo: str, target_branch: str, head_branch: str,
+               result: BranchSweepResult, existing_pr: Any | None) -> str:
     repo = retry_github_call(lambda: gh.get_repo(push_repo), retries=2, description=f"get {push_repo}")
     body = _build_pr_body(result)
     title = f"[backport] Weekly backport sweep for {target_branch}"

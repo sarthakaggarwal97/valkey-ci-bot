@@ -59,6 +59,9 @@ def parse_diff_map(path: str, patch: str | None, *, status: str = "") -> FileDif
             continue
         if new_line is None:
             continue
+        if raw_line.startswith("\\"):
+            # Diff metadata marker like "\ No newline at end of file" — not a real line.
+            continue
         if raw_line.startswith("+") and not raw_line.startswith("+++"):
             added.add(new_line)
             new_line += 1
@@ -95,7 +98,7 @@ def is_line_commentable(
     if line is None:
         return True
     try:
-        parsed_line = int(line)
+        parsed_line = int(line)  # type: ignore[arg-type,call-overload]
     except (TypeError, ValueError):
         return True
     if parsed_line <= 0:

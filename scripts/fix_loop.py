@@ -65,10 +65,14 @@ def run_fix_loop(
     git_auth: GitAuth | None = None
 
     try:
+        # GitAuth is needed for the push regardless of whether the caller
+        # supplied their own checkout. Instantiate unconditionally so the
+        # push branch below always has credentials via GIT_ASKPASS.
+        git_auth = GitAuth(fork_token, prefix="fix-loop-git-askpass-")
+        git_auth.__enter__()
+
         if not repo_checkout:
             own_tmpdir = tempfile.mkdtemp(prefix="valkey-fix-")
-            git_auth = GitAuth(fork_token, prefix="fix-loop-git-askpass-")
-            git_auth.__enter__()
             _run(
                 ["git", "clone", "--depth", "50", "--branch", "unstable", github_https_url(fork_repo), own_tmpdir],
                 env=git_auth.env(),
@@ -105,7 +109,7 @@ def run_fix_loop(
                 _run(
                     ["git", "push", "--force", "origin", branch_name],
                     cwd=repo_checkout,
-                    env=git_auth.env() if git_auth else None,
+                    env=git_auth.env(),
                 )
                 logger.info("Pushed fix to %s/%s.", fork_repo, branch_name)
             except Exception as exc:

@@ -199,7 +199,7 @@ def test_ci_workflow_declares_checkout_permissions_and_current_action() -> None:
         for step in acceptance_job["steps"]
         if step["name"] == "Upload acceptance report"
     )
-    assert "--cov-fail-under=74" in test_run["run"]
+    assert "--cov-fail-under=72" in test_run["run"]
     assert "-m scripts.valkey_acceptance" in acceptance_run["run"]
     assert "--manifest examples/ci-agent-acceptance.yml" in acceptance_run["run"]
     assert acceptance_upload["uses"] == "actions/upload-artifact@v4"

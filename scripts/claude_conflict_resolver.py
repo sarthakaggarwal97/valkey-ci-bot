@@ -14,13 +14,13 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from scripts.agent_runtime import run_agent
 from scripts.backport_models import ConflictedFile, ResolutionResult
 from scripts.backport_utils import (
     has_conflict_markers,
     is_whitespace_only_conflict,
     validate_resolved_content,
 )
-from scripts.agent_runtime import run_agent
 
 if TYPE_CHECKING:
     from scripts.backport_models import BackportPRContext
