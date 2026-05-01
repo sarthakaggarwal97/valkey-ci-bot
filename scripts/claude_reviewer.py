@@ -182,6 +182,7 @@ def review_pr(
     stdout, stderr, rc = run_claude_code(
         prompt, cwd=repo_dir, timeout=1800,
         allowed_tools="Read,Grep,Glob,Bash",
+        effort="extra-high",
     )
 
     result_text = _extract_result_text(stdout)

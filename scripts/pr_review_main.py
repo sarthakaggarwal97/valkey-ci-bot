@@ -460,6 +460,7 @@ def run(argv: list[str] | None = None) -> int:
         )
 
         if config.disable_review:
+            logger.info("Review disabled by config")
             summary.add_result("review", "skipped", "disabled")
             event_ledger.record(
                 "review.skipped",
@@ -468,6 +469,7 @@ def run(argv: list[str] | None = None) -> int:
             )
         else:
             try:
+                logger.info("Starting code review for PR #%d...", pr_context.number)
                 diff_scope = fetcher.build_diff_scope(
                     review_context,
                     last_reviewed_head_sha,
