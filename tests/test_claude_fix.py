@@ -57,9 +57,9 @@ def test_fix_from_log_fetches_full_log_and_synthesizes_failure(monkeypatch):
             assert job_id == 99
             return "setup\nERROR: replica crash in integration test\nfull job log tail\n"
 
-    def fake_run_claude(prompt, **_kwargs):
+    def fake_run_agent(_profile, prompt, **_kwargs):
         prompts.append(prompt)
-        return "edited files", "", 0
+        return SimpleNamespace(stdout="edited files", stderr="", returncode=0)
 
     def fake_git_diff(cmd, **_kwargs):
         assert cmd == ["git", "diff"]
@@ -77,7 +77,7 @@ def test_fix_from_log_fetches_full_log_and_synthesizes_failure(monkeypatch):
         return "https://example.test/issues/1", 1, True
 
     monkeypatch.setattr(claude_fix, "LogRetriever", FakeLogRetriever)
-    monkeypatch.setattr(claude_fix, "run_claude_code", fake_run_claude)
+    monkeypatch.setattr(claude_fix, "run_agent", fake_run_agent)
     monkeypatch.setattr(claude_fix, "_run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(claude_fix.subprocess, "run", fake_git_diff)
     monkeypatch.setattr(claude_fix, "create_or_update_issue", fake_issue)
@@ -111,7 +111,15 @@ def test_fix_from_log_creates_issue_with_stderr_when_claude_edits_nothing(monkey
     gh = _FakeGithub()
 
     monkeypatch.setattr(claude_fix, "_fetch_job_log", lambda **_kwargs: "")
-    monkeypatch.setattr(claude_fix, "run_claude_code", lambda *_args, **_kwargs: ("max turns", "stderr text", 1))
+    monkeypatch.setattr(
+        claude_fix,
+        "run_agent",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            stdout="max turns",
+            stderr="stderr text",
+            returncode=1,
+        ),
+    )
     monkeypatch.setattr(claude_fix, "_run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         claude_fix.subprocess,

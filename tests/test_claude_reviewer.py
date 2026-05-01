@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from scripts.claude_reviewer import (
@@ -40,6 +41,10 @@ class _FakePR:
     base_branch: str = "unstable"
     head_sha: str = "abc123"
     files: list[_FakeFile] = field(default_factory=list)
+
+
+def _agent_result(stdout: str, stderr: str = "", rc: int = 0):
+    return SimpleNamespace(stdout=stdout, stderr=stderr, returncode=rc)
 
 
 def test_extract_result_text_from_jsonl():
@@ -98,12 +103,12 @@ def test_validate_finding_rejects_empty_body():
 
 def test_review_pr_returns_findings(tmp_path):
     findings_json = json.dumps([
-        {"path": "src/server.c", "line": 1, "body": "Memory leak", "severity": "high", "title": "Leak", "confidence": "high"},
+        {"path": "src/server.c", "line": 1, "body": "This leaks memory on the error path.", "severity": "high", "title": "Leak", "confidence": "high"},
     ])
     result_event = json.dumps({"type": "result", "result": findings_json})
     stream = f'{{"type":"system","subtype":"init"}}\n{result_event}'
 
-    with patch("scripts.claude_reviewer.run_claude_code", return_value=(stream, "", 0)):
+    with patch("scripts.claude_reviewer.run_agent", return_value=_agent_result(stream)):
         results = review_pr(_FakePR(), _FakeDiffScope(), str(tmp_path))
 
     assert len(results) == 1
@@ -112,7 +117,7 @@ def test_review_pr_returns_findings(tmp_path):
 
 
 def test_review_pr_empty_diff(tmp_path):
-    with patch("scripts.claude_reviewer.run_claude_code") as mock:
+    with patch("scripts.claude_reviewer.run_agent") as mock:
         results = review_pr(_FakePR(), _FakeDiffScope(files=[]), str(tmp_path))
     assert results == []
     mock.assert_not_called()
@@ -122,7 +127,7 @@ def test_summarize_pr(tmp_path):
     result_event = json.dumps({"type": "result", "result": "This PR fixes a memory leak."})
     stream = f'{{"type":"system","subtype":"init"}}\n{result_event}'
 
-    with patch("scripts.claude_reviewer.run_claude_code", return_value=(stream, "", 0)):
+    with patch("scripts.claude_reviewer.run_agent", return_value=_agent_result(stream)):
         summary = summarize_pr(_FakePR(), _FakeDiffScope(), str(tmp_path))
 
     assert "memory leak" in summary.lower()

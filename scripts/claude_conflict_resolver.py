@@ -20,7 +20,7 @@ from scripts.backport_utils import (
     is_whitespace_only_conflict,
     validate_resolved_content,
 )
-from scripts.claude_code import run_claude_code
+from scripts.agent_runtime import run_agent
 
 if TYPE_CHECKING:
     from scripts.backport_models import BackportPRContext
@@ -86,10 +86,8 @@ def resolve_conflicts_with_claude(
         "Calling Claude Code to resolve %d conflict(s) for PR #%d onto %s...",
         len(llm_files), pr_context.source_pr_number, pr_context.target_branch,
     )
-    stdout, stderr, rc = run_claude_code(
-        prompt, cwd=repo_dir, timeout=1200,
-        allowed_tools="Read,Edit,MultiEdit,Grep,Glob",
-    )
+    agent_result = run_agent("conflict_resolve_edit_only", prompt, cwd=repo_dir)
+    stdout = agent_result.stdout
 
     # Extract result from JSONL stream
     result_text = ""
@@ -103,10 +101,10 @@ def resolve_conflicts_with_claude(
 
     logger.info(
         "Claude Code finished (rc=%d). Result: %s",
-        rc, result_text[:200] if result_text else "(no result text)",
+        agent_result.returncode, result_text[:200] if result_text else "(no result text)",
     )
-    if rc != 0:
-        detail = stderr or result_text or "Claude Code returned non-zero"
+    if agent_result.returncode != 0:
+        detail = agent_result.stderr or result_text or "Claude Code returned non-zero"
         return [
             ResolutionResult(
                 path=cf.path,

@@ -45,6 +45,7 @@ _PASSTHROUGH_ENV_VARS = {
     "AWS_ROLE_ARN",
     "AWS_ROLE_SESSION_NAME",
 }
+DEFAULT_CLAUDE_ENV_ALLOWLIST = tuple(sorted(_PASSTHROUGH_ENV_VARS))
 _DIFF_FENCE_RE = re.compile(
     r"```(?:diff|patch)?\n(---\s.+?)\n```", re.DOTALL
 )
@@ -62,13 +63,14 @@ def run_claude_code(
     effort: str | None = "high",
     max_turns: int = 80,
     allowed_tools: str = "Read,Edit,MultiEdit,Write,Bash,Glob,Grep",
+    env_allowlist: tuple[str, ...] | None = None,
 ) -> tuple[str, str, int]:
     """Run claude CLI and return (stdout, stderr, exit_code).
 
     Requires ``claude`` on PATH and Bedrock credentials in the
     environment (CLAUDE_CODE_USE_BEDROCK=1 + AWS creds).
     """
-    env = _build_claude_env()
+    env = _build_claude_env(env_allowlist)
     env["CLAUDE_CODE_USE_BEDROCK"] = "1"
     env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = _DEFAULT_BEDROCK_OPUS_MODEL
     if "AWS_REGION" not in env and "AWS_DEFAULT_REGION" not in env:
@@ -140,7 +142,7 @@ def run_claude_code(
         return "", "claude not found", 127
 
 
-def _build_claude_env() -> dict[str, str]:
+def _build_claude_env(env_allowlist: tuple[str, ...] | None = None) -> dict[str, str]:
     """Return the minimal environment Claude Code needs for Bedrock.
 
     GitHub tokens and other workflow secrets are intentionally not inherited.
@@ -148,10 +150,11 @@ def _build_claude_env() -> dict[str, str]:
     subprocess gets only process/runtime basics plus AWS credentials required
     by the Bedrock provider.
     """
+    allowed = set(env_allowlist or DEFAULT_CLAUDE_ENV_ALLOWLIST)
     env = {
         name: value
         for name, value in os.environ.items()
-        if name in _PASSTHROUGH_ENV_VARS and value
+        if name in allowed and value
     }
     env["CLAUDE_CODE_USE_BEDROCK"] = "1"
     env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = _DEFAULT_BEDROCK_OPUS_MODEL

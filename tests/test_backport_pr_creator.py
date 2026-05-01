@@ -195,6 +195,8 @@ def test_build_pr_body_includes_checklist_and_plain_status_labels() -> None:
 
     assert "Reviewer Checklist" in body
     assert "Human Review Required" in body
+    assert "Backport Risk" in body
+    assert "Risk level" in body
     assert "Resolved automatically" in body
     assert "✅" not in body
     assert "❌" not in body

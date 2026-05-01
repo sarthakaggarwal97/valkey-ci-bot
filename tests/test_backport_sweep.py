@@ -6,21 +6,21 @@ from unittest.mock import MagicMock
 
 from scripts import backport_sweep
 from scripts.backport_sweep import ProjectBackportCandidate
+from scripts.git_auth import GitAuth
 
 
-def test_git_auth_env_keeps_askpass_outside_clone_destination(tmp_path):
+def test_git_auth_keeps_askpass_outside_clone_destination(tmp_path):
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
 
-    env = backport_sweep._git_auth_env(str(repo_dir), "token")
-    askpass = Path(env["GIT_ASKPASS"])
-    try:
+    with GitAuth("token", prefix="test-git-auth-") as git_auth:
+        env = git_auth.env()
+        askpass = Path(env["GIT_ASKPASS"])
         assert askpass.exists()
         assert askpass.parent != repo_dir
         assert env["GIT_TERMINAL_PROMPT"] == "0"
         assert env["GIT_PASSWORD"] == "token"
-    finally:
-        askpass.unlink(missing_ok=True)
+    assert not askpass.exists()
 
 
 def test_apply_candidate_aborts_empty_cherry_pick(monkeypatch, tmp_path):

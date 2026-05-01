@@ -13,8 +13,13 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
-from scripts.claude_code import run_claude_code
+from scripts.agent_runtime import run_agent
 from scripts.models import ReviewFinding
+from scripts.review_diff import (
+    build_diff_maps,
+    is_line_commentable,
+    validate_review_finding_for_publish,
+)
 
 if TYPE_CHECKING:
     from scripts.config import ReviewerConfig
@@ -114,44 +119,6 @@ def _base_ref(pr_context: PullRequestContext) -> str:
     )
 
 
-def _changed_line_numbers(patch: str | None) -> set[int]:
-    if not patch:
-        return set()
-    lines: set[int] = set()
-    new_line = 0
-    for raw_line in patch.splitlines():
-        if raw_line.startswith("@@"):
-            match = re.search(r"\+(\d+)(?:,(\d+))?", raw_line)
-            if match:
-                new_line = int(match.group(1))
-            continue
-        if raw_line.startswith("+") and not raw_line.startswith("+++"):
-            lines.add(new_line)
-            new_line += 1
-        elif raw_line.startswith("-") and not raw_line.startswith("---"):
-            continue
-        else:
-            new_line += 1
-    return lines
-
-
-def _line_is_commentable(
-    raw_path: object,
-    raw_line: object,
-    changed_lines: dict[str, set[int]],
-) -> bool:
-    if raw_line is None:
-        return True
-    try:
-        line = int(raw_line)
-    except (TypeError, ValueError):
-        return True
-    if line <= 0:
-        return False
-    path_lines = changed_lines.get(str(raw_path or ""), set())
-    return not path_lines or line in path_lines
-
-
 def _validate_finding(raw: dict[str, Any], changed_paths: set[str]) -> ReviewFinding | None:
     """Validate and normalize a raw finding dict into a ReviewFinding."""
     path = str(raw.get("path") or "")
@@ -227,7 +194,7 @@ def review_pr(
 
     changed_paths = {f.path for f in diff_scope.files}
     diff_text = _serialize_diff_scope(diff_scope)
-    changed_lines = {f.path: _changed_line_numbers(f.patch) for f in diff_scope.files}
+    diff_maps = build_diff_maps(diff_scope)
     custom_instructions = _custom_instructions_section(config)
     max_findings = _review_limit(config)
 
@@ -292,27 +259,33 @@ def review_pr(
     )
 
     logger.info("Reviewing PR #%d (%d files)...", pr_context.number, len(diff_scope.files))
-    stdout, stderr, rc = run_claude_code(
-        prompt, cwd=repo_dir, timeout=1800,
-        allowed_tools="Read,Grep,Glob",
-        effort="max",
-    )
-    if rc != 0:
+    agent_result = run_agent("review_readonly", prompt, cwd=repo_dir)
+    if agent_result.returncode != 0:
         raise ReviewGenerationError(
-            f"Claude Code review failed with exit code {rc}: {stderr or stdout[-500:]}"
+            "Claude Code review failed with exit code "
+            f"{agent_result.returncode}: {agent_result.stderr or agent_result.stdout[-500:]}"
         )
 
-    result_text = _extract_result_text(stdout)
+    result_text = _extract_result_text(agent_result.stdout)
     if not result_text:
         raise ReviewGenerationError(f"No review result from Claude Code for PR #{pr_context.number}")
 
     raw_findings = _parse_findings_json_strict(result_text)
     findings = []
     for raw in raw_findings:
-        if not _line_is_commentable(raw.get("path"), raw.get("line"), changed_lines):
+        if not is_line_commentable(raw.get("path"), raw.get("line"), diff_maps):
             continue
         finding = _validate_finding(raw, changed_paths)
         if finding:
+            publishable, reason = validate_review_finding_for_publish(finding, diff_maps)
+            if not publishable:
+                logger.info(
+                    "Dropping non-publishable review finding %s:%s (%s).",
+                    finding.path,
+                    finding.line,
+                    reason,
+                )
+                continue
             findings.append(finding)
         if len(findings) >= max_findings:
             break
@@ -352,16 +325,14 @@ def summarize_pr(
     )
 
     logger.info("Summarizing PR #%d...", pr_context.number)
-    stdout, stderr, rc = run_claude_code(
-        prompt, cwd=repo_dir, timeout=600,
-        allowed_tools="Read,Grep,Glob",
-    )
-    if rc != 0:
+    agent_result = run_agent("summary_readonly", prompt, cwd=repo_dir)
+    if agent_result.returncode != 0:
         raise ReviewGenerationError(
-            f"Claude Code summary failed with exit code {rc}: {stderr or stdout[-500:]}"
+            "Claude Code summary failed with exit code "
+            f"{agent_result.returncode}: {agent_result.stderr or agent_result.stdout[-500:]}"
         )
 
-    result_text = _extract_result_text(stdout)
+    result_text = _extract_result_text(agent_result.stdout)
     if not result_text:
         raise ReviewGenerationError(f"No summary result from Claude Code for PR #{pr_context.number}")
     return result_text
@@ -395,16 +366,14 @@ def reply_to_review_comment(
     )
 
     logger.info("Replying to review thread on PR #%d...", pr_context.number)
-    stdout, stderr, rc = run_claude_code(
-        prompt, cwd=repo_dir, timeout=600,
-        allowed_tools="Read,Grep,Glob",
-    )
-    if rc != 0:
+    agent_result = run_agent("chat_readonly", prompt, cwd=repo_dir)
+    if agent_result.returncode != 0:
         raise ReviewGenerationError(
-            f"Claude Code chat reply failed with exit code {rc}: {stderr or stdout[-500:]}"
+            "Claude Code chat reply failed with exit code "
+            f"{agent_result.returncode}: {agent_result.stderr or agent_result.stdout[-500:]}"
         )
 
-    result_text = _extract_result_text(stdout)
+    result_text = _extract_result_text(agent_result.stdout)
     if not result_text:
         raise ReviewGenerationError(
             f"No chat reply result from Claude Code for PR #{pr_context.number}"

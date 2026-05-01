@@ -423,6 +423,10 @@ class FuzzerRunAnalysis:
     raw_log_fallback_used: bool = False
     triage_verdict: str = "needs-human-triage"
     suggested_labels: list[str] = field(default_factory=list)
+    tested_valkey_sha: str | None = None
+    incident_fingerprint: str | None = None
+    evidence_quality: str = "unknown"
+    missing_artifact_fields: list[str] = field(default_factory=list)
 
 
 def failure_report_to_dict(report: FailureReport) -> dict:
@@ -571,5 +575,11 @@ def fuzzer_run_analysis_to_dict(analysis: FuzzerRunAnalysis) -> dict:
                 analysis, "triage_verdict", "needs-human-triage"
             ),
             "suggested_labels": list(getattr(analysis, "suggested_labels", [])),
+            "tested_valkey_sha": getattr(analysis, "tested_valkey_sha", None),
+            "incident_fingerprint": getattr(analysis, "incident_fingerprint", None),
+            "evidence_quality": getattr(analysis, "evidence_quality", "unknown"),
+            "missing_artifact_fields": list(
+                getattr(analysis, "missing_artifact_fields", [])
+            ),
         }
     return asdict(analysis)

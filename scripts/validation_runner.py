@@ -157,11 +157,13 @@ class ValidationRunner:
         config: BotConfig,
         *,
         repo_clone_url: str | None = None,
+        repo_clone_env: dict[str, str] | None = None,
         github_client: Any | None = None,
         repo_full_name: str = "",
     ):
         self._config = config
         self._repo_clone_url = repo_clone_url
+        self._repo_clone_env = repo_clone_env
         self._github_client = github_client
         self._repo_full_name = repo_full_name
 
@@ -373,6 +375,7 @@ class ValidationRunner:
                 capture_output=True,
                 text=True,
                 timeout=300,
+                env=self._repo_clone_env,
             )
             if result.returncode != 0:
                 return False, f"Clone failed:\n{result.stderr}"
@@ -384,6 +387,7 @@ class ValidationRunner:
                 text=True,
                 timeout=120,
                 cwd=str(work_dir),
+                env=self._repo_clone_env,
             )
             if fetch_result.returncode != 0:
                 return False, f"Fetch SHA failed:\n{fetch_result.stderr}"

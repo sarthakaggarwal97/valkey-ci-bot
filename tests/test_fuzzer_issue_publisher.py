@@ -46,6 +46,10 @@ def _analysis() -> FuzzerRunAnalysis:
         root_cause_category="split-brain",
         triage_verdict="possible-core-valkey-bug",
         suggested_labels=["possible-valkey-bug"],
+        tested_valkey_sha="1234567890abcdef1234567890abcdef12345678",
+        incident_fingerprint="incident-fp-1",
+        evidence_quality="degraded",
+        missing_artifact_fields=["results.final_validation"],
     )
 
 
@@ -73,6 +77,9 @@ def test_upsert_issue_creates_new_issue_when_no_match_exists() -> None:
     assert "839534793" in body
     assert "Split-brain or slot loss" in body
     assert "possible-core-valkey-bug" in body
+    assert "incident-fp-1" in body
+    assert "Tested Valkey SHA" in body
+    assert "Missing artifact fields" in body
     assert "valkey-ci-agent:fuzzer-issue:" in body
 
 

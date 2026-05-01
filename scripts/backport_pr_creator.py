@@ -15,6 +15,7 @@ from scripts.backport_models import (
     CherryPickResult,
     ResolutionResult,
 )
+from scripts.backport_risk import assess_backport_risk
 from scripts.backport_utils import build_branch_name, build_pr_title
 from scripts.github_client import retry_github_call
 from scripts.publish_guard import check_publish_allowed
@@ -144,6 +145,11 @@ class BackportPRCreator:
         results = resolution_results or []
         resolved_count = sum(result.resolved_content is not None for result in results)
         unresolved_count = len(results) - resolved_count
+        risk = assess_backport_risk(
+            context,
+            had_conflicts=had_conflicts,
+            resolution_results=results,
+        )
 
         if had_conflicts:
             if unresolved_count > 0:
@@ -173,11 +179,26 @@ class BackportPRCreator:
                 f"| Conflicts detected | {'yes' if had_conflicts else 'no'} |",
                 f"| Auto-resolved files | {resolved_count} |",
                 f"| Unresolved files | {unresolved_count} |",
+                f"| Risk level | `{risk.level}` |",
+            ])
+        )
+        sections.append(
+            "\n".join([
+                "### Backport Risk",
+                "",
+                f"- Level: `{risk.level}`",
+                "- Signals:",
+                *[f"  - {reason}" for reason in risk.reasons],
+                f"- Touched paths: {_escape_table_cell(', '.join(risk.touched_paths[:12]) or 'unknown')}",
             ])
         )
         checklist = [
             "- Compare this backport against the source PR before merge.",
         ]
+        if risk.level == "high":
+            checklist.append(
+                "- Run subsystem-focused tests before merge; this backport has high-risk signals."
+            )
         if resolved_count > 0:
             checklist.append(
                 "- Review the automatically resolved files carefully for semantic drift."

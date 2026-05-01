@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import re
 
+from scripts.fuzzer_incidents import compute_fuzzer_incident_fingerprint
 from scripts.github_client import retry_github_call
 from scripts.models import FuzzerRunAnalysis, FuzzerSignal
 from scripts.publish_guard import check_publish_allowed
@@ -69,20 +69,14 @@ def _stable_titles(signals: list[FuzzerSignal]) -> list[str]:
 
 
 def _fingerprint_for_analysis(analysis: FuzzerRunAnalysis) -> str:
-    if analysis.root_cause_category:
-        basis = "|".join([
-            analysis.repo,
-            analysis.workflow_file,
-            analysis.root_cause_category,
-        ])
-    else:
-        titles = _stable_titles(analysis.anomalies)
-        basis = "|".join([
-            analysis.repo,
-            analysis.workflow_file,
-            *titles[:6],
-        ])
-    return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:20]
+    if analysis.incident_fingerprint:
+        return analysis.incident_fingerprint
+    return compute_fuzzer_incident_fingerprint(
+        repo=analysis.repo,
+        workflow_file=analysis.workflow_file,
+        root_cause_category=analysis.root_cause_category,
+        anomalies=analysis.anomalies,
+    )
 
 
 def _issue_marker(fingerprint: str) -> str:
@@ -139,7 +133,15 @@ def _render_issue_body(
         f"| Conclusion | `{analysis.conclusion or 'unknown'}` |",
         f"| Status | `{analysis.overall_status}` |",
         f"| Triage verdict | `{_escape_table_cell(analysis.triage_verdict)}` |",
+        f"| Incident fingerprint | `{fingerprint}` |",
     ]
+    if analysis.tested_valkey_sha:
+        lines.append(f"| Tested Valkey SHA | `{_escape_table_cell(analysis.tested_valkey_sha)}` |")
+    if analysis.evidence_quality != "unknown":
+        lines.append(f"| Evidence quality | `{_escape_table_cell(analysis.evidence_quality)}` |")
+    if analysis.missing_artifact_fields:
+        missing = ", ".join(analysis.missing_artifact_fields)
+        lines.append(f"| Missing artifact fields | `{_escape_table_cell(missing)}` |")
     if analysis.root_cause_category:
         lines.append(
             f"| Root cause | `{_escape_table_cell(analysis.root_cause_category)}` |"
@@ -233,6 +235,15 @@ def _render_occurrence_comment(analysis: FuzzerRunAnalysis, *, occurrences: int)
         f"| Status | `{analysis.overall_status}` |",
         f"| Triage verdict | `{_escape_table_cell(analysis.triage_verdict)}` |",
     ]
+    fingerprint = _fingerprint_for_analysis(analysis)
+    lines.append(f"| Incident fingerprint | `{fingerprint}` |")
+    if analysis.tested_valkey_sha:
+        lines.append(f"| Tested Valkey SHA | `{_escape_table_cell(analysis.tested_valkey_sha)}` |")
+    if analysis.evidence_quality != "unknown":
+        lines.append(f"| Evidence quality | `{_escape_table_cell(analysis.evidence_quality)}` |")
+    if analysis.missing_artifact_fields:
+        missing = ", ".join(analysis.missing_artifact_fields)
+        lines.append(f"| Missing artifact fields | `{_escape_table_cell(missing)}` |")
     if analysis.root_cause_category:
         lines.append(
             f"| Root cause | `{_escape_table_cell(analysis.root_cause_category)}` |"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from scripts.fuzzer_run_analyzer import FuzzerRunAnalyzer
@@ -16,6 +17,10 @@ def _make_run(run_id: int = 10, conclusion: str = "failure") -> MagicMock:
     run.head_sha = "abc123"
     run.jobs.return_value = []
     return run
+
+
+def _agent_result(stdout: str, stderr: str = "", rc: int = 0):
+    return SimpleNamespace(stdout=stdout, stderr=stderr, returncode=rc)
 
 
 def test_analyzer_prefers_artifacts_and_keeps_deterministic_findings() -> None:
@@ -33,7 +38,12 @@ def test_analyzer_prefers_artifacts_and_keeps_deterministic_findings() -> None:
     ]
     artifact_client.download_artifact_files.return_value = {
         "bundle/manifest.json": json.dumps(
-            {"scenario_id": "839534793", "seed": 839534793, "success": False}
+            {
+                "scenario_id": "839534793",
+                "seed": 839534793,
+                "success": False,
+                "tested_valkey_sha": "1234567890abcdef1234567890abcdef12345678",
+            }
         ).encode("utf-8"),
         "bundle/results.json": json.dumps(
             {
@@ -85,8 +95,8 @@ def test_analyzer_prefers_artifacts_and_keeps_deterministic_findings() -> None:
 
     import unittest.mock
     with unittest.mock.patch(
-        "scripts.fuzzer_run_analyzer.run_claude_code",
-        return_value=(claude_response, "", 0),
+        "scripts.fuzzer_run_analyzer.run_agent",
+        return_value=_agent_result(claude_response),
     ):
         analyzer = FuzzerRunAnalyzer(
             github_client,
@@ -108,6 +118,10 @@ def test_analyzer_prefers_artifacts_and_keeps_deterministic_findings() -> None:
     assert "Replication validation passed." in analysis.normal_signals
     assert any("Chaos event process_kill" in signal for signal in analysis.normal_signals)
     assert analysis.raw_log_fallback_used is False
+    assert analysis.tested_valkey_sha == "1234567890abcdef1234567890abcdef12345678"
+    assert analysis.evidence_quality == "complete"
+    assert analysis.missing_artifact_fields == []
+    assert analysis.incident_fingerprint
 
 
 def test_analyzer_falls_back_to_job_log_when_artifacts_are_missing() -> None:
@@ -135,7 +149,7 @@ def test_analyzer_falls_back_to_job_log_when_artifacts_are_missing() -> None:
     )
     import unittest.mock
     with unittest.mock.patch(
-        "scripts.fuzzer_run_analyzer.run_claude_code",
+        "scripts.fuzzer_run_analyzer.run_agent",
         side_effect=RuntimeError("claude unavailable"),
     ):
         analyzer = FuzzerRunAnalyzer(
@@ -154,6 +168,8 @@ def test_analyzer_falls_back_to_job_log_when_artifacts_are_missing() -> None:
     assert analysis.overall_status == "normal"
     assert analysis.triage_verdict == "expected-chaos-noise"
     assert analysis.raw_log_fallback_used is True
+    assert analysis.evidence_quality == "degraded"
+    assert "tested_valkey_sha" in analysis.missing_artifact_fields
     assert analysis.summary.startswith("Run 11")
 
 
@@ -174,7 +190,7 @@ def test_analyzer_does_not_treat_serverassert_object_name_as_crash() -> None:
 
     import unittest.mock
     with unittest.mock.patch(
-        "scripts.fuzzer_run_analyzer.run_claude_code",
+        "scripts.fuzzer_run_analyzer.run_agent",
         side_effect=RuntimeError("claude unavailable"),
     ):
         analyzer = FuzzerRunAnalyzer(
@@ -261,8 +277,8 @@ def test_invoke_claude_code_parses_json(tmp_path: Path, monkeypatch: object) -> 
         "reproduction_hint": None,
     })
     monkeypatch.setattr(
-        "scripts.fuzzer_run_analyzer.run_claude_code",
-        lambda prompt, **kw: (mock_response, "", 0),
+        "scripts.fuzzer_run_analyzer.run_agent",
+        lambda profile, prompt, **kw: _agent_result(mock_response),
     )
     result = _invoke_claude_code(
         system_prompt="You analyze fuzzer runs.",
@@ -274,5 +290,3 @@ def test_invoke_claude_code_parses_json(tmp_path: Path, monkeypatch: object) -> 
     assert result["overall_status"] == "anomalous"
     assert result["triage_verdict"] == "likely-core-valkey-bug"
     assert result["root_cause_category"] == "split-brain"
-
-

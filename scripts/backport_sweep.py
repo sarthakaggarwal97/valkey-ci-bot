@@ -16,7 +16,6 @@ import json
 import logging
 import os
 import re
-import stat
 import subprocess
 import sys
 import tempfile
@@ -40,6 +39,7 @@ from scripts.backport_main import (
 from scripts.backport_models import BackportPRContext
 from scripts.cherry_pick import CherryPickExecutor
 from scripts.claude_conflict_resolver import resolve_conflicts_with_claude
+from scripts.git_auth import GitAuth, github_https_url
 from scripts.github_client import retry_github_call
 from scripts.publish_guard import check_publish_allowed
 
@@ -266,69 +266,70 @@ def _process_branch(
 ) -> BranchSweepResult:
     result = BranchSweepResult(target_branch=target_branch, candidates_found=len(candidates))
     tmpdir = tempfile.mkdtemp(prefix=f"backport-{target_branch}-")
-    git_env = _git_auth_env(tmpdir, github_token)
 
     try:
-        check_publish_allowed(target_repo=push_repo, action="git_push", context=f"{_BRANCH_PREFIX}/{target_branch}")
-        # Clone
-        clone_url = f"https://github.com/{repo_full_name}.git"
-        _run_git(tmpdir, "clone", "--branch", target_branch, clone_url, tmpdir, env=git_env)
-        _run_git(tmpdir, "config", "user.name", "valkey-ci-agent")
-        _run_git(tmpdir, "config", "user.email", "ci-agent@valkey.io")
+        with GitAuth(github_token, prefix="backport-sweep-git-askpass-") as git_auth:
+            git_env = git_auth.env()
+            check_publish_allowed(target_repo=push_repo, action="git_push", context=f"{_BRANCH_PREFIX}/{target_branch}")
+            # Clone
+            clone_url = github_https_url(repo_full_name)
+            _run_git(tmpdir, "clone", "--branch", target_branch, clone_url, tmpdir, env=git_env)
+            _run_git(tmpdir, "config", "user.name", "valkey-ci-agent")
+            _run_git(tmpdir, "config", "user.email", "ci-agent@valkey.io")
 
-        # Check for existing backport branch on push_repo
-        backport_branch = f"{_BRANCH_PREFIX}/{target_branch}"
-        existing_pr = _find_existing_pr(gh, push_repo, backport_branch)
+            # Check for existing backport branch on push_repo
+            backport_branch = f"{_BRANCH_PREFIX}/{target_branch}"
+            existing_pr = _find_existing_pr(gh, push_repo, backport_branch)
 
-        if existing_pr:
-            logger.info("Found existing PR #%d for %s, fetching branch...", existing_pr.number, target_branch)
-            push_url = f"https://github.com/{push_repo}.git"
-            _run_git(tmpdir, "remote", "add", "push_target", push_url)
-            _run_git(tmpdir, "fetch", "push_target", backport_branch, env=git_env)
-            _run_git(tmpdir, "checkout", f"push_target/{backport_branch}")
-            _run_git(tmpdir, "checkout", "-B", backport_branch)
-        else:
-            _run_git(tmpdir, "checkout", "-b", backport_branch)
-            push_url = f"https://github.com/{push_repo}.git"
-            _run_git(tmpdir, "remote", "add", "push_target", push_url)
+            if existing_pr:
+                logger.info("Found existing PR #%d for %s, fetching branch...", existing_pr.number, target_branch)
+                push_url = github_https_url(push_repo)
+                _run_git(tmpdir, "remote", "add", "push_target", push_url)
+                _run_git(tmpdir, "fetch", "push_target", backport_branch, env=git_env)
+                _run_git(tmpdir, "checkout", f"push_target/{backport_branch}")
+                _run_git(tmpdir, "checkout", "-B", backport_branch)
+            else:
+                _run_git(tmpdir, "checkout", "-b", backport_branch)
+                push_url = github_https_url(push_repo)
+                _run_git(tmpdir, "remote", "add", "push_target", push_url)
 
-        # Find already-applied PRs
-        already_applied = _list_already_applied(tmpdir, target_branch, backport_branch)
-        logger.info("Already applied on %s: %s", backport_branch, already_applied)
+            # Find already-applied PRs
+            already_applied = _list_already_applied(tmpdir, target_branch, backport_branch)
+            logger.info("Already applied on %s: %s", backport_branch, already_applied)
 
-        cherry_picker = CherryPickExecutor(tmpdir)
-        signer, _ = _resolve_commit_signer()
+            cherry_picker = CherryPickExecutor(tmpdir)
+            signer, _ = _resolve_commit_signer()
 
-        for candidate in candidates:
-            if str(candidate.source_pr_number) in already_applied:
-                result.results.append(CandidateResult(
-                    source_pr_number=candidate.source_pr_number,
-                    source_pr_title=candidate.source_pr_title,
-                    outcome="skipped-existing",
-                    detail="already on backport branch",
-                ))
-                continue
+            for candidate in candidates:
+                if str(candidate.source_pr_number) in already_applied:
+                    result.results.append(CandidateResult(
+                        source_pr_number=candidate.source_pr_number,
+                        source_pr_title=candidate.source_pr_title,
+                        outcome="skipped-existing",
+                        detail="already on backport branch",
+                    ))
+                    continue
 
-            cr = _apply_candidate(tmpdir, candidate, cherry_picker, signer, repo_full_name, git_env)
-            result.results.append(cr)
+                cr = _apply_candidate(tmpdir, candidate, cherry_picker, signer, repo_full_name, git_env)
+                result.results.append(cr)
 
-        # Push if we applied anything and validation passes.
-        applied = [r for r in result.results if r.outcome == "applied"]
-        if applied:
-            ok, output = _run_test_commands(tmpdir, test_commands)
-            if not ok:
-                for item in applied:
-                    item.outcome = "skipped-test"
-                    item.detail = output[:500]
-                logger.warning("Validation failed for %s; not pushing branch.", target_branch)
-                return result
-            check_publish_allowed(target_repo=push_repo, action="git_push", context=backport_branch)
-            _run_git(tmpdir, "push", "push_target", backport_branch, env=git_env)
-            logger.info("Pushed %d commit(s) to %s/%s", len(applied), push_repo, backport_branch)
+            # Push if we applied anything and validation passes.
+            applied = [r for r in result.results if r.outcome == "applied"]
+            if applied:
+                ok, output = _run_test_commands(tmpdir, test_commands)
+                if not ok:
+                    for item in applied:
+                        item.outcome = "skipped-test"
+                        item.detail = output[:500]
+                    logger.warning("Validation failed for %s; not pushing branch.", target_branch)
+                    return result
+                check_publish_allowed(target_repo=push_repo, action="git_push", context=backport_branch)
+                _run_git(tmpdir, "push", "push_target", backport_branch, env=git_env)
+                logger.info("Pushed %d commit(s) to %s/%s", len(applied), push_repo, backport_branch)
 
-            # Upsert PR
-            pr_url = _upsert_pr(gh, push_repo, target_branch, backport_branch, result, existing_pr)
-            result.pr_url = pr_url
+                # Upsert PR
+                pr_url = _upsert_pr(gh, push_repo, target_branch, backport_branch, result, existing_pr)
+                result.pr_url = pr_url
 
     except Exception as exc:
         logger.exception("Error processing branch %s: %s", target_branch, exc)
@@ -340,12 +341,6 @@ def _process_branch(
             detail=str(exc),
         ))
     finally:
-        askpass_script = git_env.get("GIT_ASKPASS")
-        if askpass_script:
-            try:
-                os.unlink(askpass_script)
-            except OSError:
-                pass
         import shutil
         shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -472,28 +467,6 @@ def _read_index_stage(repo_dir: str, path: str, stage: int) -> str:
     except Exception:
         pass
     return ""
-
-
-def _git_auth_env(repo_dir: str, github_token: str) -> dict[str, str]:
-    fd, askpass_script = tempfile.mkstemp(
-        prefix=f"{Path(repo_dir).name}.git-askpass-",
-        suffix=".sh",
-    )
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(
-            "#!/bin/sh\n"
-            "case \"$1\" in\n"
-            "  *Username*) echo x-access-token ;;\n"
-            "  *) echo \"$GIT_PASSWORD\" ;;\n"
-            "esac\n"
-        )
-    os.chmod(askpass_script, stat.S_IRWXU)
-    return {
-        **os.environ,
-        "GIT_ASKPASS": askpass_script,
-        "GIT_TERMINAL_PROMPT": "0",
-        "GIT_PASSWORD": github_token,
-    }
 
 
 def _run_test_commands(repo_dir: str, test_commands: list[str]) -> tuple[bool, str]:

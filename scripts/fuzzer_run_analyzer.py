@@ -8,9 +8,10 @@ import re
 from pathlib import Path
 from typing import Any
 
+from scripts.agent_runtime import run_agent
 from scripts.bedrock_retriever import BedrockRetriever
-from scripts.claude_code import run_claude_code
 from scripts.config import RetrievalConfig
+from scripts.fuzzer_incidents import compute_fuzzer_incident_fingerprint
 from scripts.log_retriever import LogRetriever
 from scripts.models import FuzzerRunAnalysis, FuzzerRunContext, FuzzerSignal
 from scripts.workflow_artifact_client import WorkflowArtifact, WorkflowArtifactClient
@@ -559,6 +560,33 @@ def _extract_metadata_from_log(context: FuzzerRunContext) -> None:
             context.seed = seed_match.group(1).strip()
 
 
+def _missing_artifact_fields(context: FuzzerRunContext) -> list[str]:
+    """Return required fuzzer evidence fields that were unavailable."""
+    missing: list[str] = []
+    if not context.scenario_id:
+        missing.append("scenario_id")
+    if not context.seed:
+        missing.append("seed")
+    if not context.tested_valkey_sha:
+        missing.append("tested_valkey_sha")
+    validation = (context.results or {}).get("final_validation")
+    if not isinstance(validation, dict):
+        missing.append("results.final_validation")
+    if not context.structured_logs and not context.node_logs and not context.raw_job_log:
+        missing.append("logs")
+    return missing
+
+
+def _failed_checks_from_context(context: FuzzerRunContext) -> list[object]:
+    validation = (context.results or {}).get("final_validation")
+    if not isinstance(validation, dict):
+        return []
+    failed_checks = validation.get("failed_checks")
+    if isinstance(failed_checks, list):
+        return failed_checks
+    return []
+
+
 def _load_context_from_artifacts(
     context: FuzzerRunContext,
     artifact_files: dict[str, bytes],
@@ -783,6 +811,7 @@ def _invoke_claude_code(
             "source line numbers as exact commit evidence."
         )
     )
+    missing_fields = _missing_artifact_fields(context)
     prompt_parts = [
         system_prompt,
         "",
@@ -803,6 +832,7 @@ def _invoke_claude_code(
         f"Scenario ID: {context.scenario_id or 'unknown'}",
         f"Seed: {context.seed or 'unknown'}",
         f"Tested Valkey commit: {context.tested_valkey_sha or 'unknown'}",
+        f"Evidence quality: {'degraded' if missing_fields else 'complete'}",
         "",
         "## Source code",
         source_note,
@@ -833,6 +863,13 @@ def _invoke_claude_code(
         prompt_parts.append("## Pre-computed deterministic findings")
         prompt_parts.append(deterministic_summary)
         prompt_parts.append("")
+    if missing_fields:
+        prompt_parts.append("## Missing artifact fields")
+        prompt_parts.append(
+            "The following required fields were missing, so lower confidence when "
+            "classifying root cause: " + ", ".join(missing_fields)
+        )
+        prompt_parts.append("")
 
     if retrieved_context:
         prompt_parts.append(retrieved_context)
@@ -858,13 +895,11 @@ def _invoke_claude_code(
 
     prompt = "\n".join(prompt_parts)
     logger.info("Calling Claude Code for fuzzer run %s...", context.run_id)
-    stdout, stderr, rc = run_claude_code(
-        prompt, cwd=str(artifact_dir), timeout=1200,
-        allowed_tools="Read,Grep,Glob",
-    )
+    agent_result = run_agent("fuzzer_analysis_readonly", prompt, cwd=str(artifact_dir))
+    stdout = agent_result.stdout
     logger.info(
         "Claude Code returned for run %s (rc=%d, %d chars).",
-        context.run_id, rc, len(stdout),
+        context.run_id, agent_result.returncode, len(stdout),
     )
     # Claude Code with --output-format stream-json returns JSONL.
     # Extract the final result text from the stream.
@@ -1083,6 +1118,15 @@ class FuzzerRunAnalyzer:
         summary = str(model_payload.get("summary") or "").strip()
         if not summary:
             summary = _fallback_summary(context, merged_anomalies, merged_normal_signals)
+        missing_fields = _missing_artifact_fields(context)
+        evidence_quality = "degraded" if missing_fields else "complete"
+        incident_fingerprint = compute_fuzzer_incident_fingerprint(
+            repo=context.repo,
+            workflow_file=context.workflow_file,
+            root_cause_category=root_cause_category,
+            anomalies=merged_anomalies,
+            failed_checks=_failed_checks_from_context(context),
+        )
 
         return FuzzerRunAnalysis(
             repo=context.repo,
@@ -1105,4 +1149,8 @@ class FuzzerRunAnalyzer:
             raw_log_fallback_used=context.raw_log_fallback_used,
             triage_verdict=triage_verdict,
             suggested_labels=_suggested_labels_for_triage(triage_verdict),
+            tested_valkey_sha=context.tested_valkey_sha,
+            incident_fingerprint=incident_fingerprint,
+            evidence_quality=evidence_quality,
+            missing_artifact_fields=missing_fields,
         )

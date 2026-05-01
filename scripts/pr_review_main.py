@@ -6,7 +6,6 @@ import argparse
 import logging
 import os
 import re
-import stat
 import sys
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -24,6 +23,7 @@ from scripts.claude_reviewer import summarize_pr as claude_summarize_pr
 from scripts.comment_publisher import CommentPublisher
 from scripts.config import ReviewerConfig, load_reviewer_config, load_reviewer_config_text
 from scripts.event_ledger import EventLedger
+from scripts.git_auth import GitAuth, github_https_url
 from scripts.models import PullRequestContext, ReviewState, SummaryResult
 from scripts.path_filter import PathFilter
 from scripts.permission_gate import PermissionGate
@@ -168,25 +168,6 @@ def _select_chat_paths(
     return set(selected_paths[: min(5, len(selected_paths))])
 
 
-def _git_auth_env(token: str, askpass_path: Path) -> dict[str, str]:
-    """Build git auth env without embedding the token in remote URLs."""
-    askpass_path.write_text(
-        "#!/bin/sh\n"
-        "case \"$1\" in\n"
-        "  *Username*) echo x-access-token ;;\n"
-        "  *) echo \"$GIT_PASSWORD\" ;;\n"
-        "esac\n",
-        encoding="utf-8",
-    )
-    askpass_path.chmod(stat.S_IRWXU)
-    return {
-        **os.environ,
-        "GIT_ASKPASS": str(askpass_path),
-        "GIT_TERMINAL_PROMPT": "0",
-        "GIT_PASSWORD": token,
-    }
-
-
 def _clone_pr_checkout(
     *,
     repo_name: str,
@@ -198,10 +179,9 @@ def _clone_pr_checkout(
     """Clone the target repository and check out the PR head."""
     import subprocess
 
-    askpass_path = Path(dest_dir).with_name(f"{Path(dest_dir).name}.askpass.sh")
-    env = _git_auth_env(token, askpass_path)
-    try:
-        clone_url = f"https://github.com/{repo_name}.git"
+    with GitAuth(token, prefix="pr-review-git-askpass-") as git_auth:
+        env = git_auth.env()
+        clone_url = github_https_url(repo_name)
         subprocess.run(
             ["git", "clone", "--filter=blob:none", "--branch", base_ref or "unstable", clone_url, dest_dir],
             capture_output=True, text=True, timeout=120, check=True, env=env,
@@ -214,11 +194,6 @@ def _clone_pr_checkout(
             ["git", "checkout", "pr-head"],
             cwd=dest_dir, capture_output=True, text=True, timeout=30, check=True, env=env,
         )
-    finally:
-        try:
-            askpass_path.unlink()
-        except OSError:
-            pass
 
 
 def _build_parser() -> argparse.ArgumentParser:

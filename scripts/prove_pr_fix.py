@@ -9,7 +9,6 @@ import os
 import sys
 from pathlib import Path
 from urllib import error as urllib_error
-from urllib import parse as urllib_parse
 from urllib import request as urllib_request
 
 if __package__ in {None, ""}:
@@ -21,6 +20,7 @@ from github.GithubException import GithubException
 from scripts.config import load_config
 from scripts.event_ledger import EventLedger
 from scripts.failure_store import FailureStore
+from scripts.git_auth import GitAuth, github_https_url
 from scripts.github_client import retry_github_call
 from scripts.models import FailureReport, ValidationResult, failure_report_from_dict
 from scripts.pr_manager import upsert_pull_request
@@ -32,9 +32,12 @@ _COMMENT_MARKER_PREFIX = "<!-- ci-agent-proof:"
 
 
 def _build_clone_url(repo_full_name: str, token: str) -> str:
-    """Return an HTTPS clone URL with embedded token auth."""
-    safe_token = urllib_parse.quote(token, safe="")
-    return f"https://x-access-token:{safe_token}@github.com/{repo_full_name}.git"
+    """Return an HTTPS clone URL.
+
+    Token-bearing URLs are intentionally no longer used by subprocess
+    callers; pass ``GitAuth.env()`` alongside this URL instead.
+    """
+    return github_https_url(repo_full_name)
 
 
 def _proof_run_url() -> str:
@@ -334,13 +337,15 @@ def run_proof_campaign(args: argparse.Namespace) -> dict[str, object]:
     failure_store.save()
     event_ledger.save()
 
-    runner = ValidationRunner(
-        config,
-        repo_clone_url=_build_clone_url(args.repo, args.token),
-        github_client=target_gh,
-        repo_full_name=args.repo,
-    )
-    result = runner.validate("", report, repeat_count=max(1, args.repeat_count))
+    with GitAuth(args.token, prefix="proof-validation-git-askpass-") as git_auth:
+        runner = ValidationRunner(
+            config,
+            repo_clone_url=_build_clone_url(args.repo, args.token),
+            repo_clone_env=git_auth.env(),
+            github_client=target_gh,
+            repo_full_name=args.repo,
+        )
+        result = runner.validate("", report, repeat_count=max(1, args.repeat_count))
     summary = _summarize_validation(result, max(1, args.repeat_count))
 
     marked_ready = False

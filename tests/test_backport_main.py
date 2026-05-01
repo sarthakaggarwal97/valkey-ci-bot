@@ -288,6 +288,8 @@ class TestRunBackportCleanCherryPick:
             files_resolved=0,
             files_unresolved=0,
             total_tokens_used=0,
+            risk_level="medium",
+            risk_reasons="target branch `8.1` is an older release line",
         )
         _mock_event_ledger.save.assert_called_once()
 

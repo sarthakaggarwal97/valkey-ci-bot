@@ -17,8 +17,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from scripts.agent_runtime import run_agent
 from scripts.ci_validator import dispatch_validation, poll_run
-from scripts.claude_code import run_claude_code
+from scripts.git_auth import GitAuth, github_https_url
 
 if TYPE_CHECKING:
     from scripts.models import FailureReport, RootCauseReport
@@ -61,13 +62,19 @@ def run_fix_loop(
 
     # Clone the repo once for Claude Code to read files from.
     own_tmpdir = None
-    if not repo_checkout:
-        own_tmpdir = tempfile.mkdtemp(prefix="valkey-fix-")
-        clone_url = f"https://x-access-token:{fork_token}@github.com/{fork_repo}.git"
-        _run(["git", "clone", "--depth", "50", "--branch", "unstable", clone_url, own_tmpdir])
-        repo_checkout = own_tmpdir
+    git_auth: GitAuth | None = None
 
     try:
+        if not repo_checkout:
+            own_tmpdir = tempfile.mkdtemp(prefix="valkey-fix-")
+            git_auth = GitAuth(fork_token, prefix="fix-loop-git-askpass-")
+            git_auth.__enter__()
+            _run(
+                ["git", "clone", "--depth", "50", "--branch", "unstable", github_https_url(fork_repo), own_tmpdir],
+                env=git_auth.env(),
+            )
+            repo_checkout = own_tmpdir
+
         for attempt in range(1, max_attempts + 1):
             logger.info(
                 "Fix attempt %d/%d for %s (branch=%s).",
@@ -95,7 +102,11 @@ def run_fix_loop(
                 _run(["git", "checkout", "-B", branch_name], cwd=repo_checkout)
                 _run(["git", "add", "-A"], cwd=repo_checkout)
                 _run(["git", "commit", "-m", msg, "--allow-empty"], cwd=repo_checkout)
-                _run(["git", "push", "--force", "origin", branch_name], cwd=repo_checkout)
+                _run(
+                    ["git", "push", "--force", "origin", branch_name],
+                    cwd=repo_checkout,
+                    env=git_auth.env() if git_auth else None,
+                )
                 logger.info("Pushed fix to %s/%s.", fork_repo, branch_name)
             except Exception as exc:
                 logger.error("Push failed (attempt %d): %s", attempt, exc)
@@ -169,6 +180,8 @@ def run_fix_loop(
             last_error=validation_error,
         )
     finally:
+        if git_auth is not None:
+            git_auth.cleanup()
         if own_tmpdir:
             import shutil
             shutil.rmtree(own_tmpdir, ignore_errors=True)
@@ -218,8 +231,12 @@ def _generate_fix(
         _run(["git", "checkout", "."], cwd=cwd)
 
         # Let Claude edit files
-        stdout, stderr, rc = run_claude_code(prompt, cwd=cwd)
-        logger.info("Claude fix generation output (%d chars):\n%s", len(stdout), stdout[:1500])
+        agent_result = run_agent("fix_generate_patch", prompt, cwd=cwd)
+        logger.info(
+            "Claude fix generation output (%d chars):\n%s",
+            len(agent_result.stdout),
+            agent_result.stdout[:1500],
+        )
 
         # Capture the diff from git
         result = subprocess.run(
@@ -242,27 +259,35 @@ def _push_patch_to_branch(
 ) -> None:
     """Clone, apply patch, push to branch."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        clone_url = f"https://x-access-token:{token}@github.com/{repo}.git"
-        _run(["git", "clone", "--depth", "1", "--branch", "unstable", clone_url, tmpdir])
-        _run(["git", "checkout", "-B", branch], cwd=tmpdir)
+        with GitAuth(token, prefix="fix-push-git-askpass-") as git_auth:
+            git_env = git_auth.env()
+            _run(
+                ["git", "clone", "--depth", "1", "--branch", "unstable", github_https_url(repo), tmpdir],
+                env=git_env,
+            )
+            _run(["git", "checkout", "-B", branch], cwd=tmpdir)
 
-        patch_file = Path(tmpdir) / "fix.patch"
-        patch_file.write_text(patch)
-        result = subprocess.run(
-            ["git", "apply", "--check", str(patch_file)],
-            cwd=tmpdir, capture_output=True, text=True,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"Patch doesn't apply: {result.stderr[:500]}")
-        _run(["git", "apply", str(patch_file)], cwd=tmpdir)
-        _run(["git", "add", "-A"], cwd=tmpdir)
-        _run(["git", "commit", "-m", commit_message, "--allow-empty"], cwd=tmpdir)
-        _run(["git", "push", "--force", "origin", branch], cwd=tmpdir)
+            patch_file = Path(tmpdir) / "fix.patch"
+            patch_file.write_text(patch)
+            result = subprocess.run(
+                ["git", "apply", "--check", str(patch_file)],
+                cwd=tmpdir, capture_output=True, text=True,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(f"Patch doesn't apply: {result.stderr[:500]}")
+            _run(["git", "apply", str(patch_file)], cwd=tmpdir)
+            _run(["git", "add", "-A"], cwd=tmpdir)
+            _run(["git", "commit", "-m", commit_message, "--allow-empty"], cwd=tmpdir)
+            _run(["git", "push", "--force", "origin", branch], cwd=tmpdir, env=git_env)
         logger.info("Pushed fix to %s/%s.", repo, branch)
 
 
-def _run(cmd: list[str], cwd: str | None = None) -> None:
-    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+def _run(
+    cmd: list[str],
+    cwd: str | None = None,
+    env: dict[str, str] | None = None,
+) -> None:
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, env=env)
     if result.returncode != 0:
         raise RuntimeError(f"{' '.join(cmd[:4])}: {result.stderr[:500]}")
 

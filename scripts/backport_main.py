@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import stat
 import subprocess
 import sys
 import tempfile
@@ -29,6 +28,7 @@ from scripts.backport_models import (
     ResolutionResult,
 )
 from scripts.backport_pr_creator import BackportPRCreator
+from scripts.backport_risk import assess_backport_risk
 from scripts.backport_utils import build_branch_name
 from scripts.cherry_pick import CherryPickExecutor
 from scripts.claude_conflict_resolver import resolve_conflicts_with_claude
@@ -39,6 +39,7 @@ from scripts.commit_signoff import (
 )
 from scripts.config import BotConfig
 from scripts.event_ledger import EventLedger
+from scripts.git_auth import GitAuth, github_https_url
 from scripts.github_client import retry_github_call
 from scripts.publish_guard import check_publish_allowed
 from scripts.rate_limiter import RateLimiter
@@ -79,6 +80,10 @@ def build_summary(result: BackportResult) -> str:
         f"- Files unresolved: {result.files_unresolved}",
         f"- Total tokens used: {result.total_tokens_used}",
     ]
+    if result.risk_level:
+        lines.append(f"- Backport risk: `{result.risk_level}`")
+    if result.risk_reasons:
+        lines.append("- Risk signals: " + "; ".join(result.risk_reasons[:4]))
     return "\n".join(lines)
 
 
@@ -139,7 +144,6 @@ def run_backport(
         target_branch=target_branch,
     )
     rate_limiter: RateLimiter | None = None
-    git_auth_paths: set[str] = set()
     try:
         try:
             signer, require_dco_signoff = _resolve_commit_signer()
@@ -307,119 +311,133 @@ def run_backport(
         logger.info("Executing cherry-pick onto %s.", target_branch)
         branch_name = build_branch_name(source_pr_number, target_branch)
         with tempfile.TemporaryDirectory() as tmp_dir:
-            # Clone the repo with full history for cherry-pick
-            git_env = _clone_repo(
-                repo_full_name,
-                github_token,
-                tmp_dir,
-                target_branch,
-                signer=signer,
-            )
-            git_auth_paths.add(git_env["GIT_ASKPASS"])
-
-            # Create the backport branch locally from target branch HEAD
-            _run_git(tmp_dir, "checkout", "-b", branch_name)
-
-            executor = CherryPickExecutor(tmp_dir)
-
-            try:
-                cherry_result = executor.execute(
-                    branch_name, merge_commit_sha, commits,
-                )
-            except Exception as exc:
-                msg = f"Cherry-pick failed: {exc}"
-                logger.error(msg)
-                _post_comment(repo, source_pr_number, f"Backport failed: {msg}")
-                event_ledger.record(
-                    "backport.failed",
-                    subject,
-                    phase="cherry-pick",
-                    error=msg,
-                )
-                return BackportResult(outcome="error", error_message=msg)
-
-            # ---- Step 6: Conflict resolution ----
-            resolution_results = None
-            total_tokens = 0
-            if not cherry_result.success and cherry_result.conflicting_files:
-                logger.info(
-                    "Cherry-pick produced %d conflict(s). Invoking conflict resolver.",
-                    len(cherry_result.conflicting_files),
-                )
-                event_ledger.record(
-                    "backport.conflicts_detected",
-                    subject,
-                    conflicting_files=len(cherry_result.conflicting_files),
-                )
-                resolution_results = resolve_conflicts_with_claude(
+            with GitAuth(github_token, prefix="backport-git-askpass-") as git_auth:
+                git_env = git_auth.env()
+                # Clone the repo with full history for cherry-pick
+                _clone_repo(
+                    repo_full_name,
                     tmp_dir,
-                    cherry_result.conflicting_files,
-                    pr_context,
+                    target_branch,
+                    signer=signer,
+                    git_env=git_env,
                 )
-                total_tokens = 0  # Claude Code manages its own budget
-                unresolved = [
-                    r for r in resolution_results
-                    if r.resolved_content is None
-                ]
-                if unresolved:
-                    files_resolved = len(resolution_results) - len(unresolved)
-                    files_unresolved = len(unresolved)
-                    result = BackportResult(
-                        outcome="conflicts-unresolved",
-                        commits_cherry_picked=len(cherry_result.applied_commits),
-                        files_conflicted=len(cherry_result.conflicting_files),
-                        files_resolved=files_resolved,
-                        files_unresolved=files_unresolved,
-                        total_tokens_used=total_tokens,
-                        error_message=(
-                            "Unresolved conflict(s): "
-                            + ", ".join(r.path for r in unresolved)
-                        ),
+
+                # Create the backport branch locally from target branch HEAD
+                _run_git(tmp_dir, "checkout", "-b", branch_name)
+
+                executor = CherryPickExecutor(tmp_dir)
+
+                try:
+                    cherry_result = executor.execute(
+                        branch_name, merge_commit_sha, commits,
                     )
-                    summary_text = build_summary(result)
-                    _post_comment(
-                        repo,
-                        source_pr_number,
-                        "## Backport Result\n\n"
-                        "Backport could not be completed automatically.\n\n"
-                        f"### Overview\n{summary_text}",
+                except Exception as exc:
+                    msg = f"Cherry-pick failed: {exc}"
+                    logger.error(msg)
+                    _post_comment(repo, source_pr_number, f"Backport failed: {msg}")
+                    event_ledger.record(
+                        "backport.failed",
+                        subject,
+                        phase="cherry-pick",
+                        error=msg,
+                    )
+                    return BackportResult(outcome="error", error_message=msg)
+
+                # ---- Step 6: Conflict resolution ----
+                resolution_results = None
+                total_tokens = 0
+                if not cherry_result.success and cherry_result.conflicting_files:
+                    logger.info(
+                        "Cherry-pick produced %d conflict(s). Invoking conflict resolver.",
+                        len(cherry_result.conflicting_files),
                     )
                     event_ledger.record(
-                        "backport.conflicts_unresolved",
+                        "backport.conflicts_detected",
                         subject,
-                        files_resolved=files_resolved,
-                        files_unresolved=files_unresolved,
-                        unresolved_files=",".join(r.path for r in unresolved),
+                        conflicting_files=len(cherry_result.conflicting_files),
                     )
-                    emit_job_summary(
-                        f"## Backport Result: conflicts-unresolved\n\n"
-                        f"- Source PR: #{source_pr_number}\n"
-                        f"- Target branch: `{target_branch}`\n\n"
-                        f"### Overview\n{summary_text}"
+                    resolution_results = resolve_conflicts_with_claude(
+                        tmp_dir,
+                        cherry_result.conflicting_files,
+                        pr_context,
                     )
-                    return result
+                    total_tokens = 0  # Claude Code manages its own budget
+                    unresolved = [
+                        r for r in resolution_results
+                        if r.resolved_content is None
+                    ]
+                    if unresolved:
+                        risk = assess_backport_risk(
+                            pr_context,
+                            had_conflicts=True,
+                            resolution_results=resolution_results,
+                        )
+                        files_resolved = len(resolution_results) - len(unresolved)
+                        files_unresolved = len(unresolved)
+                        result = BackportResult(
+                            outcome="conflicts-unresolved",
+                            commits_cherry_picked=len(cherry_result.applied_commits),
+                            files_conflicted=len(cherry_result.conflicting_files),
+                            files_resolved=files_resolved,
+                            files_unresolved=files_unresolved,
+                            total_tokens_used=total_tokens,
+                            risk_level=risk.level,
+                            risk_reasons=risk.reasons,
+                            error_message=(
+                                "Unresolved conflict(s): "
+                                + ", ".join(r.path for r in unresolved)
+                            ),
+                        )
+                        summary_text = build_summary(result)
+                        _post_comment(
+                            repo,
+                            source_pr_number,
+                            "## Backport Result\n\n"
+                            "Backport could not be completed automatically.\n\n"
+                            f"### Overview\n{summary_text}",
+                        )
+                        event_ledger.record(
+                            "backport.conflicts_unresolved",
+                            subject,
+                            files_resolved=files_resolved,
+                            files_unresolved=files_unresolved,
+                            unresolved_files=",".join(r.path for r in unresolved),
+                            risk_level=risk.level,
+                            risk_reasons="; ".join(risk.reasons),
+                        )
+                        emit_job_summary(
+                            f"## Backport Result: conflicts-unresolved\n\n"
+                            f"- Source PR: #{source_pr_number}\n"
+                            f"- Target branch: `{target_branch}`\n\n"
+                            f"### Overview\n{summary_text}"
+                        )
+                        return result
 
-                # Apply resolved files to the working tree and commit
-                _apply_resolutions(
-                    tmp_dir,
-                    resolution_results,
-                    signer=signer,
-                    require_dco_signoff=require_dco_signoff,
-                )
+                    # Apply resolved files to the working tree and commit
+                    _apply_resolutions(
+                        tmp_dir,
+                        resolution_results,
+                        signer=signer,
+                        require_dco_signoff=require_dco_signoff,
+                    )
 
-            # Push the backport branch to the remote
-            push_target = push_repo or repo_full_name
-            if push_repo and push_repo != repo_full_name:
-                fork_url = f"https://x-access-token@github.com/{push_repo}.git"
-                _run_git(tmp_dir, "remote", "add", "fork", fork_url, env=git_env)
-                logger.info("Pushing branch %s to fork %s.", branch_name, push_repo)
-                _run_git(tmp_dir, "push", "fork", branch_name, env=git_env)
-            else:
-                logger.info("Pushing branch %s to origin.", branch_name)
-                _run_git(tmp_dir, "push", "origin", branch_name, env=git_env)
+                # Push the backport branch to the remote
+                if push_repo and push_repo != repo_full_name:
+                    fork_url = github_https_url(push_repo)
+                    _run_git(tmp_dir, "remote", "add", "fork", fork_url, env=git_env)
+                    logger.info("Pushing branch %s to fork %s.", branch_name, push_repo)
+                    _run_git(tmp_dir, "push", "fork", branch_name, env=git_env)
+                else:
+                    logger.info("Pushing branch %s to origin.", branch_name)
+                    _run_git(tmp_dir, "push", "origin", branch_name, env=git_env)
 
         # ---- Step 7: Create backport PR (Req 4.6) ----
         logger.info("Creating backport PR.")
+        risk = assess_backport_risk(
+            pr_context,
+            had_conflicts=not cherry_result.success,
+            resolution_results=resolution_results,
+        )
         try:
             backport_pr_url = pr_creator.create_backport_pr(
                 pr_context, cherry_result, resolution_results, branch_name,
@@ -456,6 +474,8 @@ def run_backport(
             files_resolved=files_resolved,
             files_unresolved=files_unresolved,
             total_tokens_used=total_tokens,
+            risk_level=risk.level,
+            risk_reasons=risk.reasons,
         )
 
         # ---- Step 8: Post summary comment on source PR (Req 9.2) ----
@@ -480,6 +500,8 @@ def run_backport(
             files_resolved=result.files_resolved,
             files_unresolved=result.files_unresolved,
             total_tokens_used=result.total_tokens_used,
+            risk_level=result.risk_level,
+            risk_reasons="; ".join(result.risk_reasons),
         )
 
         # ---- Step 10: Emit GitHub Actions job summary (Req 9.4) ----
@@ -504,11 +526,6 @@ def run_backport(
         )
         return BackportResult(outcome="error", error_message=str(exc))
     finally:
-        for auth_path in git_auth_paths:
-            try:
-                os.unlink(auth_path)
-            except OSError:
-                pass
         if rate_limiter is not None:
             rate_limiter.save()
         event_ledger.save()
@@ -544,11 +561,11 @@ def _post_comment(repo: object, pr_number: int, body: str) -> None:
 
 def _clone_repo(
     repo_full_name: str,
-    github_token: str,
     dest_dir: str,
     target_branch: str,
     *,
     signer: CommitSigner,
+    git_env: dict[str, str],
 ) -> dict[str, str]:
     """Clone the repository with full history into *dest_dir*.
 
@@ -558,39 +575,15 @@ def _clone_repo(
     """
     logger.info("Cloning %s into %s.", repo_full_name, dest_dir)
 
-    # Write a small credential-helper script that supplies the token.
-    # This keeps the token out of .git/config remote URLs while still
-    # allowing subsequent git operations (push, fetch) to authenticate.
-    askpass_script = str(
-        Path(dest_dir).with_name(f"{Path(dest_dir).name}.git-askpass.sh")
+    clone_url = github_https_url(repo_full_name)
+    subprocess.run(
+        ["git", "clone", "--no-single-branch", "--branch", target_branch, clone_url, "."],
+        cwd=dest_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+        env=git_env,
     )
-    with open(askpass_script, "w", encoding="utf-8") as f:
-        f.write('#!/bin/sh\necho "$GIT_PASSWORD"\n')
-    os.chmod(askpass_script, stat.S_IRWXU)
-
-    env = {
-        **os.environ,
-        "GIT_ASKPASS": askpass_script,
-        "GIT_TERMINAL_PROMPT": "0",
-        "GIT_PASSWORD": github_token,
-    }
-
-    clone_url = f"https://x-access-token@github.com/{repo_full_name}.git"
-    try:
-        subprocess.run(
-            ["git", "clone", "--no-single-branch", "--branch", target_branch, clone_url, "."],
-            cwd=dest_dir,
-            check=True,
-            capture_output=True,
-            text=True,
-            env=env,
-        )
-    except Exception:
-        try:
-            os.unlink(askpass_script)
-        except OSError:
-            pass
-        raise
     # Configure git identity for cherry-pick commits
     user_name = signer.name if signer.configured else "valkey-ci-agent"
     user_email = (
@@ -613,9 +606,9 @@ def _clone_repo(
         check=True,
         capture_output=True,
         text=True,
-        env=env,
+        env=git_env,
     )
-    return env
+    return git_env
 
 
 def _run_git(repo_dir: str, *args: str, env: dict[str, str] | None = None) -> None:

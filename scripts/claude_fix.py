@@ -14,7 +14,8 @@ import subprocess
 import tempfile
 from typing import TYPE_CHECKING, Any
 
-from scripts.claude_code import run_claude_code
+from scripts.agent_runtime import run_agent
+from scripts.git_auth import GitAuth, github_https_url
 from scripts.issue_tracker import create_or_update_issue
 from scripts.log_retriever import LogRetriever
 from scripts.models import FailureReport, ParsedFailure
@@ -69,11 +70,15 @@ def fix_from_log(
 
     tmpdir = tempfile.mkdtemp(prefix="valkey-fix-")
     try:
-        clone_url = f"https://x-access-token:{fork_token}@github.com/{fork_repo}.git"
         try:
-            _run(["git", "clone", "--depth", "50", "--branch", target_branch, clone_url, tmpdir])
-            _run(["git", "config", "user.name", "valkey-ci-agent"], cwd=tmpdir)
-            _run(["git", "config", "user.email", "ci-agent@valkey.io"], cwd=tmpdir)
+            with GitAuth(fork_token, prefix="claude-fix-git-askpass-") as git_auth:
+                git_env = git_auth.env()
+                _run(
+                    ["git", "clone", "--depth", "50", "--branch", target_branch, github_https_url(fork_repo), tmpdir],
+                    env=git_env,
+                )
+                _run(["git", "config", "user.name", "valkey-ci-agent"], cwd=tmpdir)
+                _run(["git", "config", "user.email", "ci-agent@valkey.io"], cwd=tmpdir)
         except Exception as exc:
             logger.error("Clone failed: %s", exc)
             result["error"] = str(exc)
@@ -88,8 +93,10 @@ def fix_from_log(
         )
 
         logger.info("Calling Claude Code for %s (log=%d chars)...", job_name, len(log_text))
-        stdout, stderr, rc = run_claude_code(prompt, cwd=tmpdir)
-        result["claude_exit_code"] = rc
+        agent_result = run_agent("fix_generate_patch", prompt, cwd=tmpdir)
+        stdout = agent_result.stdout
+        stderr = agent_result.stderr
+        result["claude_exit_code"] = agent_result.returncode
         logger.info(
             "Claude output for %s (%d chars stdout, %d chars stderr):\n%s",
             job_name,
@@ -111,20 +118,22 @@ def fix_from_log(
                 tracking_failures,
                 job_name,
                 run_url,
-                _format_no_fix_comment(stdout, stderr, rc),
+                _format_no_fix_comment(stdout, stderr, agent_result.returncode),
             )
             result["outcome"] = "no-fix-generated"
-            result["error"] = f"claude exited {rc} without editing files"
+            result["error"] = f"claude exited {agent_result.returncode} without editing files"
             return result
 
         logger.info("Claude produced %d-line diff for %s.", patch.count("\n"), job_name)
 
         branch_name = f"bot/fix/{_slugify(job_name)[:44]}-{(base_sha or 'unknown')[:8]}"
         try:
-            _run(["git", "checkout", "-B", branch_name], cwd=tmpdir)
-            _run(["git", "add", "-A"], cwd=tmpdir)
-            _run(["git", "commit", "-m", f"[bot-fix] Fix {job_name}"], cwd=tmpdir)
-            _run(["git", "push", "--force", "origin", branch_name], cwd=tmpdir)
+            with GitAuth(fork_token, prefix="claude-fix-push-askpass-") as git_auth:
+                git_env = git_auth.env()
+                _run(["git", "checkout", "-B", branch_name], cwd=tmpdir)
+                _run(["git", "add", "-A"], cwd=tmpdir)
+                _run(["git", "commit", "-m", f"[bot-fix] Fix {job_name}"], cwd=tmpdir)
+                _run(["git", "push", "--force", "origin", branch_name], cwd=tmpdir, env=git_env)
             logger.info("Pushed fix to %s/%s.", fork_repo, branch_name)
         except Exception as exc:
             logger.error("Push failed for %s: %s", job_name, exc)
@@ -416,7 +425,11 @@ def _slugify(value: str) -> str:
     return slug or "job"
 
 
-def _run(cmd: list[str], cwd: str | None = None) -> None:
-    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+def _run(
+    cmd: list[str],
+    cwd: str | None = None,
+    env: dict[str, str] | None = None,
+) -> None:
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, env=env)
     if result.returncode != 0:
         raise RuntimeError(f"{' '.join(cmd[:4])}: {result.stderr[:500]}")

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from scripts.backport_models import BackportPRContext, ConflictedFile
@@ -21,6 +22,10 @@ def _pr_context() -> BackportPRContext:
         commits=["abc123"],
         repo_full_name="valkey-io/valkey",
     )
+
+
+def _agent_result(stdout: str, stderr: str = "", rc: int = 0):
+    return SimpleNamespace(stdout=stdout, stderr=stderr, returncode=rc)
 
 
 def test_whitespace_only_conflict_skips_claude(tmp_path: Path) -> None:
@@ -51,13 +56,13 @@ def test_claude_resolves_conflict(tmp_path: Path) -> None:
     )
 
     # Mock Claude Code to edit the file (simulate resolution)
-    def mock_claude(prompt, **kw):
+    def mock_agent(_profile, prompt, **kw):
         # Simulate Claude editing the file
         conflicted.write_text("new code\n")
         result_event = json.dumps({"type": "result", "result": "Resolved conflict in src/cluster.c"})
-        return f'{{"type":"system","subtype":"init"}}\n{result_event}', "", 0
+        return _agent_result(f'{{"type":"system","subtype":"init"}}\n{result_event}')
 
-    with patch("scripts.claude_conflict_resolver.run_claude_code", side_effect=mock_claude):
+    with patch("scripts.claude_conflict_resolver.run_agent", side_effect=mock_agent):
         results = resolve_conflicts_with_claude(str(tmp_path), [cf], _pr_context())
 
     assert len(results) == 1
@@ -79,11 +84,11 @@ def test_unresolved_conflict_returns_none(tmp_path: Path) -> None:
     )
 
     # Mock Claude Code that fails to resolve (markers remain)
-    def mock_claude(prompt, **kw):
+    def mock_agent(_profile, prompt, **kw):
         # Claude didn't edit the file — markers remain
-        return '{"type":"result","result":"I could not resolve this"}', "", 0
+        return _agent_result('{"type":"result","result":"I could not resolve this"}')
 
-    with patch("scripts.claude_conflict_resolver.run_claude_code", side_effect=mock_claude):
+    with patch("scripts.claude_conflict_resolver.run_agent", side_effect=mock_agent):
         results = resolve_conflicts_with_claude(str(tmp_path), [cf], _pr_context())
 
     assert len(results) == 1
@@ -110,11 +115,11 @@ def test_mixed_whitespace_and_real_conflicts(tmp_path: Path) -> None:
         source_branch_content="new",
     )
 
-    def mock_claude(prompt, **kw):
+    def mock_agent(_profile, prompt, **kw):
         real_conflict.write_text("new\n")
-        return '{"type":"result","result":"Resolved"}', "", 0
+        return _agent_result('{"type":"result","result":"Resolved"}')
 
-    with patch("scripts.claude_conflict_resolver.run_claude_code", side_effect=mock_claude):
+    with patch("scripts.claude_conflict_resolver.run_agent", side_effect=mock_agent):
         results = resolve_conflicts_with_claude(str(tmp_path), [ws_file, real_file], _pr_context())
 
     assert len(results) == 2
