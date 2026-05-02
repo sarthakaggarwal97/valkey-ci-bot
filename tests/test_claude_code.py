@@ -54,6 +54,8 @@ def test_run_claude_code_streams_json_and_uses_bedrock_env(monkeypatch, caplog):
         return captured["process"]
 
     monkeypatch.delenv("AWS_REGION", raising=False)
+    monkeypatch.delenv("CI_AGENT_CLAUDE_MODEL", raising=False)
+    monkeypatch.delenv("CI_AGENT_CLAUDE_BEDROCK_OPUS_MODEL", raising=False)
     monkeypatch.setattr(claude_code.subprocess, "Popen", fake_popen)
 
     with caplog.at_level(logging.INFO, logger="scripts.claude_code"):
@@ -63,9 +65,9 @@ def test_run_claude_code_streams_json_and_uses_bedrock_env(monkeypatch, caplog):
     assert stderr == ""
     assert rc == 0
     assert captured["process"].stdin.getvalue() == "fix this"
-    assert captured["cmd"][:4] == ["claude", "--print", "--max-turns", "80"]
+    assert captured["cmd"][:4] == ["claude", "--print", "--max-turns", "200"]
     assert captured["cmd"][captured["cmd"].index("--model") + 1] == "opus"
-    assert captured["cmd"][captured["cmd"].index("--effort") + 1] == "high"
+    assert captured["cmd"][captured["cmd"].index("--effort") + 1] == "max"
     assert captured["cmd"][captured["cmd"].index("--output-format") + 1] == "stream-json"
     assert "--verbose" in captured["cmd"]
     allowed_tools = captured["cmd"][captured["cmd"].index("--allowedTools") + 1]
@@ -89,6 +91,7 @@ def test_run_claude_code_preserves_existing_region_and_model(monkeypatch):
         return _FakeProcess(cmd, stdout_text='{"type":"result","result":"ok"}\n', **kwargs)
 
     monkeypatch.setenv("AWS_REGION", "us-west-2")
+    monkeypatch.delenv("CI_AGENT_CLAUDE_MODEL", raising=False)
     monkeypatch.setattr(claude_code.subprocess, "Popen", fake_popen)
 
     stdout, stderr, rc = claude_code.run_claude_code("prompt", model="model-id")
@@ -96,6 +99,30 @@ def test_run_claude_code_preserves_existing_region_and_model(monkeypatch):
     assert (stdout, stderr, rc) == ('{"type":"result","result":"ok"}\n', "", 0)
     assert captured["cmd"][captured["cmd"].index("--model") + 1] == "model-id"
     assert captured["env"]["AWS_REGION"] == "us-west-2"
+
+
+def test_run_claude_code_honors_model_env_overrides(monkeypatch):
+    captured = {}
+
+    def fake_popen(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["env"] = kwargs["env"]
+        return _FakeProcess(cmd, stdout_text='{"type":"result","result":"ok"}\n', **kwargs)
+
+    monkeypatch.setenv("CI_AGENT_CLAUDE_MODEL", "custom-opus")
+    monkeypatch.setenv(
+        "CI_AGENT_CLAUDE_BEDROCK_OPUS_MODEL",
+        "global.anthropic.claude-opus-4-7",
+    )
+    monkeypatch.setattr(claude_code.subprocess, "Popen", fake_popen)
+
+    stdout, stderr, rc = claude_code.run_claude_code("prompt", model="ignored")
+
+    assert (stdout, stderr, rc) == ('{"type":"result","result":"ok"}\n', "", 0)
+    assert captured["cmd"][captured["cmd"].index("--model") + 1] == "custom-opus"
+    assert captured["env"]["ANTHROPIC_DEFAULT_OPUS_MODEL"] == (
+        "global.anthropic.claude-opus-4-7"
+    )
 
 
 def test_run_claude_code_reports_timeout(monkeypatch):

@@ -14,6 +14,7 @@ def test_run_agent_applies_profile_and_writes_hashed_evidence(tmp_path, monkeypa
         return "secret stdout", "secret stderr", 0
 
     monkeypatch.setattr(agent_runtime, "run_claude_code", fake_run_claude_code)
+    monkeypatch.delenv("CI_AGENT_CLAUDE_MODEL", raising=False)
 
     result = agent_runtime.run_agent(
         "review_readonly",
@@ -35,3 +36,19 @@ def test_run_agent_applies_profile_and_writes_hashed_evidence(tmp_path, monkeypa
     assert "stdout" not in evidence["result"]
     assert "stderr" not in evidence["result"]
     assert "secret stdout" not in evidence_files[0].read_text(encoding="utf-8")
+
+
+def test_run_agent_writes_default_github_actions_evidence(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.delenv("CI_AGENT_EVIDENCE_DIR", raising=False)
+    monkeypatch.setattr(
+        agent_runtime,
+        "run_claude_code",
+        lambda *_args, **_kwargs: ("stdout", "", 0),
+    )
+
+    agent_runtime.run_agent("summary_readonly", "summarize", cwd=str(tmp_path))
+
+    evidence_files = list((tmp_path / "agent-evidence").glob("*.json"))
+    assert len(evidence_files) == 1

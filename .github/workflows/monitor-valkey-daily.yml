@@ -44,7 +44,7 @@ jobs:
   monitor:
     name: Monitor ${{ matrix.label }}
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
@@ -74,6 +74,8 @@ jobs:
       cancel-in-progress: false
     env:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      CLAUDE_CODE_USE_BEDROCK: "1"
+      CI_AGENT_EVIDENCE_DIR: agent-evidence
       MONITOR_DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || github.event.inputs.dry_run || 'true' }}
       MONITOR_MAX_RUNS: ${{ github.event.inputs.max_runs || matrix.max_runs || '14' }}
       MONITOR_VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
@@ -300,6 +302,15 @@ jobs:
           path: monitor-result.json
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Upload agent evidence
+        if: ${{ always() && env.MONITOR_SCOPE_SELECTED == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: valkey-${{ matrix.scope }}-agent-evidence-${{ github.run_id }}
+          path: agent-evidence
+          if-no-files-found: ignore
+          retention-days: 30
 
   dashboard:
     if: ${{ always() && (github.event_name != 'workflow_dispatch' || github.event.inputs.workflow_scope == 'all' || github.event.inputs.workflow_scope == 'daily') }}

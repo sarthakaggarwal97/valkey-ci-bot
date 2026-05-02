@@ -56,7 +56,10 @@ def test_claude_resolves_conflict(tmp_path: Path) -> None:
     )
 
     # Mock Claude Code to edit the file (simulate resolution)
+    captured = {}
+
     def mock_agent(_profile, prompt, **kw):
+        captured["prompt"] = prompt
         # Simulate Claude editing the file
         conflicted.write_text("new code\n")
         result_event = json.dumps({"type": "result", "result": "Resolved conflict in src/cluster.c"})
@@ -68,6 +71,7 @@ def test_claude_resolves_conflict(tmp_path: Path) -> None:
     assert len(results) == 1
     assert results[0].resolved_content == "new code\n"
     assert "Claude Code" in results[0].resolution_summary
+    assert "untrusted data" in captured["prompt"]
 
 
 def test_unresolved_conflict_returns_none(tmp_path: Path) -> None:

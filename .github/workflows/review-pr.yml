@@ -34,11 +34,12 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   CLAUDE_CODE_USE_BEDROCK: "1"
+  CI_AGENT_EVIDENCE_DIR: agent-evidence
 
 jobs:
   review:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     concurrency:
       group: review-pr-${{ github.repository }}-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
       cancel-in-progress: false
@@ -192,3 +193,12 @@ jobs:
             --mode "${REVIEW_MODE}" \
             --token "${REVIEW_TOKEN}" \
             --aws-region "${AWS_REGION_INPUT}"
+
+      - name: Upload agent evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-pr-agent-evidence-${{ github.run_id }}
+          path: agent-evidence
+          if-no-files-found: ignore
+          retention-days: 30

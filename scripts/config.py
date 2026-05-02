@@ -57,17 +57,17 @@ class RetrievalConfig:
     enabled: bool = False
     code_knowledge_base_id: str = ""
     docs_knowledge_base_id: str = ""
-    max_results_per_knowledge_base: int = 3
-    max_chars_per_result: int = 1200
-    max_total_chars: int = 5000
+    max_results_per_knowledge_base: int = 8
+    max_chars_per_result: int = 3000
+    max_total_chars: int = 30000
 
 
 @dataclass
 class BotConfig:
     """Top-level agent configuration with sensible defaults."""
-    bedrock_model_id: str = "us.anthropic.claude-opus-4-6-v1"
-    max_input_tokens: int = 100_000
-    max_output_tokens: int = 4096
+    bedrock_model_id: str = "us.anthropic.claude-opus-4-7"
+    max_input_tokens: int = 900_000
+    max_output_tokens: int = 65536
     max_patch_files: int = 30
     max_patch_files_override: int | None = None
     confidence_threshold: str = "medium"
@@ -91,7 +91,7 @@ class BotConfig:
     require_validation_profile: bool = True
     soak_validation_workflows: list[str] = field(default_factory=list)
     soak_validation_passes: int = 1
-    thinking_budget: int = 32_000
+    thinking_budget: int = 128_000
     project: ProjectContext = field(default_factory=ProjectContext)
     validation_profiles: list[ValidationProfile] = field(default_factory=list)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
@@ -121,10 +121,10 @@ class BotConfig:
 class ReviewerModels:
     """Model configuration for PR reviewer light/heavy tasks."""
 
-    light_model_id: str = "us.anthropic.claude-sonnet-4-v1"
-    heavy_model_id: str = "us.anthropic.claude-opus-4-6-v1"
+    light_model_id: str = "us.anthropic.claude-opus-4-7"
+    heavy_model_id: str = "us.anthropic.claude-opus-4-7"
     temperature: float = 0.0
-    thinking_budget: int = 32_000
+    thinking_budget: int = 128_000
 
 
 @dataclass
@@ -145,14 +145,14 @@ class ReviewerConfig:
     max_files: int = 150
     max_review_comments: int = 25
     path_filters: list[str] = field(default_factory=list)
-    daily_token_budget: int = 1_000_000_000
+    daily_token_budget: int = 0
     bedrock_retries: int = 5
     github_retries: int = 5
     bedrock_timeout_ms: int = 300_000
     bedrock_concurrency_limit: int = 2
     github_concurrency_limit: int = 6
     max_input_tokens: int = 190_000
-    max_output_tokens: int = 8192
+    max_output_tokens: int = 65536
     custom_instructions: str = ""
     project: ProjectContext = field(default_factory=ProjectContext)
     models: ReviewerModels = field(default_factory=ReviewerModels)

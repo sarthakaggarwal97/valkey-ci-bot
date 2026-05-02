@@ -901,6 +901,11 @@ def _invoke_claude_code(
         "Claude Code returned for run %s (rc=%d, %d chars).",
         context.run_id, agent_result.returncode, len(stdout),
     )
+    if agent_result.returncode != 0:
+        detail = agent_result.stderr or stdout[-500:] or "no Claude Code output"
+        raise RuntimeError(
+            f"Claude Code returned {agent_result.returncode}: {detail[:500]}"
+        )
     # Claude Code with --output-format stream-json returns JSONL.
     # Extract the final result text from the stream.
     result_text = ""
@@ -917,15 +922,8 @@ def _invoke_claude_code(
         result_text = stdout.strip()
     if not result_text:
         logger.warning("No result text found in Claude Code output for run %s", context.run_id)
-        return {}
-    try:
-        return _parse_model_payload(result_text)
-    except Exception as exc:
-        logger.warning(
-            "Failed to parse Claude Code result for run %s: %s\nText: %s",
-            context.run_id, exc, result_text[:500],
-        )
-        return {}
+        raise ValueError("No result text found in Claude Code output.")
+    return _parse_model_payload(result_text)
 
 class FuzzerRunAnalyzer:
     """Analysis-only evaluator for scheduled Valkey fuzzer workflow runs."""
@@ -1018,6 +1016,7 @@ class FuzzerRunAnalyzer:
             )
 
         model_payload: dict[str, Any] = {}
+        model_error = ""
         try:
             import shutil
             import subprocess
@@ -1086,6 +1085,7 @@ class FuzzerRunAnalyzer:
             finally:
                 shutil.rmtree(tmpdir, ignore_errors=True)
         except Exception as exc:
+            model_error = str(exc)
             logger.warning("Fuzzer run analysis model call failed for run %s: %s", run_id, exc)
 
         merged_anomalies = _dedupe_signals(
@@ -1125,6 +1125,8 @@ class FuzzerRunAnalyzer:
         if not summary:
             summary = _fallback_summary(context, merged_anomalies, merged_normal_signals)
         missing_fields = _missing_artifact_fields(context)
+        if model_error:
+            missing_fields = [*missing_fields, "model.analysis"]
         evidence_quality = "degraded" if missing_fields else "complete"
         incident_fingerprint = compute_fuzzer_incident_fingerprint(
             repo=context.repo,

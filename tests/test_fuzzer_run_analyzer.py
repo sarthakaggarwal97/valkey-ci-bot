@@ -377,3 +377,32 @@ def test_invoke_claude_code_parses_json(tmp_path: Path, monkeypatch: object) -> 
     assert result["overall_status"] == "anomalous"
     assert result["triage_verdict"] == "likely-core-valkey-bug"
     assert result["root_cause_category"] == "split-brain"
+
+
+def test_invoke_claude_code_raises_on_nonzero_exit(tmp_path: Path, monkeypatch: object) -> None:
+    import pytest
+
+    from scripts.fuzzer_run_analyzer import _invoke_claude_code
+    from scripts.models import FuzzerRunContext
+
+    context = FuzzerRunContext(
+        repo="valkey-io/valkey-fuzzer",
+        workflow_file="fuzzer-run.yml",
+        run_id=43,
+        run_url="https://example.com/43",
+        conclusion="failure",
+        head_sha="def456",
+    )
+    monkeypatch.setattr(
+        "scripts.fuzzer_run_analyzer.run_agent",
+        lambda profile, prompt, **kw: _agent_result("partial output", rc=1),
+    )
+
+    with pytest.raises(RuntimeError):
+        _invoke_claude_code(
+            system_prompt="You analyze fuzzer runs.",
+            deterministic_summary="",
+            retrieved_context="",
+            artifact_dir=tmp_path,
+            context=context,
+        )

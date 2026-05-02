@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import difflib
 import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -442,9 +443,9 @@ class TestAgenticGeneration:
 
 class TestPatchScopeLimits:
     def test_rejects_patch_exceeding_max_files(self):
-        # Generate a diff with 11 files (default limit is 10)
+        limit = BotConfig().max_patch_files
         lines = []
-        for i in range(11):
+        for i in range(limit + 1):
             lines.append(f"--- a/src/file{i}.c")
             lines.append(f"+++ b/src/file{i}.c")
             lines.append("@@ -1,1 +1,2 @@")
@@ -482,6 +483,57 @@ class TestPatchScopeLimits:
         rc = _make_root_cause(files_to_change=["src/server.c"])
         result = gen.generate(rc, {})
         assert result is None
+        assert mock_bedrock.invoke.call_count == 1
+
+
+class TestClaudeCodePatchGeneration:
+    def test_generate_prefers_claude_code_checkout_when_available(self):
+        gen, mock_bedrock = _make_generator()
+        gen._repo_full_name = "valkey-io/valkey"
+        rc = _make_root_cause(files_to_change=["src/server.c"])
+
+        def fake_run(cmd, **_kwargs):
+            if cmd[:2] in (["git", "clone"], ["git", "fetch"], ["git", "checkout"]):
+                return SimpleNamespace(stdout="", stderr="", returncode=0)
+            raise AssertionError(f"unexpected command: {cmd}")
+
+        with patch("scripts.fix_generator.shutil.which", return_value="/bin/claude"), \
+            patch("scripts.fix_generator.subprocess.run", side_effect=fake_run), \
+            patch(
+                "scripts.fix_generator.run_agent",
+                return_value=SimpleNamespace(stdout="edited", stderr="", returncode=0),
+            ) as mock_agent, \
+            patch("scripts.fix_generator._capture_worktree_diff", return_value=_SAMPLE_DIFF), \
+            patch(
+                "scripts.fix_generator._validate_checkout_diff",
+                return_value=(True, "", {"src/server.c"}),
+            ):
+            result = gen.generate(rc, {"src/server.c": "old"})
+
+        assert result == _SAMPLE_DIFF
+        mock_agent.assert_called_once()
+        mock_bedrock.invoke.assert_not_called()
+
+    def test_generate_falls_back_when_claude_code_fails(self):
+        gen, mock_bedrock = _make_generator(bedrock_return=_SAMPLE_DIFF)
+        gen._repo_full_name = "valkey-io/valkey"
+        rc = _make_root_cause(files_to_change=["src/server.c"])
+
+        def fake_run(cmd, **_kwargs):
+            if cmd[:2] in (["git", "clone"], ["git", "fetch"], ["git", "checkout"]):
+                return SimpleNamespace(stdout="", stderr="", returncode=0)
+            raise AssertionError(f"unexpected command: {cmd}")
+
+        with patch("scripts.fix_generator.shutil.which", return_value="/bin/claude"), \
+            patch("scripts.fix_generator.subprocess.run", side_effect=fake_run), \
+            patch(
+                "scripts.fix_generator.run_agent",
+                return_value=SimpleNamespace(stdout="failed", stderr="", returncode=1),
+            ), \
+            patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
+            result = gen.generate(rc, {"src/server.c": "old"})
+
+        assert result == _SAMPLE_DIFF
         assert mock_bedrock.invoke.call_count == 1
 
 

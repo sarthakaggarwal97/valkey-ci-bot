@@ -17,7 +17,7 @@ def test_load_reviewer_config_defaults() -> None:
     assert config.collaborator_only is False
     assert config.chat_collaborator_only is True
     assert config.ignore_keyword == "/reviewbot: ignore"
-    assert config.daily_token_budget == 1_000_000_000
+    assert config.daily_token_budget == 0
     assert config.approve_on_no_findings is False
     assert config.model_file_triage is False
     assert config.post_policy_notes is True

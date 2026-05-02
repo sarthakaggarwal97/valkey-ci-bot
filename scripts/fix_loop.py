@@ -241,6 +241,12 @@ def _generate_fix(
             len(agent_result.stdout),
             agent_result.stdout[:1500],
         )
+        if agent_result.returncode != 0:
+            logger.warning(
+                "Claude exited %d during fix generation; ignoring worktree edits.",
+                agent_result.returncode,
+            )
+            return None
 
         patch = _capture_worktree_diff(cwd)
         if not patch:

@@ -202,6 +202,42 @@ class TestBedrockClientInvoke:
         call_kwargs = mock_client.converse.call_args[1]
         assert call_kwargs["inferenceConfig"]["maxTokens"] == 2048
 
+    def test_opus_47_uses_adaptive_thinking_request(self):
+        mock_client = MagicMock()
+        mock_client.converse.return_value = _make_converse_response("ok")
+        config = BotConfig(
+            bedrock_model_id="us.anthropic.claude-opus-4-7",
+            max_output_tokens=8192,
+        )
+        client = _make_bedrock_client(config=config, mock_client=mock_client)
+
+        client.invoke("sys", "user", thinking_budget=128_000)
+
+        call_kwargs = mock_client.converse.call_args[1]
+        assert call_kwargs["additionalModelRequestFields"]["thinking"] == {
+            "type": "adaptive",
+        }
+        assert call_kwargs["inferenceConfig"]["maxTokens"] == 128_000
+        assert "temperature" not in call_kwargs["inferenceConfig"]
+
+    def test_budgeted_thinking_remains_for_non_opus_47_models(self):
+        mock_client = MagicMock()
+        mock_client.converse.return_value = _make_converse_response("ok")
+        config = BotConfig(
+            bedrock_model_id="us.anthropic.claude-opus-4-6-v1",
+            max_output_tokens=4096,
+        )
+        client = _make_bedrock_client(config=config, mock_client=mock_client)
+
+        client.invoke("sys", "user", thinking_budget=32_000)
+
+        call_kwargs = mock_client.converse.call_args[1]
+        assert call_kwargs["additionalModelRequestFields"]["thinking"] == {
+            "type": "enabled",
+            "budget_tokens": 32_000,
+        }
+        assert call_kwargs["inferenceConfig"]["maxTokens"] == 36_096
+
     def test_enforces_max_input_tokens(self):
         mock_client = MagicMock()
         config = BotConfig(max_input_tokens=4)

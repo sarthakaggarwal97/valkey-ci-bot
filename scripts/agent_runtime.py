@@ -10,7 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from scripts.claude_code import DEFAULT_CLAUDE_ENV_ALLOWLIST, run_claude_code
+from scripts.claude_code import (
+    DEFAULT_CLAUDE_ENV_ALLOWLIST,
+    _resolve_claude_model,
+    run_claude_code,
+)
 
 AgentProfileName = Literal[
     "review_readonly",
@@ -30,7 +34,7 @@ class AgentProfile:
     allowed_tools: str
     timeout: int
     effort: str | None = "high"
-    max_turns: int = 80
+    max_turns: int = 200
     writes_allowed: bool = False
     output_schema: str = "text"
     failure_policy: str = "fail-closed"
@@ -57,43 +61,54 @@ AGENT_PROFILES: dict[AgentProfileName, AgentProfile] = {
     "review_readonly": AgentProfile(
         name="review_readonly",
         allowed_tools="Read,Grep,Glob",
-        timeout=1800,
+        timeout=3600,
         effort="max",
+        max_turns=240,
         writes_allowed=False,
         output_schema="review-findings-json",
     ),
     "summary_readonly": AgentProfile(
         name="summary_readonly",
         allowed_tools="Read,Grep,Glob",
-        timeout=600,
+        timeout=1800,
+        effort="max",
+        max_turns=160,
         writes_allowed=False,
         output_schema="summary-markdown",
     ),
     "chat_readonly": AgentProfile(
         name="chat_readonly",
         allowed_tools="Read,Grep,Glob",
-        timeout=600,
+        timeout=1800,
+        effort="max",
+        max_turns=160,
         writes_allowed=False,
         output_schema="reply-markdown",
     ),
     "conflict_resolve_edit_only": AgentProfile(
         name="conflict_resolve_edit_only",
         allowed_tools="Read,Edit,MultiEdit,Grep,Glob",
-        timeout=1200,
+        timeout=3600,
+        effort="max",
+        max_turns=240,
         writes_allowed=True,
         output_schema="edited-files",
     ),
     "fix_generate_patch": AgentProfile(
         name="fix_generate_patch",
         allowed_tools="Read,Edit,MultiEdit,Write,Grep,Glob",
-        timeout=1200,
+        timeout=3600,
+        effort="max",
+        max_turns=240,
         writes_allowed=True,
         output_schema="edited-files",
     ),
     "fuzzer_analysis_readonly": AgentProfile(
         name="fuzzer_analysis_readonly",
         allowed_tools="Read,Grep,Glob",
-        timeout=1200,
+        timeout=3600,
+        effort="max",
+        max_turns=240,
         writes_allowed=False,
         output_schema="fuzzer-analysis-json",
     ),
@@ -111,7 +126,7 @@ def run_agent(
     *,
     cwd: str | None = None,
     timeout: int | None = None,
-    model: str | None = "opus",
+    model: str | None = None,
     evidence_dir: str | Path | None = None,
 ) -> AgentRunResult:
     """Run Claude Code under a named capability profile.
@@ -122,11 +137,12 @@ def run_agent(
     """
     profile = get_agent_profile(profile_name)
     started_at = datetime.now(timezone.utc).isoformat()
+    resolved_model = _resolve_claude_model(model)
     stdout, stderr, rc = run_claude_code(
         prompt,
         cwd=cwd,
         timeout=timeout if timeout is not None else profile.timeout,
-        model=model,
+        model=resolved_model,
         effort=profile.effort,
         max_turns=profile.max_turns,
         allowed_tools=profile.allowed_tools,
@@ -141,7 +157,7 @@ def run_agent(
         prompt_sha256=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
         cwd=str(cwd or ""),
         allowed_tools=profile.allowed_tools,
-        model=model or "",
+        model=resolved_model or "",
         started_at=started_at,
         finished_at=finished_at,
     )
@@ -155,6 +171,8 @@ def _write_evidence(
     evidence_dir: str | Path | None,
 ) -> None:
     configured_dir = evidence_dir or os.environ.get("CI_AGENT_EVIDENCE_DIR", "")
+    if not configured_dir and os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
+        configured_dir = "agent-evidence"
     if not configured_dir:
         return
     target_dir = Path(configured_dir)

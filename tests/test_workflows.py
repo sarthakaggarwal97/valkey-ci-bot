@@ -34,6 +34,8 @@ def test_analyze_workflow_checks_out_bot_repository() -> None:
     assert "AWS_ROLE_ARN" in secrets
     assert "GITHUB_TOKEN" not in secrets
     assert workflow["env"]["FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"] is True
+    assert workflow["env"]["CLAUDE_CODE_USE_BEDROCK"] == "1"
+    assert workflow["env"]["CI_AGENT_EVIDENCE_DIR"] == "agent-evidence"
 
     checkout_step = next(
         step
@@ -63,7 +65,20 @@ def test_analyze_workflow_checks_out_bot_repository() -> None:
         for step in workflow["jobs"]["run-pipeline"]["steps"]
         if step["name"] == "Set up Python 3.11"
     )
+    install_step = next(
+        step
+        for step in workflow["jobs"]["run-pipeline"]["steps"]
+        if step["name"] == "Install dependencies"
+    )
+    evidence_step = next(
+        step
+        for step in workflow["jobs"]["run-pipeline"]["steps"]
+        if step["name"] == "Upload agent evidence"
+    )
     assert setup_step["uses"] == "actions/setup-python@v6"
+    assert "npm install -g @anthropic-ai/claude-code" in install_step["run"]
+    assert evidence_step["uses"] == "actions/upload-artifact@v4"
+    assert evidence_step["with"]["path"] == "agent-evidence"
     assert role_step["uses"] == "aws-actions/configure-aws-credentials@v5"
     assert role_step["with"]["role-to-assume"] == "${{ secrets.AWS_ROLE_ARN }}"
     assert role_step["with"]["aws-region"] == "${{ inputs.aws_region }}"
@@ -88,10 +103,12 @@ def test_backport_workflow_contract_and_token_handling() -> None:
     assert secrets["AWS_ROLE_ARN"]["required"] is True
     assert secrets["VALKEY_GITHUB_TOKEN"]["required"] is False
     assert workflow["env"]["FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"] is True
+    assert workflow["env"]["CLAUDE_CODE_USE_BEDROCK"] == "1"
+    assert workflow["env"]["CI_AGENT_EVIDENCE_DIR"] == "agent-evidence"
     assert "AWS_REGION" not in workflow["env"]
 
     job = workflow["jobs"]["backport"]
-    assert job["timeout-minutes"] == 60
+    assert job["timeout-minutes"] == 120
     assert job["concurrency"]["group"] == (
         "backport-${{ inputs.repo_full_name }}-"
         "${{ inputs.source_pr_number }}-${{ inputs.target_branch }}"
@@ -113,6 +130,11 @@ def test_backport_workflow_contract_and_token_handling() -> None:
         for step in job["steps"]
         if step["name"] == "Run backport pipeline"
     )
+    evidence_step = next(
+        step
+        for step in job["steps"]
+        if step["name"] == "Upload agent evidence"
+    )
 
     assert checkout_step["with"]["repository"] == "${{ steps.called-workflow.outputs.repository }}"
     assert checkout_step["with"]["ref"] == "${{ steps.called-workflow.outputs.ref }}"
@@ -122,6 +144,8 @@ def test_backport_workflow_contract_and_token_handling() -> None:
     assert run_step["env"]["BACKPORT_GITHUB_TOKEN"] == (
         "${{ secrets.VALKEY_GITHUB_TOKEN || github.token }}"
     )
+    assert evidence_step["uses"] == "actions/upload-artifact@v4"
+    assert evidence_step["with"]["path"] == "agent-evidence"
     assert "--token" not in run_step["run"]
     assert '--aws-region "${AWS_REGION_INPUT}"' in run_step["run"]
 

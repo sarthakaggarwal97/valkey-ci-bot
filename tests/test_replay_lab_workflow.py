@@ -27,7 +27,11 @@ def test_replay_lab_runs_acceptance_harness_and_uploads_scorecard() -> None:
     assert "workflow_dispatch" in on_block
     assert workflow["permissions"] == {"contents": "read", "id-token": "write"}
     assert workflow["env"]["FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"] is True
+    assert workflow["env"]["CLAUDE_CODE_USE_BEDROCK"] == "1"
+    assert workflow["env"]["CI_AGENT_EVIDENCE_DIR"] == "agent-evidence"
+    assert job["timeout-minutes"] == 90
 
+    install_step = next(step for step in job["steps"] if step["name"] == "Install dependencies")
     run_step = next(step for step in job["steps"] if step["name"] == "Run replay lab")
     bot_data_checkout = next(
         step for step in job["steps"] if step["name"] == "Check out agent data snapshots"
@@ -38,7 +42,11 @@ def test_replay_lab_runs_acceptance_harness_and_uploads_scorecard() -> None:
     upload_step = next(
         step for step in job["steps"] if step["name"] == "Upload replay lab artifacts"
     )
+    evidence_step = next(
+        step for step in job["steps"] if step["name"] == "Upload agent evidence"
+    )
 
+    assert "npm install -g @anthropic-ai/claude-code" in install_step["run"]
     assert "-m scripts.valkey_acceptance" in run_step["run"]
     assert "--json-output acceptance-report.json" in run_step["run"]
     assert "--run-models" in run_step["run"]
@@ -47,3 +55,5 @@ def test_replay_lab_runs_acceptance_harness_and_uploads_scorecard() -> None:
     assert "-m scripts.agent_dashboard_site" in site_step["run"]
     assert upload_step["uses"] == "actions/upload-artifact@v4"
     assert "dashboard-site" in upload_step["with"]["path"]
+    assert evidence_step["uses"] == "actions/upload-artifact@v4"
+    assert evidence_step["with"]["path"] == "agent-evidence"

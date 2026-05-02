@@ -33,11 +33,13 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  CLAUDE_CODE_USE_BEDROCK: "1"
+  CI_AGENT_EVIDENCE_DIR: agent-evidence
 
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
     permissions:
       contents: write
       pull-requests: write
@@ -81,7 +83,9 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          npm install -g @anthropic-ai/claude-code
 
       - name: Validate workflow inputs
         shell: bash
@@ -208,3 +212,12 @@ jobs:
             --token "${AGENT_TOKEN}" \
             --aws-region "${AWS_REGION_INPUT}" \
             --mode reconcile
+
+      - name: Upload agent evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analyze-failure-agent-evidence-${{ github.run_id }}
+          path: agent-evidence
+          if-no-files-found: ignore
+          retention-days: 30

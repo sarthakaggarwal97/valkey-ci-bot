@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 # Retry constants
 _BASE_DELAY = 1.0  # seconds
 _MAX_DELAY = 30.0  # seconds
+_CLAUDE_OPUS_47_MARKER = "claude-opus-4-7"
+_CLAUDE_OPUS_47_MAX_TOKENS = 128_000
 
 # HTTP status codes
 _THROTTLING_CODE = "ThrottlingException"
@@ -51,6 +53,34 @@ def _has_prompt_safety_guard(system_prompt: str, user_prompt: str) -> bool:
         or "do not follow instructions" in prompt
         or ("treat" in prompt and "as untrusted" in prompt)
     )
+
+
+def _thinking_request_for_model(
+    model_id: str,
+    thinking_budget: int | None,
+) -> dict[str, Any] | None:
+    """Return the model-compatible extended-thinking request, if enabled."""
+    if thinking_budget is None or thinking_budget <= 0:
+        return None
+    if _CLAUDE_OPUS_47_MARKER in model_id:
+        return {"type": "adaptive"}
+    return {"type": "enabled", "budget_tokens": thinking_budget}
+
+
+def _effective_max_tokens(
+    model_id: str,
+    output_tokens: int,
+    thinking_budget: int | None,
+) -> int:
+    """Return a maxTokens value large enough for visible output plus thinking."""
+    if thinking_budget is None or thinking_budget <= 0:
+        return output_tokens
+    if _CLAUDE_OPUS_47_MARKER in model_id:
+        return min(
+            _CLAUDE_OPUS_47_MAX_TOKENS,
+            max(output_tokens, output_tokens + thinking_budget),
+        )
+    return max(output_tokens, thinking_budget + output_tokens)
 
 
 class BedrockError(Exception):
@@ -306,6 +336,11 @@ class BedrockClient:
             )
 
         output_tokens = max_output_tokens or self._config.max_output_tokens
+        selected_model = model_id or self._config.bedrock_model_id
+        thinking_request = _thinking_request_for_model(
+            selected_model,
+            thinking_budget,
+        )
         messages = [
             {
                 "role": "user",
@@ -313,26 +348,24 @@ class BedrockClient:
             }
         ]
 
-        # When thinking is enabled, maxTokens must exceed budget_tokens.
-        effective_max_tokens = output_tokens
-        if thinking_budget is not None and thinking_budget > 0:
-            effective_max_tokens = max(output_tokens, thinking_budget + output_tokens)
+        effective_max_tokens = _effective_max_tokens(
+            selected_model,
+            output_tokens,
+            thinking_budget,
+        )
 
         converse_kwargs: dict[str, Any] = {
-            "modelId": model_id or self._config.bedrock_model_id,
+            "modelId": selected_model,
             "system": [{"text": full_system_prompt}],
             "messages": messages,
             "inferenceConfig": {
                 "maxTokens": effective_max_tokens,
             },
         }
-        if thinking_budget is not None and thinking_budget > 0:
+        if thinking_request is not None:
             # Extended thinking: temperature must not be set.
             converse_kwargs["additionalModelRequestFields"] = {
-                "thinking": {
-                    "type": "enabled",
-                    "budget_tokens": thinking_budget,
-                },
+                "thinking": thinking_request,
             }
             self._record_ai_metric("bedrock.invoke.thinking_enabled")
         elif temperature is not None:
@@ -532,6 +565,11 @@ class BedrockClient:
             )
 
         output_tokens = max_output_tokens or self._config.max_output_tokens
+        selected_model = model_id or self._config.bedrock_model_id
+        thinking_request = _thinking_request_for_model(
+            selected_model,
+            thinking_budget,
+        )
         messages = [
             {
                 "role": "user",
@@ -539,14 +577,15 @@ class BedrockClient:
             }
         ]
 
-        # When thinking is enabled, maxTokens must exceed budget_tokens.
-        thinking_enabled = thinking_budget is not None and thinking_budget > 0
-        effective_max_tokens = output_tokens
-        if thinking_budget is not None and thinking_budget > 0:
-            effective_max_tokens = max(output_tokens, thinking_budget + output_tokens)
+        thinking_enabled = thinking_request is not None
+        effective_max_tokens = _effective_max_tokens(
+            selected_model,
+            output_tokens,
+            thinking_budget,
+        )
 
         converse_kwargs: dict[str, Any] = {
-            "modelId": model_id or self._config.bedrock_model_id,
+            "modelId": selected_model,
             "system": [{"text": full_system_prompt}],
             "messages": messages,
             "inferenceConfig": {
@@ -571,10 +610,7 @@ class BedrockClient:
             # and temperature must not be set.
             converse_kwargs["toolConfig"]["toolChoice"] = {"any": {}}
             converse_kwargs["additionalModelRequestFields"] = {
-                "thinking": {
-                    "type": "enabled",
-                    "budget_tokens": thinking_budget,
-                },
+                "thinking": thinking_request,
             }
             self._record_ai_metric("bedrock.invoke_schema.thinking_enabled")
         else:
@@ -759,16 +795,23 @@ class BedrockClient:
         self._record_ai_metric("bedrock.tool_loop.calls")
         self._record_prompt_safety_guard(full_system_prompt, user_prompt)
         output_tokens = max_output_tokens or self._config.max_output_tokens
-        thinking_enabled = thinking_budget is not None and thinking_budget > 0
-        effective_max_tokens = output_tokens
-        if thinking_budget is not None and thinking_budget > 0:
-            effective_max_tokens = max(output_tokens, thinking_budget + output_tokens)
+        selected_model = model_id or self._config.bedrock_model_id
+        thinking_request = _thinking_request_for_model(
+            selected_model,
+            thinking_budget,
+        )
+        thinking_enabled = thinking_request is not None
+        effective_max_tokens = _effective_max_tokens(
+            selected_model,
+            output_tokens,
+            thinking_budget,
+        )
         messages: list[dict[str, Any]] = [
             {"role": "user", "content": [{"text": user_prompt}]},
         ]
 
         converse_kwargs: dict[str, Any] = {
-            "modelId": model_id or self._config.bedrock_model_id,
+            "modelId": selected_model,
             "system": [
                 {"text": full_system_prompt},
                 {"cachePoint": {"type": "default"}},
@@ -778,10 +821,7 @@ class BedrockClient:
         }
         if thinking_enabled:
             converse_kwargs["additionalModelRequestFields"] = {
-                "thinking": {
-                    "type": "enabled",
-                    "budget_tokens": thinking_budget,
-                },
+                "thinking": thinking_request,
             }
             self._record_ai_metric("bedrock.tool_loop.thinking_enabled")
         elif temperature is not None:

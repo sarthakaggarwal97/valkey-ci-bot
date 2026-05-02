@@ -5,7 +5,7 @@ reviewer:
   model_file_triage: false
   post_policy_notes: true
   max_review_comments: 20
-  daily_token_budget: 1000000
+  daily_token_budget: 0
   custom_instructions: |
     This project is Valkey, a high-performance in-memory key-value store
     forked from Redis 7.2. It is written in C and uses an event-driven,
@@ -63,10 +63,11 @@ reviewer:
     enabled: true
     code_knowledge_base_id: "OHQMPN9RCG"
     docs_knowledge_base_id: "NAKLE24DH9"
-    max_results_per_knowledge_base: 3
-    max_chars_per_result: 1200
-    max_total_chars: 5000
+    max_results_per_knowledge_base: 8
+    max_chars_per_result: 3000
+    max_total_chars: 30000
   models:
-    light_model_id: "us.anthropic.claude-opus-4-6-v1"
-    heavy_model_id: "us.anthropic.claude-opus-4-6-v1"
+    light_model_id: "us.anthropic.claude-opus-4-7"
+    heavy_model_id: "us.anthropic.claude-opus-4-7"
     temperature: 0.05
+    thinking_budget: 128000

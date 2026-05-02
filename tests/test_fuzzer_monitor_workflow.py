@@ -30,6 +30,8 @@ def test_fuzzer_monitor_workflow_uses_oidc_and_app_token_support() -> None:
     assert workflow["jobs"]["monitor"]["concurrency"]["group"] == "monitor-valkey-fuzzer-scan"
     assert "github.event_name != 'workflow_dispatch'" in job_env["MONITOR_DRY_RUN"]
     assert "VALKEY_GITHUB_APP_ID" in job_env
+    assert job_env["CLAUDE_CODE_USE_BEDROCK"] == "1"
+    assert job_env["CI_AGENT_EVIDENCE_DIR"] == "agent-evidence"
     assert "VALKEY_GITHUB_TOKEN" not in job_env
     assert "VALKEY_GITHUB_APP_PRIVATE_KEY" not in job_env
 
@@ -72,4 +74,11 @@ def test_fuzzer_monitor_workflow_runs_analysis_script() -> None:
         for step in workflow["jobs"]["monitor"]["steps"]
         if step["name"] == "Upload fuzzer analysis result"
     )
+    evidence_step = next(
+        step
+        for step in workflow["jobs"]["monitor"]["steps"]
+        if step["name"] == "Upload agent evidence"
+    )
     assert upload_step["uses"] == "actions/upload-artifact@v4"
+    assert evidence_step["uses"] == "actions/upload-artifact@v4"
+    assert evidence_step["with"]["path"] == "agent-evidence"

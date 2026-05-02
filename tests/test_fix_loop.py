@@ -152,3 +152,36 @@ def test_generate_fix_captures_new_files_in_patch(monkeypatch, tmp_path) -> None
     assert "new file mode" in patch
     assert ["git", "add", "-N", "."] in git_calls
     assert ["git", "diff", "--binary"] in git_calls
+
+
+def test_generate_fix_rejects_nonzero_claude_even_with_edits(monkeypatch, tmp_path) -> None:
+    checkout = _fresh_checkout(tmp_path)
+
+    monkeypatch.setattr(fix_loop, "_run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        fix_loop,
+        "run_agent",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            stdout="edited then failed",
+            stderr="tool failed",
+            returncode=1,
+        ),
+    )
+
+    def fake_git(cmd, **_kwargs):
+        return SimpleNamespace(
+            stdout="diff --git a/src/a.c b/src/a.c\n--- a/src/a.c\n+++ b/src/a.c\n",
+            stderr="",
+            returncode=0,
+        )
+
+    monkeypatch.setattr(fix_loop.subprocess, "run", fake_git)
+
+    patch = fix_loop._generate_fix(
+        SimpleNamespace(job_name="test-job", parsed_failures=[]),
+        SimpleNamespace(description="missing helper", files_to_change=["src/a.c"]),
+        "",
+        checkout,
+    )
+
+    assert patch is None

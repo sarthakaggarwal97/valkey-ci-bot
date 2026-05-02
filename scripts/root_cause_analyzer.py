@@ -318,7 +318,7 @@ class RootCauseAnalyzer:
     instance) in its constructor.
     """
 
-    def __init__(self, bedrock_client: BedrockClient, github_client: Any, *, thinking_budget: int = 32_000):
+    def __init__(self, bedrock_client: BedrockClient, github_client: Any, *, thinking_budget: int = 128_000):
         self._bedrock = bedrock_client
         self._github = github_client
         self._retriever: BedrockRetriever | None = None

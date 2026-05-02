@@ -10,6 +10,10 @@
 # Conflict resolution settings
 # ---------------------------------------------------------------------------
 
+# Foundation model used for any Bedrock-backed backport reasoning.
+bedrock_model_id: "us.anthropic.claude-opus-4-7"
+thinking_budget: 128000
+
 # Maximum number of retry attempts when the LLM produces a resolution that
 # still contains conflict markers. Each retry includes feedback about the
 # remaining markers.
@@ -20,9 +24,8 @@ max_conflict_retries: 2
 # agent creates the backport PR with all conflicts left unresolved.
 max_conflicting_files: 20
 
-# Per-backport token budget for Bedrock API calls. If the budget is exhausted
-# during conflict resolution, remaining files are left unresolved.
-per_backport_token_budget: 100000
+# Per-backport token budget for Bedrock API calls. 0 means unlimited.
+per_backport_token_budget: 0
 
 # ---------------------------------------------------------------------------
 # Safety limits
@@ -31,7 +34,7 @@ per_backport_token_budget: 100000
 # Maximum backport PRs the agent will create in a rolling 24-hour window.
 # Once the limit is reached, subsequent backport requests are skipped with
 # a comment on the source PR.
-max_prs_per_day: 10
+max_prs_per_day: 0
 
 # ---------------------------------------------------------------------------
 # Labels

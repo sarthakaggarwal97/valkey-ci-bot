@@ -25,7 +25,7 @@ reviewer:
   ignore_keyword: "/reviewbot: ignore"
   max_files: 150
   max_review_comments: 20
-  daily_token_budget: 1000000
+  daily_token_budget: 0
   max_input_tokens: 190000
   max_output_tokens: 8192
   bedrock_retries: 5
@@ -98,9 +98,9 @@ reviewer:
     enabled: false
     code_knowledge_base_id: "YOUR_CODE_KB_ID"
     docs_knowledge_base_id: "YOUR_DOCS_KB_ID"
-    max_results_per_knowledge_base: 3
-    max_chars_per_result: 1200
-    max_total_chars: 5000
+    max_results_per_knowledge_base: 8
+    max_chars_per_result: 3000
+    max_total_chars: 30000
   path_filters:
     - "!dist/**"
     - "!vendor/**"
@@ -110,6 +110,7 @@ reviewer:
     - "src/**"
     - "tests/**"
   models:
-    light_model_id: "us.anthropic.claude-opus-4-6-v1"
-    heavy_model_id: "us.anthropic.claude-opus-4-6-v1"
+    light_model_id: "us.anthropic.claude-opus-4-7"
+    heavy_model_id: "us.anthropic.claude-opus-4-7"
     temperature: 0.0
+    thinking_budget: 128000

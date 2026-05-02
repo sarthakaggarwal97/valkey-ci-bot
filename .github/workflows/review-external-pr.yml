@@ -32,13 +32,14 @@ env:
 jobs:
   review:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     concurrency:
       group: review-external-pr-${{ github.event.inputs.target_repo }}-${{ github.event.inputs.pr_number }}
       cancel-in-progress: false
     env:
       AWS_REGION: ${{ github.event.inputs.aws_region || vars.AWS_REGION || 'us-east-1' }}
       CLAUDE_CODE_USE_BEDROCK: "1"
+      CI_AGENT_EVIDENCE_DIR: agent-evidence
       TARGET_REPO: ${{ github.event.inputs.target_repo }}
       TARGET_PR_NUMBER: ${{ github.event.inputs.pr_number }}
       TARGET_GITHUB_APP_ID: ${{ vars.VALKEY_GITHUB_APP_ID || '' }}
@@ -151,3 +152,12 @@ jobs:
             --state-token "${STATE_TOKEN}" \
             --state-repo "${STATE_REPO}" \
             --aws-region "${AWS_REGION}"
+
+      - name: Upload agent evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-external-pr-agent-evidence-${{ github.run_id }}
+          path: agent-evidence
+          if-no-files-found: ignore
+          retention-days: 30

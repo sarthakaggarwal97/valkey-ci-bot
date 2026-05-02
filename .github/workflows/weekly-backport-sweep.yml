@@ -73,13 +73,14 @@ permissions:
 jobs:
   sweep:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
     concurrency:
       group: weekly-backport-sweep-${{ inputs.repo || 'valkey-io/valkey' }}
       cancel-in-progress: false
     env:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       CLAUDE_CODE_USE_BEDROCK: "1"
+      CI_AGENT_EVIDENCE_DIR: agent-evidence
       REPO_FULL_NAME: ${{ inputs.repo || 'valkey-io/valkey' }}
       PROJECT_OWNER: ${{ inputs.project_owner || 'valkey-io' }}
       PROJECT_OWNER_TYPE: ${{ inputs.project_owner_type || 'organization' }}
@@ -188,4 +189,13 @@ jobs:
         with:
           name: backport-sweep-result-${{ github.run_id }}
           path: backport-sweep-result.json
+          retention-days: 30
+
+      - name: Upload agent evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backport-sweep-agent-evidence-${{ github.run_id }}
+          path: agent-evidence
+          if-no-files-found: ignore
           retention-days: 30

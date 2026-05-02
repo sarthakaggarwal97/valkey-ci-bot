@@ -21,11 +21,13 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  CLAUDE_CODE_USE_BEDROCK: "1"
+  CI_AGENT_EVIDENCE_DIR: agent-evidence
 
 jobs:
   replay-lab:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     steps:
       - name: Check out agent repository
         uses: actions/checkout@v6
@@ -40,7 +42,9 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          npm install -g @anthropic-ai/claude-code
 
       - name: Check out agent data snapshots
         continue-on-error: true
@@ -119,4 +123,13 @@ jobs:
             agent-dashboard.json
             agent-dashboard.html
             dashboard-site
+          retention-days: 30
+
+      - name: Upload agent evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay-lab-agent-evidence-${{ github.run_id }}
+          path: agent-evidence
+          if-no-files-found: ignore
           retention-days: 30

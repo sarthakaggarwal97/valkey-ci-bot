@@ -20,7 +20,9 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_CLAUDE_MODEL = "opus"
 _DEFAULT_BEDROCK_OPUS_MODEL = "us.anthropic.claude-opus-4-7"
-_DEFAULT_TIMEOUT_SECONDS = 20 * 60
+_CLAUDE_MODEL_ENV = "CI_AGENT_CLAUDE_MODEL"
+_BEDROCK_OPUS_MODEL_ENV = "CI_AGENT_CLAUDE_BEDROCK_OPUS_MODEL"
+_DEFAULT_TIMEOUT_SECONDS = 60 * 60
 _PASSTHROUGH_ENV_VARS = {
     "PATH",
     "HOME",
@@ -60,8 +62,8 @@ def run_claude_code(
     cwd: str | None = None,
     timeout: int = _DEFAULT_TIMEOUT_SECONDS,
     model: str | None = _DEFAULT_CLAUDE_MODEL,
-    effort: str | None = "high",
-    max_turns: int = 80,
+    effort: str | None = "max",
+    max_turns: int = 200,
     allowed_tools: str = "Read,Edit,MultiEdit,Write,Bash,Glob,Grep",
     env_allowlist: tuple[str, ...] | None = None,
 ) -> tuple[str, str, int]:
@@ -72,7 +74,8 @@ def run_claude_code(
     """
     env = _build_claude_env(env_allowlist)
     env["CLAUDE_CODE_USE_BEDROCK"] = "1"
-    env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = _DEFAULT_BEDROCK_OPUS_MODEL
+    resolved_model = _resolve_claude_model(model)
+    env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = _resolve_bedrock_opus_model()
     if "AWS_REGION" not in env and "AWS_DEFAULT_REGION" not in env:
         env["AWS_REGION"] = "us-east-1"
     elif "AWS_REGION" not in env and "AWS_DEFAULT_REGION" in env:
@@ -87,8 +90,8 @@ def run_claude_code(
         "--output-format", "stream-json",
         "--verbose",
     ]
-    if model:
-        cmd.extend(["--model", model])
+    if resolved_model:
+        cmd.extend(["--model", resolved_model])
     if effort:
         cmd.extend(["--effort", effort])
 
@@ -157,8 +160,21 @@ def _build_claude_env(env_allowlist: tuple[str, ...] | None = None) -> dict[str,
         if name in allowed and value
     }
     env["CLAUDE_CODE_USE_BEDROCK"] = "1"
-    env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = _DEFAULT_BEDROCK_OPUS_MODEL
+    env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = _resolve_bedrock_opus_model()
     return env
+
+
+def _resolve_claude_model(model: str | None) -> str | None:
+    """Resolve the Claude Code model alias, honoring operator override."""
+    override = os.environ.get(_CLAUDE_MODEL_ENV, "").strip()
+    if override:
+        return override
+    return model or _DEFAULT_CLAUDE_MODEL
+
+
+def _resolve_bedrock_opus_model() -> str:
+    """Resolve the Bedrock Opus model/inference profile used by Claude Code."""
+    return os.environ.get(_BEDROCK_OPUS_MODEL_ENV, "").strip() or _DEFAULT_BEDROCK_OPUS_MODEL
 
 
 def extract_diff(claude_output: str) -> str | None:

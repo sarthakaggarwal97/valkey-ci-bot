@@ -1,24 +1,25 @@
 bedrock:
-  model_id: "us.anthropic.claude-opus-4-6-v1"
-  max_input_tokens: 100000
-  max_output_tokens: 4096
+  model_id: "us.anthropic.claude-opus-4-7"
+  max_input_tokens: 900000
+  max_output_tokens: 65536
+  thinking_budget: 128000
 retrieval:
   enabled: true
   code_knowledge_base_id: "OHQMPN9RCG"
   docs_knowledge_base_id: "NAKLE24DH9"
-  max_results_per_knowledge_base: 3
-  max_chars_per_result: 1200
-  max_total_chars: 5000
+  max_results_per_knowledge_base: 8
+  max_chars_per_result: 3000
+  max_total_chars: 30000
 
 limits:
-  max_patch_files: 10
-  max_failures_per_run: 5
-  max_prs_per_day: 3
-  max_open_bot_prs: 3
-  queued_pr_max_attempts: 5
+  max_patch_files: 30
+  max_failures_per_run: 0
+  max_prs_per_day: 0
+  max_open_bot_prs: 0
+  queued_pr_max_attempts: 0
   daily_token_budget: 0
 
 fix_generation:
   confidence_threshold: "medium"
-  max_retries: 2
-  max_validation_retries: 1
+  max_retries: 10
+  max_validation_retries: 5

@@ -36,6 +36,8 @@ def test_monitor_workflow_uses_oidc_and_matrixed_ci_scope() -> None:
     assert workflow["env"]["FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"] is True
     assert "concurrency" not in workflow
     assert "github.event_name != 'workflow_dispatch'" in job_env["MONITOR_DRY_RUN"]
+    assert job_env["CLAUDE_CODE_USE_BEDROCK"] == "1"
+    assert job_env["CI_AGENT_EVIDENCE_DIR"] == "agent-evidence"
     assert "matrix.max_runs" in job_env["MONITOR_MAX_RUNS"]
     assert job_env["MONITOR_WORKFLOW_FILE"] == "${{ matrix.workflow_file }}"
     assert job_env["MONITOR_EVENTS"] == "${{ matrix.monitor_events }}"
@@ -147,6 +149,11 @@ def test_monitor_workflow_runs_central_monitor_script_for_matrix_entries() -> No
         for step in monitor_steps
         if step["name"] == "Upload monitor result"
     )
+    evidence_step = next(
+        step
+        for step in monitor_steps
+        if step["name"] == "Upload agent evidence"
+    )
     preflight_script = preflight_step["run"]
     assert "-m scripts.preflight_reconciliation" in preflight_script
     assert "--repo \"${VALKEY_FORK_REPO}\"" in preflight_script
@@ -162,6 +169,8 @@ def test_monitor_workflow_runs_central_monitor_script_for_matrix_entries() -> No
 
     assert upload_step["uses"] == "actions/upload-artifact@v4"
     assert "valkey-${{ matrix.scope }}-monitor-result-${{ github.run_id }}" == upload_step["with"]["name"]
+    assert evidence_step["uses"] == "actions/upload-artifact@v4"
+    assert evidence_step["with"]["path"] == "agent-evidence"
 
 
 def test_monitor_workflow_builds_dashboard_in_separate_job() -> None:

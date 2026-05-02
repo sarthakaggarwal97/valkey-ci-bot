@@ -34,6 +34,8 @@ def test_review_workflow_checks_out_bot_repository() -> None:
     assert "AWS_ROLE_ARN" in secrets
     assert "GITHUB_TOKEN" not in secrets
     assert workflow["env"]["FORCE_JAVASCRIPT_ACTIONS_TO_NODE24"] is True
+    assert workflow["env"]["CLAUDE_CODE_USE_BEDROCK"] == "1"
+    assert workflow["env"]["CI_AGENT_EVIDENCE_DIR"] == "agent-evidence"
 
     checkout_step = next(
         step
@@ -52,7 +54,7 @@ def test_review_workflow_checks_out_bot_repository() -> None:
     assert checkout_step["uses"] == "actions/checkout@v6"
 
     assert workflow["jobs"]["review"]["permissions"]["id-token"] == "write"
-    assert workflow["jobs"]["review"]["timeout-minutes"] == 45
+    assert workflow["jobs"]["review"]["timeout-minutes"] == 120
     assert workflow["jobs"]["review"]["concurrency"]["group"] == (
         "review-pr-${{ github.repository }}-"
         "${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}"
@@ -79,7 +81,14 @@ def test_review_workflow_checks_out_bot_repository() -> None:
         for step in workflow["jobs"]["review"]["steps"]
         if step["name"] == "Run PR reviewer"
     )
+    evidence_step = next(
+        step
+        for step in workflow["jobs"]["review"]["steps"]
+        if step["name"] == "Upload agent evidence"
+    )
     assert "python -m scripts.pr_review_main" in review_step["run"]
+    assert evidence_step["uses"] == "actions/upload-artifact@v4"
+    assert evidence_step["with"]["path"] == "agent-evidence"
 
 
 def test_example_pr_review_caller_passes_bot_checkout_inputs() -> None:
@@ -115,6 +124,7 @@ def test_external_review_workflow_supports_cross_repo_dispatch() -> None:
         "${{ github.event.inputs.pr_number }}"
     )
     assert "TARGET_GITHUB_APP_ID" in job_env
+    assert job_env["CI_AGENT_EVIDENCE_DIR"] == "agent-evidence"
     assert "TARGET_GITHUB_TOKEN" not in job_env
     assert "TARGET_GITHUB_APP_PRIVATE_KEY" not in job_env
 
@@ -138,6 +148,11 @@ def test_external_review_workflow_supports_cross_repo_dispatch() -> None:
         for step in job["steps"]
         if step["name"] == "Review target pull request"
     )
+    evidence_step = next(
+        step
+        for step in job["steps"]
+        if step["name"] == "Upload agent evidence"
+    )
 
     assert "TARGET_REPO" in resolve_step["run"]
     assert app_token_step["uses"] == "actions/create-github-app-token@v2"
@@ -154,6 +169,8 @@ def test_external_review_workflow_supports_cross_repo_dispatch() -> None:
     assert '--pr-number "${TARGET_PR_NUMBER}"' in review_script
     assert '--state-token "${STATE_TOKEN}"' in review_script
     assert '--state-repo "${STATE_REPO}"' in review_script
+    assert evidence_step["uses"] == "actions/upload-artifact@v4"
+    assert evidence_step["with"]["path"] == "agent-evidence"
 
     for step in job["steps"]:
         if "if" in step:
