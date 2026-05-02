@@ -49,7 +49,6 @@ def test_replay_lab_runs_acceptance_harness_and_uploads_scorecard() -> None:
     assert "npm install -g @anthropic-ai/claude-code" in install_step["run"]
     assert "-m scripts.valkey_acceptance" in run_step["run"]
     assert "--json-output acceptance-report.json" in run_step["run"]
-    assert "--run-models" in run_step["run"]
     assert bot_data_checkout["with"]["ref"] == "bot-data"
     assert "-m scripts.agent_dashboard" in site_step["run"]
     assert "-m scripts.agent_dashboard_site" in site_step["run"]

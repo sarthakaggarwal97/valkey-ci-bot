@@ -8,11 +8,6 @@ on:
         required: false
         default: "examples/valkey-acceptance.yml"
         type: string
-      run_models:
-        description: "Run Bedrock model passes in addition to deterministic policy checks."
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -55,19 +50,10 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Configure AWS credentials from OIDC role
-        if: ${{ github.event.inputs.run_models == 'true' }}
-        uses: aws-actions/configure-aws-credentials@v5
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: ci-agent-replay-lab-${{ github.run_id }}
-          aws-region: ${{ env.AWS_REGION }}
-
       - name: Run replay lab
         shell: bash
         env:
           REPLAY_MANIFEST: ${{ github.event.inputs.manifest || 'examples/valkey-acceptance.yml' }}
-          RUN_MODELS: ${{ github.event.inputs.run_models || 'false' }}
           REPLAY_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -83,10 +69,6 @@ jobs:
             --output acceptance-report.md
             --json-output acceptance-report.json
           )
-
-          if [[ "${RUN_MODELS}" == "true" ]]; then
-            args+=(--run-models)
-          fi
 
           python3 "${args[@]}"
 

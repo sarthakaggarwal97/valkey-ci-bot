@@ -471,29 +471,16 @@ def _run_review_case(
     reviewer_config_path: str,
     *,
     aws_region: str,
-    run_models: bool,
 ) -> ReviewCaseResult:
     """Evaluate one review case in report-only mode."""
     policy = _collect_policy_signals(gh, repo_name, case.pr_number)
     checks = _expectation_checks(case.expectations, policy)
-    result = ReviewCaseResult(
+    return ReviewCaseResult(
         name=case.name,
         pr_number=case.pr_number,
         policy=policy,
         expectation_checks=checks,
     )
-    if not run_models:
-        return result
-
-    # The Bedrock-based code reviewer has been removed. --run-models is
-    # retained for backward compatibility but skips model evaluation until
-    # the acceptance suite is migrated to Claude Code.
-    logger.warning(
-        "--run-models requested but the Bedrock code reviewer has been removed. "
-        "Skipping model evaluation for case %s. Migrate to Claude Code reviewer.",
-        case.name,
-    )
-    return result
 
 
 def _run_workflow_case(case: WorkflowCase) -> WorkflowCaseResult:
@@ -795,12 +782,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--aws-region",
         default="us-east-1",
-        help="AWS region for Bedrock calls when --run-models is set.",
-    )
-    parser.add_argument(
-        "--run-models",
-        action="store_true",
-        help="Execute Bedrock summary/review passes in addition to policy checks.",
+        help="AWS region (reserved for future Claude Code integration).",
     )
     parser.add_argument(
         "--output",
@@ -841,7 +823,6 @@ def main(argv: list[str] | None = None) -> int:
                     case,
                     manifest.reviewer_config_path,
                     aws_region=args.aws_region,
-                    run_models=args.run_models,
                 )
             )
 
