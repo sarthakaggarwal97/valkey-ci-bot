@@ -10,31 +10,25 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-import boto3
 import yaml  # type: ignore[import-untyped]
-from botocore.config import Config as BotocoreConfig
 from github import Auth, Github
 
-from scripts.bedrock_client import BedrockClient, PromptClient
-from scripts.bedrock_retriever import BedrockRetriever
-from scripts.code_reviewer import CodeReviewer, ReviewCoverage
+try:
+    from scripts.code_reviewer import CodeReviewer, ReviewCoverage
+    from scripts.pr_summarizer import PRSummarizer
+
+    _BEDROCK_REVIEWER_AVAILABLE = True
+except ImportError:
+    _BEDROCK_REVIEWER_AVAILABLE = False
+    CodeReviewer = None  # type: ignore[assignment,misc]
+    ReviewCoverage = None  # type: ignore[assignment,misc]
+    PRSummarizer = None  # type: ignore[assignment,misc]
 from scripts.commit_signoff import (
     CommitSigner,
     load_signer_from_env,
     require_dco_signoff_from_env,
 )
-from scripts.models import DiffScope, PullRequestContext, ReviewFinding, SummaryResult
-from scripts.pr_context_fetcher import PRContextFetcher
-from scripts.pr_review_main import (
-    _filtered_context,
-    _load_runtime_reviewer_config,
-    _select_review_files,
-)
-from scripts.pr_summarizer import PRSummarizer
-from scripts.valkey_repo_context import (
-    augment_reviewer_config_for_valkey,
-    load_valkey_repo_context,
-)
+from scripts.models import ReviewFinding, SummaryResult
 
 logger = logging.getLogger(__name__)
 
@@ -470,39 +464,6 @@ def _expectation_checks(
     return checks
 
 
-def _build_review_runtime(
-    *,
-    aws_region: str,
-    config,
-) -> tuple[PromptClient, BedrockRetriever | None]:
-    """Create the Bedrock runtime clients for report-only review execution."""
-    timeout_seconds = max(60, int(config.bedrock_timeout_ms / 1000))
-    client_config = BotocoreConfig(read_timeout=timeout_seconds, connect_timeout=60)
-    bedrock = BedrockClient(
-        config=config,
-        client=boto3.client(
-            "bedrock-runtime",
-            region_name=aws_region or None,
-            config=client_config,
-        ),
-    )
-    retriever = None
-    if config.retrieval.enabled and any(
-        [
-            config.retrieval.code_knowledge_base_id,
-            config.retrieval.docs_knowledge_base_id,
-        ]
-    ):
-        retriever = BedrockRetriever(
-            boto3.client(
-                "bedrock-agent-runtime",
-                region_name=aws_region or None,
-                config=client_config,
-            ),
-        )
-    return bedrock, retriever
-
-
 def _run_review_case(
     gh: Github,
     repo_name: str,
@@ -510,80 +471,16 @@ def _run_review_case(
     reviewer_config_path: str,
     *,
     aws_region: str,
-    run_models: bool,
 ) -> ReviewCaseResult:
     """Evaluate one review case in report-only mode."""
     policy = _collect_policy_signals(gh, repo_name, case.pr_number)
     checks = _expectation_checks(case.expectations, policy)
-    result = ReviewCaseResult(
+    return ReviewCaseResult(
         name=case.name,
         pr_number=case.pr_number,
         policy=policy,
         expectation_checks=checks,
     )
-    if not run_models:
-        return result
-
-    config = _load_runtime_reviewer_config(gh, repo_name, reviewer_config_path)
-    fetcher = PRContextFetcher(gh, github_retries=config.github_retries)
-    context = fetcher.fetch(repo_name, case.pr_number)
-    valkey_context = load_valkey_repo_context(gh, repo_name, ref=context.base_sha)
-    config = augment_reviewer_config_for_valkey(config, context, valkey_context)
-    selected_paths = set(_select_review_files(context, config))
-    review_context: PullRequestContext = _filtered_context(
-        fetcher.hydrate_contents(context, selected_paths),
-        selected_paths,
-    )
-    bedrock_client, retriever = _build_review_runtime(
-        aws_region=aws_region,
-        config=config,
-    )
-    result.summary = PRSummarizer(
-        bedrock_client,
-        retriever=retriever,
-        retrieval_config=config.retrieval,
-    ).summarize(review_context, config)
-    reviewer = CodeReviewer(
-        bedrock_client,
-        retriever=retriever,
-        retrieval_config=config.retrieval,
-        github_client=gh,
-    )
-    diff_scope = DiffScope(
-        base_sha=review_context.base_sha,
-        head_sha=review_context.head_sha,
-        files=review_context.files,
-        incremental=False,
-    )
-    triaged_files = reviewer.triage_files(diff_scope.files, review_context, config)
-    if not triaged_files:
-        result.coverage = ReviewCoverage(
-            requested_lgtm=True,
-            skipped_files=[
-                (changed_file.path, "approved by triage")
-                for changed_file in diff_scope.files
-            ],
-        )
-        return result
-
-    triaged_scope = DiffScope(
-        base_sha=diff_scope.base_sha,
-        head_sha=diff_scope.head_sha,
-        files=triaged_files,
-        incremental=diff_scope.incremental,
-    )
-    result.findings = reviewer.review(
-        review_context,
-        triaged_scope,
-        config,
-        short_summary=result.summary.short_summary if result.summary else "",
-    )
-    get_coverage = getattr(reviewer, "get_last_review_coverage", None)
-    if callable(get_coverage):
-        coverage = get_coverage()
-        if isinstance(coverage, ReviewCoverage):
-            result.coverage = coverage
-    return result
 
 
 def _run_workflow_case(case: WorkflowCase) -> WorkflowCaseResult:
@@ -885,12 +782,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--aws-region",
         default="us-east-1",
-        help="AWS region for Bedrock calls when --run-models is set.",
-    )
-    parser.add_argument(
-        "--run-models",
-        action="store_true",
-        help="Execute Bedrock summary/review passes in addition to policy checks.",
+        help="AWS region (reserved for future Claude Code integration).",
     )
     parser.add_argument(
         "--output",
@@ -931,7 +823,6 @@ def main(argv: list[str] | None = None) -> int:
                     case,
                     manifest.reviewer_config_path,
                     aws_region=args.aws_region,
-                    run_models=args.run_models,
                 )
             )
 

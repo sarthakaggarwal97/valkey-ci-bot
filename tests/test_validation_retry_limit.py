@@ -56,11 +56,18 @@ def _make_generator(
     bedrock_return: str = _SAMPLE_DIFF,
     config: BotConfig | None = None,
 ) -> tuple[FixGenerator, MagicMock]:
-    """Create a FixGenerator with a mocked BedrockClient."""
-    mock_bedrock = MagicMock()
-    mock_bedrock.invoke.return_value = bedrock_return
+    """Create a FixGenerator whose Claude-Code path is mocked out.
+
+    Returns the generator and a MagicMock patched onto the generator's
+    ``_generate_with_claude_code`` attribute. Callers can assert on
+    ``mock.call_count`` the same way the legacy tests asserted on
+    ``mock_bedrock.invoke.call_count``.
+    """
     cfg = config or BotConfig()
-    return FixGenerator(mock_bedrock, cfg), mock_bedrock
+    gen = FixGenerator(cfg, repo_full_name="valkey-io/valkey")
+    mock_claude = MagicMock(return_value=bedrock_return)
+    gen._generate_with_claude_code = mock_claude  # type: ignore[assignment]
+    return gen, mock_claude
 
 
 def _simulate_validation_retry_loop(
@@ -144,7 +151,7 @@ class TestValidationRetryLimitProperty:
         """When every validation fails, generate is called at most
         max_validation_retries + 1 times and the fix is abandoned."""
         config = BotConfig(max_retries_validation=max_validation_retries)
-        gen, mock_bedrock = _make_generator(
+        gen, _ = _make_generator(
             bedrock_return=_SAMPLE_DIFF, config=config
         )
         rc = _make_root_cause(confidence="high")
@@ -194,7 +201,7 @@ class TestValidationRetryLimitProperty:
         pass_on_retry = min(pass_on_retry, max_validation_retries)
 
         config = BotConfig(max_retries_validation=max_validation_retries)
-        gen, mock_bedrock = _make_generator(
+        gen, _ = _make_generator(
             bedrock_return=_SAMPLE_DIFF, config=config
         )
         rc = _make_root_cause(confidence="high")
@@ -237,7 +244,7 @@ class TestValidationRetryLimitProperty:
         """The total number of generate() calls never exceeds
         max_validation_retries + 1, regardless of validation outcomes."""
         config = BotConfig(max_retries_validation=max_validation_retries)
-        gen, mock_bedrock = _make_generator(
+        gen, _ = _make_generator(
             bedrock_return=_SAMPLE_DIFF, config=config
         )
         rc = _make_root_cause(confidence="high")

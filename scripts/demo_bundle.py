@@ -623,7 +623,6 @@ def _build_specs(args: argparse.Namespace) -> list[DemoWorkflowSpec]:
                 purpose="Replay real Valkey-shaped cases before asking anyone to trust the bot.",
                 inputs={
                     "manifest": args.replay_manifest,
-                    "run_models": "true" if args.replay_run_models else "false",
                 },
             )
         )
@@ -771,7 +770,6 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--review-pr-number", type=int, default=0, help="Optional PR number for live review.")
     parser.add_argument("--review-config-path", default=".github/pr-review-bot.yml", help="Config path for external reviews.")
     parser.add_argument("--replay-manifest", default="examples/valkey-acceptance.yml", help="Replay lab manifest path.")
-    parser.add_argument("--replay-run-models", action="store_true", help="Run Bedrock model passes in the replay lab.")
     parser.add_argument("--run-dashboard", action="store_true", help="Dispatch the dashboard refresh workflow.")
     parser.add_argument("--run-replay", action="store_true", help="Dispatch the replay lab workflow.")
     parser.add_argument("--run-daily", action="store_true", help="Dispatch the Daily monitor workflow.")

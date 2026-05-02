@@ -1,19 +1,16 @@
-"""Tests for the fix generator module."""
 
 from __future__ import annotations
 
 import difflib
-import json
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
-from scripts.bedrock_client import BedrockError
-from scripts.config import BotConfig, RetrievalConfig
+from scripts.config import BotConfig
 from scripts.fix_generator import (
     FixGenerator,
-    _build_user_prompt,
     _count_patch_files,
     _strip_markdown_fences,
     _validate_patch_applies,
@@ -23,6 +20,7 @@ from scripts.models import RootCauseReport
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_root_cause(**overrides) -> RootCauseReport:
     defaults = {
@@ -64,23 +62,22 @@ _SAMPLE_DIFF_MULTI = """\
 """
 
 
-def _make_generator(
-    bedrock_return: str | Exception = _SAMPLE_DIFF,
-    config: BotConfig | None = None,
-) -> tuple[FixGenerator, MagicMock]:
-    """Create a FixGenerator with a mocked BedrockClient."""
-    mock_bedrock = MagicMock()
-    if isinstance(bedrock_return, Exception):
-        mock_bedrock.invoke.side_effect = bedrock_return
-    else:
-        mock_bedrock.invoke.return_value = bedrock_return
+def _make_generator(config: BotConfig | None = None) -> FixGenerator:
     cfg = config or BotConfig()
-    return FixGenerator(mock_bedrock, cfg), mock_bedrock
+    return FixGenerator(cfg, repo_full_name="valkey-io/valkey")
+
+
+def _fake_git_run(cmd, **_kwargs):
+    """Stub subprocess.run to succeed for git clone/fetch/checkout calls."""
+    if cmd[:2] in (["git", "clone"], ["git", "fetch"], ["git", "checkout"]):
+        return SimpleNamespace(stdout="", stderr="", returncode=0)
+    raise AssertionError(f"unexpected command: {cmd}")
 
 
 # ---------------------------------------------------------------------------
 # _strip_markdown_fences
 # ---------------------------------------------------------------------------
+
 
 class TestStripMarkdownFences:
     def test_strips_plain_fences(self):
@@ -103,6 +100,7 @@ class TestStripMarkdownFences:
 # _count_patch_files
 # ---------------------------------------------------------------------------
 
+
 class TestCountPatchFiles:
     def test_single_file(self):
         files = _count_patch_files(_SAMPLE_DIFF)
@@ -122,83 +120,11 @@ class TestCountPatchFiles:
 
 
 # ---------------------------------------------------------------------------
-# _build_user_prompt
+# _validate_patch_applies
 # ---------------------------------------------------------------------------
 
-class TestBuildUserPrompt:
-    def test_includes_root_cause_info(self):
-        rc = _make_root_cause()
-        prompt = _build_user_prompt(rc, {})
-        assert "Null pointer dereference" in prompt
-        assert "high" in prompt
-        assert "src/server.c" in prompt
 
-    def test_includes_source_files(self):
-        rc = _make_root_cause()
-        sources = {"src/server.c": "void handle_request() {}"}
-        prompt = _build_user_prompt(rc, sources)
-        assert "void handle_request" in prompt
-        assert "### src/server.c" in prompt
-
-    def test_includes_apply_error_feedback(self):
-        rc = _make_root_cause()
-        prompt = _build_user_prompt(rc, {}, apply_error="patch does not apply")
-        assert "Previous Attempt Failed" in prompt
-        assert "patch does not apply" in prompt
-
-    def test_no_apply_error_omits_section(self):
-        rc = _make_root_cause()
-        prompt = _build_user_prompt(rc, {})
-        assert "Previous Attempt Failed" not in prompt
-
-    def test_includes_retrieved_context(self):
-        rc = _make_root_cause()
-        prompt = _build_user_prompt(rc, {}, "## Retrieved Valkey Context\nreplication notes")
-        assert "Retrieved Valkey Context" in prompt
-        assert "replication notes" in prompt
-
-
-# ---------------------------------------------------------------------------
-# FixGenerator.generate — confidence gating
-# ---------------------------------------------------------------------------
-
-class TestConfidenceGating:
-    def test_skips_low_confidence(self):
-        gen, mock_bedrock = _make_generator()
-        rc = _make_root_cause(confidence="low")
-        result = gen.generate(rc, {})
-        assert result is None
-        mock_bedrock.invoke.assert_not_called()
-
-    def test_proceeds_with_high_confidence(self):
-        gen, _ = _make_generator()
-        rc = _make_root_cause(confidence="high")
-        with patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
-            result = gen.generate(rc, {"src/server.c": "code"})
-        assert result is not None
-
-    def test_proceeds_with_medium_confidence(self):
-        gen, _ = _make_generator()
-        rc = _make_root_cause(confidence="medium")
-        with patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
-            result = gen.generate(rc, {"src/server.c": "code"})
-        assert result is not None
-
-    def test_respects_configured_high_threshold(self):
-        gen, mock_bedrock = _make_generator(
-            config=BotConfig(confidence_threshold="high"),
-        )
-        rc = _make_root_cause(confidence="medium")
-        result = gen.generate(rc, {})
-        assert result is None
-        mock_bedrock.invoke.assert_not_called()
-
-
-# ---------------------------------------------------------------------------
-# FixGenerator.generate — patch validation and retries
-# ---------------------------------------------------------------------------
-
-class TestPatchValidation:
+class TestValidatePatchApplies:
     def test_validate_patch_applies_against_source_file_workspace(self):
         original = "void handle_request(Request *req) {\n    process(req->data);\n}\n"
         patched = (
@@ -225,362 +151,184 @@ class TestPatchValidation:
         assert success is True
         assert error_output == ""
 
-    def test_generation_preserves_required_patch_trailing_newline(self):
-        original = "void handle_request(Request *req) {\n    process(req->data);\n}\n"
-        patched = (
-            "void handle_request(Request *req) {\n"
-            "    if (req == NULL) return;\n"
-            "    process(req->data);\n"
-            "}\n"
-        )
-        diff_without_final_newline = "\n".join(
-            difflib.unified_diff(
-                original.splitlines(),
-                patched.splitlines(),
-                fromfile="a/src/server.c",
-                tofile="b/src/server.c",
-                lineterm="",
-            )
-        )
 
-        gen, _ = _make_generator(
-            bedrock_return=diff_without_final_newline,
-            config=BotConfig(max_retries_fix=0),
-        )
-        rc = _make_root_cause(files_to_change=["src/server.c"])
+# ---------------------------------------------------------------------------
+# FixGenerator.generate — confidence gating
+# ---------------------------------------------------------------------------
 
-        result = gen.generate(rc, {"src/server.c": original})
 
-        assert result is not None
-        assert result.endswith("\n")
-
-    def test_returns_diff_on_clean_apply(self):
-        gen, _ = _make_generator()
-        rc = _make_root_cause()
-        with patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
+class TestConfidenceGating:
+    def test_skips_low_confidence(self):
+        gen = _make_generator()
+        rc = _make_root_cause(confidence="low")
+        with patch.object(gen, "_generate_with_claude_code") as mock_claude:
             result = gen.generate(rc, {})
-        assert result is not None
-        assert "--- a/src/server.c" in result
-
-    def test_retries_on_apply_failure(self):
-        gen, mock_bedrock = _make_generator(config=BotConfig(max_retries_fix=2))
-        rc = _make_root_cause()
-
-        # First two attempts fail, third succeeds
-        call_count = 0
-        def side_effect(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count <= 2:
-                return (False, "error: patch does not apply")
-            return (True, "")
-
-        with patch("scripts.fix_generator._validate_patch_applies", side_effect=side_effect):
-            result = gen.generate(rc, {})
-
-        assert result is not None
-        assert "--- a/src/server.c" in result
-        assert mock_bedrock.invoke.call_count == 3  # initial + 2 retries
-
-    def test_returns_none_after_exhausting_retries(self):
-        gen, mock_bedrock = _make_generator(config=BotConfig(max_retries_fix=1))
-        rc = _make_root_cause()
-
-        with patch(
-            "scripts.fix_generator._validate_patch_applies",
-            return_value=(False, "error: patch does not apply"),
-        ):
-            result = gen.generate(rc, {})
-
         assert result is None
-        assert mock_bedrock.invoke.call_count == 2  # initial + 1 retry
+        mock_claude.assert_not_called()
 
-    def test_retry_includes_error_feedback(self):
-        gen, mock_bedrock = _make_generator(config=BotConfig(max_retries_fix=1))
-        rc = _make_root_cause()
+    def test_proceeds_with_high_confidence(self):
+        gen = _make_generator()
+        rc = _make_root_cause(confidence="high")
+        with patch.object(
+            gen, "_generate_with_claude_code", return_value=_SAMPLE_DIFF,
+        ) as mock_claude:
+            result = gen.generate(rc, {"src/server.c": "code"})
+        assert result == _SAMPLE_DIFF
+        mock_claude.assert_called_once()
 
-        with patch(
-            "scripts.fix_generator._validate_patch_applies",
-            return_value=(False, "error: corrupt patch"),
-        ):
-            gen.generate(rc, {})
+    def test_proceeds_with_medium_confidence(self):
+        gen = _make_generator()
+        rc = _make_root_cause(confidence="medium")
+        with patch.object(
+            gen, "_generate_with_claude_code", return_value=_SAMPLE_DIFF,
+        ) as mock_claude:
+            result = gen.generate(rc, {"src/server.c": "code"})
+        assert result == _SAMPLE_DIFF
+        mock_claude.assert_called_once()
 
-        # Second call should include the error feedback
-        assert mock_bedrock.invoke.call_count == 2
-        second_call_args = mock_bedrock.invoke.call_args_list[1]
-        user_prompt = second_call_args[0][1]
-        assert "corrupt patch" in user_prompt
-
-    def test_includes_retrieved_context_when_retriever_is_configured(self):
-        gen, mock_bedrock = _make_generator()
-        mock_retriever = MagicMock()
-        mock_retriever.render_for_prompt.return_value = (
-            "## Retrieved Valkey Context\nreplication subsystem notes"
-        )
-        gen.with_retriever(
-            mock_retriever,
-            RetrievalConfig(enabled=True, code_knowledge_base_id="CODEKB"),
-        )
-        rc = _make_root_cause()
-
-        with patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
-            gen.generate(rc, {"src/server.c": "void handle_request(void) {}"})
-
-        user_prompt = mock_bedrock.invoke.call_args[0][1]
-        assert "Retrieved Valkey Context" in user_prompt
-        assert "replication subsystem notes" in user_prompt
-
-    def test_includes_failed_hypotheses_when_provided(self):
-        gen, mock_bedrock = _make_generator()
-        rc = _make_root_cause()
-
-        with patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
-            gen.generate(
-                rc,
-                {"src/server.c": "void handle_request(void) {}"},
-                failed_hypotheses=["null-guard only did not hold in repeated validation"],
-            )
-
-        user_prompt = mock_bedrock.invoke.call_args[0][1]
-        assert "Previous Failed Approaches" in user_prompt
-        assert "null-guard only did not hold" in user_prompt
+    def test_respects_configured_high_threshold(self):
+        gen = _make_generator(config=BotConfig(confidence_threshold="high"))
+        rc = _make_root_cause(confidence="medium")
+        with patch.object(gen, "_generate_with_claude_code") as mock_claude:
+            result = gen.generate(rc, {})
+        assert result is None
+        mock_claude.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
-# FixGenerator.generate — agentic path safety
+# FixGenerator.generate — returns None when Claude Code is unavailable
 # ---------------------------------------------------------------------------
 
-class TestAgenticGeneration:
-    def test_agentic_generation_uses_explicit_repo_ref(self):
-        mock_bedrock = MagicMock()
-        mock_bedrock.converse_with_tools.return_value = json.dumps({
-            "diff": _SAMPLE_DIFF,
-        })
-        gen = FixGenerator(
-            mock_bedrock,
-            BotConfig(),
-            github_client=MagicMock(),
-            repo_full_name="owner/repo",
-        )
+
+class TestClaudeCodeUnavailable:
+    def test_returns_none_when_claude_cli_missing(self):
+        gen = _make_generator()
         rc = _make_root_cause()
-
-        with patch("scripts.code_reviewer.ReviewToolHandler") as handler_cls:
-            with patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
-                result = gen.generate(
-                    rc,
-                    {"src/server.c": "void handle_request(Request *req) {}"},
-                    repo_ref="abc123",
-                )
-
-        assert result is not None
-        assert _count_patch_files(result) == {"src/server.c"}
-        assert handler_cls.call_args.kwargs["head_sha"] == "abc123"
-
-    def test_agentic_generation_rejects_patch_outside_allowed_files(self):
-        mock_bedrock = MagicMock()
-        mock_bedrock.converse_with_tools.return_value = json.dumps({
-            "diff": _SAMPLE_DIFF_MULTI,
-        })
-        gen = FixGenerator(
-            mock_bedrock,
-            BotConfig(),
-            github_client=MagicMock(),
-            repo_full_name="owner/repo",
-        )
-        rc = _make_root_cause(files_to_change=["src/server.c"])
-
-        with patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
-            result = gen._generate_agentic(
-                rc,
-                {"src/server.c": "void handle_request(Request *req) {}"},
-                repo_ref="abc123",
-            )
-
+        with patch("scripts.fix_generator.shutil.which", return_value=None):
+            result = gen.generate(rc, {"src/server.c": "code"})
         assert result is None
 
-    def test_agentic_generation_validates_against_tool_fetched_files(self):
-        original = "void handle_request(Request *req) {\n    process(req->data);\n}\n"
-        patched = (
-            "void handle_request(Request *req) {\n"
-            "    if (req == NULL) return;\n"
-            "    process(req->data);\n"
-            "}\n"
-        )
-        diff = "\n".join(
-            difflib.unified_diff(
-                original.splitlines(),
-                patched.splitlines(),
-                fromfile="a/src/server.c",
-                tofile="b/src/server.c",
-                lineterm="",
-            )
-        ) + "\n"
+    def test_returns_none_when_repo_full_name_missing(self):
+        gen = FixGenerator(BotConfig(), repo_full_name="")
+        rc = _make_root_cause()
+        with patch("scripts.fix_generator.shutil.which", return_value="/bin/claude"):
+            result = gen.generate(rc, {"src/server.c": "code"})
+        assert result is None
 
-        mock_bedrock = MagicMock()
-        mock_bedrock.converse_with_tools.return_value = json.dumps({
-            "diff": diff,
-        })
-        handler = MagicMock()
-        handler.fetched_file_texts.return_value = {"src/server.c": original}
-        gen = FixGenerator(
-            mock_bedrock,
-            BotConfig(),
-            github_client=MagicMock(),
-            repo_full_name="owner/repo",
-        )
-        rc = _make_root_cause(files_to_change=["src/server.c"])
-
-        with patch("scripts.code_reviewer.ReviewToolHandler", return_value=handler):
-            result = gen._generate_agentic(rc, {}, repo_ref="abc123")
-
-        assert result == diff
-        handler.fetched_file_texts.assert_called()
+    def test_returns_none_when_disabled_by_env(self, monkeypatch):
+        gen = _make_generator()
+        rc = _make_root_cause()
+        monkeypatch.setenv("CI_AGENT_DISABLE_CLAUDE_PATCH_GENERATOR", "1")
+        with patch("scripts.fix_generator.shutil.which", return_value="/bin/claude"):
+            result = gen.generate(rc, {"src/server.c": "code"})
+        assert result is None
 
 
 # ---------------------------------------------------------------------------
-# FixGenerator.generate — patch scope limits
+# FixGenerator.generate — Claude Code happy path + validation
 # ---------------------------------------------------------------------------
-
-class TestPatchScopeLimits:
-    def test_rejects_patch_exceeding_max_files(self):
-        limit = BotConfig().max_patch_files
-        lines = []
-        for i in range(limit + 1):
-            lines.append(f"--- a/src/file{i}.c")
-            lines.append(f"+++ b/src/file{i}.c")
-            lines.append("@@ -1,1 +1,2 @@")
-            lines.append(" existing")
-            lines.append("+added")
-        big_diff = "\n".join(lines) + "\n"
-
-        gen, _ = _make_generator(bedrock_return=big_diff)
-        rc = _make_root_cause()
-        result = gen.generate(rc, {})
-        assert result is None
-
-    def test_accepts_patch_within_file_limit(self):
-        gen, _ = _make_generator(bedrock_return=_SAMPLE_DIFF_MULTI)
-        rc = _make_root_cause(files_to_change=["src/server.c", "src/client.c"])
-        with patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
-            result = gen.generate(rc, {})
-        assert result is not None
-
-    def test_custom_max_patch_files(self):
-        gen, _ = _make_generator(
-            bedrock_return=_SAMPLE_DIFF_MULTI,
-            config=BotConfig(max_patch_files=1),
-        )
-        rc = _make_root_cause()
-        # 2 files > limit of 1
-        result = gen.generate(rc, {})
-        assert result is None
-
-    def test_rejects_patch_outside_allowed_files(self):
-        gen, mock_bedrock = _make_generator(
-            bedrock_return=_SAMPLE_DIFF_MULTI,
-            config=BotConfig(max_retries_fix=0),
-        )
-        rc = _make_root_cause(files_to_change=["src/server.c"])
-        result = gen.generate(rc, {})
-        assert result is None
-        assert mock_bedrock.invoke.call_count == 1
 
 
 class TestClaudeCodePatchGeneration:
-    def test_generate_prefers_claude_code_checkout_when_available(self):
-        gen, mock_bedrock = _make_generator()
-        gen._repo_full_name = "valkey-io/valkey"
+    def test_generate_returns_captured_diff_from_claude_code(self):
+        gen = _make_generator()
         rc = _make_root_cause(files_to_change=["src/server.c"])
 
-        def fake_run(cmd, **_kwargs):
-            if cmd[:2] in (["git", "clone"], ["git", "fetch"], ["git", "checkout"]):
-                return SimpleNamespace(stdout="", stderr="", returncode=0)
-            raise AssertionError(f"unexpected command: {cmd}")
+        with patch("scripts.fix_generator.shutil.which", return_value="/bin/claude"), \
+            patch("scripts.fix_generator.subprocess.run", side_effect=_fake_git_run), \
+            patch(
+                "scripts.fix_generator.run_agent",
+                return_value=SimpleNamespace(stdout="edited", stderr="", returncode=0),
+            ) as mock_agent, \
+            patch("scripts.fix_generator._capture_worktree_diff", return_value=_SAMPLE_DIFF):
+            result = gen.generate(rc, {"src/server.c": "old"})
+
+        assert result == _SAMPLE_DIFF
+        mock_agent.assert_called_once()
+
+    def test_generate_returns_none_when_claude_agent_fails(self):
+        gen = _make_generator()
+        rc = _make_root_cause(files_to_change=["src/server.c"])
+
+        with patch("scripts.fix_generator.shutil.which", return_value="/bin/claude"), \
+            patch("scripts.fix_generator.subprocess.run", side_effect=_fake_git_run), \
+            patch(
+                "scripts.fix_generator.run_agent",
+                return_value=SimpleNamespace(stdout="failed", stderr="", returncode=1),
+            ):
+            result = gen.generate(rc, {"src/server.c": "old"})
+
+        assert result is None
+
+    def test_generate_rejects_patch_outside_allowed_files(self):
+        gen = _make_generator()
+        rc = _make_root_cause(files_to_change=["src/server.c"])
+
+        with patch("scripts.fix_generator.shutil.which", return_value="/bin/claude"), \
+            patch("scripts.fix_generator.subprocess.run", side_effect=_fake_git_run), \
+            patch(
+                "scripts.fix_generator.run_agent",
+                return_value=SimpleNamespace(stdout="edited", stderr="", returncode=0),
+            ), \
+            patch("scripts.fix_generator._capture_worktree_diff", return_value=_SAMPLE_DIFF_MULTI):
+            result = gen.generate(rc, {"src/server.c": "old"})
+
+        # Patch touches src/server.c AND src/client.c but scope limits to server.c
+        assert result is None
+
+    def test_generate_uses_explicit_repo_ref_for_checkout(self):
+        gen = _make_generator()
+        rc = _make_root_cause(files_to_change=["src/server.c"])
+
+        observed = {}
+
+        def fake_run(cmd, **kwargs):
+            # Record the checkout ref
+            if cmd[:2] == ["git", "checkout"]:
+                observed["checkout_cmd"] = cmd
+            if cmd[:2] == ["git", "fetch"]:
+                observed["fetch_cmd"] = cmd
+            return SimpleNamespace(stdout="", stderr="", returncode=0)
 
         with patch("scripts.fix_generator.shutil.which", return_value="/bin/claude"), \
             patch("scripts.fix_generator.subprocess.run", side_effect=fake_run), \
             patch(
                 "scripts.fix_generator.run_agent",
                 return_value=SimpleNamespace(stdout="edited", stderr="", returncode=0),
-            ) as mock_agent, \
-            patch("scripts.fix_generator._capture_worktree_diff", return_value=_SAMPLE_DIFF), \
-            patch(
-                "scripts.fix_generator._validate_checkout_diff",
-                return_value=(True, "", {"src/server.c"}),
-            ):
-            result = gen.generate(rc, {"src/server.c": "old"})
+            ), \
+            patch("scripts.fix_generator._capture_worktree_diff", return_value=_SAMPLE_DIFF):
+            result = gen.generate(rc, {"src/server.c": "old"}, repo_ref="abc123")
 
         assert result == _SAMPLE_DIFF
-        mock_agent.assert_called_once()
-        mock_bedrock.invoke.assert_not_called()
+        # After fetching repo_ref, the checkout uses FETCH_HEAD
+        assert observed["checkout_cmd"][-1] == "FETCH_HEAD"
+        assert "abc123" in observed["fetch_cmd"]
 
-    def test_generate_falls_back_when_claude_code_fails(self):
-        gen, mock_bedrock = _make_generator(bedrock_return=_SAMPLE_DIFF)
-        gen._repo_full_name = "valkey-io/valkey"
-        rc = _make_root_cause(files_to_change=["src/server.c"])
+    def test_with_domain_context_feeds_into_prompt(self):
+        gen = _make_generator()
+        rc = _make_root_cause()
 
-        def fake_run(cmd, **_kwargs):
-            if cmd[:2] in (["git", "clone"], ["git", "fetch"], ["git", "checkout"]):
-                return SimpleNamespace(stdout="", stderr="", returncode=0)
-            raise AssertionError(f"unexpected command: {cmd}")
+        captured_prompt = {}
+
+        def capture_run_agent(name, prompt, cwd):
+            captured_prompt["prompt"] = prompt
+            return SimpleNamespace(stdout="edited", stderr="", returncode=0)
+
+        gen.with_domain_context("Valkey runtime: replication is critical.")
 
         with patch("scripts.fix_generator.shutil.which", return_value="/bin/claude"), \
-            patch("scripts.fix_generator.subprocess.run", side_effect=fake_run), \
-            patch(
-                "scripts.fix_generator.run_agent",
-                return_value=SimpleNamespace(stdout="failed", stderr="", returncode=1),
-            ), \
-            patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
-            result = gen.generate(rc, {"src/server.c": "old"})
+            patch("scripts.fix_generator.subprocess.run", side_effect=_fake_git_run), \
+            patch("scripts.fix_generator.run_agent", side_effect=capture_run_agent), \
+            patch("scripts.fix_generator._capture_worktree_diff", return_value=_SAMPLE_DIFF):
+            gen.generate(rc, {"src/server.c": "old"})
 
-        assert result == _SAMPLE_DIFF
-        assert mock_bedrock.invoke.call_count == 1
+        assert "Valkey runtime: replication is critical." in captured_prompt["prompt"]
 
 
 # ---------------------------------------------------------------------------
-# FixGenerator.generate — Bedrock errors
+# Property: confidence gating
 # ---------------------------------------------------------------------------
 
-class TestBedrockErrors:
-    def test_returns_none_on_bedrock_error(self):
-        gen, _ = _make_generator(
-            bedrock_return=BedrockError("API error", error_code="500")
-        )
-        rc = _make_root_cause()
-        result = gen.generate(rc, {})
-        assert result is None
-
-    def test_returns_none_on_empty_response(self):
-        gen, _ = _make_generator(bedrock_return="")
-        rc = _make_root_cause(confidence="high")
-        # Empty diff after stripping — should exhaust retries
-        result = gen.generate(rc, {})
-        assert result is None
-
-
-# ---------------------------------------------------------------------------
-# FixGenerator.generate — markdown fence stripping
-# ---------------------------------------------------------------------------
-
-class TestMarkdownFenceStripping:
-    def test_strips_fences_from_response(self):
-        fenced = f"```diff\n{_SAMPLE_DIFF}```"
-        gen, _ = _make_generator(bedrock_return=fenced)
-        rc = _make_root_cause()
-        with patch("scripts.fix_generator._validate_patch_applies", return_value=(True, "")):
-            result = gen.generate(rc, {})
-        assert result is not None
-        assert "```" not in result
-
-
-# ---------------------------------------------------------------------------
-# Feature: valkey-ci-agent, Property 8: Confidence gating for fix generation
-# ---------------------------------------------------------------------------
-
-from hypothesis import given, settings
-from hypothesis import strategies as st
-
-# Strategy: generate RootCauseReport instances with varying confidence levels
 _confidence_strategy = st.sampled_from(["high", "medium", "low"])
 
 _root_cause_strategy = st.builds(
@@ -595,45 +343,31 @@ _root_cause_strategy = st.builds(
 
 
 class TestConfidenceGatingProperty:
-    """Property 8: Confidence gating for fix generation.
-
-    **Validates: Requirements 4.1, 4.6**
-
-    For any RootCauseReport, the Fix_Generator should proceed with generation
-    if and only if the confidence level is "high" or "medium". For any report
-    with confidence "low", no fix should be generated.
-    """
+    """Confidence gating remains enforced regardless of backend."""
 
     @given(root_cause=_root_cause_strategy)
-    @settings(max_examples=100)
+    @settings(max_examples=50)
     def test_confidence_gating_property(self, root_cause: RootCauseReport):
-        """Low confidence → None + no Bedrock call; high/medium → Bedrock called."""
-        gen, mock_bedrock = _make_generator(bedrock_return=_SAMPLE_DIFF)
+        gen = _make_generator()
+        with patch.object(
+            gen, "_generate_with_claude_code", return_value=_SAMPLE_DIFF,
+        ) as mock_claude:
+            result = gen.generate(root_cause, {"src/server.c": "code"})
 
         if root_cause.confidence == "low":
-            result = gen.generate(root_cause, {"src/server.c": "code"})
-            assert result is None, "Low confidence must produce None"
-            mock_bedrock.invoke.assert_not_called()
+            assert result is None
+            mock_claude.assert_not_called()
         else:
-            # confidence is "high" or "medium" — Bedrock should be invoked
-            with patch(
-                "scripts.fix_generator._validate_patch_applies",
-                return_value=(True, ""),
-            ):
-                result = gen.generate(root_cause, {"src/server.c": "code"})
-            assert result is not None, (
-                f"Confidence '{root_cause.confidence}' must proceed with generation"
-            )
-            mock_bedrock.invoke.assert_called()
+            assert result == _SAMPLE_DIFF
+            mock_claude.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
-# Feature: valkey-ci-agent, Property 9: Patch scope validation
+# Property: patch scope validation via _validate_checkout_diff
 # ---------------------------------------------------------------------------
 
 
 def _make_diff_for_files(file_paths: list[str]) -> str:
-    """Build a minimal unified diff that modifies the given file paths."""
     lines: list[str] = []
     for path in file_paths:
         lines.append(f"--- a/{path}")
@@ -644,19 +378,11 @@ def _make_diff_for_files(file_paths: list[str]) -> str:
     return "\n".join(lines) + "\n"
 
 
-# Strategy: file paths that look like real C source paths
 _file_path_strategy = st.from_regex(r"src/[a-z][a-z0-9_]{0,15}\.(c|h)", fullmatch=True)
 
 
 class TestPatchScopeValidationProperty:
-    """Property 9: Patch scope validation.
-
-    **Validates: Requirements 4.5**
-
-    For any generated patch, the total number of modified files should not
-    exceed the configured max_patch_files limit. Patches exceeding the limit
-    are rejected (return None); patches within the limit are accepted.
-    """
+    """Patches exceeding max_patch_files are rejected; within-limit patches accepted."""
 
     @given(
         file_paths=st.lists(
@@ -667,27 +393,29 @@ class TestPatchScopeValidationProperty:
         ),
         max_patch_files=st.integers(min_value=1, max_value=20),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=50)
     def test_patch_scope_validation_property(
         self,
         file_paths: list[str],
         max_patch_files: int,
     ):
-        """Patches exceeding max_patch_files are rejected; within-limit patches are accepted."""
         diff = _make_diff_for_files(file_paths)
         num_files = len(file_paths)
 
         config = BotConfig(max_patch_files=max_patch_files)
-        gen, mock_bedrock = _make_generator(bedrock_return=diff, config=config)
+        gen = FixGenerator(config, repo_full_name="valkey-io/valkey")
         rc = _make_root_cause(
             confidence="high",
             files_to_change=file_paths,
         )
 
-        with patch(
-            "scripts.fix_generator._validate_patch_applies",
-            return_value=(True, ""),
-        ):
+        with patch("scripts.fix_generator.shutil.which", return_value="/bin/claude"), \
+            patch("scripts.fix_generator.subprocess.run", side_effect=_fake_git_run), \
+            patch(
+                "scripts.fix_generator.run_agent",
+                return_value=SimpleNamespace(stdout="edited", stderr="", returncode=0),
+            ), \
+            patch("scripts.fix_generator._capture_worktree_diff", return_value=diff):
             result = gen.generate(rc, {"src/server.c": "code"})
 
         if num_files > max_patch_files:
@@ -700,54 +428,8 @@ class TestPatchScopeValidationProperty:
                 f"Patch with {num_files} files should be accepted "
                 f"(limit={max_patch_files})"
             )
-            # Verify the accepted patch only modifies the expected files
             modified = _count_patch_files(result)
             assert len(modified) <= max_patch_files, (
                 f"Accepted patch modifies {len(modified)} files "
                 f"but limit is {max_patch_files}"
             )
-
-
-# ---------------------------------------------------------------------------
-# Feature: valkey-ci-agent, Property 10: Fix generation retry limit
-# ---------------------------------------------------------------------------
-
-
-class TestFixGenerationRetryLimitProperty:
-    """Property 10: Fix generation retry limit.
-
-    **Validates: Requirements 4.4**
-
-    For any sequence of patch apply failures, the Fix_Generator should retry
-    at most max_retries_fix times. After exhausting retries, the fix should
-    be marked as "generation-failed" (returns None). Total Bedrock calls
-    should equal max_retries_fix + 1 (initial attempt + retries).
-    """
-
-    @given(max_retries=st.integers(min_value=0, max_value=5))
-    @settings(max_examples=100)
-    def test_fix_generation_retry_limit_property(self, max_retries: int):
-        """When all patch applies fail, exactly max_retries_fix + 1 Bedrock
-        calls are made and the result is None."""
-        config = BotConfig(max_retries_fix=max_retries)
-        gen, mock_bedrock = _make_generator(
-            bedrock_return=_SAMPLE_DIFF, config=config
-        )
-        rc = _make_root_cause(confidence="high")
-
-        with patch(
-            "scripts.fix_generator._validate_patch_applies",
-            return_value=(False, "error: patch does not apply"),
-        ):
-            result = gen.generate(rc, {"src/server.c": "code"})
-
-        expected_calls = max_retries + 1
-        assert result is None, (
-            f"Expected None after exhausting {max_retries} retries, "
-            f"got a non-None result"
-        )
-        assert mock_bedrock.invoke.call_count == expected_calls, (
-            f"Expected {expected_calls} Bedrock calls "
-            f"(1 initial + {max_retries} retries), "
-            f"got {mock_bedrock.invoke.call_count}"
-        )

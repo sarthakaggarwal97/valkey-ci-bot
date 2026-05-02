@@ -1,0 +1,14 @@
+{
+    "name": "pr-117-empty-files",
+    "repo": "sarthakaggarwal97/valkey",
+    "pr_number": 117,
+    "description": "Backport PR where conflict resolution deleted networking.c and server.h entirely",
+    "expected_findings": [
+        {"path": "src/networking.c", "description": "File is empty after conflict resolution", "severity": "critical"},
+        {"path": "src/server.h", "description": "File is empty after conflict resolution", "severity": "critical"},
+        {"path": "src/cluster_legacy.c", "description": "max() macro undefined because server.h is empty", "severity": "high"}
+    ],
+    "ground_truth_root_cause": "Whitespace-only fast path in conflict resolver matched empty strings and wrote empty content",
+    "ground_truth_fix_files": ["src/networking.c", "src/server.h"],
+    "tags": ["backport", "conflict-resolution", "critical"]
+}

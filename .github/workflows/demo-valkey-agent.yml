@@ -18,11 +18,6 @@ on:
         required: false
         default: "examples/valkey-acceptance.yml"
         type: string
-      replay_run_models:
-        description: "Run Bedrock model passes in the replay lab."
-        required: false
-        default: false
-        type: boolean
       run_daily:
         description: "Run the Daily monitor as part of the demo bundle."
         required: false
@@ -123,7 +118,6 @@ jobs:
           RUN_DASHBOARD: ${{ github.event.inputs.run_dashboard || 'true' }}
           RUN_REPLAY: ${{ github.event.inputs.run_replay || 'true' }}
           REPLAY_MANIFEST: ${{ github.event.inputs.replay_manifest || 'examples/valkey-acceptance.yml' }}
-          REPLAY_RUN_MODELS: ${{ github.event.inputs.replay_run_models || 'false' }}
           RUN_DAILY: ${{ github.event.inputs.run_daily || 'true' }}
           DAILY_DRY_RUN: ${{ github.event.inputs.daily_dry_run || 'true' }}
           DAILY_MAX_RUNS: ${{ github.event.inputs.daily_max_runs || '' }}
@@ -185,9 +179,6 @@ jobs:
           fi
           if [[ "${RUN_REPLAY}" == "true" ]]; then
             args+=(--run-replay)
-          fi
-          if [[ "${REPLAY_RUN_MODELS}" == "true" ]]; then
-            args+=(--replay-run-models)
           fi
           if [[ "${RUN_DAILY}" == "true" ]]; then
             args+=(--run-daily)

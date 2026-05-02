@@ -45,7 +45,6 @@ def _mock_event_ledger():
 
 
 @patch("scripts.monitor_fuzzer_runs.RateLimiter")
-@patch("scripts.monitor_fuzzer_runs._make_retriever")
 @patch("scripts.monitor_fuzzer_runs.FuzzerIssuePublisher")
 @patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
 @patch("scripts.monitor_fuzzer_runs.Github")
@@ -55,7 +54,6 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
     mock_github_cls,
     mock_analyzer_cls,
     mock_issue_publisher_cls,
-    mock_make_retriever,
     mock_rate_limiter_cls,
     _mock_event_ledger,
 ) -> None:
@@ -67,7 +65,6 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
     repo = MagicMock()
     repo.get_workflow.return_value = workflow
     mock_github_cls.return_value.get_repo.return_value = repo
-    mock_make_retriever.return_value = None
     mock_issue_publisher_cls.return_value.upsert_issue.return_value = (
         "created",
         "https://github.com/valkey-io/valkey-fuzzer/issues/1",
@@ -116,8 +113,10 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
     mock_issue_publisher_cls.return_value.upsert_issue.assert_called_once()
     mock_rate_limiter_cls.return_value.load.assert_called_once()
     mock_rate_limiter_cls.return_value.save.assert_called_once()
-    _, make_kwargs = mock_make_retriever.call_args
-    assert make_kwargs["rate_limiter"] is mock_rate_limiter_cls.return_value
+    # FuzzerRunAnalyzer is built without a Bedrock retriever (retriever arg
+    # is no longer passed from monitor()).
+    _, analyzer_kwargs = mock_analyzer_cls.call_args
+    assert "retriever" not in analyzer_kwargs
     state_store.mark_seen.assert_called_once_with(
         "valkey-io/valkey-fuzzer:fuzzer-run.yml:schedule",
         last_seen_run_id=102,
@@ -146,7 +145,6 @@ def test_monitor_analyzes_new_runs_and_updates_watermark(
 
 
 @patch("scripts.monitor_fuzzer_runs.RateLimiter")
-@patch("scripts.monitor_fuzzer_runs._make_retriever")
 @patch("scripts.monitor_fuzzer_runs.FuzzerIssuePublisher")
 @patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
 @patch("scripts.monitor_fuzzer_runs.Github")
@@ -156,7 +154,6 @@ def test_monitor_stops_after_analysis_error_and_preserves_watermark(
     mock_github_cls,
     mock_analyzer_cls,
     mock_issue_publisher_cls,
-    mock_make_retriever,
     mock_rate_limiter_cls,
     _mock_event_ledger,
 ) -> None:
@@ -168,7 +165,6 @@ def test_monitor_stops_after_analysis_error_and_preserves_watermark(
     repo = MagicMock()
     repo.get_workflow.return_value = workflow
     mock_github_cls.return_value.get_repo.return_value = repo
-    mock_make_retriever.return_value = None
 
     analyzer = mock_analyzer_cls.return_value
     analyzer.analyze_workflow_run.side_effect = RuntimeError("bad artifact")
@@ -187,7 +183,6 @@ def test_monitor_stops_after_analysis_error_and_preserves_watermark(
 
 
 @patch("scripts.monitor_fuzzer_runs.RateLimiter")
-@patch("scripts.monitor_fuzzer_runs._make_retriever")
 @patch("scripts.monitor_fuzzer_runs.FuzzerIssuePublisher")
 @patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
 @patch("scripts.monitor_fuzzer_runs.Github")
@@ -197,7 +192,6 @@ def test_monitor_dry_run_does_not_analyze_or_advance_state(
     mock_github_cls,
     mock_analyzer_cls,
     mock_issue_publisher_cls,
-    mock_make_retriever,
     mock_rate_limiter_cls,
     _mock_event_ledger,
 ) -> None:
@@ -209,7 +203,6 @@ def test_monitor_dry_run_does_not_analyze_or_advance_state(
     repo = MagicMock()
     repo.get_workflow.return_value = workflow
     mock_github_cls.return_value.get_repo.return_value = repo
-    mock_make_retriever.return_value = None
 
     result = monitor(_args(dry_run=True))
 
@@ -225,3 +218,71 @@ def test_monitor_dry_run_does_not_analyze_or_advance_state(
         "valkey-io/valkey-fuzzer:fuzzer-run:101",
         workflow_file="fuzzer-run.yml",
     )
+
+
+@patch("scripts.monitor_fuzzer_runs.RateLimiter")
+@patch("scripts.monitor_fuzzer_runs.FuzzerIssuePublisher")
+@patch("scripts.monitor_fuzzer_runs.FuzzerRunAnalyzer")
+@patch("scripts.monitor_fuzzer_runs.Github")
+@patch("scripts.monitor_fuzzer_runs.MonitorStateStore")
+def test_monitor_bounds_run_iteration_by_max_runs(
+    mock_state_store_cls,
+    mock_github_cls,
+    mock_analyzer_cls,
+    mock_issue_publisher_cls,
+    mock_rate_limiter_cls,
+    _mock_event_ledger,
+) -> None:
+    """Cold-start with a stale watermark must not walk unbounded pages.
+
+    Regression guard: previously max_runs was only applied via a post-loop
+    slice, so the iterator consumed every remaining run (and triggered
+    paginated API calls) before truncation. With the early break, we stop
+    after exactly max_runs iterations.
+    """
+    state_store = mock_state_store_cls.return_value
+    # Simulate cold start: no watermark, so every run is "fresh".
+    state_store.get_last_seen_run_id.return_value = 0
+
+    # Pretend the workflow has 50 completed runs available (e.g. the
+    # paginated listing could materialize thousands). Track how many the
+    # monitor actually consumes via the iterator protocol.
+    available_runs = [_run(2000 - i, "success") for i in range(50)]
+    consumed = {"count": 0}
+
+    def _counting_iter():
+        for run in available_runs:
+            consumed["count"] += 1
+            yield run
+
+    workflow = MagicMock()
+    # Important: return a fresh iterator so get_runs() behaves like the
+    # paginated PyGithub iterable (not a cached list).
+    workflow.get_runs.return_value = _counting_iter()
+    repo = MagicMock()
+    repo.get_workflow.return_value = workflow
+    mock_github_cls.return_value.get_repo.return_value = repo
+
+    analyzer = mock_analyzer_cls.return_value
+    analyzer.analyze_workflow_run.return_value = MagicMock(
+        run_id=0,
+        run_url="https://example.com/run",
+        conclusion="success",
+        overall_status="normal",
+        triage_verdict="expected-chaos-noise",
+        suggested_labels=[],
+        scenario_id="seed",
+        seed="0",
+        anomalies=[],
+        normal_signals=["ok"],
+        summary="Healthy run.",
+        reproduction_hint="valkey-fuzzer cluster --seed 0",
+    )
+
+    max_runs = 3
+    result = monitor(_args(max_runs=max_runs))
+
+    # The monitor must collect at most max_runs and stop iterating.
+    assert consumed["count"] == max_runs
+    assert result["new_run_count"] == max_runs
+    assert len(result["runs"]) == max_runs

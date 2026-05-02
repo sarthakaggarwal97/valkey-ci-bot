@@ -119,7 +119,6 @@ def test_run_demo_writes_report_and_site(monkeypatch, tmp_path) -> None:
         review_pr_number=0,
         review_config_path=".github/pr-review-bot.yml",
         replay_manifest="examples/valkey-acceptance.yml",
-        replay_run_models=False,
         run_dashboard=True,
         run_replay=True,
         run_daily=False,

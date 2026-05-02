@@ -237,3 +237,44 @@ jobs:
     assert "`test-ubuntu-latest`" in guidance
     assert "./runtest --verbose --dump-logs" in guidance
     assert "integration-tests.instructions.md" in guidance
+
+
+def test_render_context_summary_reports_subsystems_and_instruction_count() -> None:
+    context = build_valkey_repo_context(
+        "valkey-io/valkey",
+        "unstable",
+        ref="abc123",
+        labels={},
+        copilot_instructions="",
+        instruction_files={
+            ".github/instructions/core-engine.instructions.md": (
+                "---\napplyTo:\n  - \"src/**/*.{c,h}\"\n---\n"
+                "Core engine files need architectural care."
+            ),
+            ".github/instructions/integration-tests.instructions.md": (
+                "---\napplyTo:\n  - \"tests/**/*.tcl\"\n---\n"
+                "Avoid timing-dependent Tcl tests."
+            ),
+        },
+        workflow_files={},
+    )
+
+    summary = context.render_context_summary(
+        ["src/cluster.c", "src/replication.c", "tests/unit/cluster/foo.tcl"]
+    )
+    assert summary.startswith("Valkey context:")
+    assert "subsystems=cluster,replication" in summary
+    assert "instructions=2" in summary
+
+
+def test_render_context_summary_is_generic_without_matches() -> None:
+    context = build_valkey_repo_context(
+        "valkey-io/valkey",
+        "unstable",
+        ref="abc123",
+        labels={},
+        copilot_instructions="",
+        instruction_files={},
+        workflow_files={},
+    )
+    assert context.render_context_summary(["README.md"]) == "Valkey context: generic"

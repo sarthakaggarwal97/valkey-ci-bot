@@ -74,9 +74,4 @@ workflow_cases:
       - "agent-dashboard.html"
       - "Upload dashboard artifact"
 
-  - name: "knowledge base refresh workflow"
-    workflow_path: .github/workflows/refresh-bedrock-kb.yml
-    required_strings:
-      - "scripts.bedrock_kb_refresh"
-      - "aws-actions/configure-aws-credentials@v5"
-      - "python \"${args[@]}\""
+

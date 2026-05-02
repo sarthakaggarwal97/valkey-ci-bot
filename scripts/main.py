@@ -16,11 +16,8 @@ from urllib import request as urllib_request
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import boto3
 from github import Auth, Github
 
-from scripts.bedrock_client import BedrockClient
-from scripts.bedrock_retriever import BedrockRetriever
 from scripts.config import BotConfig, ProjectContext, load_config, load_config_text
 from scripts.event_ledger import EventLedger
 from scripts.failure_detector import FailureDetector
@@ -1106,38 +1103,9 @@ def run_pipeline(
         head_branch=workflow_run.head_branch,
     )
 
-    # Build Bedrock-backed components
-    bedrock_kwargs: dict = {}
-    if aws_region:
-        bedrock_kwargs["client"] = boto3.client("bedrock-runtime", region_name=aws_region)
-    bedrock_client = BedrockClient(config, rate_limiter=rate_limiter, **bedrock_kwargs)
-
-    # Wire the AI fallback parser: invoked only when deterministic parsers
-    # fail to extract any structured failure. Default enabled; operators
-    # can disable via config.ai_fallback_parser_enabled=false.
-    if use_claude_fix:
-        logger.info("Claude Code remediation enabled; skipping AI fallback parser.")
-    elif getattr(config, "ai_fallback_parser_enabled", True):
-        from scripts.parsers.ai_fallback_parser import AIFallbackParser
-        parser_router.set_fallback(AIFallbackParser(bedrock_client))
-
-    retriever = None
-    retrieval_enabled = config.retrieval.enabled and any([
-        config.retrieval.code_knowledge_base_id,
-        config.retrieval.docs_knowledge_base_id,
-    ])
-    if retrieval_enabled:
-        retriever = BedrockRetriever(
-            boto3.client("bedrock-agent-runtime", region_name=aws_region),
-            metric_recorder=rate_limiter.record_ai_metric,
-        )
-    root_cause_analyzer = RootCauseAnalyzer(bedrock_client, gh, thinking_budget=config.thinking_budget)
-    root_cause_analyzer.with_retriever(retriever, config.retrieval)
-    fix_generator = FixGenerator(
-        bedrock_client, config,
-        github_client=gh, repo_full_name=repo_name,
-    )
-    fix_generator.with_retriever(retriever, config.retrieval)
+    # Build analysis components (Claude Code-backed; no Bedrock wiring).
+    root_cause_analyzer = RootCauseAnalyzer(gh, github_token=github_token)
+    fix_generator = FixGenerator(config, repo_full_name=repo_name)
 
     # Build validation runner and PR manager (allow injection for testing)
     if validation_runner is None:
@@ -1282,7 +1250,7 @@ def run_pipeline(
 
     # Process each selected failure through Claude Code or the legacy Analyze → Fix → Validate → PR flow.
     # Cache root cause results so correlated failures (same commit + error
-    # signature) share a single analysis instead of redundant Bedrock calls.
+    # signature) share a single analysis instead of redundant Claude Code calls.
     _root_cause_cache: dict[str, tuple[RootCauseReport | None, str]] = {}
 
     for candidate in prepared_candidates:
@@ -1339,15 +1307,6 @@ def run_pipeline(
                     summary.add_result(job.name, failure_id, "error")
                 continue
             # --- End Claude Code pipeline ---
-
-            # Check token budget before Bedrock-backed stages. Claude Code is not
-            # metered by this limiter, so it runs before this guard.
-            if not rate_limiter.can_use_tokens(1):
-                logger.warning(
-                    "Skipping job %s: token-budget-exhausted.", job.name,
-                )
-                summary.add_result(job.name, "", "skipped-token-budget-exhausted")
-                continue
 
             existing_campaign = (
                 failure_store.get_flaky_campaign(fingerprint)
@@ -1957,7 +1916,7 @@ def main() -> None:
     parser.add_argument("--token", required=True, help="GitHub token")
     parser.add_argument("--state-token", default=None, help="GitHub token for agent-state storage")
     parser.add_argument("--state-repo", default=None, help="Repository full name used for agent-state persistence")
-    parser.add_argument("--aws-region", default=None, help="AWS region for Bedrock client")
+    parser.add_argument("--aws-region", default=None, help="AWS region (retained for backward compatibility; unused)")
     parser.add_argument("--mode", default="analyze", choices=["analyze", "reconcile"],
                         help="Pipeline mode: 'analyze' for normal failure processing, 'reconcile' for draining queued failures")
     parser.add_argument(
