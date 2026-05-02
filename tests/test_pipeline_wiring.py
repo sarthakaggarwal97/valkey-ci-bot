@@ -823,7 +823,6 @@ class TestRunPipeline:
     @patch("scripts.main.FailureDetector")
     @patch("scripts.main.LogRetriever")
     @patch("scripts.main.FailureStore")
-    @patch("scripts.main.BedrockClient")
     @patch("scripts.main.RootCauseAnalyzer")
     @patch("scripts.main.FixGenerator")
     @patch("scripts.main.ValidationRunner")
@@ -834,7 +833,6 @@ class TestRunPipeline:
         mock_validation_runner,
         mock_fix_generator,
         mock_root_cause_analyzer,
-        mock_bedrock_client,
         mock_failure_store,
         mock_log_retriever,
         mock_detector,
@@ -931,7 +929,6 @@ class TestRunPipeline:
     @patch("scripts.main.FailureDetector")
     @patch("scripts.main.LogRetriever")
     @patch("scripts.main.FailureStore")
-    @patch("scripts.main.BedrockClient")
     @patch("scripts.main.RootCauseAnalyzer")
     @patch("scripts.main.FixGenerator")
     @patch("scripts.main.ValidationRunner")
@@ -942,7 +939,6 @@ class TestRunPipeline:
         mock_validation_runner,
         mock_fix_generator,
         mock_root_cause_analyzer,
-        mock_bedrock_client,
         mock_failure_store,
         mock_log_retriever,
         mock_detector,
@@ -1060,7 +1056,6 @@ class TestRunPipeline:
     @patch("scripts.main.FailureDetector")
     @patch("scripts.main.LogRetriever")
     @patch("scripts.main.FailureStore")
-    @patch("scripts.main.BedrockClient")
     @patch("scripts.main.RootCauseAnalyzer")
     @patch("scripts.main.FixGenerator")
     @patch("scripts.main.ValidationRunner")
@@ -1071,7 +1066,6 @@ class TestRunPipeline:
         mock_validation_runner,
         mock_fix_generator,
         mock_root_cause_analyzer,
-        mock_bedrock_client,
         mock_failure_store,
         mock_log_retriever,
         mock_detector,
@@ -1167,7 +1161,6 @@ class TestRunPipeline:
     @patch("scripts.main.FailureDetector")
     @patch("scripts.main.LogRetriever")
     @patch("scripts.main.FailureStore")
-    @patch("scripts.main.BedrockClient")
     @patch("scripts.main.RootCauseAnalyzer")
     @patch("scripts.main.FixGenerator")
     @patch("scripts.main.ValidationRunner")
@@ -1178,7 +1171,6 @@ class TestRunPipeline:
         mock_validation_runner,
         mock_fix_generator,
         mock_root_cause_analyzer,
-        mock_bedrock_client,
         mock_failure_store,
         mock_log_retriever,
         mock_detector,
@@ -1268,7 +1260,6 @@ class TestRunPipeline:
     @patch("scripts.main.FailureDetector")
     @patch("scripts.main.LogRetriever")
     @patch("scripts.main.FailureStore")
-    @patch("scripts.main.BedrockClient")
     @patch("scripts.main.RootCauseAnalyzer")
     @patch("scripts.main.FixGenerator")
     @patch("scripts.main.ValidationRunner")
@@ -1279,7 +1270,6 @@ class TestRunPipeline:
         mock_validation_runner,
         mock_fix_generator,
         mock_root_cause_analyzer,
-        mock_bedrock_client,
         mock_failure_store,
         mock_log_retriever,
         mock_detector,
@@ -1365,7 +1355,6 @@ class TestRunPipeline:
     @patch("scripts.main.FailureDetector")
     @patch("scripts.main.LogRetriever")
     @patch("scripts.main.FailureStore")
-    @patch("scripts.main.BedrockClient")
     @patch("scripts.main.RootCauseAnalyzer")
     @patch("scripts.main.FixGenerator")
     @patch("scripts.main.ValidationRunner")
@@ -1376,7 +1365,6 @@ class TestRunPipeline:
         mock_validation_runner,
         mock_fix_generator,
         mock_root_cause_analyzer,
-        mock_bedrock_client,
         mock_failure_store,
         mock_log_retriever,
         mock_detector,
@@ -1419,7 +1407,6 @@ class TestRunPipeline:
     @patch("scripts.main.FailureDetector")
     @patch("scripts.main.LogRetriever")
     @patch("scripts.main.FailureStore")
-    @patch("scripts.main.BedrockClient")
     @patch("scripts.main.RootCauseAnalyzer")
     @patch("scripts.main.FixGenerator")
     @patch("scripts.main.ValidationRunner")
@@ -1430,7 +1417,6 @@ class TestRunPipeline:
         mock_validation_runner,
         mock_fix_generator,
         mock_root_cause_analyzer,
-        mock_bedrock_client,
         mock_failure_store,
         mock_log_retriever,
         mock_detector,
@@ -1509,7 +1495,6 @@ class TestRunPipeline:
     @patch("scripts.main.FailureDetector")
     @patch("scripts.main.LogRetriever")
     @patch("scripts.main.FailureStore")
-    @patch("scripts.main.BedrockClient")
     @patch("scripts.main.RootCauseAnalyzer")
     @patch("scripts.main.FixGenerator")
     @patch("scripts.main.ValidationRunner")
@@ -1520,7 +1505,6 @@ class TestRunPipeline:
         mock_validation_runner,
         mock_fix_generator,
         mock_root_cause_analyzer,
-        mock_bedrock_client,
         mock_failure_store,
         mock_log_retriever,
         mock_detector,
@@ -1606,7 +1590,6 @@ class TestRunPipeline:
     @patch("scripts.main.FailureDetector")
     @patch("scripts.main.LogRetriever")
     @patch("scripts.main.FailureStore")
-    @patch("scripts.main.BedrockClient")
     @patch("scripts.main.RootCauseAnalyzer")
     @patch("scripts.main.FixGenerator")
     @patch("scripts.main.ValidationRunner")
@@ -1617,7 +1600,6 @@ class TestRunPipeline:
         mock_validation_runner,
         mock_fix_generator,
         mock_root_cause_analyzer,
-        mock_bedrock_client,
         mock_failure_store,
         mock_log_retriever,
         mock_detector,
@@ -1713,14 +1695,12 @@ class TestRunPipeline:
         failure_store.record_flaky_campaign_attempt.assert_called_once()
         failure_store.record_queued_pr.assert_called_once()
 
-    @patch("scripts.main.boto3.client")
     @patch("scripts.main._build_workflow_run")
     @patch("scripts.main._load_runtime_config")
     @patch("scripts.main.Github")
     @patch("scripts.main.FailureDetector")
     @patch("scripts.main.LogRetriever")
     @patch("scripts.main.FailureStore")
-    @patch("scripts.main.BedrockClient")
     @patch("scripts.main.RootCauseAnalyzer")
     @patch("scripts.main.FixGenerator")
     @patch("scripts.main.ValidationRunner")
@@ -1731,14 +1711,12 @@ class TestRunPipeline:
         mock_validation_runner,
         mock_fix_generator,
         mock_root_cause_analyzer,
-        mock_bedrock_client,
         mock_failure_store,
         mock_log_retriever,
         mock_detector,
         mock_gh,
         mock_load_config,
         mock_build_workflow_run,
-        mock_boto_client,
     ):
         workflow_run = WorkflowRun(
             id=1,
@@ -1817,128 +1795,6 @@ class TestRunPipeline:
             repeat_count=100,
         )
         failure_store.record_queued_pr.assert_called_once()
-
-    @patch("scripts.main.boto3.client")
-    @patch("scripts.main._build_workflow_run")
-    @patch("scripts.main._load_runtime_config")
-    @patch("scripts.main.Github")
-    @patch("scripts.main.FailureDetector")
-    @patch("scripts.main.LogRetriever")
-    @patch("scripts.main.FailureStore")
-    @patch("scripts.main.BedrockClient")
-    @patch("scripts.main.RootCauseAnalyzer")
-    @patch("scripts.main.FixGenerator")
-    @patch("scripts.main.ValidationRunner")
-    @patch("scripts.main.PRManager")
-    def test_wires_retriever_when_retrieval_is_enabled(
-        self,
-        mock_pr_manager,
-        mock_validation_runner,
-        mock_fix_generator,
-        mock_root_cause_analyzer,
-        mock_bedrock_client,
-        mock_failure_store,
-        mock_log_retriever,
-        mock_detector,
-        mock_gh,
-        mock_load_config,
-        mock_build_workflow_run,
-        mock_boto_client,
-    ):
-        workflow_run = WorkflowRun(
-            id=1,
-            name="CI",
-            event="push",
-            head_sha="abc123",
-            head_branch="unstable",
-            head_repository="owner/repo",
-            is_fork=False,
-            conclusion="failure",
-            workflow_file="ci.yml",
-        )
-        mock_build_workflow_run.return_value = workflow_run
-        config = BotConfig(monitored_workflows=["ci.yml"])
-        config.retrieval.enabled = True
-        config.retrieval.code_knowledge_base_id = "CODEKB"
-        mock_load_config.return_value = config
-
-        mock_detector.return_value.detect.return_value = []
-        mock_boto_client.side_effect = [MagicMock(), MagicMock()]
-        mock_gh.return_value.get_repo.return_value.get_contents.side_effect = (
-            GithubException(404, {"message": "missing state"})
-        )
-
-        run_pipeline(
-            "owner/repo",
-            1,
-            ".github/ci-failure-bot.yml",
-            "token",
-            aws_region="us-east-1",
-        )
-
-        mock_boto_client.assert_any_call("bedrock-runtime", region_name="us-east-1")
-        mock_boto_client.assert_any_call("bedrock-agent-runtime", region_name="us-east-1")
-        assert mock_root_cause_analyzer.return_value.with_retriever.call_count == 1
-        assert mock_fix_generator.return_value.with_retriever.call_count == 1
-
-    @patch("scripts.main.boto3.client")
-    @patch("scripts.main._build_workflow_run")
-    @patch("scripts.main._load_runtime_config")
-    @patch("scripts.main.Github")
-    @patch("scripts.main.FailureDetector")
-    @patch("scripts.main.LogRetriever")
-    @patch("scripts.main.FailureStore")
-    @patch("scripts.main.BedrockClient")
-    @patch("scripts.main.RootCauseAnalyzer")
-    @patch("scripts.main.FixGenerator")
-    @patch("scripts.main.ValidationRunner")
-    @patch("scripts.main.PRManager")
-    def test_skips_retriever_client_when_no_kb_ids_are_configured(
-        self,
-        mock_pr_manager,
-        mock_validation_runner,
-        mock_fix_generator,
-        mock_root_cause_analyzer,
-        mock_bedrock_client,
-        mock_failure_store,
-        mock_log_retriever,
-        mock_detector,
-        mock_gh,
-        mock_load_config,
-        mock_build_workflow_run,
-        mock_boto_client,
-    ):
-        workflow_run = WorkflowRun(
-            id=1,
-            name="CI",
-            event="push",
-            head_sha="abc123",
-            head_branch="unstable",
-            head_repository="owner/repo",
-            is_fork=False,
-            conclusion="failure",
-            workflow_file="ci.yml",
-        )
-        mock_build_workflow_run.return_value = workflow_run
-        config = BotConfig(monitored_workflows=["ci.yml"])
-        config.retrieval.enabled = True
-        mock_load_config.return_value = config
-
-        mock_detector.return_value.detect.return_value = []
-        mock_boto_client.return_value = MagicMock()
-        mock_gh.return_value.get_repo.return_value.get_contents.side_effect = (
-            GithubException(404, {"message": "missing state"})
-        )
-
-        run_pipeline(
-            "owner/repo",
-            1,
-            ".github/ci-failure-bot.yml",
-            "token",
-            aws_region="us-east-1",
-        )
-
-        mock_boto_client.assert_called_once_with("bedrock-runtime", region_name="us-east-1")
 
 
 class TestProcessFailure:

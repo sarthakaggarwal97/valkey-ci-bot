@@ -7,17 +7,15 @@ import json
 import logging
 import sys
 from dataclasses import dataclass
+from itertools import islice
 from pathlib import Path
 from typing import Any
-
-import boto3
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from github import Auth, Github
 
-from scripts.bedrock_retriever import BedrockRetriever
 from scripts.config import BotConfig, load_config
 from scripts.event_ledger import EventLedger
 from scripts.fuzzer_issue_publisher import FuzzerIssuePublisher
@@ -105,13 +103,19 @@ def _fetch_recent_completed_runs(args: MonitorArgs, last_seen_run_id: int) -> li
     workflow = repo.get_workflow(args.workflow_file)
     runs = workflow.get_runs(event=args.event, status="completed")
 
+    # Strictly bound iteration via islice. The PyGithub iterable is paginated,
+    # so without this a cold start with an old last_seen_run_id would walk
+    # thousands of runs via repeated API calls. islice guarantees we pull at
+    # most args.max_runs items from the upstream iterator.
     fresh_runs: list[Any] = []
-    for run in runs:
+    for run in islice(runs, args.max_runs):
         if run.id <= last_seen_run_id:
             break
         fresh_runs.append(run)
 
     fresh_runs.sort(key=lambda run: run.id)
+    # Belt-and-suspenders: even if the loop above is altered later, never
+    # return more than max_runs entries to callers.
     return fresh_runs[: args.max_runs]
 
 
@@ -120,26 +124,6 @@ def _load_local_bot_config(config_path: str) -> BotConfig:
     if not path.exists():
         return BotConfig()
     return load_config(path)
-
-
-def _make_retriever(
-    config: BotConfig,
-    aws_region: str | None,
-    *,
-    rate_limiter: RateLimiter | None = None,
-) -> BedrockRetriever | None:
-    client_kwargs: dict[str, str] = {}
-    if aws_region:
-        client_kwargs["region_name"] = aws_region
-    retriever: BedrockRetriever | None = None
-    if config.retrieval.enabled:
-        retriever = BedrockRetriever(
-            boto3.client("bedrock-agent-runtime", **client_kwargs),
-            metric_recorder=(
-                rate_limiter.record_ai_metric if rate_limiter is not None else None
-            ),
-        )
-    return retriever
 
 
 def monitor(args: MonitorArgs) -> dict[str, object]:
@@ -159,16 +143,9 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
         state_repo_full_name=args.state_repo,
     )
     rate_limiter.load()
-    retriever = _make_retriever(
-        config,
-        args.aws_region,
-        rate_limiter=rate_limiter,
-    )
     analyzer = FuzzerRunAnalyzer(
         target_gh,
         github_token=args.target_token,
-        retriever=retriever,
-        retrieval_config=config.retrieval,
     )
     issue_publisher = FuzzerIssuePublisher(target_gh)
     monitor_key = _build_monitor_key(args.target_repo, args.workflow_file, args.event)

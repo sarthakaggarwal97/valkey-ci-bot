@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, PropertyMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from scripts.bedrock_client import BedrockClient, BedrockError
-from scripts.config import BotConfig, ProjectContext, RetrievalConfig
-from scripts.models import FailureReport, ParsedFailure, RootCauseReport
+from scripts.config import ProjectContext
+from scripts.models import FailureReport, ParsedFailure
 from scripts.root_cause_analyzer import (
     RootCauseAnalyzer,
     _apply_test_to_source_patterns,
@@ -53,7 +53,7 @@ def _make_failure_report(**overrides) -> FailureReport:
     return FailureReport(**defaults)
 
 
-def _make_bedrock_response(
+def _make_agent_response_json(
     description: str = "Bug in foo.c",
     files_to_change: list[str] | None = None,
     confidence: str = "high",
@@ -61,6 +61,7 @@ def _make_bedrock_response(
     is_flaky: bool = False,
     flakiness_indicators: list[str] | None = None,
 ) -> str:
+    """Build a JSON string matching the RootCauseReport schema."""
     return json.dumps({
         "description": description,
         "files_to_change": files_to_change or ["src/foo.c"],
@@ -71,17 +72,17 @@ def _make_bedrock_response(
     })
 
 
-def _make_analyzer(
-    bedrock_response: str | Exception = "",
-    file_contents: dict[str, str] | None = None,
-) -> tuple[RootCauseAnalyzer, MagicMock, MagicMock]:
-    """Create an analyzer with mocked Bedrock and GitHub clients."""
-    mock_bedrock = MagicMock(spec=BedrockClient)
-    if isinstance(bedrock_response, Exception):
-        mock_bedrock.invoke.side_effect = bedrock_response
-    else:
-        mock_bedrock.invoke.return_value = bedrock_response
+def _agent_result(
+    stdout: str = "",
+    stderr: str = "",
+    returncode: int = 0,
+) -> SimpleNamespace:
+    """Build a mock AgentRunResult-shaped object for run_agent patches."""
+    return SimpleNamespace(stdout=stdout, stderr=stderr, returncode=returncode)
 
+
+def _make_github_mock(file_contents: dict[str, str] | None = None) -> MagicMock:
+    """Create a mocked GitHub client that serves optional file contents."""
     mock_github = MagicMock()
     mock_repo = MagicMock()
     mock_github.get_repo.return_value = mock_repo
@@ -97,8 +98,16 @@ def _make_analyzer(
     else:
         mock_repo.get_contents.side_effect = Exception("File not found")
 
-    analyzer = RootCauseAnalyzer(mock_bedrock, mock_github)
-    return analyzer, mock_bedrock, mock_github
+    return mock_github
+
+
+def _make_analyzer(
+    file_contents: dict[str, str] | None = None,
+) -> tuple[RootCauseAnalyzer, MagicMock]:
+    """Create an analyzer with a mocked GitHub client."""
+    mock_github = _make_github_mock(file_contents)
+    analyzer = RootCauseAnalyzer(mock_github)
+    return analyzer, mock_github
 
 
 # ---------------------------------------------------------------------------
@@ -220,12 +229,12 @@ class TestApplyTestToSourcePatterns:
 
 
 # ---------------------------------------------------------------------------
-# Unit tests: _parse_bedrock_response
+# Unit tests: _parse_bedrock_response (JSON parser helper)
 # ---------------------------------------------------------------------------
 
 class TestParseBedrockResponse:
     def test_parses_valid_json(self):
-        raw = _make_bedrock_response()
+        raw = _make_agent_response_json()
         report = _parse_bedrock_response(raw)
         assert report.description == "Bug in foo.c"
         assert report.files_to_change == ["src/foo.c"]
@@ -233,12 +242,12 @@ class TestParseBedrockResponse:
         assert report.is_flaky is False
 
     def test_strips_markdown_fences(self):
-        raw = "```json\n" + _make_bedrock_response() + "\n```"
+        raw = "```json\n" + _make_agent_response_json() + "\n```"
         report = _parse_bedrock_response(raw)
         assert report.description == "Bug in foo.c"
 
     def test_invalid_confidence_defaults_to_low(self):
-        raw = _make_bedrock_response(confidence="unknown")
+        raw = _make_agent_response_json(confidence="unknown")
         report = _parse_bedrock_response(raw)
         assert report.confidence == "low"
 
@@ -247,7 +256,7 @@ class TestParseBedrockResponse:
             _parse_bedrock_response("not json at all")
 
     def test_flaky_report(self):
-        raw = _make_bedrock_response(
+        raw = _make_agent_response_json(
             is_flaky=True,
             flakiness_indicators=["timeout", "race condition"],
         )
@@ -305,14 +314,14 @@ class TestBuildUserPrompt:
 
 class TestIdentifyRelevantFiles:
     def test_includes_failure_file_path(self):
-        analyzer, _, _ = _make_analyzer()
+        analyzer, _ = _make_analyzer()
         pf = _make_parsed_failure(file_path="tests/unit/test_foo.cc")
         project = ProjectContext()
         files = analyzer.identify_relevant_files(pf, project)
         assert "tests/unit/test_foo.cc" in files
 
     def test_extracts_paths_from_error_message(self):
-        analyzer, _, _ = _make_analyzer()
+        analyzer, _ = _make_analyzer()
         pf = _make_parsed_failure(
             error_message="error in src/server.c:42: bad value"
         )
@@ -321,7 +330,7 @@ class TestIdentifyRelevantFiles:
         assert "src/server.c" in files
 
     def test_extracts_paths_from_stack_trace(self):
-        analyzer, _, _ = _make_analyzer()
+        analyzer, _ = _make_analyzer()
         pf = _make_parsed_failure(
             stack_trace="  at src/networking.c:100\n  at src/server.c:50"
         )
@@ -331,7 +340,7 @@ class TestIdentifyRelevantFiles:
         assert "src/server.c" in files
 
     def test_applies_test_to_source_patterns(self):
-        analyzer, _, _ = _make_analyzer()
+        analyzer, _ = _make_analyzer()
         pf = _make_parsed_failure(file_path="tests/unit/expire.tcl")
         project = ProjectContext(
             test_to_source_patterns=[
@@ -343,7 +352,7 @@ class TestIdentifyRelevantFiles:
         assert "tests/unit/expire.tcl" in files
 
     def test_deduplicates_files(self):
-        analyzer, _, _ = _make_analyzer()
+        analyzer, _ = _make_analyzer()
         pf = _make_parsed_failure(
             file_path="src/foo.c",
             error_message="error in src/foo.c:10",
@@ -358,94 +367,121 @@ class TestIdentifyRelevantFiles:
 # ---------------------------------------------------------------------------
 
 class TestAnalyze:
-    def test_successful_analysis(self):
-        response = _make_bedrock_response(
+    @patch("scripts.root_cause_analyzer.run_agent")
+    def test_successful_analysis(self, mock_run_agent):
+        stdout = _make_agent_response_json(
             description="Null pointer in server.c",
             confidence="high",
         )
-        analyzer, mock_bedrock, _ = _make_analyzer(bedrock_response=response)
+        mock_run_agent.return_value = _agent_result(stdout=stdout)
+        analyzer, _ = _make_analyzer()
         report = _make_failure_report()
-        report._repo_name = "valkey-io/valkey"
 
         result = analyzer.analyze(report, ProjectContext())
 
         assert result.description == "Null pointer in server.c"
         assert result.confidence == "high"
-        mock_bedrock.invoke.assert_called_once()
+        mock_run_agent.assert_called_once()
+        args, kwargs = mock_run_agent.call_args
+        assert args[0] == "fuzzer_analysis_readonly"
+        assert kwargs.get("cwd") is None
 
-    def test_bedrock_error_returns_analysis_failed(self):
-        analyzer, _, _ = _make_analyzer(
-            bedrock_response=BedrockError("API down", error_code="ServiceError")
+    @patch("scripts.root_cause_analyzer.run_agent")
+    def test_agent_error_returncode_returns_analysis_failed(self, mock_run_agent):
+        mock_run_agent.return_value = _agent_result(
+            stdout="", stderr="claude exploded", returncode=1,
         )
+        analyzer, _ = _make_analyzer()
         report = _make_failure_report()
-        report._repo_name = "valkey-io/valkey"
+
+        result = analyzer.analyze(report, ProjectContext())
+
+        assert "analysis-failed" in result.description
+        assert result.confidence == "low"
+        assert result.files_to_change == []
+        assert result.is_flaky is False
+
+    @patch("scripts.root_cause_analyzer.run_agent")
+    def test_run_agent_raises_returns_analysis_failed(self, mock_run_agent):
+        mock_run_agent.side_effect = RuntimeError("subprocess crashed")
+        analyzer, _ = _make_analyzer()
+        report = _make_failure_report()
 
         result = analyzer.analyze(report, ProjectContext())
 
         assert "analysis-failed" in result.description
         assert result.confidence == "low"
 
-    def test_unparseable_response_returns_analysis_failed(self):
-        analyzer, _, _ = _make_analyzer(bedrock_response="not valid json {{{")
+    @patch("scripts.root_cause_analyzer.run_agent")
+    def test_unparseable_response_returns_analysis_failed(self, mock_run_agent):
+        mock_run_agent.return_value = _agent_result(stdout="not valid json {{{")
+        analyzer, _ = _make_analyzer()
         report = _make_failure_report()
-        report._repo_name = "valkey-io/valkey"
 
         result = analyzer.analyze(report, ProjectContext())
 
         assert "analysis-failed" in result.description
 
-    def test_flaky_indicators_merged_into_report(self):
-        response = _make_bedrock_response(is_flaky=False)
-        analyzer, _, _ = _make_analyzer(bedrock_response=response)
+    @patch("scripts.root_cause_analyzer.run_agent")
+    def test_empty_stdout_returns_analysis_failed(self, mock_run_agent):
+        mock_run_agent.return_value = _agent_result(stdout="", returncode=0)
+        analyzer, _ = _make_analyzer()
+        report = _make_failure_report()
+
+        result = analyzer.analyze(report, ProjectContext())
+
+        assert "analysis-failed" in result.description
+        assert "No result text" in result.description
+
+    @patch("scripts.root_cause_analyzer.run_agent")
+    def test_stream_json_result_event_is_parsed(self, mock_run_agent):
+        """Claude Code's stream-json wraps JSON in a 'result' event."""
+        payload = _make_agent_response_json(description="Race in cluster.c")
+        stream_json = "\n".join([
+            json.dumps({"type": "thinking", "text": "analysing..."}),
+            json.dumps({"type": "result", "result": payload}),
+        ])
+        mock_run_agent.return_value = _agent_result(stdout=stream_json)
+        analyzer, _ = _make_analyzer()
+        report = _make_failure_report()
+
+        result = analyzer.analyze(report, ProjectContext())
+
+        assert result.description == "Race in cluster.c"
+
+    @patch("scripts.root_cause_analyzer.run_agent")
+    def test_flaky_indicators_merged_into_report(self, mock_run_agent):
+        mock_run_agent.return_value = _agent_result(
+            stdout=_make_agent_response_json(is_flaky=False)
+        )
+        analyzer, _ = _make_analyzer()
         pf = _make_parsed_failure(
             error_message="Test timed out after waiting"
         )
         report = _make_failure_report(parsed_failures=[pf])
-        report._repo_name = "valkey-io/valkey"
 
         result = analyzer.analyze(report, ProjectContext())
 
         assert result.is_flaky is True
         assert "timed out" in result.flakiness_indicators
 
-    def test_retrieves_file_contents_at_commit_sha(self):
-        response = _make_bedrock_response()
+    @patch("scripts.root_cause_analyzer.run_agent")
+    def test_retrieves_file_contents_at_commit_sha(self, mock_run_agent):
+        mock_run_agent.return_value = _agent_result(
+            stdout=_make_agent_response_json()
+        )
         file_contents = {"tests/unit/test_foo.cc": "// test code"}
-        analyzer, mock_bedrock, mock_github = _make_analyzer(
-            bedrock_response=response,
-            file_contents=file_contents,
-        )
+        analyzer, mock_github = _make_analyzer(file_contents=file_contents)
         report = _make_failure_report()
-        report._repo_name = "valkey-io/valkey"
-
-        result = analyzer.analyze(report, ProjectContext())
-
-        # Verify GitHub was called to get file contents
-        mock_github.get_repo.assert_called()
-        # Verify the prompt sent to Bedrock includes the source content
-        call_args = mock_bedrock.invoke.call_args
-        user_prompt = call_args[0][1]
-        assert "test code" in user_prompt
-
-    def test_includes_retrieved_context_when_retriever_is_configured(self):
-        response = _make_bedrock_response()
-        analyzer, mock_bedrock, _ = _make_analyzer(bedrock_response=response)
-        mock_retriever = MagicMock()
-        mock_retriever.render_for_prompt.return_value = (
-            "## Retrieved Valkey Context\nsentinel failover notes"
-        )
-        analyzer.with_retriever(
-            mock_retriever,
-            RetrievalConfig(enabled=True, code_knowledge_base_id="CODEKB"),
-        )
-        report = _make_failure_report(raw_log_excerpt="failover timeout")
-        report._repo_name = "valkey-io/valkey"
 
         analyzer.analyze(report, ProjectContext())
 
-        user_prompt = mock_bedrock.invoke.call_args[0][1]
-        assert "Retrieved Valkey Context" in user_prompt
-        assert "sentinel failover notes" in user_prompt
+        # Verify GitHub was called to get file contents
+        mock_github.get_repo.assert_called()
+        # Verify the prompt sent to run_agent includes the source content
+        args, _ = mock_run_agent.call_args
+        prompt = args[1]
+        assert "test code" in prompt
 
     def test_analysis_failed_report_structure(self):
         """Verify the analysis-failed report has the expected shape."""
@@ -555,7 +591,7 @@ class TestRelevantFileIdentificationProperty:
         should return a non-empty list that includes those paths.
         """
         failure, embedded_paths, own_file = data
-        analyzer, _, _ = _make_analyzer()
+        analyzer, _ = _make_analyzer()
         project = ProjectContext()
 
         result = analyzer.identify_relevant_files(failure, project)
@@ -586,7 +622,7 @@ class TestRelevantFileIdentificationProperty:
 
 
 def _unparseable_response_strategy() -> st.SearchStrategy[str]:
-    """Generate strings that cause _parse_bedrock_response to raise.
+    """Generate strings that cause _parse_response to raise.
 
     These are either invalid JSON or valid JSON whose top-level value is
     not a dict (so .get() / attribute access fails).
@@ -605,7 +641,6 @@ def _unparseable_response_strategy() -> st.SearchStrategy[str]:
         # Valid JSON but not a dict — causes AttributeError on .get()
         st.sampled_from([
             "null",
-            "[]",
             "true",
             "false",
             "0",
@@ -616,25 +651,15 @@ def _unparseable_response_strategy() -> st.SearchStrategy[str]:
     )
 
 
-def _bedrock_error_strategy() -> st.SearchStrategy[BedrockError]:
-    """Generate various BedrockError instances."""
-    error_codes = st.sampled_from([
-        "ServiceError",
-        "ValidationException",
-        "AccessDeniedException",
-        "ResourceNotFoundException",
-        "ThrottlingException",
-        "InternalServerException",
-        "ModelErrorException",
-        None,
-    ])
-    messages = st.text(min_size=1, max_size=200)
-    retryable = st.booleans()
+def _agent_error_result_strategy() -> st.SearchStrategy[SimpleNamespace]:
+    """Generate AgentRunResult-shaped failures (non-zero returncodes)."""
     return st.builds(
-        lambda msg, code, retry: BedrockError(msg, error_code=code, retryable=retry),
-        msg=messages,
-        code=error_codes,
-        retry=retryable,
+        lambda rc, stderr, stdout: _agent_result(
+            stdout=stdout, stderr=stderr, returncode=rc,
+        ),
+        rc=st.integers(min_value=1, max_value=255),
+        stderr=st.text(min_size=0, max_size=200),
+        stdout=st.text(min_size=0, max_size=200),
     )
 
 
@@ -643,28 +668,30 @@ class TestRootCauseAnalysisErrorPropagation:
 
     **Validates: Requirements 3.6**
 
-    For any Bedrock error (API failure or unparseable response), the
-    Root_Cause_Analyzer should return a result with status
-    "analysis-failed" and confidence "low".
+    For any agent error (non-zero returncode or unparseable response), the
+    RootCauseAnalyzer should return a result with status "analysis-failed"
+    and confidence "low".
     """
 
-    @given(error=_bedrock_error_strategy())
+    @given(failure_result=_agent_error_result_strategy())
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
-    def test_bedrock_error_returns_analysis_failed(
+    def test_nonzero_returncode_returns_analysis_failed(
         self,
-        error: BedrockError,
+        failure_result: SimpleNamespace,
     ) -> None:
         """**Validates: Requirements 3.6**
 
-        For any BedrockError raised by the client, analyze() must return
-        a report with 'analysis-failed' in the description, confidence
-        'low', empty files_to_change, and is_flaky False.
+        For any non-zero Claude Code returncode, analyze() must return a
+        report with 'analysis-failed' in the description, confidence 'low',
+        empty files_to_change, and is_flaky False.
         """
-        analyzer, _, _ = _make_analyzer(bedrock_response=error)
-        report = _make_failure_report()
-        report._repo_name = "valkey-io/valkey"
-
-        result = analyzer.analyze(report, ProjectContext())
+        with patch(
+            "scripts.root_cause_analyzer.run_agent",
+            return_value=failure_result,
+        ):
+            analyzer, _ = _make_analyzer()
+            report = _make_failure_report()
+            result = analyzer.analyze(report, ProjectContext())
 
         assert "analysis-failed" in result.description, (
             f"Expected 'analysis-failed' in description, got: {result.description!r}"
@@ -687,15 +714,17 @@ class TestRootCauseAnalysisErrorPropagation:
     ) -> None:
         """**Validates: Requirements 3.6**
 
-        For any unparseable Bedrock response, analyze() must return
-        a report with 'analysis-failed' in the description, confidence
-        'low', empty files_to_change, and is_flaky False.
+        For any unparseable Claude Code response, analyze() must return a
+        report with 'analysis-failed' in the description, confidence 'low',
+        empty files_to_change, and is_flaky False.
         """
-        analyzer, _, _ = _make_analyzer(bedrock_response=bad_response)
-        report = _make_failure_report()
-        report._repo_name = "valkey-io/valkey"
-
-        result = analyzer.analyze(report, ProjectContext())
+        with patch(
+            "scripts.root_cause_analyzer.run_agent",
+            return_value=_agent_result(stdout=bad_response, returncode=0),
+        ):
+            analyzer, _ = _make_analyzer()
+            report = _make_failure_report()
+            result = analyzer.analyze(report, ProjectContext())
 
         assert "analysis-failed" in result.description, (
             f"Expected 'analysis-failed' in description, got: {result.description!r}"

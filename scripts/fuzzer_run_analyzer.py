@@ -9,8 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from scripts.agent_runtime import run_agent
-from scripts.bedrock_retriever import BedrockRetriever
-from scripts.config import RetrievalConfig
 from scripts.fuzzer_incidents import compute_fuzzer_incident_fingerprint
 from scripts.log_retriever import LogRetriever
 from scripts.models import FuzzerRunAnalysis, FuzzerRunContext, FuzzerSignal
@@ -710,28 +708,6 @@ def _build_reproduction_hint(context: FuzzerRunContext, payload_hint: Any) -> st
     return None
 
 
-def _build_retrieval_query(context: FuzzerRunContext, anomalies: list[FuzzerSignal]) -> str:
-    lines = [
-        context.workflow_file,
-        context.scenario_id or "",
-        context.seed or "",
-        context.conclusion,
-    ]
-    if context.results:
-        validation = context.results.get("final_validation")
-        if isinstance(validation, dict):
-            failed_checks = validation.get("failed_checks")
-            if isinstance(failed_checks, list):
-                lines.extend(str(item) for item in failed_checks if item)
-            error_messages = validation.get("error_messages")
-            if isinstance(error_messages, list):
-                lines.extend(str(item) for item in error_messages if item)
-    for anomaly in anomalies[:8]:
-        lines.append(anomaly.title)
-        lines.append(anomaly.evidence)
-    return "\n".join(filter(None, lines))
-
-
 def _collapse_run_log_archive(log_files: dict[str, bytes]) -> str:
     parts: list[str] = []
     for path, payload in sorted(log_files.items()):
@@ -935,8 +911,6 @@ class FuzzerRunAnalyzer:
         github_token: str | None = None,
         artifact_client: WorkflowArtifactClient | None = None,
         log_retriever: LogRetriever | None = None,
-        retriever: BedrockRetriever | None = None,
-        retrieval_config: RetrievalConfig | None = None,
     ) -> None:
         self._gh = github_client
         self._artifact_client = artifact_client or WorkflowArtifactClient(
@@ -947,8 +921,6 @@ class FuzzerRunAnalyzer:
             github_client,
             token=github_token,
         )
-        self._retriever = retriever
-        self._retrieval_config = retrieval_config or RetrievalConfig()
 
     def analyze_workflow_run(
         self,
@@ -1008,12 +980,6 @@ class FuzzerRunAnalyzer:
         anomalies, normal_signals = _extract_observations(context)
 
         retrieved_context = ""
-        if self._retriever is not None:
-            retrieved_context = self._retriever.render_for_prompt(
-                _build_retrieval_query(context, anomalies),
-                self._retrieval_config,
-                section_title="Retrieved Valkey Context",
-            )
 
         model_payload: dict[str, Any] = {}
         model_error = ""
