@@ -138,4 +138,4 @@ def _is_older_release_branch(target_branch: str) -> bool:
         major = int(parts[0])
     except ValueError:
         return False
-    return major < 9
+    return major < _CURRENT_DEV_MAJOR

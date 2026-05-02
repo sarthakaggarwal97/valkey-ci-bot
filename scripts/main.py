@@ -1104,13 +1104,7 @@ def run_pipeline(
     )
 
     # Build analysis components (Claude Code-backed; no Bedrock wiring).
-    if use_claude_fix:
-        logger.info("Claude Code remediation enabled; skipping AI fallback parser.")
-    # AI fallback parser has been removed along with the Bedrock client.
-    # Deterministic parsers handle all log formats; unparseable jobs are
-    # recorded and skipped.
-
-    root_cause_analyzer = RootCauseAnalyzer(gh)
+    root_cause_analyzer = RootCauseAnalyzer(gh, github_token=github_token)
     fix_generator = FixGenerator(config, repo_full_name=repo_name)
 
     # Build validation runner and PR manager (allow injection for testing)
@@ -1313,15 +1307,6 @@ def run_pipeline(
                     summary.add_result(job.name, failure_id, "error")
                 continue
             # --- End Claude Code pipeline ---
-
-            # Check token budget before model-backed stages. Claude Code is not
-            # metered by this limiter, so it runs before this guard.
-            if not rate_limiter.can_use_tokens(1):
-                logger.warning(
-                    "Skipping job %s: token-budget-exhausted.", job.name,
-                )
-                summary.add_result(job.name, "", "skipped-token-budget-exhausted")
-                continue
 
             existing_campaign = (
                 failure_store.get_flaky_campaign(fingerprint)

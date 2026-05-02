@@ -229,7 +229,7 @@ def review_pr(
         f"Your comments appear inline on the PR. Write the way senior maintainers do on GitHub:\n\n"
         f"**Good** (write like this):\n"
         f"- \"This can race with `freeClient` — do we hold the client lock here?\"\n"
-        f"- \"`zmalloc` return isn't checked; OOM here will crash instead of returning a graceful error.\"\n"
+        f"- \"`ztrymalloc` can return NULL here but the caller doesn't check it.\"\n"
         f"- \"Same issue exists in `tls.c:syncSSLRead`, worth addressing as a follow-up.\"\n"
         f"- \"Looks like this reverts commit abc123 — was that intentional?\"\n"
         f"- Use GitHub suggestion blocks for concrete one-line fixes:\n"

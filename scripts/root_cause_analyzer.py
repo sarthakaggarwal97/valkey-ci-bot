@@ -14,6 +14,7 @@ import re
 from typing import Any
 
 from scripts.agent_runtime import run_agent
+from scripts.claude_workspace import claude_workspace
 from scripts.config import ProjectContext
 from scripts.models import FailureReport, ParsedFailure, RootCauseReport
 
@@ -293,13 +294,19 @@ _parse_bedrock_response = _parse_response
 class RootCauseAnalyzer:
     """Claude Code-powered root cause analysis for CI failures.
 
-    Accepts a GitHub client (PyGithub ``Github`` instance) in its constructor.
+    Accepts a GitHub client (PyGithub ``Github`` instance) and optionally a
+    raw GitHub token. The token, when provided, lets the analyzer clone the
+    failing repository at the failure's commit SHA so Claude Code can use its
+    Read/Grep/Glob tools on the real source tree (not just the curated
+    snippets collected via the GitHub API).
+
     The agent itself is invoked via :func:`scripts.agent_runtime.run_agent`
     under the ``fuzzer_analysis_readonly`` profile.
     """
 
-    def __init__(self, github_client: Any):
+    def __init__(self, github_client: Any, *, github_token: str = ""):
         self._github = github_client
+        self._github_token = github_token
         self._domain_context = ""
 
     def with_domain_context(self, domain_context: str | None) -> RootCauseAnalyzer:
@@ -412,8 +419,39 @@ class RootCauseAnalyzer:
 
         prompt = _SYSTEM_PROMPT + "\n\n" + user_content
 
+        # When we know the repo + commit, clone it so Claude Code can use its
+        # Read/Grep/Glob tools on the actual source tree instead of being
+        # limited to the curated snippets in source_contents.
+        repo_name = failure_report.repo_full_name or self._infer_repo_name(failure_report)
+        commit_sha = failure_report.commit_sha or ""
+        use_checkout = bool(repo_name and commit_sha)
+
         try:
-            agent_result = run_agent("fuzzer_analysis_readonly", prompt, cwd=None)
+            if use_checkout:
+                token = self._github_token or None
+                try:
+                    with claude_workspace(
+                        repo_name,
+                        ref=commit_sha,
+                        token=token,
+                        prefix="rca-",
+                        clone_depth=1,
+                    ) as workspace:
+                        agent_result = run_agent(
+                            "fuzzer_analysis_readonly",
+                            prompt,
+                            cwd=workspace.tmpdir,
+                        )
+                except Exception as clone_exc:
+                    logger.warning(
+                        "Checkout for RCA failed (%s); falling back to snippet-only analysis.",
+                        clone_exc,
+                    )
+                    agent_result = run_agent(
+                        "fuzzer_analysis_readonly", prompt, cwd=None,
+                    )
+            else:
+                agent_result = run_agent("fuzzer_analysis_readonly", prompt, cwd=None)
         except Exception as exc:
             logger.error("run_agent raised during root cause analysis: %s", exc)
             return self._analysis_failed_report(str(exc))

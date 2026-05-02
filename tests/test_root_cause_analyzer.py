@@ -386,6 +386,65 @@ class TestAnalyze:
         assert args[0] == "fuzzer_analysis_readonly"
         assert kwargs.get("cwd") is None
 
+    @patch("scripts.root_cause_analyzer.claude_workspace")
+    @patch("scripts.root_cause_analyzer.run_agent")
+    def test_clones_repo_when_repo_and_sha_are_available(
+        self, mock_run_agent, mock_workspace,
+    ):
+        """When repo_full_name + commit_sha are set, RCA runs Claude with
+        cwd pointed at the checkout so Read/Grep/Glob see real source."""
+        stdout = _make_agent_response_json(description="Bug in cluster.c")
+        mock_run_agent.return_value = _agent_result(stdout=stdout)
+
+        # Mock the context manager to yield a fake workspace
+        fake_ws = MagicMock()
+        fake_ws.tmpdir = "/tmp/fake-checkout"
+        mock_workspace.return_value.__enter__.return_value = fake_ws
+        mock_workspace.return_value.__exit__.return_value = False
+
+        analyzer, _ = _make_analyzer()
+        report = _make_failure_report(
+            repo_full_name="valkey-io/valkey",
+            commit_sha="deadbeef1234",
+        )
+
+        analyzer.analyze(report, ProjectContext())
+
+        # claude_workspace should have been called with the repo+sha
+        mock_workspace.assert_called_once()
+        ws_args, ws_kwargs = mock_workspace.call_args
+        assert ws_args[0] == "valkey-io/valkey"
+        assert ws_kwargs.get("ref") == "deadbeef1234"
+
+        # run_agent should have been called with cwd pointed at the workspace
+        mock_run_agent.assert_called_once()
+        _args, kwargs = mock_run_agent.call_args
+        assert kwargs.get("cwd") == "/tmp/fake-checkout"
+
+    @patch("scripts.root_cause_analyzer.claude_workspace")
+    @patch("scripts.root_cause_analyzer.run_agent")
+    def test_falls_back_to_snippet_analysis_when_clone_fails(
+        self, mock_run_agent, mock_workspace,
+    ):
+        """If the clone fails, RCA should still run Claude without a checkout."""
+        mock_workspace.side_effect = RuntimeError("clone exploded")
+        stdout = _make_agent_response_json(description="Bug in cluster.c")
+        mock_run_agent.return_value = _agent_result(stdout=stdout)
+
+        analyzer, _ = _make_analyzer()
+        report = _make_failure_report(
+            repo_full_name="valkey-io/valkey",
+            commit_sha="deadbeef1234",
+        )
+
+        result = analyzer.analyze(report, ProjectContext())
+
+        # Should still produce a valid analysis (not analysis-failed)
+        assert result.description == "Bug in cluster.c"
+        mock_run_agent.assert_called_once()
+        _args, kwargs = mock_run_agent.call_args
+        assert kwargs.get("cwd") is None
+
     @patch("scripts.root_cause_analyzer.run_agent")
     def test_agent_error_returncode_returns_analysis_failed(self, mock_run_agent):
         mock_run_agent.return_value = _agent_result(
