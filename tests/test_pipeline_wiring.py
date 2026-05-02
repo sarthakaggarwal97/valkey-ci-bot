@@ -8,7 +8,13 @@ import pytest
 from github.GithubException import GithubException
 
 from scripts.config import BotConfig, ProjectContext
-from scripts.main import _analyze_and_fix, _load_runtime_config, _process_failure, run_pipeline
+from scripts.main import (
+    _analyze_and_fix,
+    _direct_claude_fix_enabled,
+    _load_runtime_config,
+    _process_failure,
+    run_pipeline,
+)
 from scripts.models import (
     FailedJob,
     FailureReport,
@@ -86,6 +92,18 @@ class TestLoadRuntimeConfig:
         repo.get_contents.assert_called_once_with(
             ".github/ci-failure-bot.yml", ref="abc123",
         )
+
+
+def test_direct_claude_fix_requires_explicit_opt_in(monkeypatch) -> None:
+    monkeypatch.delenv("CI_AGENT_ENABLE_DIRECT_CLAUDE_FIX", raising=False)
+
+    assert _direct_claude_fix_enabled("owner/fork", "token", True) is False
+
+    monkeypatch.setenv("CI_AGENT_ENABLE_DIRECT_CLAUDE_FIX", "true")
+
+    assert _direct_claude_fix_enabled("owner/fork", "token", True) is True
+    assert _direct_claude_fix_enabled("owner/fork", "token", False) is False
+    assert _direct_claude_fix_enabled("", "token", True) is False
 
 
 class TestAnalyzeAndFix:
@@ -684,6 +702,86 @@ class TestRunReconciliation:
     @patch("scripts.main.FailureStore")
     @patch("scripts.main.PRManager")
     @patch("scripts.main.Github")
+    def test_rate_limit_slot_is_reserved_after_stale_queue_cleanup(
+        self, mock_gh, mock_pr_mgr, mock_store, mock_load_config,
+    ):
+        """Stale queue entries should not consume scarce PR creation slots."""
+        mock_load_config.return_value = BotConfig()
+
+        rate_limiter = MagicMock()
+        rate_limiter.reserve_pr_creation.return_value = True
+
+        entry = MagicMock(failure_identifier="TestSuite.TestCase")
+        entry.queued_pr_payload = self._queued_payload()
+        store_instance = MagicMock()
+        store_instance.list_queued_failures.return_value = ["missing", "fp1"]
+        store_instance.get_entry.side_effect = [None, entry]
+        store_instance.has_open_pr.return_value = False
+        mock_store.return_value = store_instance
+
+        pr_manager = MagicMock()
+        pr_manager.create_pr.return_value = "https://github.com/owner/repo/pull/1"
+        mock_pr_mgr.return_value = pr_manager
+
+        count = run_reconciliation(
+            "owner/repo", "config.yml", "token",
+            rate_limiter=rate_limiter,
+        )
+
+        assert count == 2
+        rate_limiter.reserve_pr_creation.assert_called_once()
+        pr_manager.create_pr.assert_called_once()
+        rate_limiter.record_pr_created.assert_called_once()
+
+    @patch("scripts.main._load_runtime_config")
+    @patch("scripts.main.FailureStore")
+    @patch("scripts.main.PRManager")
+    @patch("scripts.main.Github")
+    def test_reconciliation_filters_queue_by_workflow_without_spending_pr_slots(
+        self, mock_gh, mock_pr_mgr, mock_store, mock_load_config,
+    ):
+        """Matrix monitor legs should leave other workflow queues untouched."""
+        mock_load_config.return_value = BotConfig()
+
+        rate_limiter = MagicMock()
+        rate_limiter.reserve_pr_creation.return_value = True
+
+        ci_entry = MagicMock(failure_identifier="CiSuite.TestCase")
+        ci_entry.queued_pr_payload = self._queued_payload(
+            report=_make_report(workflow_name="CI", workflow_file="ci.yml"),
+        )
+        daily_entry = MagicMock(failure_identifier="DailySuite.TestCase")
+        daily_entry.queued_pr_payload = self._queued_payload(
+            report=_make_report(workflow_name="Daily", workflow_file="daily.yml"),
+        )
+        store_instance = MagicMock()
+        store_instance.list_queued_failures.return_value = ["ci-fp", "daily-fp"]
+        store_instance.get_entry.side_effect = [ci_entry, daily_entry]
+        store_instance.has_open_pr.return_value = False
+        mock_store.return_value = store_instance
+
+        pr_manager = MagicMock()
+        pr_manager.create_pr.return_value = "https://github.com/owner/repo/pull/1"
+        mock_pr_mgr.return_value = pr_manager
+
+        count = run_reconciliation(
+            "owner/repo",
+            "config.yml",
+            "token",
+            rate_limiter=rate_limiter,
+            queued_workflow_file="daily.yml",
+        )
+
+        assert count == 1
+        rate_limiter.reserve_pr_creation.assert_called_once()
+        pr_manager.create_pr.assert_called_once()
+        assert pr_manager.create_pr.call_args.args[1].workflow_file == "daily.yml"
+        store_instance.clear_queued_pr.assert_called_once_with("daily-fp")
+
+    @patch("scripts.main._load_runtime_config")
+    @patch("scripts.main.FailureStore")
+    @patch("scripts.main.PRManager")
+    @patch("scripts.main.Github")
     def test_pr_creation_failure_keeps_queued_payload_for_retry(
         self, mock_gh, mock_pr_mgr, mock_store, mock_load_config,
     ):
@@ -1158,6 +1256,105 @@ class TestRunPipeline:
             rate_limiter=rate_limiter,
         )
 
+        failure_store.record_queued_pr.assert_called_once()
+        mock_pr_manager.return_value.create_pr.assert_not_called()
+        mock_approval_summary.return_value.add_candidate.assert_called_once()
+
+    @patch("scripts.claude_fix.fix_from_log")
+    @patch("scripts.main._build_workflow_run")
+    @patch("scripts.main._load_runtime_config")
+    @patch("scripts.main.Github")
+    @patch("scripts.main.ApprovalSummary")
+    @patch("scripts.main.FailureDetector")
+    @patch("scripts.main.LogRetriever")
+    @patch("scripts.main.FailureStore")
+    @patch("scripts.main.BedrockClient")
+    @patch("scripts.main.RootCauseAnalyzer")
+    @patch("scripts.main.FixGenerator")
+    @patch("scripts.main.ValidationRunner")
+    @patch("scripts.main.PRManager")
+    def test_queue_only_ignores_fork_env_and_uses_validated_queue_path(
+        self,
+        mock_pr_manager,
+        mock_validation_runner,
+        mock_fix_generator,
+        mock_root_cause_analyzer,
+        mock_bedrock_client,
+        mock_failure_store,
+        mock_log_retriever,
+        mock_detector,
+        mock_approval_summary,
+        mock_gh,
+        mock_load_config,
+        mock_build_workflow_run,
+        mock_fix_from_log,
+    ):
+        mock_build_workflow_run.return_value = WorkflowRun(
+            id=1,
+            name="Daily",
+            event="schedule",
+            head_sha="abc123",
+            head_branch="unstable",
+            head_repository="owner/repo",
+            is_fork=False,
+            conclusion="failure",
+            workflow_file="daily.yml",
+        )
+        mock_load_config.return_value = BotConfig(monitored_workflows=["daily.yml"])
+        mock_detector.return_value.detect.return_value = [
+            FailedJob(
+                id=10,
+                name="test-unit",
+                conclusion="failure",
+                step_name="Run tests",
+                matrix_params={},
+            )
+        ]
+        mock_log_retriever.return_value.get_job_log.return_value = (
+            "src/foo.c:42: Failure\n"
+            "Expected: 1\n"
+            "  Actual: 0\n"
+            "[  FAILED  ] TestSuite.TestCase\n"
+        )
+
+        failure_store = mock_failure_store.return_value
+        failure_store.compute_incident_key.return_value = "fp1"
+        failure_store.has_open_pr.return_value = False
+        failure_store.get_entry.return_value = None
+        failure_store.get_flaky_campaign.return_value = None
+        failure_store.summarize_history.return_value = MagicMock(
+            consecutive_failures=2,
+            failure_count=2,
+            last_known_good_sha="goodsha",
+            first_bad_sha="badsha",
+        )
+
+        mock_root_cause_analyzer.return_value.analyze.return_value = _make_root_cause()
+        mock_root_cause_analyzer.return_value.identify_relevant_files.return_value = []
+        mock_root_cause_analyzer.return_value._retrieve_file_contents.return_value = {}
+        mock_fix_generator.return_value.generate.return_value = "diff"
+        mock_validation_runner.return_value.validate.return_value = ValidationResult(
+            passed=True, output="ok",
+        )
+
+        rate_limiter = MagicMock()
+        rate_limiter.can_use_tokens.return_value = True
+
+        with patch.dict(
+            "os.environ",
+            {"VALKEY_FORK_REPO": "owner/fork", "FORK_TOKEN": "fork-token"},
+            clear=False,
+        ):
+            run_pipeline(
+                "owner/repo",
+                1,
+                ".github/ci-failure-bot.yml",
+                "token",
+                allow_pr_creation=False,
+                rate_limiter=rate_limiter,
+            )
+
+        mock_fix_from_log.assert_not_called()
         failure_store.record_queued_pr.assert_called_once()
         mock_pr_manager.return_value.create_pr.assert_not_called()
         mock_approval_summary.return_value.add_candidate.assert_called_once()

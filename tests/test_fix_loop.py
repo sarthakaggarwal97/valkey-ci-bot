@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from scripts import fix_loop
 from scripts.fix_loop import run_fix_loop
 
 
@@ -103,3 +105,50 @@ def test_push_uses_gitauth_env_when_fix_loop_clones(
     assert push_calls, "expected at least one `git push` invocation"
     push_env = push_calls[0].kwargs.get("env")
     assert push_env is not None and push_env.get("GIT_ASKPASS")
+
+
+def test_generate_fix_captures_new_files_in_patch(monkeypatch, tmp_path) -> None:
+    checkout = _fresh_checkout(tmp_path)
+    git_calls: list[list[str]] = []
+
+    monkeypatch.setattr(fix_loop, "_run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        fix_loop,
+        "run_agent",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            stdout="created src/new.c",
+            stderr="",
+            returncode=0,
+        ),
+    )
+
+    def fake_git(cmd, **_kwargs):
+        git_calls.append(cmd)
+        if cmd == ["git", "add", "-N", "."]:
+            return SimpleNamespace(stdout="", stderr="", returncode=0)
+        assert cmd == ["git", "diff", "--binary"]
+        return SimpleNamespace(
+            stdout=(
+                "diff --git a/src/new.c b/src/new.c\n"
+                "new file mode 100644\n"
+                "--- /dev/null\n"
+                "+++ b/src/new.c\n"
+                "@@ -0,0 +1 @@\n"
+                "+int fixed;\n"
+            ),
+            stderr="",
+            returncode=0,
+        )
+
+    monkeypatch.setattr(fix_loop.subprocess, "run", fake_git)
+
+    patch = fix_loop._generate_fix(
+        SimpleNamespace(job_name="test-job", parsed_failures=[]),
+        SimpleNamespace(description="missing helper", files_to_change=["src/new.c"]),
+        "",
+        checkout,
+    )
+
+    assert "new file mode" in patch
+    assert ["git", "add", "-N", "."] in git_calls
+    assert ["git", "diff", "--binary"] in git_calls

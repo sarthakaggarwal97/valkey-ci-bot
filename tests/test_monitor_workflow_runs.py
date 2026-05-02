@@ -145,6 +145,46 @@ def test_monitor_dry_run_does_not_process_or_advance_state(
     )
 
 
+@patch("scripts.monitor_workflow_runs._record_successful_job_observations")
+@patch("scripts.monitor_workflow_runs.run_pipeline")
+@patch("scripts.monitor_workflow_runs.Github")
+@patch("scripts.monitor_workflow_runs.MonitorStateStore")
+def test_monitor_success_observation_failure_does_not_block_watermark(
+    mock_state_store_cls,
+    mock_github_cls,
+    mock_run_pipeline,
+    mock_record_observations,
+    _mock_event_ledger,
+) -> None:
+    state_store = mock_state_store_cls.return_value
+    state_store.get_last_seen_run_id.return_value = 100
+    mock_record_observations.side_effect = RuntimeError("bot-data write failed")
+
+    workflow = MagicMock()
+    workflow.get_runs.return_value = [_run(101, "success")]
+    repo = MagicMock()
+    repo.get_workflow.return_value = workflow
+    repo.get_contents.side_effect = GithubException(404, {"message": "missing state"})
+    mock_github_cls.return_value.get_repo.return_value = repo
+
+    result = monitor(_args())
+
+    assert result["runs"][0]["action"] == "skip-non-failure"
+    mock_run_pipeline.assert_not_called()
+    state_store.mark_seen.assert_called_once_with(
+        "valkey-io/valkey:daily.yml:schedule",
+        last_seen_run_id=101,
+        target_repo="valkey-io/valkey",
+        workflow_file="daily.yml",
+        event="schedule",
+    )
+    _mock_event_ledger.record.assert_any_call(
+        "monitor.success_observation_failed",
+        "valkey-io/valkey:daily.yml:101",
+        error="bot-data write failed",
+    )
+
+
 @patch("scripts.monitor_workflow_runs.run_pipeline")
 @patch("scripts.monitor_workflow_runs.Github")
 @patch("scripts.monitor_workflow_runs.MonitorStateStore")

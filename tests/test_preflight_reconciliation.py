@@ -147,3 +147,49 @@ def test_run_preflight_reports_missing_branches(
 
     assert result.target_branches == ["9.1", "unstable"]
     assert result.missing_branches == ["9.1"]
+
+
+@patch("scripts.preflight_reconciliation.FailureStore")
+@patch("scripts.preflight_reconciliation.Github")
+def test_run_preflight_filters_by_workflow_file(
+    mock_github_cls,
+    mock_failure_store_cls,
+) -> None:
+    repo = MagicMock()
+    mock_github_cls.return_value.get_repo.return_value = repo
+
+    ci_report = failure_report_to_dict(_make_report(target_branch="ci-branch"))
+    ci_report["workflow_file"] = "ci.yml"
+    daily_report = failure_report_to_dict(_make_report(target_branch="unstable"))
+    daily_report["workflow_file"] = "daily.yml"
+
+    store = mock_failure_store_cls.return_value
+    store.list_queued_failures.return_value = ["ci", "daily"]
+    store.get_entry.side_effect = [
+        MagicMock(
+            queued_pr_payload={
+                "failure_report": ci_report,
+                "root_cause": root_cause_report_to_dict(_make_root_cause()),
+                "patch": "diff",
+                "target_branch": "ci-branch",
+            }
+        ),
+        MagicMock(
+            queued_pr_payload={
+                "failure_report": daily_report,
+                "root_cause": root_cause_report_to_dict(_make_root_cause()),
+                "patch": "diff",
+                "target_branch": "unstable",
+            }
+        ),
+    ]
+
+    result = run_preflight(
+        "sarthakaggarwal97/valkey",
+        "token",
+        workflow_file="daily.yml",
+    )
+
+    assert result.queued_failure_count == 1
+    assert result.target_branches == ["unstable"]
+    repo.get_git_ref.assert_called_once_with("heads/unstable")

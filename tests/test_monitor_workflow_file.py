@@ -114,6 +114,7 @@ def test_monitor_workflow_runs_central_monitor_script_for_matrix_entries() -> No
         if step["name"] == "Capture monitor outputs"
     )
     script = run_step["run"]
+    assert "FORK_TOKEN" not in run_step.get("env", {})
     assert "-m scripts.monitor_workflow_runs" in script
     assert '--workflow-file "${MONITOR_WORKFLOW_FILE}"' in script
     assert '--config ".github/valkey-daily-bot.yml"' in script
@@ -149,12 +150,14 @@ def test_monitor_workflow_runs_central_monitor_script_for_matrix_entries() -> No
     preflight_script = preflight_step["run"]
     assert "-m scripts.preflight_reconciliation" in preflight_script
     assert "--repo \"${VALKEY_FORK_REPO}\"" in preflight_script
+    assert "--workflow-file \"${MONITOR_WORKFLOW_FILE}\"" in preflight_script
     assert "steps.capture-monitor.outputs.has_queued_failures" in preflight_step["if"]
     assert "steps.capture-monitor.outputs.has_queued_failures" in select_fork_token_step["if"]
 
     reconcile_script = reconcile_step["run"]
     assert "--mode reconcile" in reconcile_script
     assert "--repo \"${VALKEY_FORK_REPO}\"" in reconcile_script
+    assert "--queued-workflow-file \"${MONITOR_WORKFLOW_FILE}\"" in reconcile_script
     assert "--draft-prs" in reconcile_script
 
     assert upload_step["uses"] == "actions/upload-artifact@v4"

@@ -242,11 +242,7 @@ def _generate_fix(
             agent_result.stdout[:1500],
         )
 
-        # Capture the diff from git
-        result = subprocess.run(
-            ["git", "diff"], cwd=cwd, capture_output=True, text=True,
-        )
-        patch = result.stdout.strip()
+        patch = _capture_worktree_diff(cwd)
         if not patch:
             logger.warning("Claude edited no files (git diff empty).")
             return None
@@ -284,6 +280,23 @@ def _push_patch_to_branch(
             _run(["git", "commit", "-m", commit_message, "--allow-empty"], cwd=tmpdir)
             _run(["git", "push", "--force", "origin", branch], cwd=tmpdir, env=git_env)
         logger.info("Pushed fix to %s/%s.", repo, branch)
+
+
+def _capture_worktree_diff(cwd: str) -> str:
+    """Capture tracked and newly-created files as a unified patch."""
+    subprocess.run(
+        ["git", "add", "-N", "."],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+    )
+    result = subprocess.run(
+        ["git", "diff", "--binary"],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
 
 
 def _run(

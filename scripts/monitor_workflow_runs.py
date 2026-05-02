@@ -197,6 +197,46 @@ def _record_successful_job_observations(
         store.save()
 
 
+def _record_successful_job_observations_best_effort(
+    *,
+    event_ledger: EventLedger,
+    subject: str,
+    target_gh: Github,
+    state_gh: Github,
+    target_repo: str,
+    state_repo: str,
+    workflow_run_id: int,
+    workflow_name: str,
+    workflow_file: str,
+    commit_sha: str,
+    max_history_entries: int,
+) -> None:
+    """Persist successful-job observations without blocking monitoring."""
+    try:
+        _record_successful_job_observations(
+            target_gh=target_gh,
+            state_gh=state_gh,
+            target_repo=target_repo,
+            state_repo=state_repo,
+            workflow_run_id=workflow_run_id,
+            workflow_name=workflow_name,
+            workflow_file=workflow_file,
+            commit_sha=commit_sha,
+            max_history_entries=max_history_entries,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to record successful job observations for run %s: %s",
+            workflow_run_id,
+            exc,
+        )
+        event_ledger.record(
+            "monitor.success_observation_failed",
+            subject,
+            error=str(exc),
+        )
+
+
 def monitor(args: MonitorArgs) -> dict[str, object]:
     """Monitor new workflow runs and process newly failed ones."""
     target_gh = Github(auth=Auth.Token(args.target_token))
@@ -270,7 +310,9 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
 
                 if run.conclusion != "failure":
                     if not args.dry_run:
-                        _record_successful_job_observations(
+                        _record_successful_job_observations_best_effort(
+                            event_ledger=event_ledger,
+                            subject=subject,
                             target_gh=target_gh,
                             state_gh=state_gh,
                             target_repo=args.target_repo,
@@ -301,7 +343,9 @@ def monitor(args: MonitorArgs) -> dict[str, object]:
                     )
                     continue
 
-                _record_successful_job_observations(
+                _record_successful_job_observations_best_effort(
+                    event_ledger=event_ledger,
+                    subject=subject,
                     target_gh=target_gh,
                     state_gh=state_gh,
                     target_repo=args.target_repo,

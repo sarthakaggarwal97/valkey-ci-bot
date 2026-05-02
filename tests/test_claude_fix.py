@@ -47,6 +47,7 @@ def test_fix_from_log_fetches_full_log_and_synthesizes_failure(monkeypatch):
     prompts: list[str] = []
     issue_calls: list[dict] = []
     retriever_tokens: list[str | None] = []
+    git_calls: list[list[str]] = []
 
     class FakeLogRetriever:
         def __init__(self, _gh, *, token=None):
@@ -62,7 +63,10 @@ def test_fix_from_log_fetches_full_log_and_synthesizes_failure(monkeypatch):
         return SimpleNamespace(stdout="edited files", stderr="", returncode=0)
 
     def fake_git_diff(cmd, **_kwargs):
-        assert cmd == ["git", "diff"]
+        git_calls.append(cmd)
+        if cmd == ["git", "add", "-N", "."]:
+            return SimpleNamespace(stdout="", stderr="", returncode=0)
+        assert cmd == ["git", "diff", "--binary"]
         return SimpleNamespace(stdout="diff --git a/test b/test\n+fix\n", stderr="", returncode=0)
 
     def fake_issue(_gh, repo, parsed_failure, report, run_url):
@@ -105,6 +109,8 @@ def test_fix_from_log_fetches_full_log_and_synthesizes_failure(monkeypatch):
     assert "Treat this as a hint only" in prompts[0]
     assert issue_calls[0]["failure"].parser_type == "claude-log"
     assert issue_calls[0]["failure"].test_name == "test fedora tls"
+    assert ["git", "add", "-N", "."] in git_calls
+    assert ["git", "diff", "--binary"] in git_calls
 
 
 def test_fix_from_log_creates_issue_with_stderr_when_claude_edits_nothing(monkeypatch):
@@ -149,6 +155,61 @@ def test_fix_from_log_creates_issue_with_stderr_when_claude_edits_nothing(monkey
     assert "without editing files" in result["error"]
     assert "stderr text" in gh.repo.issue.comments[0]
     assert "Exit code: `1`" in gh.repo.issue.comments[0]
+
+
+def test_fix_from_log_refuses_to_publish_nonzero_claude_patch(monkeypatch):
+    gh = _FakeGithub()
+
+    monkeypatch.setattr(claude_fix, "_fetch_job_log", lambda **_kwargs: "")
+    monkeypatch.setattr(
+        claude_fix,
+        "run_agent",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            stdout="edited files before error",
+            stderr="tool failed",
+            returncode=1,
+        ),
+    )
+    monkeypatch.setattr(claude_fix, "_run", lambda *_args, **_kwargs: None)
+
+    def fake_git(cmd, **_kwargs):
+        if cmd == ["git", "add", "-N", "."]:
+            return SimpleNamespace(stdout="", stderr="", returncode=0)
+        assert cmd == ["git", "diff", "--binary"]
+        return SimpleNamespace(
+            stdout="diff --git a/src/foo.c b/src/foo.c\n+fix\n",
+            stderr="",
+            returncode=0,
+        )
+
+    monkeypatch.setattr(claude_fix.subprocess, "run", fake_git)
+    monkeypatch.setattr(
+        claude_fix,
+        "create_or_update_issue",
+        lambda *_args, **_kwargs: ("https://example.test/issues/3", 3, False),
+    )
+    monkeypatch.setattr(
+        claude_fix,
+        "_open_draft_pr",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("should not open PR")),
+    )
+
+    result = claude_fix.fix_from_log(
+        job_name="test valgrind",
+        log_excerpt="valgrind failure",
+        parsed_failures=[_parsed_failure()],
+        fork_repo="me/valkey",
+        fork_token="fork-token",
+        base_sha="abcdef123456",
+        target_branch="unstable",
+        run_url="https://example.test/run",
+        gh=gh,
+    )
+
+    assert result["outcome"] == "claude-failed"
+    assert result["claude_exit_code"] == 1
+    assert "after editing files" in result["error"]
+    assert "tool failed" in gh.repo.issue.comments[0]
 
 
 def test_compact_log_keeps_failure_markers_and_tail():

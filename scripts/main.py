@@ -61,6 +61,18 @@ from scripts.valkey_repo_context import (
 
 logger = logging.getLogger(__name__)
 _PROOF_WORKFLOW_FILE = "prove-daily-fix.yml"
+_DIRECT_CLAUDE_FIX_ENV = "CI_AGENT_ENABLE_DIRECT_CLAUDE_FIX"
+
+
+def _direct_claude_fix_enabled(
+    fork_repo: str,
+    fork_token_env: str,
+    allow_pr_creation: bool,
+) -> bool:
+    """Return whether the direct Claude Code publisher path is explicitly enabled."""
+    if not (fork_repo and fork_token_env and allow_pr_creation):
+        return False
+    return os.environ.get(_DIRECT_CLAUDE_FIX_ENV, "").lower() in {"1", "true", "yes"}
 
 
 def _build_parser_router() -> LogParserRouter:
@@ -1035,7 +1047,17 @@ def run_pipeline(
     config = apply_valkey_runtime_defaults(config, valkey_context)
     fork_repo = os.environ.get("VALKEY_FORK_REPO", "")
     fork_token_env = os.environ.get("FORK_TOKEN", "")
-    use_claude_fix = bool(fork_repo and fork_token_env)
+    use_claude_fix = _direct_claude_fix_enabled(
+        fork_repo, fork_token_env, allow_pr_creation,
+    )
+    if fork_repo and fork_token_env and not allow_pr_creation:
+        logger.info("Queue-only mode disables direct Claude Code PR remediation.")
+    elif fork_repo and fork_token_env and not use_claude_fix:
+        logger.info(
+            "Direct Claude Code PR remediation disabled; set "
+            "%s=true to opt in.",
+            _DIRECT_CLAUDE_FIX_ENV,
+        )
     if (
         config.monitored_workflows
         and workflow_run.workflow_file
@@ -1279,9 +1301,9 @@ def run_pipeline(
             reports.append(report)
 
             # --- Claude Code pipeline: one call with raw log ---
-            # When VALKEY_FORK_REPO is set, give Claude the raw CI log and
-            # let it figure out what failed + fix it in one shot.
-            if fork_repo and fork_token_env:
+            # Explicit opt-in path: give Claude the raw CI log and let it
+            # produce/publish a draft fix outside the normal queue.
+            if use_claude_fix:
                 failure_id = (
                     report.parsed_failures[0].failure_identifier
                     if report.parsed_failures else report.job_name
@@ -1653,6 +1675,7 @@ def run_reconciliation(
     rate_limiter: RateLimiter | None = None,
     *,
     draft_prs: bool = False,
+    queued_workflow_file: str | None = None,
 ) -> int:
     """Drain queued failures when rate limits have reset.
 
@@ -1726,14 +1749,6 @@ def run_reconciliation(
 
     processed = 0
     for fingerprint in list(queued):
-        # Check if we can still create PRs
-        if not rate_limiter.reserve_pr_creation():
-            logger.info(
-                "Rate limit reached during reconciliation drain, stopping. "
-                "%d failure(s) remain queued.", len(queued) - processed,
-            )
-            break
-
         # Look up the failure in the store to get context
         entry = failure_store.get_entry(fingerprint)
         if entry is None:
@@ -1766,13 +1781,34 @@ def run_reconciliation(
             processed += 1
             continue
 
+        payload = entry.queued_pr_payload
+        report = failure_report_from_dict(payload.get("failure_report", {}))
+        if queued_workflow_file and report.workflow_file != queued_workflow_file:
+            logger.info(
+                "Queued fingerprint %s belongs to workflow %s, not %s; leaving queued.",
+                fingerprint[:12],
+                report.workflow_file or "<unknown>",
+                queued_workflow_file,
+            )
+            summary.add_result(
+                report.job_name, entry.failure_identifier, "skipped-workflow-scope",
+            )
+            continue
+
+        # Check if we can still create PRs after cheap queue cleanup, so
+        # stale entries do not consume scarce daily PR slots.
+        if not rate_limiter.reserve_pr_creation():
+            logger.info(
+                "Rate limit reached during reconciliation drain, stopping. "
+                "%d failure(s) remain queued.", len(queued) - processed,
+            )
+            break
+
         logger.info(
             "Processing queued failure %s (%s).",
             fingerprint[:12], entry.failure_identifier,
         )
 
-        payload = entry.queued_pr_payload
-        report = failure_report_from_dict(payload.get("failure_report", {}))
         root_cause = root_cause_report_from_dict(payload.get("root_cause", {}))
         patch = str(payload.get("patch", ""))
         target_branch = str(
@@ -1934,6 +1970,11 @@ def main() -> None:
         action="store_true",
         help="Open draft pull requests when reconciling queued fixes.",
     )
+    parser.add_argument(
+        "--queued-workflow-file",
+        default=None,
+        help="Only reconcile queued fixes from this workflow file.",
+    )
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
@@ -1951,6 +1992,7 @@ def main() -> None:
             state_github_token=args.state_token,
             state_repo_name=args.state_repo,
             draft_prs=args.draft_prs,
+            queued_workflow_file=args.queued_workflow_file,
         )
         logger.info("Reconciliation drained %d queued failure(s).", count)
         sys.exit(0)

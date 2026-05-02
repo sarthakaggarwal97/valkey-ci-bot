@@ -52,6 +52,7 @@ def run_preflight(
     *,
     state_github_token: str | None = None,
     state_repo_name: str | None = None,
+    workflow_file: str | None = None,
 ) -> ReconciliationPreflightResult:
     """Ensure every queued fix targets a branch present in the target repo."""
     gh = Github(auth=Auth.Token(github_token))
@@ -67,6 +68,7 @@ def run_preflight(
     failure_store.load()
 
     queued = failure_store.list_queued_failures()
+    queued_failure_count = len(queued) if workflow_file is None else 0
     target_branches: set[str] = set()
     for fingerprint in queued:
         entry = failure_store.get_entry(fingerprint)
@@ -76,6 +78,14 @@ def run_preflight(
                 fingerprint[:12],
             )
             continue
+        failure_report_payload = entry.queued_pr_payload.get("failure_report")
+        if not isinstance(failure_report_payload, dict):
+            failure_report_payload = {}
+        failure_report = failure_report_from_dict(failure_report_payload)
+        if workflow_file and failure_report.workflow_file != workflow_file:
+            continue
+        if workflow_file:
+            queued_failure_count += 1
         target_branches.add(_resolve_target_branch(entry.queued_pr_payload))
 
     repo = gh.get_repo(repo_name)
@@ -87,7 +97,7 @@ def run_preflight(
             missing_branches.append(branch)
 
     return ReconciliationPreflightResult(
-        queued_failure_count=len(queued),
+        queued_failure_count=queued_failure_count,
         target_branches=sorted(target_branches),
         missing_branches=missing_branches,
     )
@@ -100,6 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--token", required=True, help="GitHub token for the target repo")
     parser.add_argument("--state-token", default=None, help="GitHub token for agent-state persistence")
     parser.add_argument("--state-repo", default=None, help="Repository full name used for agent-state persistence")
+    parser.add_argument("--workflow-file", default=None, help="Only inspect queued fixes from this workflow file")
     return parser
 
 
@@ -112,6 +123,7 @@ def main(argv: list[str] | None = None) -> int:
         args.token,
         state_github_token=args.state_token,
         state_repo_name=args.state_repo,
+        workflow_file=args.workflow_file,
     )
     print(json.dumps(result.to_dict(), indent=2))
     if result.missing_branches:

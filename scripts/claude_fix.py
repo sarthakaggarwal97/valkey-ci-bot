@@ -105,10 +105,7 @@ def fix_from_log(
             stdout[:3000],
         )
 
-        diff_result = subprocess.run(
-            ["git", "diff"], cwd=tmpdir, capture_output=True, text=True,
-        )
-        patch = diff_result.stdout.strip()
+        patch = _capture_worktree_diff(tmpdir)
 
         if not patch:
             logger.warning("Claude edited no files for %s.", job_name)
@@ -122,6 +119,24 @@ def fix_from_log(
             )
             result["outcome"] = "no-fix-generated"
             result["error"] = f"claude exited {agent_result.returncode} without editing files"
+            return result
+
+        if agent_result.returncode != 0:
+            logger.warning(
+                "Claude exited %d after editing files for %s; refusing to publish.",
+                agent_result.returncode,
+                job_name,
+            )
+            _create_issue_best_effort(
+                gh,
+                fork_repo,
+                tracking_failures,
+                job_name,
+                run_url,
+                _format_no_fix_comment(stdout, stderr, agent_result.returncode),
+            )
+            result["outcome"] = "claude-failed"
+            result["error"] = f"claude exited {agent_result.returncode} after editing files"
             return result
 
         logger.info("Claude produced %d-line diff for %s.", patch.count("\n"), job_name)
@@ -418,6 +433,23 @@ def _open_draft_pr(
         labels=("bot-fix",),
     )
     return str(getattr(pr, "html_url", ""))
+
+
+def _capture_worktree_diff(cwd: str) -> str:
+    """Capture tracked and newly-created files as a unified patch."""
+    subprocess.run(
+        ["git", "add", "-N", "."],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+    )
+    result = subprocess.run(
+        ["git", "diff", "--binary"],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
 
 
 def _slugify(value: str) -> str:
