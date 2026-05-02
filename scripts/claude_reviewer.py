@@ -20,6 +20,7 @@ from scripts.review_diff import (
     is_line_commentable,
     validate_review_finding_for_publish,
 )
+from scripts.valkey_knowledge import get_divergence_block, get_subsystem_context
 
 if TYPE_CHECKING:
     from scripts.config import ReviewerConfig
@@ -198,6 +199,11 @@ def review_pr(
     custom_instructions = _custom_instructions_section(config)
     max_findings = _review_limit(config)
 
+    valkey_block = get_divergence_block()
+    subsystem_block = get_subsystem_context([f.path for f in diff_scope.files])
+    if subsystem_block:
+        valkey_block += f"\n\n## Subsystem-specific context\n{subsystem_block}"
+
     incremental_note = ""
     if previous_reviewed_sha:
         incremental_note = (
@@ -237,6 +243,7 @@ def review_pr(
         f"- \"I ran `git cat-file -s` and it returns 0 bytes...\" (showing methodology)\n"
         f"- Multi-paragraph explanations when a question will do\n"
         f"- Restating what the PR already said\n\n"
+        f"{valkey_block}\n\n"
         f"## What matters\n"
         f"Flag real bugs: memory leaks, NULL derefs, UAF, races, missing error handling, protocol/RDB/AOF breakage, "
         f"incorrect locks, broken invariants, tests that don't test the changed code.\n\n"

@@ -180,6 +180,21 @@ class ValkeyRepoContext:
         """Return the repo instruction files relevant to the given paths."""
         return [instruction for instruction in self.instructions if instruction.matches_any(paths)]
 
+    def render_context_summary(self, paths: list[str]) -> str:
+        """Render a compact summary of which Valkey context applies to ``paths``."""
+        subsystems: set[str] = set()
+        for path in paths:
+            sub = infer_valkey_subsystem([path], [])
+            if sub:
+                subsystems.add(sub)
+        applicable = self.applicable_instructions(paths)
+        parts: list[str] = []
+        if subsystems:
+            parts.append(f"subsystems={','.join(sorted(subsystems))}")
+        if applicable:
+            parts.append(f"instructions={len(applicable)}")
+        return f"Valkey context: {'; '.join(parts)}" if parts else "Valkey context: generic"
+
     def matching_recipes(self, job_name: str) -> list[WorkflowRecipe]:
         """Return workflow recipes whose job regex matches the given job name."""
         matches: list[WorkflowRecipe] = []
@@ -236,7 +251,18 @@ class ValkeyRepoContext:
             for instruction in applicable:
                 lines.append(f"- `{instruction.name}`")
                 lines.append(_bulleted_block(instruction.body))
-        return "\n".join(lines).strip()
+        result = "\n".join(lines).strip()
+        inferred_subsystems = sorted({
+            sub
+            for path in paths
+            if (sub := infer_valkey_subsystem([path], []))
+        })
+        logger.info(
+            "Review guidance: %d chars, subsystems=%s",
+            len(result),
+            inferred_subsystems,
+        )
+        return result
 
     def render_failure_guidance(self, report: FailureReport) -> str:
         """Render live Valkey workflow guidance for one failure-analysis run."""
