@@ -17,7 +17,17 @@ from github import Auth, Github
 
 from scripts.bedrock_client import BedrockClient, PromptClient
 from scripts.bedrock_retriever import BedrockRetriever
-from scripts.code_reviewer import CodeReviewer, ReviewCoverage
+
+try:
+    from scripts.code_reviewer import CodeReviewer, ReviewCoverage
+    from scripts.pr_summarizer import PRSummarizer
+
+    _BEDROCK_REVIEWER_AVAILABLE = True
+except ImportError:
+    _BEDROCK_REVIEWER_AVAILABLE = False
+    CodeReviewer = None  # type: ignore[assignment,misc]
+    ReviewCoverage = None  # type: ignore[assignment,misc]
+    PRSummarizer = None  # type: ignore[assignment,misc]
 from scripts.commit_signoff import (
     CommitSigner,
     load_signer_from_env,
@@ -30,7 +40,6 @@ from scripts.pr_review_main import (
     _load_runtime_reviewer_config,
     _select_review_files,
 )
-from scripts.pr_summarizer import PRSummarizer
 from scripts.valkey_repo_context import (
     augment_reviewer_config_for_valkey,
     load_valkey_repo_context,
@@ -523,6 +532,12 @@ def _run_review_case(
     )
     if not run_models:
         return result
+
+    if not _BEDROCK_REVIEWER_AVAILABLE:
+        raise RuntimeError(
+            "valkey_acceptance requires the Bedrock code reviewer which has been removed. "
+            "This acceptance suite needs migration to Claude Code."
+        )
 
     config = _load_runtime_reviewer_config(gh, repo_name, reviewer_config_path)
     fetcher = PRContextFetcher(gh, github_retries=config.github_retries)

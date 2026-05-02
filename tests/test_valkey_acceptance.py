@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scripts.code_reviewer import ReviewCoverage
+import pytest
+
+try:
+    from scripts.code_reviewer import ReviewCoverage
+
+    _BEDROCK_REVIEWER_AVAILABLE = True
+except ImportError:
+    _BEDROCK_REVIEWER_AVAILABLE = False
+    ReviewCoverage = None  # type: ignore[assignment,misc]
+
 from scripts.commit_signoff import CommitSigner
 from scripts.models import SummaryResult
 from scripts.valkey_acceptance import (
@@ -113,6 +122,10 @@ def test_render_backport_command_includes_branch_and_identity() -> None:
     assert "CI_BOT_COMMIT_EMAIL='valkey@example.com'" in command
 
 
+@pytest.mark.skipif(
+    not _BEDROCK_REVIEWER_AVAILABLE,
+    reason="Bedrock code reviewer has been removed; ReviewCoverage unavailable",
+)
 def test_review_case_result_blocks_on_incomplete_model_coverage() -> None:
     result = ReviewCaseResult(
         name="model-case",
@@ -141,6 +154,10 @@ def test_review_case_result_blocks_on_incomplete_model_coverage() -> None:
     assert result.model_followups == ["review-coverage-incomplete"]
 
 
+@pytest.mark.skipif(
+    not _BEDROCK_REVIEWER_AVAILABLE,
+    reason="Bedrock code reviewer has been removed; ReviewCoverage unavailable",
+)
 def test_acceptance_scorecard_counts_review_and_replay_cases() -> None:
     passing = ReviewCaseResult(
         name="policy-case",
