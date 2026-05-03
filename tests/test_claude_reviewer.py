@@ -183,6 +183,62 @@ def test_review_pr_empty_diff(tmp_path):
     mock.assert_not_called()
 
 
+def test_review_pr_skeptic_drops_finding(tmp_path):
+    """Stage 1 returns 2 findings, skeptic drops one as speculative."""
+    stage1_json = json.dumps([
+        {"path": "src/server.c", "line": 1, "body": "Real memory leak on the error return path.", "severity": "high", "title": "Leak", "confidence": "high"},
+        {"path": "src/server.c", "line": 1, "body": "Also speculative race condition in handler.", "severity": "medium", "title": "Maybe race", "confidence": "medium"},
+    ])
+    skeptic_json = json.dumps([
+        {"index": 0, "verdict": "keep", "severity": "high", "reason": "verified"},
+        {"index": 1, "verdict": "drop", "severity": "medium", "reason": "speculative, no concrete trigger"},
+    ])
+
+    # The skeptic prompt contains "## Candidate findings" (unique marker),
+    # not "skeptic" which leaks into both prompts.
+    def mock_run_agent(*args, **kwargs):
+        prompt = args[1] if len(args) > 1 else kwargs.get("prompt", "")
+        if "## Candidate findings" in prompt:
+            payload = skeptic_json
+        else:
+            payload = stage1_json
+        result_event = json.dumps({"type": "result", "result": payload})
+        stream = f'{{"type":"system","subtype":"init"}}\n{result_event}'
+        return _agent_result(stream)
+
+    with patch("scripts.claude_reviewer.run_agent", side_effect=mock_run_agent):
+        results = review_pr(_FakePR(), _FakeDiffScope(), str(tmp_path))
+
+    # Skeptic should have dropped the second finding
+    assert len(results) == 1
+    assert results[0].path == "src/server.c"
+    assert results[0].body == "Real memory leak on the error return path."
+
+
+def test_review_pr_skeptic_keeps_all_when_parse_fails(tmp_path):
+    """If skeptic output is unparseable, keep all original findings (fail open)."""
+    stage1_json = json.dumps([
+        {"path": "src/server.c", "line": 1, "body": "Memory leak on the error return path.", "severity": "high", "title": "Leak", "confidence": "high"},
+    ])
+    skeptic_garbage = "I couldn't parse anything useful"
+
+    def mock_run_agent(*args, **kwargs):
+        prompt = args[1] if len(args) > 1 else kwargs.get("prompt", "")
+        if "## Candidate findings" in prompt:
+            payload = skeptic_garbage
+        else:
+            payload = stage1_json
+        result_event = json.dumps({"type": "result", "result": payload})
+        stream = f'{{"type":"system","subtype":"init"}}\n{result_event}'
+        return _agent_result(stream)
+
+    with patch("scripts.claude_reviewer.run_agent", side_effect=mock_run_agent):
+        results = review_pr(_FakePR(), _FakeDiffScope(), str(tmp_path))
+
+    # Skeptic failed, but we keep the original finding (fail open)
+    assert len(results) == 1
+
+
 def test_summarize_pr(tmp_path):
     result_event = json.dumps({"type": "result", "result": "This PR fixes a memory leak."})
     stream = f'{{"type":"system","subtype":"init"}}\n{result_event}'
