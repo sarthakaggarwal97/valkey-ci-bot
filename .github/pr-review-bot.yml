@@ -4,7 +4,7 @@ reviewer:
   review_comment_lgtm: false
   model_file_triage: false
   post_policy_notes: true
-  max_review_comments: 20
+  max_review_comments: 5
   daily_token_budget: 0
   custom_instructions: |
     This project is Valkey, a high-performance in-memory key-value store

@@ -340,34 +340,48 @@ def review_pr(
         f"- Multi-paragraph explanations when a question will do\n"
         f"- Restating what the PR already said\n\n"
         f"{valkey_block}\n\n"
-        f"## What matters\n"
-        f"Flag real bugs first: memory leaks, NULL derefs, UAF, races, missing error handling, "
-        f"protocol/RDB/AOF breakage, incorrect locks, broken invariants.\n\n"
-        f"Also flag issues maintainers actually care about:\n"
-        f"- Test coverage gaps: does the test actually exercise the changed code path? "
-        f"Would the test still pass if the fix were reverted? Are edge cases covered?\n"
-        f"- Naming clarity in hot-path code: confusing variable/function names that make the diff harder to read\n"
-        f"- Doc accuracy: help text that contradicts code behavior, outdated comments near changed lines\n"
-        f"- Missing callers: if a function is renamed/changed, are all call sites updated? Similar analog "
-        f"functions (tls.c vs unix.c vs socket.c) often need the same fix\n"
-        f"- Simpler alternatives: if there's a shorter, clearer way that the PR author might not have seen\n\n"
-        f"Skip: formatting-only changes, preference-based rewrites, things already handled elsewhere, "
-        f"bikeshedding on cosmetic-only choices.\n\n"
+        f"## The maintainer bar (read carefully)\n"
+        f"Valkey maintainers hate false positives. One unwarranted nit on a PR is worse than zero comments. "
+        f"**I'd rather you post nothing than post a nit.** The goal is not coverage — it is signal.\n\n"
+        f"Two-pass review:\n\n"
+        f"**Pass 1: Brainstorm** — Draft every potential finding you'd consider. Memory leaks, NULL derefs, "
+        f"UAF, races, missing error handling, protocol breakage, locking bugs, invariants, test gaps, "
+        f"doc inaccuracies, missing analog callers. Be thorough. This is your private working set.\n\n"
+        f"**Pass 2: Ruthless filter** — For each Pass 1 finding, ask: \"Would a senior Valkey maintainer "
+        f"(Madelyn Olson, Viktor Söderqvist) genuinely want to see this comment on the PR, or would they "
+        f"dismiss it as noise?\" Keep ONLY findings that meet ALL of these:\n\n"
+        f"1. **Correctness or safety**: memory safety, concurrency, protocol correctness, data integrity, "
+        f"security, or a clearly wrong invariant. Not style, not preference, not \"could be clearer\".\n"
+        f"2. **High confidence**: you verified the concern by reading enough code to be sure. "
+        f"If you'd say \"maybe\" or \"might\", drop it.\n"
+        f"3. **Non-trivial**: the PR author would want to know about this before merge. It would affect "
+        f"whether the PR ships or not. If the maintainer might say \"fine, ignore\", drop it.\n"
+        f"4. **Not obvious from the diff**: if a reasonable reviewer would catch it in 30 seconds of "
+        f"reading the same diff, the comment adds no value.\n\n"
+        f"For doc/help-text PRs (valkey.conf, --help output, README), precision rules still apply. "
+        f"Flag factual errors or contradictions; do not flag wording preferences.\n\n"
+        f"**If the PR is small and clean, returning `[]` is the correct answer.** Maintainers trust "
+        f"bots more when they're quiet than when they're chatty.\n\n"
         f"## Output\n"
-        f"Return JSON array. Use line numbers from the NEW version of the file (after the PR's changes); "
-        f"they must point to lines present in the diff for GitHub to post inline.\n"
+        f"Return a JSON array of findings that survived Pass 2. Use line numbers from the NEW version "
+        f"of the file (after the PR's changes); they must point to lines present in the diff for GitHub "
+        f"to post inline.\n"
         f"```json\n"
         f"[\n"
         f'  {{"path": "src/file.c", "line": 42, "severity": "high",\n'
         f'    "title": "Brief title",\n'
         f'    "body": "Short human comment. Use ```suggestion``` block for concrete fixes.",\n'
-        f'    "confidence": "high"}}\n'
+        f'    "confidence": "high",\n'
+        f'    "essential": true}}\n'
         f"]\n"
         f"```\n\n"
-        f"Severities: info, low, medium, high, critical. Confidence: low, medium, high.\n"
-        f"Prefer fewer high-confidence findings. A 500-line PR usually needs 3-10 comments. "
-        f"Return at most {max_findings} findings. "
-        f"Return `[]` if genuinely nothing to flag.\n\n"
+        f"Severities: low, medium, high, critical. Confidence: low, medium, high.\n"
+        f"`essential: true` means this finding passed Pass 2 — include it. `essential: false` findings "
+        f"will be dropped before posting. Only include `essential: true` findings in the array.\n\n"
+        f"**Hard limits:** at most 5 findings, all `confidence: high`. Prefer 0-3 findings over 5. "
+        f"If a finding is `essential: false`, do not include it in the output array.\n\n"
+        f"Return `[]` if Pass 2 eliminated every finding. This is the correct answer most of the time — "
+        f"maintainers routinely approve PRs without leaving any comments.\n\n"
         f"**JSON output must be strictly valid.** Do not use `...` as a placeholder, "
         f"do not add comments, do not truncate fields. Every finding must have all fields "
         f"fully populated. If you need to omit a value, use `null`, never `...`."
@@ -383,11 +397,53 @@ def review_pr(
 
     result_text = _extract_result_text(agent_result.stdout)
     if not result_text:
-        raise ReviewGenerationError(f"No review result from Claude Code for PR #{pr_context.number}")
+        # Retry once with a shorter, more direct prompt. Empty-result runs
+        # (distinct from JSON parse failures) happen ~3% of the time when
+        # Claude finishes but emits no result event.
+        logger.warning(
+            "Claude returned no result text for PR #%d; retrying with direct prompt.",
+            pr_context.number,
+        )
+        retry_prompt = (
+            prompt
+            + "\n\n## RETRY\nYour previous run produced no output. "
+            "Return the JSON array now, or `[]` if genuinely nothing to flag. "
+            "Do not run additional tool calls; use what you already know."
+        )
+        agent_result = run_agent("review_readonly", retry_prompt, cwd=repo_dir)
+        if agent_result.returncode != 0:
+            raise ReviewGenerationError(
+                f"Claude Code review retry failed with exit code {agent_result.returncode}"
+            )
+        result_text = _extract_result_text(agent_result.stdout)
+        if not result_text:
+            logger.warning(
+                "PR #%d: Claude returned empty result twice; treating as no findings.",
+                pr_context.number,
+            )
+            return []
 
     raw_findings = _parse_findings_json_strict(result_text)
     findings = []
+    dropped_not_essential = 0
+    dropped_low_confidence = 0
     for raw in raw_findings:
+        # Precision gate 1: explicit essential=false
+        essential = raw.get("essential")
+        if essential is False:
+            dropped_not_essential += 1
+            continue
+
+        # Precision gate 2: confidence must be high
+        confidence = str(raw.get("confidence") or "medium").lower()
+        if confidence != "high":
+            dropped_low_confidence += 1
+            logger.info(
+                "Dropping low-confidence finding %s:%s (confidence=%s)",
+                raw.get("path"), raw.get("line"), confidence,
+            )
+            continue
+
         if not is_line_commentable(raw.get("path"), raw.get("line"), diff_maps):
             continue
         finding = _validate_finding(raw, changed_paths)
@@ -402,11 +458,16 @@ def review_pr(
                 )
                 continue
             findings.append(finding)
-        if len(findings) >= max_findings:
+        # Hard cap at 5 to maintain precision
+        if len(findings) >= min(max_findings, 5):
             break
 
-    logger.info("PR #%d: %d finding(s) from Claude Code (%d raw, %d validated)",
-                pr_context.number, len(findings), len(raw_findings), len(findings))
+    logger.info(
+        "PR #%d: %d finding(s) posted (raw=%d, dropped_not_essential=%d, "
+        "dropped_low_confidence=%d)",
+        pr_context.number, len(findings), len(raw_findings),
+        dropped_not_essential, dropped_low_confidence,
+    )
     return findings
 
 

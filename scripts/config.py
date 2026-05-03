@@ -139,7 +139,7 @@ class ReviewerConfig:
     post_policy_notes: bool = True
     ignore_keyword: str = "/reviewbot: ignore"
     max_files: int = 150
-    max_review_comments: int = 25
+    max_review_comments: int = 5
     path_filters: list[str] = field(default_factory=list)
     daily_token_budget: int = 0
     bedrock_retries: int = 5

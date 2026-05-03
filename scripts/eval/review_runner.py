@@ -22,13 +22,13 @@ from typing import Any
 from scripts.claude_reviewer import review_pr
 from scripts.eval.flow_scorer import score_review_flow
 from scripts.git_auth import GitAuth, github_https_url
-from scripts.models import DiffScope
+from scripts.models import DiffScope, PullRequestContext
 from scripts.pr_context_fetcher import PRContextFetcher
 
 logger = logging.getLogger(__name__)
 
 
-def _fetch_pr_diff(repo: str, pr_number: int, token: str) -> DiffScope:
+def _fetch_pr_diff(repo: str, pr_number: int, token: str) -> PullRequestContext:
     """Fetch the PR's changed files via GitHub API and build a DiffScope."""
     from github import Auth, Github
     gh = Github(auth=Auth.Token(token))
