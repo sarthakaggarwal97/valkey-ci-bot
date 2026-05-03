@@ -1,0 +1,74 @@
+{
+  "name": "review-3561",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3561,
+  "description": "Refactor dict restoring abstraction",
+  "base_ref": "unstable",
+  "head_sha": "f11a02c2afb31a649c78a8fec93a4694419348c0",
+  "author": "JimB123",
+  "changed_files": [
+    "cmake/Modules/SourceFiles.cmake",
+    "src/Makefile",
+    "src/cluster_legacy.c",
+    "src/config.c",
+    "src/defrag.c",
+    "src/dict.h",
+    "src/dict_ht.c",
+    "src/eval.c",
+    "src/expire.c",
+    "src/functions.c",
+    "src/fuzzer_command_generator.c",
+    "src/latency.c",
+    "src/module.c",
+    "src/rdb.c",
+    "src/scripting_engine.c",
+    "src/sentinel.c",
+    "src/server.c",
+    "src/valkey-benchmark.c",
+    "src/valkey-cli.c"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "zuiderkwast",
+        "path": "src/Makefile",
+        "line": 501,
+        "body": "Don't mix spaces and tabs."
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/dict_ht.c",
+        "line": 32,
+        "body": "This manipulates the dictType which isn't owned by this dict instance. It's it's shared among multiple dicts. It isn't marked as `const` but still...\n\nIs this ugliness the cost this PR is paying for removing some other uglinesses?\n\nI guess it can be OK, but it's worth mentioning. :)"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/dict_ht.c",
+        "line": 26,
+        "body": "It can be marked as `static` right?"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/dict_ht.c",
+        "line": 1,
+        "body": "Woudn't it be nicer if the filename and the function prefix `htdict` would match? E.g.\n\n* `htdictCreate`/`htdict.c`\n* `dictHtCreate`/`dict_ht.c`\n* `dicthtCreate`/`dictht.c`."
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/dict.h",
+        "line": 46,
+        "body": "@rainsupreme I see you solved it by creating a dict clone based on hashtable where the dictEntry clone is not opaque to your code.\r\n\r\nI'd call that's a workaround for something you can't do in dict anymore.\r\n\r\nIMHO we could just keep dictEntry non-opaque and then it's strait-forward to just replace the individual calls to functions like dictAddOrFind with the lower-level hashtable functions + manual dictEntry manipulation whenever the dict API is limiting you."
+      }
+    ],
+    "additions": 362,
+    "deletions": 322,
+    "changed_file_count": 19
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "complex"
+  ],
+  "mirror_pr_number_shadow": 144
+}

@@ -1,0 +1,68 @@
+{
+  "name": "review-3413",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3413,
+  "description": "Optimize infoCommand with SDS pre-allocation",
+  "base_ref": "unstable",
+  "head_sha": "02de9b8f4b60ae7191e5025068644189631c1e55",
+  "author": "charsyam",
+  "changed_files": [
+    "src/server.c"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "zuiderkwast",
+        "path": "src/server.c",
+        "line": 1468,
+        "body": "The problem of a slow INFO command is not the latency of INFO itself, but it can cause other commands to be slow when they wait for the server to run the slow INFO command.\n\nMoving the `getrusage()` calls to cron (run with period 100ms) will make the INFO command faster, but instead we run getrusage every 100ms in the background. This can cause latency spikes to other commands during the time when this cron task is running.\n\nMaybe a better solution is to do a lazy update of all this memory stats"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/server.c",
+        "line": 1468,
+        "body": "If it's not slow, then why move it from INFO? \ud83d\ude04\r\n\r\nThere is a comment actually that says these are \"relatively slow\":\r\n\r\n```c\r\n    run_with_period(100) {\r\n        /* Sample the RSS and other metrics here since this is a relatively slow call.\r\n         * We must sample the zmalloc_used at the same time we take the rss, otherwise\r\n         * the frag ratio calculate may be off (ratio of two samples at different times) */\r\n        server.cron_malloc_stats.process_rss = zmalloc_get_rss();\r\n        s"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/server.c",
+        "line": 1468,
+        "body": "OK, thanks!\r\n\r\nNow the PR title needs to be updated.\r\n\r\nCan you run the benchmarks again too?\r\n\r\nYou need to signoff the commits using `git commit --signoff`. Look at the details for the failing [DCO](https://github.com/valkey-io/valkey/pull/3413/checks?check_run_id=69154244764) job in the CI jobs below for how to fix it."
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/server.c",
+        "line": 1468,
+        "body": "OK, good. I updated title and description."
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/server.c",
+        "line": 6028,
+        "body": "The `maxmemory` tests are failing:\n\n```\n*** [err]: maxmemory - is the memory limit honoured? (policy allkeys-random) in tests/unit/maxmemory.tcl\nExpected [s used_memory] < (1120264+4096) (context: type eval line 26 cmd {assert {[s used_memory] < ($limit+4096)}} proc ::test)\n```\n\n`s used_memory` calls INFO and extracts the `used_memory` field. It adds 4096 bytes to account for the memory usage of INFO itself, but I believe it uses more than that.\n\n`sdsMakeRoomFor(info, 4096);` results in an alloc"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/server.c",
+        "line": 6028,
+        "body": "I think: If this test passed before, it means the INFO command didn't use so much memory. 4096 is probably enough for the full INFO reply, no?\r\n\r\nA simple solution is to use `sdsMakeRoomFor(info, 2048);` instead. It will result in 4096 bytes capacity. Isn't it enough?"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/server.c",
+        "line": 6028,
+        "body": "4096 is not huge memory, but I want to understand why the test started to fail.\r\n\r\nIt uses INFO each time to check `used_memory` and it uses the same amount of memory each time, so I don't really understand why the sds allocation size matter actually.\r\n\r\nThe failing test looks like this:\r\n\r\n```tcl\r\n    foreach policy {\r\n        allkeys-random allkeys-lru allkeys-lfu volatile-lru volatile-lfu volatile-random volatile-ttl\r\n    } {\r\n        test \"maxmemory - is the memory limit honoured? (policy $p"
+      }
+    ],
+    "additions": 1,
+    "deletions": 0,
+    "changed_file_count": 1
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "simple"
+  ],
+  "mirror_pr_number_shadow": 154
+}

@@ -1,0 +1,46 @@
+{
+  "name": "review-3409",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3409,
+  "description": "Add AOF rewrite support for module auxiliary data",
+  "base_ref": "unstable",
+  "head_sha": "3d4b5af802988d0dd52f3c717de375c52818f8be",
+  "author": "soloestoy",
+  "changed_files": [
+    "src/aof.c",
+    "src/commands.def",
+    "src/commands/module-auxload.json",
+    "src/module.c",
+    "src/module.h",
+    "src/valkeymodule.h",
+    "tests/modules/Makefile",
+    "tests/modules/testaof.c",
+    "tests/unit/moduleapi/testaof.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "soloestoy",
+        "path": "src/module.c",
+        "line": 14034,
+        "body": "something like the `LOADING` flag? for example `ONLY-LOADING` flag WDYT"
+      },
+      {
+        "author": "soloestoy",
+        "path": "src/module.c",
+        "line": 7705,
+        "body": "I'm not very familiar with Valkey-Search. Does it store the entire index data in the RDB's aux data?\r\n\r\nBased on my understanding, it should only need to store the schema. The index should be built when loading the key-value data from the RDB.\r\n\r\nIf the entire index is stored, I have a concern: when we load expired data, those keys are simply skipped. Wouldn't this lead to dirty data in the index when facing expired keys? Is this a potential issue?"
+      }
+    ],
+    "additions": 448,
+    "deletions": 1,
+    "changed_file_count": 9
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "complex"
+  ],
+  "mirror_pr_number_shadow": 155
+}

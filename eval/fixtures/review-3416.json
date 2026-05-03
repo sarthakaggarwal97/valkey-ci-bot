@@ -1,0 +1,38 @@
+{
+  "name": "review-3416",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3416,
+  "description": "fix test_entry to consider diffrerent allocator size classes",
+  "base_ref": "unstable",
+  "head_sha": "9505ed7b9306853b66d048fb529e764f6db512f4",
+  "author": "ranshid",
+  "changed_files": [
+    "src/unit/test_entry.cpp"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "zuiderkwast",
+        "path": "src/unit/test_entry.cpp",
+        "line": 188,
+        "body": "Please explain why.\n\n@asagege's explanation in https://github.com/valkey-io/valkey/issues/3200#issuecomment-4114394332 makes sense to me, but how does this change affect the numbers?"
+      },
+      {
+        "author": "ranshid",
+        "path": "src/unit/test_entry.cpp",
+        "line": 188,
+        "body": "It's just fits in both 16 and 8 alignment. But I will also add a fix to skip this test when jemalloc is not used"
+      }
+    ],
+    "additions": 6,
+    "deletions": 3,
+    "changed_file_count": 1
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "simple"
+  ],
+  "mirror_pr_number_shadow": 153
+}

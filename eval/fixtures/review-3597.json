@@ -1,0 +1,46 @@
+{
+  "name": "review-3597",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3597,
+  "description": "Enable multi-command parsing for replicated clients",
+  "base_ref": "unstable",
+  "head_sha": "a6364decdf240c978936ebef4621b93acf057bfe",
+  "author": "enjoy-binbin",
+  "changed_files": [
+    "src/networking.c",
+    "src/server.h",
+    "tests/integration/replication-multi-cmd.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "enjoy-binbin",
+        "path": "src/server.h",
+        "line": 1321,
+        "body": "Yes, we should, i forgot to init it, thanks."
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "src/networking.c",
+        "line": 2302,
+        "body": "Yes, you are right, i removed the assert now"
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "src/networking.c",
+        "line": 4006,
+        "body": "We can't guard the write, we need to maintain the write everytime since we have a CLUSTER SYNCSLOTS ESTABLISH command, this command will turn the client into a replicated client in the mid run."
+      }
+    ],
+    "additions": 173,
+    "deletions": 9,
+    "changed_file_count": 3
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "medium"
+  ],
+  "mirror_pr_number_shadow": 139
+}

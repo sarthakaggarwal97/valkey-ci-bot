@@ -1,0 +1,45 @@
+{
+  "name": "review-3583",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3583,
+  "description": "Fix checkPrefixCollisionsOrReply returning non-zero on self-overlap",
+  "base_ref": "unstable",
+  "head_sha": "840604141128b44b8706a936eb63963079b3625c",
+  "author": "beebs-systap",
+  "changed_files": [
+    "src/tracking.c",
+    "tests/unit/tracking.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "madolson",
+        "path": "src/unit/test_tracking.cpp",
+        "line": 1,
+        "body": "These tests are good, but now there is quite a bit of overlap with the TCL testing we are doing in unit/tracking. I think in this instance there is quite a bit of whitebox testing, accessing local variables, so I think extending the integration tests is probably the better long term maintainable here. We probably need to add better guidance on when to write unit vs integration."
+      },
+      {
+        "author": "madolson",
+        "path": "src/unit/test_tracking.cpp",
+        "line": 1,
+        "body": "Specifically, I think we only need these three new end tests to cover the existing main permutations:\n```\n      test {BCAST self-collision at later index is rejected} {\n          set r [valkey_client]\n          catch {$r CLIENT TRACKING ON BCAST PREFIX aaa PREFIX bbb PREFIX bbbc} output\n          assert_match {ERR*Prefix*overlaps*} $output\n          $r close\n      }\n  \n      test {BCAST identical prefix at later index is rejected} {\n          set r [valkey_client]\n          catch {$r CLIENT TRAC"
+      },
+      {
+        "author": "madolson",
+        "path": "src/unit/test_tracking.cpp",
+        "line": 1,
+        "body": "I think we can remove them. We have good coverage of them on TCL already, and it's a lot code that's effectively redundant. I don't want to discourage unit tests, but in this case it seems unecessary."
+      }
+    ],
+    "additions": 25,
+    "deletions": 1,
+    "changed_file_count": 2
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "simple"
+  ],
+  "mirror_pr_number_shadow": 140
+}

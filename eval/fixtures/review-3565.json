@@ -1,0 +1,58 @@
+{
+  "name": "review-3565",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3565,
+  "description": "Implement AOF data integrity check support.",
+  "base_ref": "unstable",
+  "head_sha": "7beeeb5853b248307c9e71b040a2f16404619853",
+  "author": "sumitk163",
+  "changed_files": [
+    "src/aof.c",
+    "src/config.c",
+    "src/rdb.c",
+    "src/server.c",
+    "src/server.h",
+    "src/valkey-check-aof.c",
+    "src/valkey-check-rdb.c",
+    "tests/integration/aof-integrity.tcl",
+    "valkey.conf"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "madolson",
+        "path": "src/aof.c",
+        "line": 1653,
+        "body": "Dead code. `if (!cksum_tag)` above goes to `fmterr`, so this `if (cksum_tag)` is always true. Remove the redundant guard. Same pattern in `valkey-check-aof.c`."
+      },
+      {
+        "author": "madolson",
+        "path": "src/valkey-check-aof.c",
+        "line": 210,
+        "body": "Same dead `if (cksum_tag)` guard as in `aof.c`."
+      },
+      {
+        "author": "madolson",
+        "path": "src/aof.c",
+        "line": 1482,
+        "body": "General naming feedback across the PR: prefer more descriptive names over abbreviations. `aof_lsn` \u2192 `aof_sequence` or `aof_seq_number` (LSN is single-use jargon here), `h_len`/`h_lsn`/`h_cksum` \u2192 `hdr_len`/`hdr_seq`/`hdr_checksum`, `cksum` \u2192 `checksum`, `calc_cksum` \u2192 `computed_checksum`, `cksum_tag` \u2192 `checksum_tag`. The abbreviated forms save a few characters but make the code harder to read without context. Applies to variable names, header field names (`cksum:` \u2192 `checksum:`), and the RDB a"
+      },
+      {
+        "author": "madolson",
+        "path": "src/aof.c",
+        "line": 1666,
+        "body": "\"AOF short write detected\" \u2014 this is during loading, so it should be \"short read\". Same in `valkey-check-aof.c`."
+      }
+    ],
+    "additions": 436,
+    "deletions": 9,
+    "changed_file_count": 9
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "complex"
+  ],
+  "mirror_pr_number_shadow": 143
+}

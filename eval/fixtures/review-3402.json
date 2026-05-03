@@ -1,0 +1,62 @@
+{
+  "name": "review-3402",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3402,
+  "description": "Env: Read VALKEYCLI_HOST and VALKEYCLI_PORT environment variables",
+  "base_ref": "unstable",
+  "head_sha": "ec237c669f866734c48c0f0e146e5eae08a0395f",
+  "author": "Dietr1ch",
+  "changed_files": [
+    "src/valkey-cli.c"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "zuiderkwast",
+        "path": "src/valkey-cli.c",
+        "line": 2945,
+        "body": "parseEnv is called after parseOptions. We need to make sure the environment variables don't override an explicit `-h` option.\n\nFor AUTH above, the check is `auth != NULL && config.conn_info.auth == NULL`. We can do something similar for host and port, i.e. initialize `config.conn_info.host = NULL` and `config.conn_info.port = 0` and check if they're still zero here, and after the call to parseEnv, check if they're still zero set them to the default values (\"127.0.0.1\", 6379)."
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/valkey-cli.c",
+        "line": 2945,
+        "body": "Yeah, reading env before options is the cleanest. I thought it would be affecting more things, but it looks simple."
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/valkey-cli.c",
+        "line": 10156,
+        "body": "Don't leave two blank lines here. One blank line is enough."
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "src/valkey-cli.c",
+        "line": 10056,
+        "body": "```suggestion\n    /* Valkey defaults */\n```"
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "src/valkey-cli.c",
+        "line": 10151,
+        "body": "```suggestion\n    /* Override configuration based on explicit command-line arguments */\n```"
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "src/valkey-cli.c",
+        "line": 10148,
+        "body": "```suggestion\n    /* Override configuration based on environment variables */\n```"
+      }
+    ],
+    "additions": 17,
+    "deletions": 4,
+    "changed_file_count": 1
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "simple"
+  ],
+  "mirror_pr_number_shadow": 156
+}

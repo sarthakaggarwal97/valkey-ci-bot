@@ -1,0 +1,56 @@
+{
+  "name": "review-3511",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3511,
+  "description": "Stabilize diskless no-drop replication test",
+  "base_ref": "unstable",
+  "head_sha": "fe1d7e658c6f10dacb2bcea6d8949914ba85f632",
+  "author": "sarthakaggarwal97",
+  "changed_files": [
+    "tests/integration/replication.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "zuiderkwast",
+        "path": "tests/integration/replication.tcl",
+        "line": 892,
+        "body": "```suggestion\n    # buffers so the primary can hit the blocked writer path while replicas\n```"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "tests/integration/replication.tcl",
+        "line": 919,
+        "body": "Does this mean the all/fast/slow/timeout cases can still be flaky?"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "tests/integration/replication.tcl",
+        "line": 972,
+        "body": "We could also just increase it to 2100 for all cases. It doesn't hurt? Less logic seems simpler."
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "tests/integration/replication.tcl",
+        "line": 972,
+        "body": "I see you increased it to 2400, which is safer? Then why not do 2400 for all cases? Will it hurt?"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "tests/integration/replication.tcl",
+        "line": 969,
+        "body": "You added a variable `set slow_replica_pid [srv -1 pid]`. If you do that, then we should use the variable everywhere with the function to avoid confusion. We should also add a variable `set fast_replica_pid [srv 0 pid]` and use it for killing the fast replica, etc.\n\nOr just keep using -1 (follow the old pattern) which is less readable but a smaller change.\n\nFor backporting, a smaller change is better? We can do either. (We can also just merge it as-is.)"
+      }
+    ],
+    "additions": 68,
+    "deletions": 17,
+    "changed_file_count": 1
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "medium"
+  ],
+  "mirror_pr_number_shadow": 147
+}

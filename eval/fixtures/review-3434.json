@@ -1,0 +1,57 @@
+{
+  "name": "review-3434",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3434,
+  "description": "add key_len parameter to hashtable lookup api - enables copy-avoidance work",
+  "base_ref": "unstable",
+  "head_sha": "2d629495dd55be7bd43d396aae969343ce673c26",
+  "author": "rainsupreme",
+  "changed_files": [
+    "src/cluster_legacy.c",
+    "src/config.c",
+    "src/db.c",
+    "src/defrag.c",
+    "src/dict.h",
+    "src/eval.c",
+    "src/evict.c",
+    "src/expire.c",
+    "src/functions.c",
+    "src/fuzzer_command_generator.c",
+    "src/hashtable.c",
+    "src/hashtable.h",
+    "src/kvstore.c",
+    "src/kvstore.h",
+    "src/latency.c",
+    "src/memory_prefetch.c",
+    "src/module.c",
+    "src/multi.c",
+    "src/networking.c",
+    "src/pubsub.c"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "zuiderkwast",
+        "path": "src/hashtable.c",
+        "line": 410,
+        "body": "Have you flipped this logic and changed all the dict keyCompare functions?\r\n\r\nIf you're touching all of these lines, we could as well rename it to avoid the ambiguity, to something like keyEqual?"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/hashtable.h",
+        "line": 66,
+        "body": "> The hashtable itself shouldn't need to be aware of lengths.\r\n\r\nI can agree about this point.\r\n\r\n> The entry simply IS the entry\r\n\r\nThat's a set-like API you're describing. Most people are familiar with Set and Map-like APIs (key/value, like dict) but this one with key/entry is unusual.\r\n\r\nThe set-like API (that you get by removing entryGetKey) is conceptually more familiar for anyone who expects a set-API, but you'd need to contruct dummy entries for lookup. This is doable in many cases (e.g. "
+      }
+    ],
+    "additions": 523,
+    "deletions": 414,
+    "changed_file_count": 33
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "complex"
+  ],
+  "mirror_pr_number_shadow": 151
+}

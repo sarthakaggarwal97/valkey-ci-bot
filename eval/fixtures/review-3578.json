@@ -1,0 +1,41 @@
+{
+  "name": "review-3578",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3578,
+  "description": "Fix Deferred Reply Placeholders in Active Deferred Buffers",
+  "base_ref": "unstable",
+  "head_sha": "66afca0ba844fcfc204ad608ef8537d75287ec5b",
+  "author": "eifrah-aws",
+  "changed_files": [
+    "src/networking.c",
+    "tests/modules/Makefile",
+    "tests/modules/deferred_reply.c",
+    "tests/unit/moduleapi/deferred_reply.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "ranshid",
+        "path": "src/networking.c",
+        "line": 1136,
+        "body": "When the deferred reply buffer is active, addReplyDeferredLen now correctly adds the placeholder to c->deferred_reply, but trimReplyUnusedTailSpace(c) still always operates on \nc->reply:\n\n\nThis is not a correctness bug \u2014 trimming c->reply is harmless. However, the purpose of the trim is to reclaim wasted tail space before adding a new node. When deferred reply is \nactive, the trim should target c->deferred_reply instead, since that's where the placeholder is going. As-is, the trim is a no-op in "
+      },
+      {
+        "author": "ranshid",
+        "path": "tests/modules/deferred_reply.c",
+        "line": 64,
+        "body": "The pthread_create in OnKeyspaceNotification doesn't detach or join the thread:\n\nThis is consistent with other test modules (e.g., block_keyspace_notification.c:72), so it's an existing pattern. Not a blocker, but pthread_detach(tid) after a successful create \nwould be cleaner since the thread is fire-and-forget."
+      }
+    ],
+    "additions": 167,
+    "deletions": 9,
+    "changed_file_count": 4
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "medium"
+  ],
+  "mirror_pr_number_shadow": 141
+}

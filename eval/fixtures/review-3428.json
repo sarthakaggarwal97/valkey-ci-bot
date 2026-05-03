@@ -1,0 +1,104 @@
+{
+  "name": "review-3428",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3428,
+  "description": "Improve AGENTS.md with comprehensive development guide",
+  "base_ref": "unstable",
+  "head_sha": "c16a81d28036d9b1ed64653d5616c3e2bfc00108",
+  "author": "soloestoy",
+  "changed_files": [
+    "AGENTS.md"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "hpatro",
+        "path": "AGENTS.md",
+        "line": 187,
+        "body": "```suggestion\n| `clang-format` CI check fails | `clang-format -i <modified files>` |\n```\n\nI was facing some problem in my macos where the agent didn't find the right tool."
+      },
+      {
+        "author": "hpatro",
+        "path": "AGENTS.md",
+        "line": 179,
+        "body": "```suggestion\n- For large features, open an issue for discussion before submitting a PR.\n```"
+      },
+      {
+        "author": "hpatro",
+        "path": "AGENTS.md",
+        "line": 129,
+        "body": "Let's use `clang-format`, I believe the symlink should exist to appropriate version.\n```suggestion\n- After modifying C/C++ files, run: `clang-format -i <modified files>`\n```"
+      },
+      {
+        "author": "hpatro",
+        "path": "AGENTS.md",
+        "line": 65,
+        "body": "Shall we provide similar `$(nproc)` suggestion like you have done below for CMake ?\n\n\n```suggestion\nmake -j$(nproc) BUILD_TLS=yes             # With TLS support\nmake -j$(nproc) SANITIZER=address         # With AddressSanitizer\n```"
+      },
+      {
+        "author": "hpatro",
+        "path": "AGENTS.md",
+        "line": 34,
+        "body": "Does this help ? Generally the agents are able to discover the right files for me."
+      },
+      {
+        "author": "madolson",
+        "path": "AGENTS.md",
+        "line": 18,
+        "body": "I don't think there is strong evidence that layouts help agents. Would consider removing this."
+      },
+      {
+        "author": "madolson",
+        "path": "AGENTS.md",
+        "line": 139,
+        "body": "```suggestion\n**License header** \u2014 all new code files must include:\n```\n\nConversely, should we add a style checker to enforce this?"
+      },
+      {
+        "author": "madolson",
+        "path": "AGENTS.md",
+        "line": 70,
+        "body": "Why alternatives? I think the research says you should be prescriptive to a single approach"
+      },
+      {
+        "author": "madolson",
+        "path": "AGENTS.md",
+        "line": 16,
+        "body": "```suggestion\n- Command definitions: `src/commands/*.json`\n```"
+      },
+      {
+        "author": "madolson",
+        "path": "AGENTS.md",
+        "line": 176,
+        "body": "You can't push to the unstable branch, it has branch protections.\n```suggestion\n```"
+      },
+      {
+        "author": "hpatro",
+        "path": "AGENTS.md",
+        "line": 176,
+        "body": "Helps avoiding it on the fork where the branch protection isn't active for everyone."
+      },
+      {
+        "author": "madolson",
+        "path": "AGENTS.md",
+        "line": 176,
+        "body": "That's not a valkey specific thing though? Again, my opinion is we should include as little as possible that agents can't infer. Agents can infer that you shouldn't push to default branch."
+      },
+      {
+        "author": "madolson",
+        "path": "AGENTS.md",
+        "line": 176,
+        "body": "Actually, I now wonder if we need the \"never push directly to valkey-io\" either, you can't push there either."
+      }
+    ],
+    "additions": 176,
+    "deletions": 43,
+    "changed_file_count": 1
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "medium"
+  ],
+  "mirror_pr_number_shadow": 157
+}

@@ -1,0 +1,41 @@
+{
+  "name": "review-3566",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3566,
+  "description": "API cleanup: eliminate dictSetKey",
+  "base_ref": "unstable",
+  "head_sha": "13b518d9e6d436543fd7a75efadf47147c041282",
+  "author": "rainsupreme",
+  "changed_files": [
+    "src/dict.h",
+    "src/expire.c",
+    "src/expire.h",
+    "src/lazyfree.c"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "zuiderkwast",
+        "path": "src/expire.c",
+        "line": 651,
+        "body": "You simply inlined dictAddOrFind and added sdsdup?"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/expire.c",
+        "line": 548,
+        "body": "You could just keep using dictEntry for this. Unless Jim insists that it shall be opaque.\n\nPersonally I don't think it needs to be opaque. If it's transparent, this dict can be kept as a dict and you'd just use a mix of dict and hashtable API functions, which would be totally fine, since dict is a non-opaque synonom of hashtable. You'd only need to replace the one call to dictAddOrFind with the lower level functions."
+      }
+    ],
+    "additions": 69,
+    "deletions": 52,
+    "changed_file_count": 4
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "medium"
+  ],
+  "mirror_pr_number_shadow": 142
+}

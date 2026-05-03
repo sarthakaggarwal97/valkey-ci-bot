@@ -1,0 +1,39 @@
+{
+  "name": "review-3516",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3516,
+  "description": "Fix HPERSIST RESP protocol violation on wrong-type key",
+  "base_ref": "unstable",
+  "head_sha": "be78fca399a91a5e7b4f2772c436157686cce636",
+  "author": "madolson",
+  "changed_files": [
+    "src/t_hash.c",
+    "tests/unit/hashexpire.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "madolson",
+        "path": "tests/unit/hashexpire.tcl",
+        "line": 1400,
+        "body": "The De-sync would impact the previous response, the suggestion would never execute since it will have hung on the previous command."
+      },
+      {
+        "author": "madolson",
+        "path": "tests/unit/hashexpire.tcl",
+        "line": 1399,
+        "body": "It's not necessary, set will overwrite what is already present, so it's not necessary to reset the state."
+      }
+    ],
+    "additions": 8,
+    "deletions": 3,
+    "changed_file_count": 2
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "simple"
+  ],
+  "mirror_pr_number_shadow": 146
+}

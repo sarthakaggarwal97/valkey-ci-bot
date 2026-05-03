@@ -1,0 +1,38 @@
+{
+  "name": "review-3419",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3419,
+  "description": "Improve listpack threshold guidance in valkey.conf",
+  "base_ref": "unstable",
+  "head_sha": "a0635d42f1be767e70f3a421714e8e8a786598d6",
+  "author": "Tarte12",
+  "changed_files": [
+    "valkey.conf"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "zuiderkwast",
+        "path": "valkey.conf",
+        "line": 2295,
+        "body": "It's a good introduction, but your comment doesn't say what listpacks are.\n\nIn the comment below your change introduces it: \"a memory efficient data structure when they have a small number of entries, and the biggest entry does not exceed a given threshold\".\n\nAlso further down for sets and sorted sets, the comments just say \"memory efficient data structure\" without saying that it's a listpack.\n\nPlease rewrite the complete text so it introduces the listpack concept at the top and explains what it"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "valkey.conf",
+        "line": 2283,
+        "body": "We haven't introduced quicklist yet. That comes further down in \"Lists are stored as quicklists, where each internal node is a listpack.\".\n\nHere, we can just say list.\n\n```suggestion\n# list nodes.\n```"
+      }
+    ],
+    "additions": 29,
+    "deletions": 19,
+    "changed_file_count": 1
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "simple"
+  ],
+  "mirror_pr_number_shadow": 152
+}

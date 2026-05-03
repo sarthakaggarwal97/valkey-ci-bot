@@ -1,0 +1,77 @@
+{
+  "name": "review-3443",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3443,
+  "description": "Fix slot-migration-max-failover-repl-bytes unable to accept -1",
+  "base_ref": "unstable",
+  "head_sha": "442125d131c76b4fc8b9fd7f7c9a366c5315cce5",
+  "author": "enjoy-binbin",
+  "changed_files": [
+    "src/cluster_migrateslots.c",
+    "src/config.c",
+    "src/server.h",
+    "tests/unit/cluster/cluster-migrateslots.tcl",
+    "tests/unit/introspection.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "zuiderkwast",
+        "path": "src/config.c",
+        "line": 2256,
+        "body": "Less nested `if` like this?\n\n```C\n    } else if (config->data.numeric.flags & SIGNED_MEMORY_CONFIG && value < 0) {\n        ll2string(buf, sizeof(buf), value);\n    } else if (config->data.numeric.flags & MEMORY_CONFIG) {\n        ull2string(buf, sizeof(buf), value);\n```\n\n(for context, instead of this:\n\n```c\n    } else if (config->data.numeric.flags & MEMORY_CONFIG) {\n        if (config->data.numeric.flags & SIGNED_MEMORY_CONFIG && value < 0) {\n            ll2string(buf, sizeof(buf), value);\n      "
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/config.c",
+        "line": 3466,
+        "body": "So SIGNED_MEMORY_CONFIG must be used together with MEMORY_CONFIG?\n\nCan we enforce this in some way, some assert? Or can we let SIGNED_MEMORY_CONFIG imply MEMORY_CONFIG without specifying it explicitly?"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/config.c",
+        "line": 3543,
+        "body": "Nice assert!"
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "src/config.c",
+        "line": 3466,
+        "body": "> So SIGNED_MEMORY_CONFIG must be used together with MEMORY_CONFIG?\n\nYes, in this way, within the original conditional logic, `value >= 0` allows execution to proceed to the `MEMORY_CONFIG` condition.\n\nWe can add a assert to enforce it."
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "src/config.c",
+        "line": 2256,
+        "body": "sure"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/config.c",
+        "line": 3537,
+        "body": "Nice assert! \ud83d\ude04 \r\n\r\nIt can be simplified using `!(A && !B)` == `!A || B`. Easier to read like this?\r\n\r\n```suggestion\r\n            serverAssert(!(config->data.numeric.flags & SIGNED_MEMORY_CONFIG) ||\r\n                         (config->data.numeric.flags & MEMORY_CONFIG));\r\n```\r\n"
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "src/config.c",
+        "line": 3537,
+        "body": "Yes, i originally wrote `!A || B`, but later changed it to `!(A && !B)`.  I'm not sure if it's just because i'm not good at math, i like the kind that positively state what is \"invalid\". But i guess `!A || B` implies `A \u2192 B` is better in math."
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/config.c",
+        "line": 3537,
+        "body": "Yes, I guess `!(A && !B)` is more intuitive because you think about what is invalid. We can write like that, but for me it was just harder to read the parentheses.\r\n\r\nAnother possibility is the more verbose style:\r\n\r\n```C\r\nif (config->data.numeric.flags & SIGNED_MEMORY_CONFIG) {\r\n    serverAssert(config->data.numeric.flags & MEMORY_CONFIG);\r\n}\r\n```\r\n\r\nAnyway, both are equivalent and we should know this math logic. :)"
+      }
+    ],
+    "additions": 90,
+    "deletions": 10,
+    "changed_file_count": 5
+  },
+  "tags": [
+    "review",
+    "shadow"
+  ],
+  "mirror_pr_number_shadow": 150
+}

@@ -1,0 +1,50 @@
+{
+  "name": "review-3538",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3538,
+  "description": "Add AUTH/AUTH2 options to CLUSTER MIGRATESLOTS",
+  "base_ref": "unstable",
+  "head_sha": "276833c38ff98c160bc426a43be0402f1fe45277",
+  "author": "nemtsv",
+  "changed_files": [
+    "src/cluster_legacy.c",
+    "src/cluster_migrateslots.c",
+    "src/commands.def",
+    "src/commands/cluster-migrateslots.json",
+    "src/replication.c",
+    "src/server.h",
+    "tests/unit/cluster/cluster-migrateslots.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "madolson",
+        "path": "src/replication.c",
+        "line": 3011,
+        "body": "blocker: `strlen(user)` and `strlen(pass)` are not binary safe. The old code used `sdslen(server.primary_auth)` for the password, which correctly handles embedded null bytes. This PR changes it to `strlen(pass)`, which truncates at the first `\\0`.\n\nThis regresses all three call sites, not just the new migration path \u2014 the two existing replication callers also pass `server.primary_auth` (an `sds`) through `strlen` now.\n\nFor comparison, `MIGRATE` uses `sdslen(username)` and `sdslen(password)` (clu"
+      },
+      {
+        "author": "madolson",
+        "path": "src/cluster_migrateslots.c",
+        "line": 1417,
+        "body": "minor: `server.primary_user` is `char *`, not `sds`. Assigning it to an `sds` variable works (both are `char *`) but is misleading. Use `const char *` for both locals, which also matches the `replicationSendAuth` signature."
+      },
+      {
+        "author": "madolson",
+        "path": "src/cluster_migrateslots.c",
+        "line": 1282,
+        "body": "nit: The `if` guard is unnecessary \u2014 `sdsfree` handles NULL. The `if (auth_pass)` guard is needed for the `memset`, but this one is just noise. Same in `freeSlotMigrationJob` at line 2211. Optional to clean up."
+      }
+    ],
+    "additions": 343,
+    "deletions": 19,
+    "changed_file_count": 7
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "complex"
+  ],
+  "mirror_pr_number_shadow": 145
+}

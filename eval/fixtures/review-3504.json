@@ -1,0 +1,42 @@
+{
+  "name": "review-3504",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3504,
+  "description": "Add zmalloc_aligned() and fix SPMC queue buffer alignment",
+  "base_ref": "unstable",
+  "head_sha": "86961f16b8ea4d2795d1c04599e28139ca7beff0",
+  "author": "sarthakaggarwal97",
+  "changed_files": [
+    "src/queues.c",
+    "src/unit/test_queues.cpp",
+    "src/unit/test_zmalloc.cpp",
+    "src/zmalloc.c",
+    "src/zmalloc.h"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "madolson",
+        "path": "src/zmalloc.h",
+        "line": 118,
+        "body": "We shouldn't double document the code, either in header or the c file."
+      },
+      {
+        "author": "madolson",
+        "path": "src/unit/test_zmalloc.cpp",
+        "line": 58,
+        "body": "Viktor has stated a preference to always do static c style casting in files. I also don't really know why these are EXPECT and not ASSERT."
+      }
+    ],
+    "additions": 107,
+    "deletions": 4,
+    "changed_file_count": 5
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "medium"
+  ],
+  "mirror_pr_number_shadow": 148
+}

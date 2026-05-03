@@ -5,6 +5,7 @@ from scripts.eval.flow_scorer import (
     score_daily_flow,
     score_fuzzer_flow,
     score_review_flow,
+    score_review_flow_loose,
 )
 
 
@@ -64,3 +65,49 @@ def test_fuzzer_category_match():
     truth = {"root_cause_category": "cluster", "fix_files_changed": ["src/cluster.c"]}
     score = score_fuzzer_flow("test", agent, truth)
     assert score.correctness > 0.5
+
+
+def test_review_loose_exact_match_equals_strict():
+    agent = [{"path": "src/a.c", "line": 42, "body": "Missing NULL check."}]
+    maint = [{"path": "src/a.c", "line": 44, "body": "Check for NULL."}]
+    loose = score_review_flow_loose("test", agent, maint, line_tolerance=10)
+    assert loose.correctness == 1.0
+    assert loose.details["exact_matches"] == 1
+    assert loose.details["file_only_matches"] == 0
+
+
+def test_review_loose_file_match_gets_partial_credit():
+    """Agent flagged a line 50 off from maintainer but in the same file."""
+    agent = [{"path": "src/a.c", "line": 100, "body": "Race condition here."}]
+    maint = [{"path": "src/a.c", "line": 50, "body": "Unchecked allocation."}]
+    loose = score_review_flow_loose("test", agent, maint, line_tolerance=10)
+    assert loose.details["exact_matches"] == 0
+    assert loose.details["file_only_matches"] == 1
+    # With weight 0.5, precision=0.5, recall=0.5, F1=0.5
+    assert loose.correctness == 0.5
+
+
+def test_review_loose_no_match_at_all():
+    """Agent flagged a totally different file than maintainer."""
+    agent = [{"path": "src/a.c", "line": 10, "body": "x"}]
+    maint = [{"path": "src/b.c", "line": 20, "body": "y"}]
+    loose = score_review_flow_loose("test", agent, maint)
+    assert loose.correctness == 0.0
+    assert loose.details["unmatched_agent"] == 1
+    assert loose.details["unmatched_maintainer"] == 1
+
+
+def test_review_loose_gives_strict_equal_or_better():
+    """Loose F1 should always be >= strict F1 on the same inputs."""
+    agent = [
+        {"path": "src/a.c", "line": 10, "body": "bug"},  # exact match
+        {"path": "src/a.c", "line": 100, "body": "another"},  # file-only match
+        {"path": "src/z.c", "line": 5, "body": "different"},  # no match
+    ]
+    maint = [
+        {"path": "src/a.c", "line": 12, "body": "fix"},
+        {"path": "src/a.c", "line": 50, "body": "also"},
+    ]
+    strict = score_review_flow("test", agent, maint, line_tolerance=10)
+    loose = score_review_flow_loose("test", agent, maint, line_tolerance=10)
+    assert loose.correctness >= strict.correctness

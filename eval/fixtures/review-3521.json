@@ -1,0 +1,87 @@
+{
+  "name": "review-3521",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3521,
+  "description": "Update version to 9.1.0-rc2 and add release notes",
+  "base_ref": "9.1",
+  "head_sha": "f5e95850e5850e1fcbdfc901a888399c771ec4e6",
+  "author": "sarthakaggarwal97",
+  "changed_files": [
+    "00-RELEASENOTES",
+    "src/version.h"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "madolson",
+        "path": "00-RELEASENOTES",
+        "line": 22,
+        "body": "We shouldn't be publicizing this API if it's not publically visible right?"
+      },
+      {
+        "author": "madolson",
+        "path": "00-RELEASENOTES",
+        "line": 42,
+        "body": "#3439 and #3420 (line 50) are build/tooling fixes, not bug fixes. The rc1 release notes have a dedicated \"Build and Tooling\" section for this kind of change. Move these there for consistency."
+      },
+      {
+        "author": "madolson",
+        "path": "00-RELEASENOTES",
+        "line": 44,
+        "body": "#3518 (Fix VLA warning in io_threads) was included in the backport PR #3519 but is missing here. If #3439 (similar VLA fix) is listed, #3518 should be too."
+      },
+      {
+        "author": "madolson",
+        "path": "00-RELEASENOTES",
+        "line": 23,
+        "body": "Let's be clearer about what this is. It should be that LUA script is now by default statically linked instead of dynamically linked."
+      },
+      {
+        "author": "madolson",
+        "path": "00-RELEASENOTES",
+        "line": 31,
+        "body": "```suggestion\n* Optimize `CLUSTERSCAN MATCH` so that it uses a specific slot if given by @nmvk (#3380)\n```"
+      },
+      {
+        "author": "madolson",
+        "path": "00-RELEASENOTES",
+        "line": 34,
+        "body": "```suggestion\n* Optimize `HGETDEL` to pause auto shrink when deleting multiple items by @charsyam (#3535)\n```"
+      },
+      {
+        "author": "madolson",
+        "path": "00-RELEASENOTES",
+        "line": 46,
+        "body": "How did you generate this list. Many of these are not marked with release notes?"
+      },
+      {
+        "author": "madolson",
+        "path": "00-RELEASENOTES",
+        "line": 17,
+        "body": "We need to add the revert for the TLs stuff."
+      },
+      {
+        "author": "madolson",
+        "path": "00-RELEASENOTES",
+        "line": 14,
+        "body": "```suggestion\nValkey 9.1.0-rc2 - Released Tue Apr 28 00:00:00 2026\n```"
+      },
+      {
+        "author": "madolson",
+        "path": "00-RELEASENOTES",
+        "line": 46,
+        "body": "Some of these are not important. The VLA warning in linenoise is not really something that should be in the release notes. We should be relying on the release notes tag, or adding if needed."
+      }
+    ],
+    "additions": 32,
+    "deletions": 1,
+    "changed_file_count": 2
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "simple"
+  ],
+  "mirror_pr_number_shadow": 158
+}

@@ -1,0 +1,53 @@
+{
+  "name": "review-3471",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3471,
+  "description": "Defer argument redaction by storing indices instead of rewriting argv",
+  "base_ref": "unstable",
+  "head_sha": "2d9265591b9055e534cb42ba96852ce69d451c52",
+  "author": "rjd15372",
+  "changed_files": [
+    "src/commandlog.c",
+    "src/networking.c",
+    "src/replication.c",
+    "src/server.h"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "zuiderkwast",
+        "path": "src/server.h",
+        "line": 1339,
+        "body": "A dynamic array with 16 bytes overhead in the client struct seems overkill.\r\n\r\nThe arguments we redact are always among the first 32 or 64 arguments, right? We can use a bitmap instead, where each bit represents an argument index, 1 means redact, 0 means don't redact. Args beyond the fixed number can't be redacted. Seems safe to me.\r\n\r\n\r\n```suggestion\r\n    uint32_t redact_arg_bitmap; /* Bitmap of argument indexes that should be redacted in logs. */\r\n```"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/networking.c",
+        "line": 5867,
+        "body": "In many places, this function is called with an index that at least on first sight looks unbounded, e.g. in acl.c:\n\n```c\n        for (int j = 2; j < c->argc; j++) {\n            redactClientCommandArgument(c, j);\n        }\n```\n\nAn alternative is to just skip redacting if it's out of range. Bus skipping better than asserting? \ud83e\udd14"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/networking.c",
+        "line": 5867,
+        "body": "> On the other hand, this assert might trigger if someone runs a very long ACL SETUSER ... command with many rules.\r\n\r\nYeah, if it's variadic, it's a real problem.\r\n\r\nWe can let the 0-bit mean all args above 31 should be redacted. No need to encode a specific index, is it?"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/networking.c",
+        "line": 5867,
+        "body": "Or just when it redacts any arg > 31, we set the flag and imply redacting all args > 31."
+      }
+    ],
+    "additions": 27,
+    "deletions": 12,
+    "changed_file_count": 4
+  },
+  "tags": [
+    "review",
+    "shadow",
+    "simple"
+  ],
+  "mirror_pr_number_shadow": 149
+}
