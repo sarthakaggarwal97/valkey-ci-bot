@@ -58,10 +58,81 @@ def _findings_json_candidate(text: str) -> str:
     return cleaned
 
 
+def _repair_json(text: str) -> str:
+    """Apply common-case repairs to JSON-ish text that Claude sometimes emits."""
+    # Drop Python-style ellipsis placeholders ('...' as a value or continuation)
+    text = re.sub(r",\s*\.\.\.\s*", "", text)
+    text = re.sub(r"\.\.\.\s*,", "", text)
+    text = re.sub(r":\s*\.\.\.", ": null", text)
+    # Remove // line comments
+    text = re.sub(r"//[^\n]*", "", text)
+    # Remove /* block comments */
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+    # Remove trailing commas before } or ]
+    text = re.sub(r",(\s*[}\]])", r"\1", text)
+    return text
+
+
+def _extract_finding_objects(text: str) -> list[dict[str, Any]]:
+    """Scan text for top-level JSON objects that look like findings.
+
+    This is the last-resort fallback when the whole array can't be parsed.
+    Each object must have at least a ``path`` or ``file`` key to count.
+    """
+    findings: list[dict[str, Any]] = []
+    # Track brace depth to find balanced top-level objects
+    depth = 0
+    start = -1
+    in_string = False
+    escape = False
+    for i, ch in enumerate(text):
+        if escape:
+            escape = False
+            continue
+        if ch == "\\" and in_string:
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and start >= 0:
+                candidate = text[start:i + 1]
+                try:
+                    obj = json.loads(candidate)
+                    if isinstance(obj, dict) and ("path" in obj or "file" in obj):
+                        findings.append(obj)
+                except json.JSONDecodeError:
+                    # Try repairing this single object
+                    try:
+                        obj = json.loads(_repair_json(candidate))
+                        if isinstance(obj, dict) and ("path" in obj or "file" in obj):
+                            findings.append(obj)
+                    except json.JSONDecodeError:
+                        pass
+                start = -1
+    return findings
+
+
 def _parse_findings_json_strict(text: str) -> list[dict[str, Any]]:
-    """Extract a JSON array of findings or raise on malformed output."""
+    """Extract a JSON array of findings. Apply repair passes before giving up.
+
+    Handles real-world Claude failure modes:
+    - ``...`` ellipsis placeholders inside JSON
+    - Line comments and trailing commas
+    - Text around the JSON block
+    - Object-level errors where only some findings are malformed
+    """
     cleaned = _findings_json_candidate(text)
-    # Try parsing as JSON array
+
+    # Pass 1: strict parse
     try:
         data = json.loads(cleaned)
         if isinstance(data, list):
@@ -71,19 +142,44 @@ def _parse_findings_json_strict(text: str) -> list[dict[str, Any]]:
             if isinstance(findings, list):
                 return findings
             raise ValueError("findings field was not a JSON array")
-    except json.JSONDecodeError as exc:
-        parse_error = exc
-    else:
-        raise ValueError("review output was not a JSON array or findings object")
+    except json.JSONDecodeError:
+        pass
 
-    # Try finding a JSON array within the text
+    # Pass 2: repair then parse
+    repaired = _repair_json(cleaned)
+    try:
+        data = json.loads(repaired)
+        if isinstance(data, list):
+            logger.info("Parsed findings JSON after repair pass.")
+            return data
+        if isinstance(data, dict) and "findings" in data and isinstance(data["findings"], list):
+            logger.info("Parsed findings object after repair pass.")
+            return data["findings"]
+    except json.JSONDecodeError:
+        pass
+
+    # Pass 3: regex-search for the array and repair
     m = re.search(r"\[.*\]", cleaned, re.DOTALL)
     if m:
         try:
-            return json.loads(m.group(0))
-        except json.JSONDecodeError as exc:
-            parse_error = exc
-    raise ValueError(f"could not parse findings JSON: {parse_error}")
+            return json.loads(_repair_json(m.group(0)))
+        except json.JSONDecodeError:
+            pass
+
+    # Pass 4: object-by-object extraction from the raw text
+    objects = _extract_finding_objects(cleaned)
+    if objects:
+        logger.info(
+            "Parsed %d findings via object-by-object extraction after array parse failed.",
+            len(objects),
+        )
+        return objects
+
+    # Nothing worked
+    raise ValueError(
+        f"could not parse findings JSON after repair passes; "
+        f"first 200 chars: {cleaned[:200]!r}"
+    )
 
 
 def _parse_findings_json(text: str) -> list[dict[str, Any]]:
@@ -245,9 +341,18 @@ def review_pr(
         f"- Restating what the PR already said\n\n"
         f"{valkey_block}\n\n"
         f"## What matters\n"
-        f"Flag real bugs: memory leaks, NULL derefs, UAF, races, missing error handling, protocol/RDB/AOF breakage, "
-        f"incorrect locks, broken invariants, tests that don't test the changed code.\n\n"
-        f"Skip: style nits, naming, formatting, preferences, things already handled elsewhere.\n\n"
+        f"Flag real bugs first: memory leaks, NULL derefs, UAF, races, missing error handling, "
+        f"protocol/RDB/AOF breakage, incorrect locks, broken invariants.\n\n"
+        f"Also flag issues maintainers actually care about:\n"
+        f"- Test coverage gaps: does the test actually exercise the changed code path? "
+        f"Would the test still pass if the fix were reverted? Are edge cases covered?\n"
+        f"- Naming clarity in hot-path code: confusing variable/function names that make the diff harder to read\n"
+        f"- Doc accuracy: help text that contradicts code behavior, outdated comments near changed lines\n"
+        f"- Missing callers: if a function is renamed/changed, are all call sites updated? Similar analog "
+        f"functions (tls.c vs unix.c vs socket.c) often need the same fix\n"
+        f"- Simpler alternatives: if there's a shorter, clearer way that the PR author might not have seen\n\n"
+        f"Skip: formatting-only changes, preference-based rewrites, things already handled elsewhere, "
+        f"bikeshedding on cosmetic-only choices.\n\n"
         f"## Output\n"
         f"Return JSON array. Use line numbers from the NEW version of the file (after the PR's changes); "
         f"they must point to lines present in the diff for GitHub to post inline.\n"
@@ -262,7 +367,10 @@ def review_pr(
         f"Severities: info, low, medium, high, critical. Confidence: low, medium, high.\n"
         f"Prefer fewer high-confidence findings. A 500-line PR usually needs 3-10 comments. "
         f"Return at most {max_findings} findings. "
-        f"Return `[]` if genuinely nothing to flag."
+        f"Return `[]` if genuinely nothing to flag.\n\n"
+        f"**JSON output must be strictly valid.** Do not use `...` as a placeholder, "
+        f"do not add comments, do not truncate fields. Every finding must have all fields "
+        f"fully populated. If you need to omit a value, use `null`, never `...`."
     )
 
     logger.info("Reviewing PR #%d (%d files)...", pr_context.number, len(diff_scope.files))

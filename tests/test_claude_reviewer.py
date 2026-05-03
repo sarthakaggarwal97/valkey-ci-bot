@@ -76,6 +76,66 @@ def test_parse_findings_json_empty_array():
     assert _parse_findings_json("[]") == []
 
 
+def test_parse_findings_json_with_ellipsis_placeholder():
+    """Regression: Claude sometimes emits '...' as a JSON-invalid placeholder.
+
+    This is the exact failure mode from PR #3568 on the 10-PR eval
+    (cost $14.10 before the fix). The repair pass should strip the
+    ellipsis values and return the two well-formed findings.
+    """
+    text = """```json
+[
+    {"path": "tests/unit/geo.tcl", "line": 574, "body": "...", "severity": "low"},
+    {"path": "src/hashtable.c", "line": 2326, ...}
+]
+```"""
+    result = _parse_findings_json(text)
+    assert len(result) == 2
+    assert result[0]["path"] == "tests/unit/geo.tcl"
+    assert result[1]["path"] == "src/hashtable.c"
+
+
+def test_parse_findings_json_with_trailing_comma():
+    text = '[{"path": "a.c", "body": "bug"},]'
+    assert len(_parse_findings_json(text)) == 1
+
+
+def test_parse_findings_json_with_comments():
+    text = """[
+        // This is a comment Claude added
+        {"path": "a.c", "body": "bug"}
+    ]"""
+    assert len(_parse_findings_json(text)) == 1
+
+
+def test_parse_findings_json_partial_malformed_array():
+    """Only some findings in the array are malformed. Recover what we can.
+
+    Real-world case: Claude emits two valid findings followed by a third
+    object with an ellipsis-style shorthand. Repair-pass + object extraction
+    should recover the well-formed ones.
+    """
+    text = """[
+        {"path": "a.c", "line": 1, "body": "good"},
+        {"path": "b.c", "line": 2, "body": "also good"},
+        {"path": "c.c", "line": 3, ...}
+    ]"""
+    result = _parse_findings_json(text)
+    assert len(result) >= 2
+    paths = {r["path"] for r in result}
+    assert "a.c" in paths
+    assert "b.c" in paths
+
+
+def test_parse_findings_json_with_preamble_text():
+    text = """Here are my review findings:
+
+```json
+[{"path": "a.c", "body": "bug"}]
+```"""
+    assert len(_parse_findings_json(text)) == 1
+
+
 def test_validate_finding_good():
     raw = {"path": "src/server.c", "line": 10, "body": "Bug here", "severity": "high", "title": "Leak"}
     result = _validate_finding(raw, {"src/server.c"})
