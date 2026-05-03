@@ -63,7 +63,7 @@ AGENT_PROFILES: dict[AgentProfileName, AgentProfile] = {
         allowed_tools="Read,Grep,Glob",
         timeout=3600,
         effort="max",
-        max_turns=150,
+        max_turns=240,
         writes_allowed=False,
         output_schema="review-findings-json",
     ),
