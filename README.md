@@ -1,36 +1,54 @@
 # valkey-ci-agent
 
-An AI agent for Valkey CI failure remediation, PR review, and automated backports.
+An AI agent for Valkey CI failure remediation, PR review, and automated backports. Powered by Claude Code (Anthropic Claude Opus via Bedrock).
 
 ## Features
 
 - **CI Failure Agent** — analyzes workflow failures, generates and validates fixes, opens PRs with approval gating
+- **PR Review Agent** — two-stage reviewer (deep review + skeptic pass) that posts inline comments and a summary, tracks state incrementally, and filters false positives before publishing
 - **Flaky Failure Campaigns** — persists experiment history for flaky failures, repeats validation runs, and feeds failed hypotheses back into later attempts
-- **PR Review Agent** — reviews pull requests via the GitHub API, posts summaries, publishes review comments, answers follow-up questions
-- **Backport Agent** — cherry-picks merged PRs onto release branches with LLM-based conflict resolution
-- **Fuzzer Monitor** — watches fuzzer runs, detects anomalies, creates GitHub issues
+- **Backport Agent** — cherry-picks merged PRs onto release branches with Claude Code-based conflict resolution and risk scoring
+- **Fuzzer Monitor** — watches fuzzer runs, normalizes incident fingerprints for stable dedup, creates GitHub issues
 - **Central Valkey Monitor** — watches scheduled CI runs, tracks failure history, queues validated fixes
 - **Capability Dashboard** — publishes a static report for flaky campaigns, CI outcomes, PR review coverage, fuzzer anomalies, AI reliability, and state health
+- **Evaluation Framework** — scripts/eval/ harness for measuring reviewer quality against historical maintainer decisions; see [eval/RESULTS.md](eval/RESULTS.md)
+
+See [docs/architecture.md](docs/architecture.md) for a full system overview, [docs/reviewer.md](docs/reviewer.md) for the PR reviewer deep-dive, and [docs/eval.md](docs/eval.md) for the evaluation methodology.
 
 ## Setup
 
-Model selection is configured in YAML, not in secrets:
+### Runtime
 
-- `examples/config.yml` controls the CI failure agent model through `bedrock.model_id`
-- `examples/pr-review-config.yml` controls the PR reviewer model through `reviewer.models.*`
-- both configs also support optional `retrieval` settings for explicit Bedrock Knowledge Base lookup
+The agent invokes Claude Code CLI (Anthropic Claude Opus) via Bedrock. No direct Bedrock API calls are used in production flows.
 
-AWS authentication is wired for GitHub Actions OIDC by default:
+Model selection via env vars (optional — defaults are usually fine):
+
+- `CI_AGENT_CLAUDE_MODEL` — Claude Code model alias (default: `opus`)
+- `CI_AGENT_CLAUDE_BEDROCK_OPUS_MODEL` — Bedrock inference profile (default: `us.anthropic.claude-opus-4-7`)
+
+Per-flow config tuning:
+
+- `.github/ci-failure-bot.yml` — daily CI failure agent limits, retrieval settings
+- `.github/pr-review-bot.yml` — reviewer config: `max_review_comments` (default 5), daily token budget, custom instructions
+- `.github/valkey-daily-bot.yml` / `valkey-fuzzer-bot.yml` — monitor-specific overrides
+
+### AWS authentication
+
+Wired for GitHub Actions OIDC by default:
 
 - GitHub Actions secret: `CI_BOT_AWS_ROLE_ARN`
 - GitHub Actions variable: `CI_BOT_AWS_REGION`
+- Workflows set `CLAUDE_CODE_USE_BEDROCK: "1"` so Claude Code CLI uses Bedrock
 
-Local development:
+### Local development
 
 - copy `.env.example` to `.env.local`
 - fill in your own `GITHUB_TOKEN`, `AWS_REGION`, and `AWS_PROFILE`
+- install Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
 - when targeting repositories that require DCO, also set `CI_BOT_COMMIT_NAME`, `CI_BOT_COMMIT_EMAIL`, and `CI_BOT_REQUIRE_DCO_SIGNOFF=true`
 - source `.env.local` manually before running scripts
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for dev environment setup, test conventions, and how to add new parsers/agent profiles/eval fixtures.
 
 ## Capability Dashboard
 
@@ -405,16 +423,9 @@ Required GitHub configuration:
 
 ## Retrieval KB Refresh
 
-Workflow at `.github/workflows/refresh-bedrock-kb.yml`.
+Removed in the Bedrock-runtime migration. Retrieval Knowledge Bases were part of the old Bedrock-direct flow. The current Claude Code reviewer uses:
 
-Refreshes the existing Valkey code and docs knowledge bases used by retrieval:
+- `scripts/valkey_knowledge.py` — hand-curated, source-verified Valkey divergence facts (renamed symbols, deprecated configs, structural changes)
+- `scripts/valkey_repo_context.py` — live repo context (labels, copilot-instructions, workflow files, per-subsystem instruction files from `.github/instructions/`)
 
-- code KB: `OHQMPN9RCG`
-- docs KB: `NAKLE24DH9`
-
-The workflow is OIDC-only and uses:
-
-- GitHub secret: `AWS_ROLE_ARN`
-- GitHub variable: `AWS_REGION`
-
-Manual runs default to `dry_run=true` so you can verify corpus prep and data-source discovery before mutating Bedrock.
+Both load lazily based on the PR's changed files, so the agent only sees context relevant to what it's reviewing.
