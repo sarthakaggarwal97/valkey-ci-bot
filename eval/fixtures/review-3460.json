@@ -1,0 +1,69 @@
+{
+  "name": "review-3460",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3460,
+  "description": "Unique samples in hashtableSampleEntries",
+  "base_ref": "unstable",
+  "head_sha": "2f790c04a981e096b11dd09f13332b6b4ab0d0b5",
+  "author": "zuiderkwast",
+  "changed_files": [
+    "src/hashtable.c",
+    "tests/unit/cluster/packet.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "hpatro",
+        "path": "tests/unit/cluster/packet.tcl",
+        "line": 138,
+        "body": "We could just do assert_equal if the results are accurate :D\n```suggestion\n        assert_equal $count 8\n```"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "tests/unit/cluster/packet.tcl",
+        "line": 138,
+        "body": "It samples 80% of the nodes. There are 10 nodes plus the client that just sent MEET, so we have 11.\r\n\r\nwanted = 11 * 80 / 100 = 8\r\n\r\ncandidates_wanted = wanted + 2 = 10; /* +2 for myself and link->node */\r\n\r\nSo 10 out of 11 nodes are sampled. If myself and the peer are among the sampled nodes, we can get 8 nodes we can send gossip about. If either myself or the peer are not sampled, we get 9 nodes (all of the other nodes in the cluster) to gossip about. So count can at least be 8 and 9. I'm not "
+      },
+      {
+        "author": "hpatro",
+        "path": "tests/unit/cluster/packet.tcl",
+        "line": 138,
+        "body": "I think you're right.\r\n\r\nI also think the test can be flaky by being strict [8,9] node(s). As node could be in handshake state and they will not be part of the gossip. I would suggest to add an additional step as part of the test for the cluster to stabilize first."
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "tests/unit/cluster/packet.tcl",
+        "line": 138,
+        "body": "`start_cluster` does wait for all the node to converge. It didn't fail in any of the extra tests. I changed to [8,9] mostly to test the limit, but I can lower it to e.g. [7,9] to make it safer. What do you think?"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "tests/unit/cluster/packet.tcl",
+        "line": 138,
+        "body": "I just changed to [7,9] now and we can let the extra tests run one more time."
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "tests/unit/cluster/packet.tcl",
+        "line": 138,
+        "body": "The fact that it can gossip about 9 nodes is a small correctness issue. It's more than the configured 80%. Maybe there is something wrong with the calculation in the +2 added for myself and the peer? We could stop adding gossip when we've has reached the configured number..."
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "tests/unit/cluster/packet.tcl",
+        "line": 138,
+        "body": "Looking at the implementation again, I see the loop adding gossip has this condition `gossipcount < wanted` so it should not add more than 80% here. I think it's correct."
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/hashtable.c",
+        "line": 2332,
+        "body": "It's not identical. I had to keep hashtableSampleEntries and sampleRandomBuckets separate just because they are differernt. First, I tried to just change hashtableSampleEntries to sample a continous range but then fairness tests for random entry broke."
+      }
+    ]
+  },
+  "tags": [
+    "review"
+  ]
+}

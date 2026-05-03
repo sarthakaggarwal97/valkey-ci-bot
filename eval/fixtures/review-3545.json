@@ -1,0 +1,52 @@
+{
+  "name": "review-3545",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3545,
+  "description": "Fix module commandresult event cleanup during unsubscribe and module unload",
+  "base_ref": "unstable",
+  "head_sha": "acb858be2c9944312c3847c6669165f3b43aa470",
+  "author": "sarthakaggarwal97",
+  "changed_files": [
+    "src/module.c",
+    "tests/modules/commandresult.c",
+    "tests/unit/moduleapi/commandresult.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "hpatro",
+        "path": "src/module.c",
+        "line": 12882,
+        "body": "This is not the general style in Valkey. Can we stick to the below style?\n\n```\nwhile ((ln = listNext(&li))) {\n```"
+      },
+      {
+        "author": "hpatro",
+        "path": "tests/modules/commandresult.c",
+        "line": 81,
+        "body": "These all can be in single line?\n```suggestion\n  ValkeyModule_SubscribeToServerEvent(ctx, ValkeyModuleEvent_CommandResultSuccess, NULL);\n  ValkeyModule_SubscribeToServerEvent(ctx, ValkeyModuleEvent_CommandResultFailure, NULL);\n  ValkeyModule_SubscribeToServerEvent(ctx, ValkeyModuleEvent_CommandResultRejected, NULL);\n  ValkeyModule_SubscribeToServerEvent(ctx, ValkeyModuleEvent_CommandResultACLRejected, NULL);\n```"
+      },
+      {
+        "author": "hpatro",
+        "path": "tests/unit/moduleapi/commandresult.tcl",
+        "line": 79,
+        "body": "If it's equal to 0, we risk regression of stats not getting updated. Is this flaky failure? Surprised it doesn't even consume a microsecond."
+      },
+      {
+        "author": "hpatro",
+        "path": "tests/unit/moduleapi/commandresult.tcl",
+        "line": 274,
+        "body": "How does this help?"
+      },
+      {
+        "author": "hpatro",
+        "path": "tests/unit/moduleapi/commandresult.tcl",
+        "line": 634,
+        "body": "This was discovered via daily failure?"
+      }
+    ]
+  },
+  "tags": [
+    "review"
+  ]
+}

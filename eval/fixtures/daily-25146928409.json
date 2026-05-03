@@ -1,0 +1,42 @@
+{
+  "name": "daily-25146928409",
+  "flow": "daily",
+  "repo": "valkey-io/valkey",
+  "workflow_run_id": 25146928409,
+  "workflow_file": "daily.yml",
+  "head_sha": "cac8071ef5ca49794ab2cc36532e9a331715dede",
+  "created_at": "2026-04-30",
+  "description": "5 failed job(s) on 2026-04-30",
+  "failed_jobs": [
+    {
+      "name": "test-valgrind-no-malloc-usable-size-misc",
+      "conclusion": "failure"
+    },
+    {
+      "name": "test-valgrind-misc",
+      "conclusion": "failure"
+    },
+    {
+      "name": "test-sanitizer-address (clang)",
+      "conclusion": "failure"
+    },
+    {
+      "name": "test-sanitizer-address (gcc)",
+      "conclusion": "failure"
+    },
+    {
+      "name": "test-almalinux9-tls-module-no-tls",
+      "conclusion": "failure"
+    }
+  ],
+  "ground_truth": {
+    "fix_commit_sha": "",
+    "fix_pr_number": 0,
+    "fix_files_changed": [],
+    "is_flaky": false,
+    "root_cause_category": "bug"
+  },
+  "tags": [
+    "daily"
+  ]
+}

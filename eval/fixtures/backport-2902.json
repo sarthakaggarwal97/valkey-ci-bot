@@ -1,0 +1,56 @@
+{
+  "name": "backport-2902",
+  "flow": "backport",
+  "repo": "valkey-io/valkey",
+  "pr_number": 2902,
+  "source_pr_number": 0,
+  "target_branch": "8.1",
+  "description": "Backport fixes to prepare for 8.1.5",
+  "author": "zuiderkwast",
+  "changed_files": [
+    ".github/workflows/daily.yml",
+    "00-RELEASENOTES",
+    "src/Makefile",
+    "src/cli_common.c",
+    "src/cluster_legacy.c",
+    "src/cluster_legacy.h",
+    "src/hashtable.c",
+    "src/module.c",
+    "src/networking.c",
+    "src/resp_parser.c",
+    "src/t_list.c",
+    "src/version.h",
+    "tests/integration/dual-channel-replication.tcl",
+    "tests/test_helper.tcl",
+    "tests/unit/cluster/failover2.tcl",
+    "tests/unit/expire.tcl"
+  ],
+  "ground_truth": {
+    "had_conflicts": false,
+    "files_changed": [
+      ".github/workflows/daily.yml",
+      "00-RELEASENOTES",
+      "src/Makefile",
+      "src/cli_common.c",
+      "src/cluster_legacy.c",
+      "src/cluster_legacy.h",
+      "src/hashtable.c",
+      "src/module.c",
+      "src/networking.c",
+      "src/resp_parser.c",
+      "src/t_list.c",
+      "src/version.h",
+      "tests/integration/dual-channel-replication.tcl",
+      "tests/test_helper.tcl",
+      "tests/unit/cluster/failover2.tcl",
+      "tests/unit/expire.tcl"
+    ],
+    "additions": 121,
+    "deletions": 48,
+    "was_rejected": false
+  },
+  "tags": [
+    "backport",
+    "complex"
+  ]
+}

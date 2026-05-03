@@ -1,0 +1,58 @@
+{
+  "name": "backport-2900",
+  "flow": "backport",
+  "repo": "valkey-io/valkey",
+  "pr_number": 2900,
+  "source_pr_number": 0,
+  "target_branch": "8.1",
+  "description": "Backport of scripting engine fixes",
+  "author": "rjd15372",
+  "changed_files": [
+    "src/db.c",
+    "src/eval.c",
+    "src/functions.c",
+    "src/functions.h",
+    "src/lazyfree.c",
+    "src/lua/engine_lua.c",
+    "src/lua/engine_lua.h",
+    "src/lua/function_lua.c",
+    "src/lua/function_lua.h",
+    "src/replication.c",
+    "src/scripting_engine.c",
+    "src/scripting_engine.h",
+    "src/server.h",
+    "src/valkeymodule.h",
+    "tests/modules/helloscripting.c",
+    "tests/unit/functions.tcl",
+    "tests/unit/moduleapi/scriptingengine.tcl"
+  ],
+  "ground_truth": {
+    "had_conflicts": false,
+    "files_changed": [
+      "src/db.c",
+      "src/eval.c",
+      "src/functions.c",
+      "src/functions.h",
+      "src/lazyfree.c",
+      "src/lua/engine_lua.c",
+      "src/lua/engine_lua.h",
+      "src/lua/function_lua.c",
+      "src/lua/function_lua.h",
+      "src/replication.c",
+      "src/scripting_engine.c",
+      "src/scripting_engine.h",
+      "src/server.h",
+      "src/valkeymodule.h",
+      "tests/modules/helloscripting.c",
+      "tests/unit/functions.tcl",
+      "tests/unit/moduleapi/scriptingengine.tcl"
+    ],
+    "additions": 345,
+    "deletions": 164,
+    "was_rejected": false
+  },
+  "tags": [
+    "backport",
+    "clean"
+  ]
+}

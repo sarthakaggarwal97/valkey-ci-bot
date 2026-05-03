@@ -1,0 +1,30 @@
+{
+  "name": "backport-2671",
+  "flow": "backport",
+  "repo": "valkey-io/valkey",
+  "pr_number": 2671,
+  "source_pr_number": 0,
+  "target_branch": "8.1",
+  "description": "Back port of Defrag if slab 1/8 full to fix defrag didn't stop issue",
+  "author": "madolson",
+  "changed_files": [
+    "00-RELEASENOTES",
+    "src/allocator_defrag.c",
+    "tests/unit/memefficiency.tcl"
+  ],
+  "ground_truth": {
+    "had_conflicts": true,
+    "files_changed": [
+      "00-RELEASENOTES",
+      "src/allocator_defrag.c",
+      "tests/unit/memefficiency.tcl"
+    ],
+    "additions": 51,
+    "deletions": 30,
+    "was_rejected": false
+  },
+  "tags": [
+    "backport",
+    "conflict"
+  ]
+}

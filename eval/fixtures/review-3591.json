@@ -1,0 +1,27 @@
+{
+  "name": "review-3591",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3591,
+  "description": "Handle NULL pointer in streamTrim listpack delta calculation",
+  "base_ref": "unstable",
+  "head_sha": "0ab9055c252232836323ce022fb1d7fb806f9492",
+  "author": "smkher",
+  "changed_files": [
+    "src/t_stream.c",
+    "tests/unit/type/stream.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "enjoy-binbin",
+        "path": "src/t_stream.c",
+        "line": 829,
+        "body": "I like this, the diff is smaller and easy to read, @smkher Would you be able to make this change?"
+      }
+    ]
+  },
+  "tags": [
+    "review"
+  ]
+}

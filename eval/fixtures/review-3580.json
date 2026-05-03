@@ -1,0 +1,34 @@
+{
+  "name": "review-3580",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3580,
+  "description": "fix(syncio): Set errno on EOF in syncRead and propagate to conn->last\u2026",
+  "base_ref": "unstable",
+  "head_sha": "e77e3c57ea37e28579bc375cf5d35b6014874726",
+  "author": "abmathur-ie",
+  "changed_files": [
+    "src/socket.c",
+    "src/syncio.c",
+    "src/tls.c"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "madolson",
+        "path": "src/socket.c",
+        "line": 400,
+        "body": "`connTLSSyncRead`, `connTLSSyncWrite`, and `connTLSSyncReadLine` in tls.c don't set `conn->last_errno` on failure either. `updateStateAfterSSLIO` only sets it for `EINTR`. If the goal is making `connGetLastError()` reliable after sync operations, TLS should be addressed too \u2014 at least acknowledged as a follow-up."
+      },
+      {
+        "author": "madolson",
+        "path": "src/t_hash.c",
+        "line": 1796,
+        "body": "Looks like you somehow reverted this, which was a past commit?"
+      }
+    ]
+  },
+  "tags": [
+    "review"
+  ]
+}

@@ -16,11 +16,14 @@ class ExpectedFinding:
 class EvalFixture:
     name: str
     repo: str
-    pr_number: int
     description: str
+    flow: str = ""
+    pr_number: int = 0
+    workflow_run_id: int = 0
     expected_findings: list[ExpectedFinding] = field(default_factory=list)
     ground_truth_root_cause: str = ""
     ground_truth_fix_files: list[str] = field(default_factory=list)
+    ground_truth: dict = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
 
 
@@ -36,11 +39,14 @@ def load_fixtures(fixtures_dir: str | Path) -> list[EvalFixture]:
         results.append(EvalFixture(
             name=data["name"],
             repo=data["repo"],
-            pr_number=data["pr_number"],
             description=data.get("description", ""),
+            flow=data.get("flow", ""),
+            pr_number=data.get("pr_number", 0),
+            workflow_run_id=data.get("workflow_run_id", 0),
             expected_findings=findings,
             ground_truth_root_cause=data.get("ground_truth_root_cause", ""),
             ground_truth_fix_files=data.get("ground_truth_fix_files", []),
+            ground_truth=data.get("ground_truth", {}),
             tags=data.get("tags", []),
         ))
     return results

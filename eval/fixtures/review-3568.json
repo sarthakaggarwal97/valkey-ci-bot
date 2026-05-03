@@ -1,0 +1,39 @@
+{
+  "name": "review-3568",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3568,
+  "description": "Fix GEOSEARCH BYPOLYGON leak on invalid COUNT",
+  "base_ref": "unstable",
+  "head_sha": "0892e5f8eb95b8e2e8c0a9b1da4249eb9dde993b",
+  "author": "bandalgomsu",
+  "changed_files": [
+    "src/geo.c",
+    "tests/unit/geo.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "ranshid",
+        "path": "tests/unit/geo.tcl",
+        "line": 575,
+        "body": "Why is this loop needed?"
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "tests/unit/geo.tcl",
+        "line": 575,
+        "body": "let's makring this flat and just asserting each of it, since it is simple enouth so it is also easy to read."
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "tests/unit/geo.tcl",
+        "line": 577,
+        "body": "Yes, i also think we can remove this memory check. We have a lot of test cases. Normally as long as our code can cover it, other memory leak detecetion tools will catch it."
+      }
+    ]
+  },
+  "tags": [
+    "review"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "daily-25060696773",
+  "flow": "daily",
+  "repo": "valkey-io/valkey",
+  "workflow_run_id": 25060696773,
+  "workflow_file": "daily.yml",
+  "head_sha": "f5e95850e5850e1fcbdfc901a888399c771ec4e6",
+  "created_at": "2026-04-28",
+  "description": "1 failed job(s) on 2026-04-28",
+  "failed_jobs": [
+    {
+      "name": "test-fedorarawhide-tls-module",
+      "conclusion": "failure"
+    }
+  ],
+  "ground_truth": {
+    "fix_commit_sha": "",
+    "fix_pr_number": 0,
+    "fix_files_changed": [],
+    "is_flaky": true,
+    "root_cause_category": "flaky"
+  },
+  "tags": [
+    "daily"
+  ]
+}

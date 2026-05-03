@@ -1,0 +1,32 @@
+{
+  "name": "backport-3513",
+  "flow": "backport",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3513,
+  "source_pr_number": 3430,
+  "target_branch": "8.1",
+  "description": "Backport 8.1: Fix some flaky tests (#3430)",
+  "author": "sarthakaggarwal97",
+  "changed_files": [
+    "tests/unit/cluster/failover2.tcl",
+    "tests/unit/cluster/replica-migration.tcl",
+    "tests/unit/maxmemory.tcl",
+    "tests/unit/memefficiency.tcl"
+  ],
+  "ground_truth": {
+    "had_conflicts": false,
+    "files_changed": [
+      "tests/unit/cluster/failover2.tcl",
+      "tests/unit/cluster/replica-migration.tcl",
+      "tests/unit/maxmemory.tcl",
+      "tests/unit/memefficiency.tcl"
+    ],
+    "additions": 39,
+    "deletions": 28,
+    "was_rejected": false
+  },
+  "tags": [
+    "backport",
+    "clean"
+  ]
+}

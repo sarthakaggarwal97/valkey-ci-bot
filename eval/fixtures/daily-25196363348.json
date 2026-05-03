@@ -1,0 +1,30 @@
+{
+  "name": "daily-25196363348",
+  "flow": "daily",
+  "repo": "valkey-io/valkey",
+  "workflow_run_id": 25196363348,
+  "workflow_file": "daily.yml",
+  "head_sha": "cba05103de24cd5d49f2f4d80e337646c2c941b4",
+  "created_at": "2026-05-01",
+  "description": "2 failed job(s) on 2026-05-01",
+  "failed_jobs": [
+    {
+      "name": "test-ubuntu-jemalloc",
+      "conclusion": "failure"
+    },
+    {
+      "name": "test-valgrind-test",
+      "conclusion": "failure"
+    }
+  ],
+  "ground_truth": {
+    "fix_commit_sha": "",
+    "fix_pr_number": 0,
+    "fix_files_changed": [],
+    "is_flaky": true,
+    "root_cause_category": "flaky"
+  },
+  "tags": [
+    "daily"
+  ]
+}
