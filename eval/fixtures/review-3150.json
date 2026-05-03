@@ -1,0 +1,73 @@
+{
+  "name": "review-3150",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3150,
+  "description": "Rehashing more empty buckets to optimize the rehashing speed",
+  "base_ref": "unstable",
+  "head_sha": "cc5ceae7b880ee6bdad130fd2ae48d3849e7f9e9",
+  "author": "enjoy-binbin",
+  "changed_files": [
+    "src/hashtable.c",
+    "src/hashtable.h",
+    "src/unit/test_files.h",
+    "src/unit/test_hashtable.c",
+    "tests/unit/type/zset.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "zuiderkwast",
+        "path": "src/hashtable.c",
+        "line": 653,
+        "body": "b is never NULL here. This code will never run.\r\n\r\nThe condition for empty bucket is `b->presence == 0 && !b->chained`.\r\n\r\nBut I think we can do this in rehashStepShrink instead, where we already have a bucket variable. I don't like that this code is spread out in so many functions now.\r\n\r\n```C\r\n/* Processes one bucket chain during incremental table shrinkage. */\r\nstatic void rehashStepShrink(hashtable *ht) {\r\n    bucket *b;\r\n    /* find a non-empty bucket, skipping up to 10 empty buckets */\r\n  "
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "src/hashtable.c",
+        "line": 653,
+        "body": "oh, i must be drunk. Yes, let's only add it in shrink case."
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "src/hashtable.c",
+        "line": 641,
+        "body": "```suggestion\r\n        if (--empty_visits == 0) return;       /* too many empty buckets */\r\n```"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/unit/test_hashtable.c",
+        "line": 260,
+        "body": "Did it fail on 32-bit?\r\n\r\nIn the 32-bit representation, there are up to 12 elements per bucket, so I guess it's already completed in 32-bit mode.\r\n\r\nWe can make it independent of 32/64 bit if we also allow that rehashing has completed. Do you need to check an upper bound, then we can use 150 instead of 100.\r\n\r\n```suggestion\r\n    /* Check that at least 90 buckets are rehashed or that rehashing is completed. */\r\n    TEST_ASSERT(hashtableGetRehashingIndex(ht) >= 90 || hashtableGetRehashingIndex(ht)"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "tests/unit/type/zset.tcl",
+        "line": 2739,
+        "body": "We can avoid the ugly indentation with the new `skip` construct.\r\n\r\nWe can check for 32-bit using the INFO field, `[s arch_bits] != 64`.\r\n\r\n```suggestion\r\nstart_server [list overrides [list save \"\"] tags {\"zset needs:debug external:skip\"}] {\r\n    test {ZSET resize test - rehash more empty buckets in shrinking case} {\r\n        if {[s arch_bits] != 64} {\r\n            skip \"This is only for 64-bit platforms\"\r\n        }\r\n```\r\n"
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "tests/unit/type/zset.tcl",
+        "line": 2739,
+        "body": "Great, i remember we have this info but unable to find it in the TCL code, and only find the `proto-max-bulk-len 10000000000` one (that is also new for me)"
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "src/unit/test_hashtable.c",
+        "line": 260,
+        "body": "LGTM. thanks"
+      }
+    ],
+    "additions": 113,
+    "deletions": 3,
+    "changed_file_count": 5
+  },
+  "tags": [
+    "review",
+    "complex"
+  ],
+  "original_pr_number": 3150,
+  "mirror_repo": "sarthakaggarwal97/valkey",
+  "mirror_pr_number": 128
+}

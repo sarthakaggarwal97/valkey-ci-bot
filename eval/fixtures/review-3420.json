@@ -1,0 +1,60 @@
+{
+  "name": "review-3420",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3420,
+  "description": "Avoid having server.h being included by cli and benchmark",
+  "base_ref": "unstable",
+  "head_sha": "3bad891bca89fb09408eca04cb01d829f5779d46",
+  "author": "ranshid",
+  "changed_files": [
+    "src/commands.h",
+    "src/crc16.c",
+    "src/fuzzer_command_generator.c",
+    "src/server.h"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "zuiderkwast",
+        "path": "src/server.h",
+        "line": 1448,
+        "body": "Is this GCC and Clang only or is it C standard?\n\nJust curios. We have multiple `__attribute__((...))` already."
+      },
+      {
+        "author": "ranshid",
+        "path": "src/server.h",
+        "line": 1448,
+        "body": ">Is this GCC and Clang only or is it C standard?\r\n\r\nYes. this is a gcc extension which is supported by clang (not C standard)"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/server.h",
+        "line": 1448,
+        "body": "I've seen some attempt to build with other compilers, but they'll have to support this too. We already have this kind of attributes, many of them."
+      },
+      {
+        "author": "ranshid",
+        "path": "src/server.h",
+        "line": 1448,
+        "body": "So what do you suggest? should I macro it in config.h?\r\n"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/server.h",
+        "line": 1448,
+        "body": "No, let's keep `__attribute__((always_inline))`. We already have many such attributes already, so nothing will break by this. \ud83d\ude04 "
+      }
+    ],
+    "additions": 78,
+    "deletions": 79,
+    "changed_file_count": 4
+  },
+  "tags": [
+    "review",
+    "simple"
+  ],
+  "original_pr_number": 3420,
+  "mirror_repo": "sarthakaggarwal97/valkey",
+  "mirror_pr_number": 125
+}

@@ -1,0 +1,46 @@
+{
+  "name": "review-3380",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3380,
+  "description": "CLUSTERSCAN MATCH pattern maps to a specific slot optimizations",
+  "base_ref": "unstable",
+  "head_sha": "88f29baad4e5e3a65c48421d8e73141733ee0c40",
+  "author": "nmvk",
+  "changed_files": [
+    "src/cluster.c",
+    "tests/unit/cluster/clusterscan.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "hpatro",
+        "path": "tests/unit/cluster/clusterscan.tcl",
+        "line": 176,
+        "body": "What's the intent behind the `max_loops` here ? When can the below condition fail ?"
+      },
+      {
+        "author": "hpatro",
+        "path": "tests/unit/cluster/clusterscan.tcl",
+        "line": 186,
+        "body": "nit: Name the variable as `key` here and below.\n\n```suggestion\n            foreach key [lindex $res 1] {\n                lappend found_keys $key\n            }\n```"
+      },
+      {
+        "author": "hpatro",
+        "path": "tests/unit/cluster/clusterscan.tcl",
+        "line": 176,
+        "body": "Ah, okay makes sense. How many iterations does it take to retrieve all the elements though ?"
+      }
+    ],
+    "additions": 109,
+    "deletions": 8,
+    "changed_file_count": 2
+  },
+  "tags": [
+    "review",
+    "complex"
+  ],
+  "original_pr_number": 3380,
+  "mirror_repo": "sarthakaggarwal97/valkey",
+  "mirror_pr_number": 126
+}

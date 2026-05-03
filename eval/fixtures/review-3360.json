@@ -1,0 +1,42 @@
+{
+  "name": "review-3360",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3360,
+  "description": "Optimize WATCH duplicate key check from O(N) to O(1) using per-db hashtable",
+  "base_ref": "unstable",
+  "head_sha": "9fe68f5669918049181d62a2d69cba07074bdb28",
+  "author": "enjoy-binbin",
+  "changed_files": [
+    "src/multi.c",
+    "src/server.c",
+    "src/server.h",
+    "tests/unit/multi.tcl"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "enjoy-binbin",
+        "path": "src/multi.c",
+        "line": 353,
+        "body": "We can not call WATCH in a MULTI, so i think we are safe here.\r\nie we can only call WATCH before a MULTI, and in this case, there are not transaction_db_id at all."
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "src/multi.c",
+        "line": 68,
+        "body": "I did consider that, but ultimately decided doing this PR way. If a client has used WATCH in the past, it should continue to use WATCH in the future.\r\n\r\nBut i am open for this one, let's see what other people think."
+      }
+    ],
+    "additions": 144,
+    "deletions": 21,
+    "changed_file_count": 4
+  },
+  "tags": [
+    "review",
+    "complex"
+  ],
+  "original_pr_number": 3360,
+  "mirror_repo": "sarthakaggarwal97/valkey",
+  "mirror_pr_number": 127
+}

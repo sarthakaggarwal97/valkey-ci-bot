@@ -1,0 +1,51 @@
+{
+  "name": "review-3520",
+  "flow": "review",
+  "repo": "valkey-io/valkey",
+  "pr_number": 3520,
+  "description": "Document VALKEYCLI_HOST/PORT variables in help",
+  "base_ref": "unstable",
+  "head_sha": "11ccbfcfcb88e59c7fb3232209e38a9d0ea2497b",
+  "author": "Dietr1ch",
+  "changed_files": [
+    "src/valkey-cli.c"
+  ],
+  "ground_truth": {
+    "maintainer_comments": [
+      {
+        "author": "zuiderkwast",
+        "path": "src/valkey-cli.c",
+        "line": 3013,
+        "body": "I think this is too short so it becomes unclear that it's environment variable and what the default is.\n\nLet's take more inspiration from the text about `-a <password>` and `CLI_AUTH_ENV` below.\n\nIdea: *Server hostname or IP (default is 127.0.0.1). You can also use the xxxxx environment variable.*"
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/valkey-cli.c",
+        "line": 3001,
+        "body": "The default width of a terminal window is 80 colums, so let's keep the output formatted to that width.\n\n```suggestion\n            \"  -h <hostname>      Server hostname. Default is 127.0.0.1, you can also use the\\n\"\n            \"                     \" CLI_HOST_ENV \" environment variable.\\n\"\n            \"  -p <port>          Server port. Default is 6379, you can also use the\\n\"\n            \"                     \" CLI_PORT_ENV \" environment variable.\\n\"\n```"
+      },
+      {
+        "author": "enjoy-binbin",
+        "path": "src/valkey-cli.c",
+        "line": 3001,
+        "body": "We can add these lines just like -a i guess.\r\n```\r\n            \"  -a <password>      Password to use when connecting to the server.\\n\"\r\n            \"                     You can also use the \" CLI_AUTH_ENV \" environment\\n\"\r\n            \"                     variable to pass this password more safely\\n\"\r\n            \"                     (if both are used, this argument takes precedence).\\n\"\r\n```\r\n\r\n```suggestion\r\n            \"  -h <hostname>      Server hostname (default: 127.0.0.1).\\n\"\r\n       "
+      },
+      {
+        "author": "zuiderkwast",
+        "path": "src/valkey-cli.c",
+        "line": 3001,
+        "body": "I agree with you @Dietr1ch, for AUTH it can be useful to prevent the password from being store in the shell's history file, but this doesn't seem like a valid point for hostname and port."
+      }
+    ],
+    "additions": 4,
+    "deletions": 2,
+    "changed_file_count": 1
+  },
+  "tags": [
+    "review",
+    "simple"
+  ],
+  "original_pr_number": 3520,
+  "mirror_repo": "sarthakaggarwal97/valkey",
+  "mirror_pr_number": 124
+}
