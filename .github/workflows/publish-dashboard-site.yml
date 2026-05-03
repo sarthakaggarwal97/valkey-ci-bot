@@ -175,12 +175,25 @@ jobs:
             --dashboard-json agent-dashboard.json \
             --site-dir dashboard-site
 
+      - name: Generate public health site
+        shell: bash
+        run: |
+          python3 -m scripts.agent_dashboard_site_public \
+            --dashboard-json agent-dashboard.json \
+            --site-dir dashboard-site-public
+
+      - name: Merge operator site into public site at /operator/
+        shell: bash
+        run: |
+          cp -r dashboard-site dashboard-site-public/operator
+
       - name: Upload dashboard site artifact
         uses: actions/upload-artifact@v4
         with:
           name: dashboard-site-${{ github.run_id }}
           path: |
             dashboard-site
+            dashboard-site-public
             agent-dashboard.md
             agent-dashboard.json
             agent-dashboard.html
@@ -193,7 +206,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: dashboard-site
+          path: dashboard-site-public
 
   deploy:
     needs: build
