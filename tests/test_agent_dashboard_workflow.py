@@ -185,5 +185,5 @@ def test_publish_workflow_builds_pages_site() -> None:
     assert "latest-fuzzer/fuzzer-monitor-result.json" in generate_dashboard["run"] or "latest-fuzzer/*/fuzzer-monitor-result.json" in generate_dashboard["run"]
     assert "-m scripts.agent_dashboard_site" in generate_site["run"]
     assert upload_pages["uses"] == "actions/upload-pages-artifact@v4"
-    assert upload_pages["with"]["path"] == "dashboard-site"
+    assert upload_pages["with"]["path"] == "dashboard-site-public"
     assert deploy_job["needs"] == "build"
