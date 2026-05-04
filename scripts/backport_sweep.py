@@ -465,14 +465,37 @@ def _apply_candidate(
         paths = ", ".join(r.path for r in unresolved)
         return CandidateResult(candidate.source_pr_number, candidate.source_pr_title, "skipped-conflict", f"unresolved: {paths}")
 
-    # Apply resolutions and commit
+    # Apply resolutions and commit. If Claude's resolution ended up matching
+    # the target branch exactly (e.g., the conflict was a no-op on this
+    # branch), `git commit` exits non-zero because there is nothing to
+    # commit. Treat that as "skipped — resolution is a no-op on target"
+    # rather than failing the whole batch.
     for r in resolutions:
         if r.resolved_content is not None:
             resolved_path = Path(repo_dir, r.path)
             resolved_path.parent.mkdir(parents=True, exist_ok=True)
             resolved_path.write_text(r.resolved_content, encoding="utf-8")
             _run_git(repo_dir, "add", r.path)
-    _run_git(repo_dir, "commit", "--no-edit")
+    commit_result = subprocess.run(
+        ["git", "commit", "--no-edit"],
+        cwd=repo_dir, capture_output=True, text=True,
+    )
+    if commit_result.returncode != 0:
+        stderr_lower = (commit_result.stderr or "").lower()
+        stdout_lower = (commit_result.stdout or "").lower()
+        if "nothing to commit" in stderr_lower or "nothing to commit" in stdout_lower:
+            subprocess.run(["git", "cherry-pick", "--abort"], cwd=repo_dir, capture_output=True)
+            return CandidateResult(
+                candidate.source_pr_number, candidate.source_pr_title,
+                "skipped-conflict",
+                "resolution was a no-op on target branch (nothing to commit)",
+            )
+        subprocess.run(["git", "cherry-pick", "--abort"], cwd=repo_dir, capture_output=True)
+        return CandidateResult(
+            candidate.source_pr_number, candidate.source_pr_title,
+            "skipped-conflict",
+            f"commit failed: {(commit_result.stderr or commit_result.stdout).strip()[:200]}",
+        )
 
     return CandidateResult(candidate.source_pr_number, candidate.source_pr_title, "applied", "conflicts resolved by Claude Code")
 
