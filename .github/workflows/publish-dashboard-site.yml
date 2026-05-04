@@ -182,11 +182,6 @@ jobs:
             --dashboard-json agent-dashboard.json \
             --site-dir dashboard-site-public
 
-      - name: Merge operator site into public site at /operator/
-        shell: bash
-        run: |
-          cp -r dashboard-site dashboard-site-public/operator
-
       - name: Upload dashboard site artifact
         uses: actions/upload-artifact@v4
         with:

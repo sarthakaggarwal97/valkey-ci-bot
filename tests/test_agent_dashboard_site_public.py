@@ -91,13 +91,14 @@ def test_public_index_has_valkey_ci_health_branding(tmp_path: Path) -> None:
     assert "Operator Console" not in index_html
 
 
-def test_public_index_has_diagnostics_link(tmp_path: Path) -> None:
+def test_public_index_has_no_diagnostics_link(tmp_path: Path) -> None:
+    """The public site has no link to the operator diagnostics page."""
     site_dir = tmp_path / "out"
     build_public_site(_load_fixture(), site_dir)
 
     index_html = (site_dir / "index.html").read_text(encoding="utf-8")
-    assert "Agent diagnostics" in index_html
-    assert "operator/" in index_html
+    assert "Agent diagnostics" not in index_html
+    assert "operator/" not in index_html
 
 
 def test_public_index_has_no_diagnostics_nav(tmp_path: Path) -> None:
