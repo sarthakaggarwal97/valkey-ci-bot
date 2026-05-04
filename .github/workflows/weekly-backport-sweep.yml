@@ -74,8 +74,22 @@ jobs:
   sweep:
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    # Matrix over all Valkey per-release backport projects. On scheduled
+    # runs we fan out across 5 release branches. On workflow_dispatch, if
+    # the caller passed project_number, only that one matrix leg will
+    # actually do work (others are short-circuited by the "skip unless
+    # matching" guard below).
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - { number: 1,  branch: "7.2" }
+          - { number: 2,  branch: "8.0" }
+          - { number: 14, branch: "8.1" }
+          - { number: 18, branch: "9.0" }
+          - { number: 41, branch: "9.1" }
     concurrency:
-      group: weekly-backport-sweep-${{ inputs.repo || 'valkey-io/valkey' }}
+      group: weekly-backport-sweep-${{ inputs.repo || 'valkey-io/valkey' }}-${{ matrix.project.number }}
       cancel-in-progress: false
     env:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
@@ -84,7 +98,9 @@ jobs:
       REPO_FULL_NAME: ${{ inputs.repo || 'valkey-io/valkey' }}
       PROJECT_OWNER: ${{ inputs.project_owner || 'valkey-io' }}
       PROJECT_OWNER_TYPE: ${{ inputs.project_owner_type || 'organization' }}
-      PROJECT_NUMBER: ${{ inputs.project_number || vars.VALKEY_BACKPORT_PROJECT_NUMBER || '' }}
+      # On dispatch: caller's explicit project_number wins. On schedule
+      # (or when caller didn't specify): use the matrix leg's project.
+      PROJECT_NUMBER: ${{ inputs.project_number || matrix.project.number }}
       STATUS_VALUE: ${{ inputs.status_value || 'To be backported' }}
       PUSH_REPO: ${{ inputs.push_repo || vars.VALKEY_BACKPORT_PUSH_REPO || '' }}
       ONLY_BRANCH: ${{ inputs.only_branch || '' }}
@@ -94,24 +110,45 @@ jobs:
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true && 'true' || 'false' }}
       VALKEY_CI_AGENT_ALLOW_VALKEY_IO_PUBLISH: ${{ vars.VALKEY_CI_AGENT_ALLOW_VALKEY_IO_PUBLISH || '' }}
     steps:
+      - name: Skip non-matching matrix leg on targeted dispatch
+        id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          # If the dispatch explicitly passed a project_number, only the
+          # matrix leg for that project should do work. Other legs exit
+          # successfully without any side effects.
+          INPUT_PN="${{ inputs.project_number }}"
+          MATRIX_PN="${{ matrix.project.number }}"
+          if [[ -n "${INPUT_PN}" && "${INPUT_PN}" != "${MATRIX_PN}" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Skipping matrix leg project=${MATRIX_PN} (dispatch targeted project=${INPUT_PN})"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
       - name: Check out agent repository
+        if: steps.guard.outputs.skip != 'true'
         uses: actions/checkout@v6
         with:
           persist-credentials: false
           fetch-depth: 1
 
       - name: Set up Python 3.11
+        if: steps.guard.outputs.skip != 'true'
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: "pip"
 
       - name: Install dependencies
+        if: steps.guard.outputs.skip != 'true'
         run: |
           pip install -r requirements.txt
           npm install -g @anthropic-ai/claude-code
 
       - name: Resolve target repository token
+        if: steps.guard.outputs.skip != 'true'
         id: token
         shell: bash
         env:
@@ -125,6 +162,7 @@ jobs:
           echo "token=${VALKEY_GITHUB_TOKEN}" >> "$GITHUB_OUTPUT"
 
       - name: Validate project number
+        if: steps.guard.outputs.skip != 'true'
         shell: bash
         run: |
           if [[ -z "${PROJECT_NUMBER}" ]]; then
@@ -133,13 +171,15 @@ jobs:
           fi
 
       - name: Configure AWS credentials
+        if: steps.guard.outputs.skip != 'true'
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: backport-sweep-${{ github.run_id }}
+          role-session-name: backport-sweep-${{ github.run_id }}-${{ matrix.project.number }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run backport sweep
+        if: steps.guard.outputs.skip != 'true'
         shell: bash
         env:
           TARGET_TOKEN: ${{ steps.token.outputs.token }}
@@ -184,18 +224,18 @@ jobs:
           python "${args[@]}" | tee backport-sweep-result.json
 
       - name: Upload result
-        if: always()
+        if: always() && steps.guard.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: backport-sweep-result-${{ github.run_id }}
+          name: backport-sweep-result-${{ github.run_id }}-p${{ matrix.project.number }}
           path: backport-sweep-result.json
           retention-days: 30
 
       - name: Upload agent evidence
-        if: always()
+        if: always() && steps.guard.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: backport-sweep-agent-evidence-${{ github.run_id }}
+          name: backport-sweep-agent-evidence-${{ github.run_id }}-p${{ matrix.project.number }}
           path: agent-evidence
           if-no-files-found: ignore
           retention-days: 30
