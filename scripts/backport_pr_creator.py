@@ -172,7 +172,7 @@ class BackportPRCreator:
             "\n".join([
                 "| Field | Value |",
                 "|---|---|",
-                f"| Source PR | [#{context.source_pr_number}]({context.source_pr_url}) |",
+                f"| Source PR | `{context.source_pr_url}` |",
                 f"| Source title | {_escape_table_cell(context.source_pr_title)} |",
                 f"| Target branch | `{context.target_branch}` |",
                 f"| Cherry-picked commits | {len(context.commits)} |",
