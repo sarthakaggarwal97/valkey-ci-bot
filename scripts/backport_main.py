@@ -133,8 +133,12 @@ def run_backport(
     9.1, 9.2, 9.3, 9.4**
     """
     gh = Github(auth=Auth.Token(github_token))
+    # State (rate-limiter + event ledger) lives on the repo we actually write
+    # to (push_repo when set, otherwise repo_full_name). This avoids trying
+    # to create state branches on upstream repos the agent can't write to.
+    state_repo_full_name = push_repo or repo_full_name
     subject = _backport_subject(repo_full_name, source_pr_number, target_branch)
-    event_ledger = EventLedger(gh, repo_full_name)
+    event_ledger = EventLedger(gh, state_repo_full_name)
     event_ledger.record(
         "workflow.run_seen",
         subject,
@@ -221,7 +225,7 @@ def run_backport(
             None,
             "",
             state_github_client=gh,
-            state_repo_full_name=repo_full_name,
+            state_repo_full_name=state_repo_full_name,
         )
         rate_limiter.load()
         if not rate_limiter.reserve_pr_creation():
