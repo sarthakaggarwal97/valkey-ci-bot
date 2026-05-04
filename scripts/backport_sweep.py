@@ -262,10 +262,10 @@ def run_backport_sweep(
     results: list[BranchSweepResult] = []
     for branch in release_branches:
         candidates = candidates_by_branch.get(branch, [])
-        if max_candidates > 0 and len(candidates) > max_candidates:
-            logger.info("Branch %s: limiting from %d to %d candidates", branch, len(candidates), max_candidates)
-            candidates = candidates[:max_candidates]
-        logger.info("Branch %s: %d candidate(s)", branch, len(candidates))
+        if max_candidates > 0:
+            logger.info("Branch %s: %d candidate(s) found, will apply up to %d", branch, len(candidates), max_candidates)
+        else:
+            logger.info("Branch %s: %d candidate(s)", branch, len(candidates))
         if discover_only:
             for c in candidates:
                 logger.info("  PR #%d: %s (%s)", c.source_pr_number, c.source_pr_title, c.merge_commit_sha or "no merge sha")
@@ -279,6 +279,7 @@ def run_backport_sweep(
             github_token=github_token, target_branch=branch,
             candidates=candidates, push_repo=push_repo or repo_full_name,
             test_commands=test_commands or [],
+            max_applied=max_candidates,
         ))
 
     summary = _build_summary(results)
@@ -290,6 +291,7 @@ def _process_branch(
     *, gh: Any, repo: Any, repo_full_name: str, github_token: str,
     target_branch: str, candidates: list[ProjectBackportCandidate],
     push_repo: str, test_commands: list[str],
+    max_applied: int = 0,
 ) -> BranchSweepResult:
     result = BranchSweepResult(target_branch=target_branch, candidates_found=len(candidates))
     tmpdir = tempfile.mkdtemp(prefix=f"backport-{target_branch}-")
@@ -332,7 +334,14 @@ def _process_branch(
             cherry_picker = CherryPickExecutor(tmpdir)
             signer, _ = _resolve_commit_signer()
 
+            applied_count = 0
             for candidate in candidates:
+                if max_applied > 0 and applied_count >= max_applied:
+                    logger.info(
+                        "Branch %s: reached cap of %d applied backport(s); deferring remaining %d candidate(s) to next sweep",
+                        target_branch, max_applied, len(candidates) - candidates.index(candidate),
+                    )
+                    break
                 if str(candidate.source_pr_number) in already_applied:
                     result.results.append(CandidateResult(
                         source_pr_number=candidate.source_pr_number,
@@ -344,6 +353,8 @@ def _process_branch(
 
                 cr = _apply_candidate(tmpdir, candidate, cherry_picker, signer, repo_full_name, git_env)
                 result.results.append(cr)
+                if cr.outcome == "applied":
+                    applied_count += 1
 
             # Push if we applied anything and validation passes.
             applied = [r for r in result.results if r.outcome == "applied"]
