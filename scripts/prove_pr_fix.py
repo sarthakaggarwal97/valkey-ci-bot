@@ -229,7 +229,7 @@ def _build_landing_body(
 def _remove_bot_fix_label(pr) -> bool:
     """Best-effort cleanup so the fork proof PR stops counting toward bot caps."""
     try:
-        pr.remove_from_labels("bot-fix")
+        pr.remove_from_labels("agent-fix")
         return True
     except GithubException as exc:
         if exc.status == 404:
@@ -282,7 +282,7 @@ def _land_upstream_pr(
         title=title,
         body=body,
         draft=False,
-        labels=("bot-fix",),
+        labels=("agent-fix",),
     )
     if getattr(pr, "draft", False):
         _mark_ready_for_review(landing_repo_name, int(pr.number), landing_token)

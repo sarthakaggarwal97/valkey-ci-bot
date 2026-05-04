@@ -37,7 +37,7 @@ def _make_mock_pr(is_bot: bool) -> MagicMock:
     pr = MagicMock()
     if is_bot:
         label = MagicMock()
-        label.name = "bot-fix"
+        label.name = "agent-fix"
         pr.labels = [label]
     else:
         pr.labels = []

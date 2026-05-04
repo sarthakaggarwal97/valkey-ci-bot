@@ -100,7 +100,7 @@ class ReviewerConfig:
     review_simple_changes: bool = True
     approve_on_no_findings: bool = False
     post_policy_notes: bool = True
-    ignore_keyword: str = "/reviewbot: ignore"
+    ignore_keyword: str = "/reviewagent: ignore"
     max_files: int = 150
     max_review_comments: int = 5
     path_filters: list[str] = field(default_factory=list)

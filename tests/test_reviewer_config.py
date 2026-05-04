@@ -16,7 +16,7 @@ def test_load_reviewer_config_defaults() -> None:
     assert config.enabled is True
     assert config.collaborator_only is False
     assert config.chat_collaborator_only is True
-    assert config.ignore_keyword == "/reviewbot: ignore"
+    assert config.ignore_keyword == "/reviewagent: ignore"
     assert config.daily_token_budget == 0
     assert config.approve_on_no_findings is False
     assert config.post_policy_notes is True

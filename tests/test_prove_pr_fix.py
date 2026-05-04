@@ -92,13 +92,13 @@ def test_run_proof_campaign_marks_ready_after_clean_proof(
     repo = MagicMock()
     pr = MagicMock()
     pr.number = 7
-    pr.title = "[bot-fix] Fix unit/maxmemory"
+    pr.title = "[agent-fix] Fix unit/maxmemory"
     pr.body = "Body"
     pr.html_url = "https://github.com/owner/repo/pull/7"
     pr.draft = True
     pr.head = SimpleNamespace(
         sha="cafebabe",
-        ref="bot/fix/fp-proof",
+        ref="agent/fix/fp-proof",
         repo=SimpleNamespace(
             full_name="owner/repo",
             owner=SimpleNamespace(login="owner"),
@@ -185,7 +185,7 @@ def test_run_proof_campaign_keeps_draft_on_failed_proof(
     pr.draft = True
     pr.head = SimpleNamespace(
         sha="cafebabe",
-        ref="bot/fix/fp-proof",
+        ref="agent/fix/fp-proof",
         repo=SimpleNamespace(full_name="owner/repo", owner=SimpleNamespace(login="owner")),
     )
     pr.base = SimpleNamespace(ref="unstable")
@@ -253,13 +253,13 @@ def test_run_proof_campaign_records_failed_upstream_landing(
     repo = MagicMock()
     pr = MagicMock()
     pr.number = 7
-    pr.title = "[bot-fix] Fix unit/maxmemory"
+    pr.title = "[agent-fix] Fix unit/maxmemory"
     pr.body = "Body"
     pr.html_url = "https://github.com/owner/repo/pull/7"
     pr.draft = True
     pr.head = SimpleNamespace(
         sha="cafebabe",
-        ref="bot/fix/fp-proof",
+        ref="agent/fix/fp-proof",
         repo=SimpleNamespace(full_name="owner/repo", owner=SimpleNamespace(login="owner")),
     )
     pr.base = SimpleNamespace(ref="unstable")

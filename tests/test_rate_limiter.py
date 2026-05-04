@@ -89,7 +89,7 @@ class TestOpenBotPRLimit:
 
         # Simulate 2 open PRs with bot-fix label
         label = MagicMock()
-        label.name = "bot-fix"
+        label.name = "agent-fix"
         pr1 = MagicMock()
         pr1.labels = [label]
         pr2 = MagicMock()
@@ -106,7 +106,7 @@ class TestOpenBotPRLimit:
         gh.get_repo.return_value = repo
 
         label = MagicMock()
-        label.name = "bot-fix"
+        label.name = "agent-fix"
         pr1 = MagicMock()
         pr1.labels = [label]
         repo.get_pulls.return_value = [pr1]

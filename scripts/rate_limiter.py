@@ -132,7 +132,7 @@ class RateLimiter:
             open_prs = repo.get_pulls(state="open", sort="created", direction="desc")
             bot_pr_count = sum(
                 1 for pr in open_prs
-                if any(label.name == "bot-fix" for label in pr.labels)
+                if any(label.name == "agent-fix" for label in pr.labels)
             )
             if bot_pr_count >= self._config.max_open_bot_prs:
                 logger.info(

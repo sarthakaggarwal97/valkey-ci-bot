@@ -431,7 +431,7 @@ class PRManager:
             raise ValueError("fork-pr-no-write-access")
 
         fingerprint = _compute_fingerprint(failure_report)
-        branch_name = f"bot/fix/{fingerprint}"
+        branch_name = f"agent/fix/{fingerprint}"
 
         logger.info(
             "PR creation started for job %s (fingerprint %s).",
@@ -487,9 +487,9 @@ class PRManager:
             )
 
             # PR title
-            title_prefix = "[bot-fix]"
+            title_prefix = "[agent-fix]"
             if unvalidated:
-                title_prefix = "[bot-fix][UNVALIDATED]"
+                title_prefix = "[agent-fix][UNVALIDATED]"
             if failure_report.parsed_failures:
                 pf = failure_report.parsed_failures[0]
                 title = f"{title_prefix} Fix {pf.test_name or pf.failure_identifier} in {failure_report.job_name}"
@@ -504,7 +504,7 @@ class PRManager:
                 title=title,
                 body=pr_body,
                 draft=draft,
-                labels=("bot-fix",),
+                labels=("agent-fix",),
             )
             logger.info("Opened PR #%d: %s", pr.number, pr.html_url)
 

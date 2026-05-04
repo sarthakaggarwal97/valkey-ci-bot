@@ -111,7 +111,7 @@ def _make_mock_repo(full_name: str = "owner/repo", owner_login: str = "owner"):
     def get_git_ref(name: str):
         if name == "heads/unstable":
             return base_ref
-        if name.startswith("heads/bot/fix/"):
+        if name.startswith("heads/agent/fix/"):
             return branch_ref
         raise AssertionError(f"Unexpected ref lookup: {name}")
 
@@ -380,7 +380,7 @@ class TestCreatePR:
         repo.get_git_ref.assert_any_call("heads/unstable")
         repo.create_git_ref.assert_called_once()
         ref_arg = repo.create_git_ref.call_args
-        assert "bot/fix/" in ref_arg.kwargs.get("ref", ref_arg[1].get("ref", ""))
+        assert "agent/fix/" in ref_arg.kwargs.get("ref", ref_arg[1].get("ref", ""))
         assert ref_arg.kwargs.get("sha", ref_arg[1].get("sha")) == report.commit_sha
         repo.create_git_commit.assert_called_once()
         repo.branch_ref.edit.assert_called_once_with(repo.new_commit.sha)
@@ -389,11 +389,11 @@ class TestCreatePR:
         repo.create_pull.assert_called_once()
         call_kwargs = repo.create_pull.call_args.kwargs
         assert call_kwargs["base"] == "unstable"
-        assert "[bot-fix]" in call_kwargs["title"]
+        assert "[agent-fix]" in call_kwargs["title"]
 
         # Label applied
         pr_mock = repo.create_pull.return_value
-        pr_mock.add_to_labels.assert_called_once_with("bot-fix")
+        pr_mock.add_to_labels.assert_called_once_with("agent-fix")
 
         # Recorded in failure store
         fp = _compute_fingerprint(report)
@@ -402,7 +402,7 @@ class TestCreatePR:
         assert store.entries[fp].pr_url == url
 
     def test_branch_name_uses_fingerprint(self):
-        """Req 6.1: branch named bot/fix/<fingerprint>."""
+        """Req 6.1: branch named agent/fix/<fingerprint>."""
         mgr, repo, _ = _make_pr_manager()
         report = _make_failure_report()
         root_cause = _make_root_cause()
@@ -412,7 +412,7 @@ class TestCreatePR:
         fp = _compute_fingerprint(report)
         ref_call = repo.create_git_ref.call_args
         created_ref = ref_call.kwargs.get("ref") or ref_call[1].get("ref")
-        assert created_ref == f"refs/heads/bot/fix/{fp}"
+        assert created_ref == f"refs/heads/agent/fix/{fp}"
 
     def test_can_open_draft_pr(self):
         mgr, repo, _ = _make_pr_manager()
@@ -488,7 +488,7 @@ class TestCreatePR:
         fork_repo.create_git_ref.assert_called_once()
         fork_repo.create_git_commit.assert_called_once()
         upstream_repo.create_pull.assert_called_once()
-        assert upstream_repo.create_pull.call_args.kwargs["head"].startswith("forker:bot/fix/")
+        assert upstream_repo.create_pull.call_args.kwargs["head"].startswith("forker:agent/fix/")
         fp = _compute_fingerprint(report)
         assert store.entries[fp].pr_url == url
 
@@ -633,17 +633,17 @@ class TestUpsertPullRequest:
 
         pr = upsert_pull_request(
             repo,
-            head="owner:bot/fix/fp1",
+            head="owner:agent/fix/fp1",
             base="unstable",
             title="Title",
             body="Body",
             draft=False,
-            labels=("bot-fix",),
+            labels=("agent-fix",),
         )
 
         assert pr is repo.create_pull.return_value
         repo.create_pull.assert_called_once()
-        repo.create_pull.return_value.add_to_labels.assert_called_once_with("bot-fix")
+        repo.create_pull.return_value.add_to_labels.assert_called_once_with("agent-fix")
 
     def test_reuses_and_updates_existing_pull_request(self):
         repo = _make_mock_repo()
@@ -655,7 +655,7 @@ class TestUpsertPullRequest:
 
         pr = upsert_pull_request(
             repo,
-            head="owner:bot/fix/fp1",
+            head="owner:agent/fix/fp1",
             base="unstable",
             title="New title",
             body="New body",

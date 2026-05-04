@@ -248,7 +248,7 @@ def test_open_draft_pr_builds_body(monkeypatch):
     url = claude_fix._open_draft_pr(
         gh=_FakeGithub(),
         fork_repo="me/valkey",
-        branch_name="bot/fix/test-abcdef12",
+        branch_name="agent/fix/test-abcdef12",
         target_branch="unstable",
         job_name="test job",
         run_url="https://example.test/run",

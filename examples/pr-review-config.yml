@@ -6,7 +6,7 @@
 reviewer:
   enabled: true
   collaborator_only: false
-  # Keep interactive /reviewbot chat restricted to collaborator-equivalent
+  # Keep interactive /reviewagent chat restricted to collaborator-equivalent
   # actors by default. This avoids letting arbitrary public comments drive
   # repository-context tool use.
   chat_collaborator_only: true
@@ -17,7 +17,7 @@ reviewer:
   approve_on_no_findings: false
   # Add deterministic DCO/docs/core-team/security notes to the summary comment.
   post_policy_notes: true
-  ignore_keyword: "/reviewbot: ignore"
+  ignore_keyword: "/reviewagent: ignore"
   max_files: 150
   daily_token_budget: 0
   github_retries: 5

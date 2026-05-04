@@ -197,7 +197,7 @@ def test_select_chat_paths_prefers_explicit_file_mentions() -> None:
         paths,
         None,
         ["Can you explain tests/failover_timeout.tcl?"],
-        "/reviewbot what changed in tests/failover_timeout.tcl?",
+        "/reviewagent what changed in tests/failover_timeout.tcl?",
     )
 
     assert selected == {"tests/failover_timeout.tcl"}
@@ -227,7 +227,7 @@ def test_select_chat_paths_falls_back_to_first_five_when_no_file_is_mentioned() 
         paths,
         None,
         ["Can you suggest tests?"],
-        "/reviewbot can you suggest tests?",
+        "/reviewagent can you suggest tests?",
     )
 
     assert selected == set(paths[:5])
@@ -372,7 +372,7 @@ def test_run_review_mode_honors_ignore_keyword_before_checkout(tmp_path) -> None
     }
     event_path = _event_file(tmp_path, payload)
     ignored_context = _context()
-    ignored_context.body = "Details\n/reviewbot: ignore"
+    ignored_context.body = "Details\n/reviewagent: ignore"
 
     with _patched_run_dependencies() as deps:
         deps.fetcher.fetch.return_value = ignored_context
@@ -615,7 +615,7 @@ def test_run_issue_comment_chat_mode_prefers_mentioned_file_context(tmp_path) ->
         "issue": {"number": 11, "pull_request": {}},
         "comment": {
             "id": 77,
-            "body": "/reviewbot what changed in tests/failover_timeout.tcl?",
+            "body": "/reviewagent what changed in tests/failover_timeout.tcl?",
         },
     }
     event_path = _event_file(tmp_path, payload)
@@ -627,7 +627,7 @@ def test_run_issue_comment_chat_mode_prefers_mentioned_file_context(tmp_path) ->
             comment_id=77,
             path=None,
             line=None,
-            conversation=["/reviewbot what changed in tests/failover_timeout.tcl?"],
+            conversation=["/reviewagent what changed in tests/failover_timeout.tcl?"],
             reply_to_bot=True,
         )
 

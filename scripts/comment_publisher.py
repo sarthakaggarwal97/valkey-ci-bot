@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-SUMMARY_MARKER = "<!-- pr-review-bot:summary -->"
+SUMMARY_MARKER = "<!-- pr-review-agent:summary -->"
 _SEVERITY_RANK = {"high": 3, "medium": 2, "low": 1}
 
 

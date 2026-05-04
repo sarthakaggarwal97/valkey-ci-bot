@@ -2,7 +2,7 @@
 """Property test for PR content completeness.
 
 Property 13: For any validated fix, the created PR should have: a branch
-named `bot/fix/<fingerprint>`, a commit message containing the failure
+named `agent/fix/<fingerprint>`, a commit message containing the failure
 identifier (or test name when available) and job name, a PR body containing
 a link to the failing CI run, the failure summary, root cause analysis,
 confidence level, and an AI-generated disclaimer, and the `bot-fix` label
@@ -128,7 +128,7 @@ def _make_mock_repo():
 @given(report=failure_report_strategy(), root_cause=root_cause_strategy())
 @settings(deadline=None, max_examples=100, suppress_health_check=[HealthCheck.too_slow])
 def test_branch_name_follows_fingerprint_pattern(report, root_cause):
-    """Property 13 (branch): The branch is always named bot/fix/<fingerprint>.
+    """Property 13 (branch): The branch is always named agent/fix/<fingerprint>.
 
     **Validates: Requirements 6.1**
     """
@@ -144,7 +144,7 @@ def test_branch_name_follows_fingerprint_pattern(report, root_cause):
 
     ref_call = repo.create_git_ref.call_args
     created_ref = ref_call.kwargs.get("ref") or ref_call[1].get("ref")
-    assert created_ref == f"refs/heads/bot/fix/{fingerprint}"
+    assert created_ref == f"refs/heads/agent/fix/{fingerprint}"
 
 
 @given(report=failure_report_strategy(), root_cause=root_cause_strategy())
@@ -211,4 +211,4 @@ def test_bot_fix_label_is_applied(report, root_cause):
     mgr.create_pr("--- a/f\n+++ b/f\n@@ -1,1 +1,1 @@\n-a\n+b\n", report, root_cause, "unstable")
 
     pr_mock = repo.create_pull.return_value
-    pr_mock.add_to_labels.assert_called_once_with("bot-fix")
+    pr_mock.add_to_labels.assert_called_once_with("agent-fix")

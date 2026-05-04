@@ -52,7 +52,7 @@ jobs:
             const issue = context.payload.issue;
             const isPr = !!issue?.pull_request;
             const body = context.payload.comment?.body || "";
-            const invoked = body.includes("/reviewbot");
+            const invoked = body.includes("/reviewagent");
             core.setOutput("mode", isPr && invoked ? "chat" : "skip");
             core.setOutput("allowed", isPr && invoked ? "true" : "false");
 

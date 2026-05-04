@@ -61,7 +61,7 @@ def test_may_process_blocks_chat_from_non_collaborator_by_default() -> None:
             actor="alice",
             pr_number=1,
             comment_id=99,
-            body="/reviewbot explain this",
+            body="/reviewagent explain this",
         ),
         ReviewerConfig(),
     )
@@ -78,7 +78,7 @@ def test_may_process_allows_chat_when_chat_collaborator_gate_disabled() -> None:
             actor="alice",
             pr_number=1,
             comment_id=99,
-            body="/reviewbot explain this",
+            body="/reviewagent explain this",
         ),
         ReviewerConfig(chat_collaborator_only=False),
     )

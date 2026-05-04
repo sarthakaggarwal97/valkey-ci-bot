@@ -141,13 +141,13 @@ def fix_from_log(
 
         logger.info("Claude produced %d-line diff for %s.", patch.count("\n"), job_name)
 
-        branch_name = f"bot/fix/{_slugify(job_name)[:44]}-{(base_sha or 'unknown')[:8]}"
+        branch_name = f"agent/fix/{_slugify(job_name)[:44]}-{(base_sha or 'unknown')[:8]}"
         try:
             with GitAuth(fork_token, prefix="claude-fix-push-askpass-") as git_auth:
                 git_env = git_auth.env()
                 _run(["git", "checkout", "-B", branch_name], cwd=tmpdir)
                 _run(["git", "add", "-A"], cwd=tmpdir)
-                _run(["git", "commit", "-m", f"[bot-fix] Fix {job_name}"], cwd=tmpdir)
+                _run(["git", "commit", "-m", f"[agent-fix] Fix {job_name}"], cwd=tmpdir)
                 _run(["git", "push", "--force", "origin", branch_name], cwd=tmpdir, env=git_env)
             logger.info("Pushed fix to %s/%s.", fork_repo, branch_name)
         except Exception as exc:
@@ -409,7 +409,7 @@ def _open_draft_pr(
     )
 
     test_name = first_pf.test_name or first_pf.failure_identifier
-    title = f"[bot-fix] Fix {test_name} in {job_name}"[:256]
+    title = f"[agent-fix] Fix {test_name} in {job_name}"[:256]
 
     body_lines = []
     if issue_number:
@@ -430,7 +430,7 @@ def _open_draft_pr(
         title=title,
         body="\n".join(body_lines),
         draft=True,
-        labels=("bot-fix",),
+        labels=("agent-fix",),
     )
     return str(getattr(pr, "html_url", ""))
 

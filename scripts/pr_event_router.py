@@ -24,7 +24,7 @@ class PREventRouter:
 
         if event.event_name == "issue_comment":
             body = event.body or ""
-            return "chat" if "/reviewbot" in body else "skip"
+            return "chat" if "/reviewagent" in body else "skip"
 
         return "skip"
 

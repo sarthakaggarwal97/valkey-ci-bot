@@ -56,7 +56,7 @@ def run_fix_loop(
     fix_generator: Any = None,
 ) -> FixResult:
     """Run the fix-validate loop using Claude Code CLI."""
-    branch_name = f"bot/fix/{report.job_name[:40]}/{base_sha[:8]}"
+    branch_name = f"agent/fix/{report.job_name[:40]}/{base_sha[:8]}"
     validation_error = ""
     last_patch = ""
 
@@ -100,7 +100,7 @@ def run_fix_loop(
 
             # 2. Commit and push the edited files directly from the checkout
             try:
-                msg = f"[bot-fix] Fix {report.job_name} (attempt {attempt})"
+                msg = f"[agent-fix] Fix {report.job_name} (attempt {attempt})"
                 _run(["git", "config", "user.name", "valkey-ci-agent"], cwd=repo_checkout)
                 _run(["git", "config", "user.email", "ci-agent@valkey.io"], cwd=repo_checkout)
                 _run(["git", "checkout", "-B", branch_name], cwd=repo_checkout)
