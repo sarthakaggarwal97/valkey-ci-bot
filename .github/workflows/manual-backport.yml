@@ -64,6 +64,12 @@ jobs:
 
   backport:
     needs: parse-inputs
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+      id-token: write
     uses: ./.github/workflows/backport.yml
     with:
       source_pr_number: ${{ fromJSON(needs.parse-inputs.outputs.pr_number) }}
