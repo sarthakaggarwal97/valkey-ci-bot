@@ -306,6 +306,15 @@ def _process_branch(
             _run_git(tmpdir, "config", "user.name", "valkey-ci-agent")
             _run_git(tmpdir, "config", "user.email", "ci-agent@valkey.io")
 
+            # Sync push_repo's copy of target_branch to match source before
+            # we start cherry-picking. Without this, if the fork's release
+            # branch drifts behind upstream, the resulting PR diff ends up
+            # including everything between fork's branch and upstream, not
+            # just the cherry-picked commits. Only fast-forward — if the
+            # fork has diverged (local commits), we abort to avoid clobbering.
+            if push_repo != repo_full_name:
+                _sync_target_branch_to_source(gh, push_repo, repo_full_name, target_branch)
+
             # Check for existing backport branch on push_repo
             backport_branch = f"{_BRANCH_PREFIX}/{target_branch}"
             existing_pr = _find_existing_pr(gh, push_repo, backport_branch)
@@ -555,6 +564,80 @@ def _run_test_commands(repo_dir: str, test_commands: list[str]) -> tuple[bool, s
             ).strip()
             return False, output or f"`{command}` failed with exit code {result.returncode}"
     return True, ""
+
+
+def _sync_target_branch_to_source(
+    gh: Any, push_repo: str, source_repo: str, target_branch: str,
+) -> None:
+    """Fast-forward push_repo's copy of target_branch to source_repo's head.
+
+    If push_repo is a fork of source_repo, its release branches can drift
+    behind. That makes the resulting backport PR compare diff include every
+    commit between fork and upstream — not just the cherry-picked ones.
+    Before cherry-picking, fast-forward the fork's branch to match source.
+
+    Only fast-forwards. If the fork has diverged (local commits not on
+    source), this logs a warning and leaves things alone — force-pushing
+    would clobber work that a maintainer may have intended.
+    """
+    try:
+        source_sha = retry_github_call(
+            lambda: gh.get_repo(source_repo).get_branch(target_branch).commit.sha,
+            retries=2, description=f"get {source_repo}:{target_branch} head",
+        )
+        push_sha = retry_github_call(
+            lambda: gh.get_repo(push_repo).get_branch(target_branch).commit.sha,
+            retries=2, description=f"get {push_repo}:{target_branch} head",
+        )
+    except Exception as exc:
+        logger.warning("Could not resolve branch heads for sync: %s", exc)
+        return
+
+    if push_sha == source_sha:
+        logger.info("push_repo %s:%s already in sync with %s", push_repo, target_branch, source_repo)
+        return
+
+    # Check if push_sha is an ancestor of source_sha (i.e. fast-forward is safe)
+    try:
+        compare = retry_github_call(
+            lambda: gh.get_repo(source_repo).compare(push_sha, source_sha),
+            retries=2, description=f"compare {push_sha[:8]}..{source_sha[:8]}",
+        )
+    except Exception as exc:
+        logger.warning(
+            "Could not compare %s:%s to %s:%s for sync: %s",
+            push_repo, target_branch, source_repo, target_branch, exc,
+        )
+        return
+
+    if compare.status in ("identical", "ahead"):
+        # push_repo is behind source_repo — safe to fast-forward
+        logger.info(
+            "Fast-forwarding %s:%s from %s to %s (behind by %d)",
+            push_repo, target_branch, push_sha[:8], source_sha[:8], compare.ahead_by,
+        )
+        check_publish_allowed(
+            target_repo=push_repo, action="update_ref",
+            context=f"fast-forward {target_branch} to source head",
+        )
+        try:
+            ref = retry_github_call(
+                lambda: gh.get_repo(push_repo).get_git_ref(f"heads/{target_branch}"),
+                retries=2, description=f"get ref {target_branch}",
+            )
+            retry_github_call(
+                lambda: ref.edit(source_sha, force=False),
+                retries=2, description=f"fast-forward {target_branch}",
+            )
+        except Exception as exc:
+            logger.warning("Fast-forward of %s:%s failed: %s", push_repo, target_branch, exc)
+    elif compare.status in ("diverged", "behind"):
+        logger.warning(
+            "%s:%s has diverged from %s:%s (ahead=%d, behind=%d) — leaving as-is. "
+            "Backport PR diff may include unrelated commits.",
+            push_repo, target_branch, source_repo, target_branch,
+            compare.ahead_by, compare.behind_by,
+        )
 
 
 def _find_existing_pr(gh: Any, push_repo: str, branch: str) -> Any | None:
