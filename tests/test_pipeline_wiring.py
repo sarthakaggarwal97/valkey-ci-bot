@@ -74,8 +74,6 @@ class TestLoadRuntimeConfig:
         repo.default_branch = "main"
         contents = MagicMock()
         contents.decoded_content = (
-            b"bedrock:\n"
-            b"  model_id: amazon.nova-pro-v1:0\n"
             b"limits:\n"
             b"  max_prs_per_day: 2\n"
         )
@@ -87,7 +85,6 @@ class TestLoadRuntimeConfig:
             gh, "owner/repo", ".github/ci-failure-bot.yml", ref="abc123",
         )
 
-        assert cfg.bedrock_model_id == "amazon.nova-pro-v1:0"
         assert cfg.max_prs_per_day == 2
         repo.get_contents.assert_called_once_with(
             ".github/ci-failure-bot.yml", ref="abc123",

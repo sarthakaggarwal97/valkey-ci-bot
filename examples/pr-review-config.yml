@@ -8,31 +8,19 @@ reviewer:
   collaborator_only: false
   # Keep interactive /reviewbot chat restricted to collaborator-equivalent
   # actors by default. This avoids letting arbitrary public comments drive
-  # repository-context tool use and Bedrock spend.
+  # repository-context tool use.
   chat_collaborator_only: true
   disable_review: false
-  disable_release_notes: false
   review_simple_changes: true
-  review_comment_lgtm: false
   # Keep automated GitHub approvals disabled until your review eval set shows
   # the bot is reliable enough for your repository.
   approve_on_no_findings: false
-  # When false, only deterministic trivial file changes are skipped before the
-  # heavy review pass. Set true to let the light model skip files.
-  model_file_triage: false
   # Add deterministic DCO/docs/core-team/security notes to the summary comment.
   post_policy_notes: true
   ignore_keyword: "/reviewbot: ignore"
   max_files: 150
-  max_review_comments: 20
   daily_token_budget: 0
-  max_input_tokens: 190000
-  max_output_tokens: 8192
-  bedrock_retries: 5
   github_retries: 5
-  bedrock_timeout_ms: 120000
-  bedrock_concurrency_limit: 2
-  github_concurrency_limit: 6
 
   # Project-specific review instructions injected into every LLM prompt.
   # Use this to teach the reviewer about your project's architecture,
@@ -94,13 +82,6 @@ reviewer:
       - test_path: "tests/integration/{name}.tcl"
         source_path: "src/{name}.c"
 
-  retrieval:
-    enabled: false
-    code_knowledge_base_id: "YOUR_CODE_KB_ID"
-    docs_knowledge_base_id: "YOUR_DOCS_KB_ID"
-    max_results_per_knowledge_base: 8
-    max_chars_per_result: 3000
-    max_total_chars: 30000
   path_filters:
     - "!dist/**"
     - "!vendor/**"
@@ -109,8 +90,3 @@ reviewer:
     - "!**/*.jpg"
     - "src/**"
     - "tests/**"
-  models:
-    light_model_id: "us.anthropic.claude-opus-4-7"
-    heavy_model_id: "us.anthropic.claude-opus-4-7"
-    temperature: 0.0
-    thinking_budget: 128000

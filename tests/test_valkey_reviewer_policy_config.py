@@ -28,7 +28,6 @@ def test_valkey_reviewer_config_keeps_human_control_defaults() -> None:
     )["reviewer"]
 
     assert config["approve_on_no_findings"] is False
-    assert config["model_file_triage"] is False
     assert config["post_policy_notes"] is True
     assert config["chat_collaborator_only"] is True
     assert config["max_review_comments"] <= 25

@@ -12,13 +12,12 @@ from __future__ import annotations
 
 import os
 import tempfile
-from pathlib import Path
 
 import yaml
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from scripts.config import BotConfig, ProjectContext, ValidationProfile, load_config
+from scripts.config import BotConfig, ProjectContext, load_config
 
 # --- Strategies ---
 
@@ -64,11 +63,6 @@ validation_profile_strategy = st.fixed_dictionaries({
 })
 
 full_config_strategy = st.fixed_dictionaries({
-    "bedrock": st.fixed_dictionaries({
-        "model_id": safe_word,
-        "max_input_tokens": positive_int,
-        "max_output_tokens": positive_int,
-    }),
     "limits": st.fixed_dictionaries({
         "max_patch_files": positive_int,
         "max_prs_per_day": positive_int,
@@ -94,14 +88,6 @@ full_config_strategy = st.fixed_dictionaries({
         "soak_passes": st.integers(min_value=1, max_value=200),
     }),
     "monitored_workflows": st.lists(workflow_file, min_size=1, max_size=6),
-    "retrieval": st.fixed_dictionaries({
-        "enabled": st.booleans(),
-        "code_knowledge_base_id": safe_word,
-        "docs_knowledge_base_id": safe_word,
-        "max_results_per_knowledge_base": positive_int,
-        "max_chars_per_result": positive_int,
-        "max_total_chars": positive_int,
-    }),
     "project": project_context_strategy,
     "validation_profiles": st.lists(validation_profile_strategy, min_size=0, max_size=4),
 })
@@ -124,11 +110,6 @@ def test_config_round_trip_all_fields(config_data: dict) -> None:
 
     try:
         cfg = load_config(tmp_path)
-
-        # Bedrock section
-        assert cfg.bedrock_model_id == config_data["bedrock"]["model_id"]
-        assert cfg.max_input_tokens == config_data["bedrock"]["max_input_tokens"]
-        assert cfg.max_output_tokens == config_data["bedrock"]["max_output_tokens"]
 
         # Limits section
         assert cfg.max_patch_files == config_data["limits"]["max_patch_files"]
@@ -156,14 +137,6 @@ def test_config_round_trip_all_fields(config_data: dict) -> None:
 
         # Monitored workflows
         assert cfg.monitored_workflows == config_data["monitored_workflows"]
-
-        # Retrieval section
-        assert cfg.retrieval.enabled == config_data["retrieval"]["enabled"]
-        assert cfg.retrieval.code_knowledge_base_id == config_data["retrieval"]["code_knowledge_base_id"]
-        assert cfg.retrieval.docs_knowledge_base_id == config_data["retrieval"]["docs_knowledge_base_id"]
-        assert cfg.retrieval.max_results_per_knowledge_base == config_data["retrieval"]["max_results_per_knowledge_base"]
-        assert cfg.retrieval.max_chars_per_result == config_data["retrieval"]["max_chars_per_result"]
-        assert cfg.retrieval.max_total_chars == config_data["retrieval"]["max_total_chars"]
 
         # Project context
         proj = config_data["project"]
@@ -194,15 +167,11 @@ def test_missing_config_returns_defaults() -> None:
     cfg = load_config("/nonexistent/path/ci-failure-bot.yml")
     defaults = BotConfig()
 
-    assert cfg.bedrock_model_id == defaults.bedrock_model_id
-    assert cfg.max_input_tokens == defaults.max_input_tokens
-    assert cfg.max_output_tokens == defaults.max_output_tokens
     assert cfg.max_patch_files == defaults.max_patch_files
     assert cfg.confidence_threshold == defaults.confidence_threshold
     assert cfg.monitored_workflows == defaults.monitored_workflows
     assert cfg.max_retries_fix == defaults.max_retries_fix
     assert cfg.max_retries_validation == defaults.max_retries_validation
-    assert cfg.max_retries_bedrock == defaults.max_retries_bedrock
     assert cfg.max_prs_per_day == defaults.max_prs_per_day
     assert cfg.max_failures_per_run == defaults.max_failures_per_run
     assert cfg.max_open_bot_prs == defaults.max_open_bot_prs
@@ -215,7 +184,6 @@ def test_missing_config_returns_defaults() -> None:
     assert cfg.require_validation_profile == defaults.require_validation_profile
     assert cfg.soak_validation_workflows == defaults.soak_validation_workflows
     assert cfg.soak_validation_passes == defaults.soak_validation_passes
-    assert cfg.retrieval == defaults.retrieval
 
     # Project defaults
     default_proj = ProjectContext()
@@ -258,13 +226,6 @@ unrecognized_fields_strategy = st.dictionaries(
     min_size=1,
     max_size=5,
 )
-
-# Strategy for a partial valid config (subset of recognized fields) mixed with unrecognized ones
-partial_bedrock = st.fixed_dictionaries({}, optional={
-    "model_id": safe_word,
-    "max_input_tokens": positive_int,
-    "max_output_tokens": positive_int,
-})
 
 partial_limits = st.fixed_dictionaries({}, optional={
     "max_patch_files": positive_int,
@@ -311,15 +272,11 @@ def test_invalid_yaml_returns_full_defaults(invalid_content: str) -> None:
         cfg = load_config(tmp_path)
         defaults = BotConfig()
 
-        assert cfg.bedrock_model_id == defaults.bedrock_model_id
-        assert cfg.max_input_tokens == defaults.max_input_tokens
-        assert cfg.max_output_tokens == defaults.max_output_tokens
         assert cfg.max_patch_files == defaults.max_patch_files
         assert cfg.confidence_threshold == defaults.confidence_threshold
         assert cfg.monitored_workflows == defaults.monitored_workflows
         assert cfg.max_retries_fix == defaults.max_retries_fix
         assert cfg.max_retries_validation == defaults.max_retries_validation
-        assert cfg.max_retries_bedrock == defaults.max_retries_bedrock
         assert cfg.max_prs_per_day == defaults.max_prs_per_day
         assert cfg.max_failures_per_run == defaults.max_failures_per_run
         assert cfg.max_open_bot_prs == defaults.max_open_bot_prs
@@ -330,7 +287,6 @@ def test_invalid_yaml_returns_full_defaults(invalid_content: str) -> None:
         assert cfg.flaky_max_failed_hypotheses == defaults.flaky_max_failed_hypotheses
         assert cfg.soak_validation_workflows == defaults.soak_validation_workflows
         assert cfg.soak_validation_passes == defaults.soak_validation_passes
-        assert cfg.retrieval == defaults.retrieval
         assert cfg.project.language == ProjectContext().language
         assert cfg.project.build_system == ProjectContext().build_system
         assert cfg.validation_profiles == []
@@ -358,9 +314,6 @@ def test_unrecognized_fields_ignored_with_defaults(extra_fields: dict) -> None:
         cfg = load_config(tmp_path)
         defaults = BotConfig()
 
-        assert cfg.bedrock_model_id == defaults.bedrock_model_id
-        assert cfg.max_input_tokens == defaults.max_input_tokens
-        assert cfg.max_output_tokens == defaults.max_output_tokens
         assert cfg.max_patch_files == defaults.max_patch_files
         assert cfg.confidence_threshold == defaults.confidence_threshold
         assert cfg.monitored_workflows == defaults.monitored_workflows
@@ -376,7 +329,6 @@ def test_unrecognized_fields_ignored_with_defaults(extra_fields: dict) -> None:
         assert cfg.flaky_max_failed_hypotheses == defaults.flaky_max_failed_hypotheses
         assert cfg.soak_validation_workflows == defaults.soak_validation_workflows
         assert cfg.soak_validation_passes == defaults.soak_validation_passes
-        assert cfg.retrieval == defaults.retrieval
         assert cfg.project.language == ProjectContext().language
         assert cfg.validation_profiles == []
     finally:
@@ -389,14 +341,12 @@ def test_unrecognized_fields_ignored_with_defaults(extra_fields: dict) -> None:
     suppress_health_check=[HealthCheck.too_slow],
 )
 @given(
-    bedrock_data=partial_bedrock,
     limits_data=partial_limits,
     fix_gen_data=partial_fix_generation,
     flaky_data=partial_flaky_campaign,
     extra_fields=unrecognized_fields_strategy,
 )
 def test_valid_fields_preserved_with_unrecognized_ignored(
-    bedrock_data: dict,
     limits_data: dict,
     fix_gen_data: dict,
     flaky_data: dict,
@@ -408,8 +358,6 @@ def test_valid_fields_preserved_with_unrecognized_ignored(
     **Validates: Requirements 8.4**
     """
     config_data: dict = {**extra_fields}
-    if bedrock_data:
-        config_data["bedrock"] = bedrock_data
     if limits_data:
         config_data["limits"] = limits_data
     if fix_gen_data:
@@ -424,11 +372,6 @@ def test_valid_fields_preserved_with_unrecognized_ignored(
     try:
         cfg = load_config(tmp_path)
         defaults = BotConfig()
-
-        # Valid bedrock fields should be preserved, missing ones get defaults
-        assert cfg.bedrock_model_id == bedrock_data.get("model_id", defaults.bedrock_model_id)
-        assert cfg.max_input_tokens == bedrock_data.get("max_input_tokens", defaults.max_input_tokens)
-        assert cfg.max_output_tokens == bedrock_data.get("max_output_tokens", defaults.max_output_tokens)
 
         # Valid limits fields should be preserved
         assert cfg.max_patch_files == limits_data.get("max_patch_files", defaults.max_patch_files)
@@ -456,10 +399,6 @@ def test_valid_fields_preserved_with_unrecognized_ignored(
 
 def test_invalid_scalar_types_fall_back_to_defaults() -> None:
     config_data = {
-        "bedrock": {
-            "model_id": ["not-a-string"],
-            "max_input_tokens": "1000",
-        },
         "limits": {
             "max_patch_files": "10",
         },
@@ -467,11 +406,6 @@ def test_invalid_scalar_types_fall_back_to_defaults() -> None:
             "confidence_threshold": ["high"],
         },
         "monitored_workflows": "ci.yml",
-        "retrieval": {
-            "enabled": "true",
-            "code_knowledge_base_id": ["bad"],
-            "max_results_per_knowledge_base": "3",
-        },
         "project": {
             "test_frameworks": "gtest",
             "source_dirs": "src/",
@@ -497,12 +431,9 @@ def test_invalid_scalar_types_fall_back_to_defaults() -> None:
         cfg = load_config(tmp_path)
         defaults = BotConfig()
 
-        assert cfg.bedrock_model_id == defaults.bedrock_model_id
-        assert cfg.max_input_tokens == defaults.max_input_tokens
         assert cfg.max_patch_files == defaults.max_patch_files
         assert cfg.confidence_threshold == defaults.confidence_threshold
         assert cfg.monitored_workflows == defaults.monitored_workflows
-        assert cfg.retrieval == defaults.retrieval
         assert cfg.project.test_frameworks == defaults.project.test_frameworks
         assert cfg.project.source_dirs == defaults.project.source_dirs
         assert cfg.project.test_to_source_patterns == defaults.project.test_to_source_patterns

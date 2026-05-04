@@ -12,9 +12,7 @@ import yaml  # type: ignore[import-untyped]
 __all__ = [
     "ProjectContext",
     "ValidationProfile",
-    "RetrievalConfig",
     "BotConfig",
-    "ReviewerModels",
     "ReviewerConfig",
     "load_config",
     "load_config_text",
@@ -51,23 +49,8 @@ class ValidationProfile:
 
 
 @dataclass
-class RetrievalConfig:
-    """Optional Bedrock Knowledge Base retrieval settings."""
-
-    enabled: bool = False
-    code_knowledge_base_id: str = ""
-    docs_knowledge_base_id: str = ""
-    max_results_per_knowledge_base: int = 8
-    max_chars_per_result: int = 3000
-    max_total_chars: int = 30000
-
-
-@dataclass
 class BotConfig:
     """Top-level agent configuration with sensible defaults."""
-    bedrock_model_id: str = "us.anthropic.claude-opus-4-7"
-    max_input_tokens: int = 900_000
-    max_output_tokens: int = 65536
     max_patch_files: int = 30
     max_patch_files_override: int | None = None
     confidence_threshold: str = "medium"
@@ -76,7 +59,6 @@ class BotConfig:
     ])
     max_retries_fix: int = 10
     max_retries_validation: int = 5
-    max_retries_bedrock: int = 10
     max_prs_per_day: int = 0
     max_failures_per_run: int = 0
     max_open_bot_prs: int = 0
@@ -91,36 +73,20 @@ class BotConfig:
     require_validation_profile: bool = True
     soak_validation_workflows: list[str] = field(default_factory=list)
     soak_validation_passes: int = 1
-    thinking_budget: int = 128_000
     project: ProjectContext = field(default_factory=ProjectContext)
     validation_profiles: list[ValidationProfile] = field(default_factory=list)
-    retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
 
     def __post_init__(self) -> None:
         """Clamp numeric fields to valid ranges."""
         self.max_prs_per_day = max(0, self.max_prs_per_day)
         self.max_open_bot_prs = max(0, self.max_open_bot_prs)
         self.max_failures_per_run = max(0, self.max_failures_per_run)
-        self.max_retries_bedrock = max(0, self.max_retries_bedrock)
         self.max_retries_fix = max(0, self.max_retries_fix)
         self.max_retries_validation = max(0, self.max_retries_validation)
         self.daily_token_budget = max(0, self.daily_token_budget)
-        self.thinking_budget = max(1024, min(self.thinking_budget, 128_000))
-        self.max_input_tokens = max(1, self.max_input_tokens)
-        self.max_output_tokens = max(1, self.max_output_tokens)
         self.flaky_validation_passes = max(1, self.flaky_validation_passes)
         if self.confidence_threshold not in ("high", "medium", "low"):
             self.confidence_threshold = "medium"
-
-
-@dataclass
-class ReviewerModels:
-    """Model configuration for PR reviewer light/heavy tasks."""
-
-    light_model_id: str = "us.anthropic.claude-opus-4-7"
-    heavy_model_id: str = "us.anthropic.claude-opus-4-7"
-    temperature: float = 0.0
-    thinking_budget: int = 128_000
 
 
 @dataclass
@@ -131,48 +97,24 @@ class ReviewerConfig:
     collaborator_only: bool = False
     chat_collaborator_only: bool = True
     disable_review: bool = False
-    disable_release_notes: bool = False
     review_simple_changes: bool = True
-    review_comment_lgtm: bool = False
     approve_on_no_findings: bool = False
-    model_file_triage: bool = False
     post_policy_notes: bool = True
     ignore_keyword: str = "/reviewbot: ignore"
     max_files: int = 150
     max_review_comments: int = 5
     path_filters: list[str] = field(default_factory=list)
     daily_token_budget: int = 0
-    bedrock_retries: int = 5
     github_retries: int = 5
-    bedrock_timeout_ms: int = 300_000
-    bedrock_concurrency_limit: int = 2
-    github_concurrency_limit: int = 6
-    max_input_tokens: int = 190_000
-    max_output_tokens: int = 65536
     custom_instructions: str = ""
     project: ProjectContext = field(default_factory=ProjectContext)
-    models: ReviewerModels = field(default_factory=ReviewerModels)
-    retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
 
     def __post_init__(self) -> None:
         """Clamp numeric fields to valid ranges."""
         self.max_files = max(1, self.max_files)
         self.max_review_comments = max(1, self.max_review_comments)
-        self.bedrock_retries = max(0, self.bedrock_retries)
         self.github_retries = max(0, self.github_retries)
         self.daily_token_budget = max(0, self.daily_token_budget)
-        self.max_input_tokens = max(1, self.max_input_tokens)
-        self.max_output_tokens = max(1, self.max_output_tokens)
-
-    @property
-    def bedrock_model_id(self) -> str:
-        """Default reviewer Bedrock model when no per-call override is given."""
-        return self.models.heavy_model_id
-
-    @property
-    def max_retries_bedrock(self) -> int:
-        """Alias used by the shared Bedrock client."""
-        return self.bedrock_retries
 
 
 def _merge_project(data: dict) -> ProjectContext:
@@ -227,57 +169,6 @@ def _merge_validation_profiles(raw_list: list[dict]) -> list[ValidationProfile]:
     return profiles
 
 
-def _merge_reviewer_models(data: dict) -> ReviewerModels:
-    """Build ReviewerModels from a raw dict."""
-    defaults = ReviewerModels()
-    return ReviewerModels(
-        light_model_id=_coerce_str(
-            data.get("light_model_id"),
-            defaults.light_model_id,
-        ),
-        heavy_model_id=_coerce_str(
-            data.get("heavy_model_id"),
-            defaults.heavy_model_id,
-        ),
-        temperature=_coerce_float(
-            data.get("temperature"),
-            defaults.temperature,
-        ),
-        thinking_budget=_coerce_int(
-            data.get("thinking_budget"),
-            defaults.thinking_budget,
-        ),
-    )
-
-
-def _merge_retrieval(data: dict) -> RetrievalConfig:
-    """Build RetrievalConfig from a raw dict."""
-    defaults = RetrievalConfig()
-    return RetrievalConfig(
-        enabled=_coerce_bool(data.get("enabled"), defaults.enabled),
-        code_knowledge_base_id=_coerce_str(
-            data.get("code_knowledge_base_id"),
-            defaults.code_knowledge_base_id,
-        ),
-        docs_knowledge_base_id=_coerce_str(
-            data.get("docs_knowledge_base_id"),
-            defaults.docs_knowledge_base_id,
-        ),
-        max_results_per_knowledge_base=_coerce_int(
-            data.get("max_results_per_knowledge_base"),
-            defaults.max_results_per_knowledge_base,
-        ),
-        max_chars_per_result=_coerce_int(
-            data.get("max_chars_per_result"),
-            defaults.max_chars_per_result,
-        ),
-        max_total_chars=_coerce_int(
-            data.get("max_total_chars"),
-            defaults.max_total_chars,
-        ),
-    )
-
-
 def _coerce_str(value: Any, default: str) -> str:
     """Return a string value or the provided default."""
     return value if isinstance(value, str) else default
@@ -328,15 +219,6 @@ def _coerce_int(value: Any, default: int) -> int:
     return value if isinstance(value, int) else default
 
 
-def _coerce_float(value: Any, default: float) -> float:
-    """Return a float value or the provided default."""
-    if isinstance(value, bool):
-        return default
-    if isinstance(value, (int, float)):
-        return float(value)
-    return default
-
-
 def _coerce_bool(value: Any, default: bool) -> bool:
     """Return a boolean value or the provided default."""
     return value if isinstance(value, bool) else default
@@ -351,10 +233,8 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
     defaults = BotConfig()
 
     # Flatten nested sections from the YAML schema into BotConfig fields
-    bedrock = raw.get("bedrock", {}) if isinstance(raw.get("bedrock"), dict) else {}
     limits = raw.get("limits", {}) if isinstance(raw.get("limits"), dict) else {}
     fix_gen = raw.get("fix_generation", {}) if isinstance(raw.get("fix_generation"), dict) else {}
-    retrieval = raw.get("retrieval", {}) if isinstance(raw.get("retrieval"), dict) else {}
     flaky_campaign = (
         raw.get("flaky_campaign", {})
         if isinstance(raw.get("flaky_campaign"), dict)
@@ -363,18 +243,6 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
     validation = raw.get("validation", {}) if isinstance(raw.get("validation"), dict) else {}
 
     return BotConfig(
-        bedrock_model_id=_coerce_str(
-            bedrock.get("model_id"),
-            defaults.bedrock_model_id,
-        ),
-        max_input_tokens=_coerce_int(
-            bedrock.get("max_input_tokens"),
-            defaults.max_input_tokens,
-        ),
-        max_output_tokens=_coerce_int(
-            bedrock.get("max_output_tokens"),
-            defaults.max_output_tokens,
-        ),
         max_patch_files=_coerce_int(
             limits.get("max_patch_files"),
             defaults.max_patch_files,
@@ -398,10 +266,6 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
         max_retries_validation=_coerce_int(
             fix_gen.get("max_validation_retries"),
             defaults.max_retries_validation,
-        ),
-        max_retries_bedrock=_coerce_int(
-            bedrock.get("max_retries"),
-            defaults.max_retries_bedrock,
         ),
         max_prs_per_day=_coerce_int(
             limits.get("max_prs_per_day"),
@@ -459,13 +323,8 @@ def load_config_data(raw: Any, *, source: str = "<memory>") -> BotConfig:
             validation.get("soak_passes"),
             defaults.soak_validation_passes,
         ),
-        thinking_budget=_coerce_int(
-            bedrock.get("thinking_budget"),
-            defaults.thinking_budget,
-        ),
         project=_merge_project(raw.get("project", {})) if isinstance(raw.get("project"), dict) else defaults.project,
         validation_profiles=_merge_validation_profiles(raw.get("validation_profiles", [])) if isinstance(raw.get("validation_profiles"), list) else defaults.validation_profiles,
-        retrieval=_merge_retrieval(retrieval),
     )
 
 
@@ -517,9 +376,7 @@ def load_reviewer_config_data(raw: Any, *, source: str = "<memory>") -> Reviewer
         return ReviewerConfig()
 
     defaults = ReviewerConfig()
-    models = root.get("models", {}) if isinstance(root.get("models"), dict) else {}
     project = root.get("project", {}) if isinstance(root.get("project"), dict) else {}
-    retrieval = root.get("retrieval", {}) if isinstance(root.get("retrieval"), dict) else {}
 
     return ReviewerConfig(
         enabled=_coerce_bool(root.get("enabled"), defaults.enabled),
@@ -536,30 +393,15 @@ def load_reviewer_config_data(raw: Any, *, source: str = "<memory>") -> Reviewer
         disable_review=_coerce_bool(
             root.get("disable_review"), defaults.disable_review
         ),
-        disable_release_notes=_coerce_bool(
-            root.get("disable_release_notes", defaults.disable_release_notes)
-            if "disable_release_notes" in root else defaults.disable_release_notes,
-            defaults.disable_release_notes,
-        ),
         review_simple_changes=_coerce_bool(
             root.get("review_simple_changes", defaults.review_simple_changes)
             if "review_simple_changes" in root else defaults.review_simple_changes,
             defaults.review_simple_changes,
         ),
-        review_comment_lgtm=_coerce_bool(
-            root.get("review_comment_lgtm", defaults.review_comment_lgtm)
-            if "review_comment_lgtm" in root else defaults.review_comment_lgtm,
-            defaults.review_comment_lgtm,
-        ),
         approve_on_no_findings=_coerce_bool(
             root.get("approve_on_no_findings", defaults.approve_on_no_findings)
             if "approve_on_no_findings" in root else defaults.approve_on_no_findings,
             defaults.approve_on_no_findings,
-        ),
-        model_file_triage=_coerce_bool(
-            root.get("model_file_triage", defaults.model_file_triage)
-            if "model_file_triage" in root else defaults.model_file_triage,
-            defaults.model_file_triage,
         ),
         post_policy_notes=_coerce_bool(
             root.get("post_policy_notes", defaults.post_policy_notes)
@@ -585,45 +427,14 @@ def load_reviewer_config_data(raw: Any, *, source: str = "<memory>") -> Reviewer
             if "daily_token_budget" in root else defaults.daily_token_budget,
             defaults.daily_token_budget,
         ),
-        bedrock_retries=_coerce_int(
-            root.get("bedrock_retries"), defaults.bedrock_retries
-        ),
         github_retries=_coerce_int(
             root.get("github_retries"), defaults.github_retries
-        ),
-        bedrock_timeout_ms=_coerce_int(
-            root.get("bedrock_timeout_ms", defaults.bedrock_timeout_ms)
-            if "bedrock_timeout_ms" in root else defaults.bedrock_timeout_ms,
-            defaults.bedrock_timeout_ms,
-        ),
-        bedrock_concurrency_limit=_coerce_int(
-            root.get(
-                "bedrock_concurrency_limit", defaults.bedrock_concurrency_limit
-            ) if "bedrock_concurrency_limit" in root else defaults.bedrock_concurrency_limit,
-            defaults.bedrock_concurrency_limit,
-        ),
-        github_concurrency_limit=_coerce_int(
-            root.get("github_concurrency_limit", defaults.github_concurrency_limit)
-            if "github_concurrency_limit" in root else defaults.github_concurrency_limit,
-            defaults.github_concurrency_limit,
-        ),
-        max_input_tokens=_coerce_int(
-            root.get("max_input_tokens", defaults.max_input_tokens)
-            if "max_input_tokens" in root else defaults.max_input_tokens,
-            defaults.max_input_tokens,
-        ),
-        max_output_tokens=_coerce_int(
-            root.get("max_output_tokens", defaults.max_output_tokens)
-            if "max_output_tokens" in root else defaults.max_output_tokens,
-            defaults.max_output_tokens,
         ),
         custom_instructions=_coerce_str(
             root.get("custom_instructions"),
             defaults.custom_instructions,
         ),
         project=_merge_project(project) if project else defaults.project,
-        models=_merge_reviewer_models(models),
-        retrieval=_merge_retrieval(retrieval),
     )
 
 

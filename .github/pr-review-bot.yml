@@ -1,8 +1,6 @@
 reviewer:
   approve_on_no_findings: false
   chat_collaborator_only: true
-  review_comment_lgtm: false
-  model_file_triage: false
   post_policy_notes: true
   max_review_comments: 5
   daily_token_budget: 0

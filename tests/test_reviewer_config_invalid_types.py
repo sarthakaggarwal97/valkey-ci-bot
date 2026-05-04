@@ -13,23 +13,11 @@ def test_reviewer_config_invalid_types_fall_back_to_defaults() -> None:
                 "collaborator_only": "true",
                 "chat_collaborator_only": "false",
                 "approve_on_no_findings": "true",
-                "model_file_triage": "true",
                 "post_policy_notes": "false",
                 "max_files": "150",
-                "max_review_comments": "20",
                 "path_filters": "src/**",
                 "daily_token_budget": "1000000",
-                "bedrock_retries": "5",
                 "github_retries": "5",
-                "retrieval": {
-                    "enabled": "true",
-                    "code_knowledge_base_id": ["bad"],
-                    "max_results_per_knowledge_base": "2",
-                },
-                "models": {
-                    "light_model_id": ["bad"],
-                    "temperature": "0.2",
-                },
                 "project": {
                     "test_frameworks": "gtest",
                 },
@@ -43,15 +31,9 @@ def test_reviewer_config_invalid_types_fall_back_to_defaults() -> None:
     assert config.collaborator_only == defaults.collaborator_only
     assert config.chat_collaborator_only == defaults.chat_collaborator_only
     assert config.approve_on_no_findings == defaults.approve_on_no_findings
-    assert config.model_file_triage == defaults.model_file_triage
     assert config.post_policy_notes == defaults.post_policy_notes
     assert config.max_files == defaults.max_files
-    assert config.max_review_comments == defaults.max_review_comments
     assert config.path_filters == defaults.path_filters
     assert config.daily_token_budget == defaults.daily_token_budget
-    assert config.bedrock_retries == defaults.bedrock_retries
     assert config.github_retries == defaults.github_retries
-    assert config.retrieval == defaults.retrieval
-    assert config.models.light_model_id == defaults.models.light_model_id
-    assert config.models.temperature == defaults.models.temperature
     assert config.project.test_frameworks == defaults.project.test_frameworks

@@ -19,11 +19,7 @@ def test_load_reviewer_config_defaults() -> None:
     assert config.ignore_keyword == "/reviewbot: ignore"
     assert config.daily_token_budget == 0
     assert config.approve_on_no_findings is False
-    assert config.model_file_triage is False
     assert config.post_policy_notes is True
-    assert config.models.light_model_id
-    assert config.models.heavy_model_id
-    assert config.models.temperature == 0.0
 
 
 def test_load_reviewer_config_nested_section() -> None:
@@ -32,23 +28,9 @@ def test_load_reviewer_config_nested_section() -> None:
             "reviewer": {
                 "collaborator_only": True,
                 "chat_collaborator_only": False,
-                "disable_release_notes": True,
                 "approve_on_no_findings": True,
-                "model_file_triage": True,
                 "post_policy_notes": False,
-                "max_review_comments": 7,
                 "path_filters": ["src/**", "!src/generated/**"],
-                "retrieval": {
-                    "enabled": True,
-                    "code_knowledge_base_id": "CODEKB",
-                    "docs_knowledge_base_id": "DOCSKB",
-                    "max_results_per_knowledge_base": 2,
-                },
-                "models": {
-                    "light_model_id": "light-model",
-                    "heavy_model_id": "heavy-model",
-                    "temperature": 0.15,
-                },
             }
         },
         source="test",
@@ -56,19 +38,9 @@ def test_load_reviewer_config_nested_section() -> None:
 
     assert config.collaborator_only is True
     assert config.chat_collaborator_only is False
-    assert config.disable_release_notes is True
     assert config.approve_on_no_findings is True
-    assert config.model_file_triage is True
     assert config.post_policy_notes is False
-    assert config.max_review_comments == 7
     assert config.path_filters == ["src/**", "!src/generated/**"]
-    assert config.retrieval.enabled is True
-    assert config.retrieval.code_knowledge_base_id == "CODEKB"
-    assert config.retrieval.docs_knowledge_base_id == "DOCSKB"
-    assert config.retrieval.max_results_per_knowledge_base == 2
-    assert config.models.light_model_id == "light-model"
-    assert config.models.heavy_model_id == "heavy-model"
-    assert config.models.temperature == 0.15
 
 
 def test_load_reviewer_config_invalid_yaml_uses_defaults() -> None:
