@@ -17,14 +17,11 @@ def _assert_ai_first_fix_config(config: dict) -> None:
     limits = config["limits"]
     fix_generation = config["fix_generation"]
     bedrock = config["bedrock"]
-    retrieval = config["retrieval"]
 
     assert bedrock["model_id"] == "us.anthropic.claude-opus-4-7"
     assert bedrock["max_input_tokens"] >= 900000
     assert bedrock["max_output_tokens"] >= 65536
     assert bedrock["thinking_budget"] == 128000
-    assert retrieval["max_results_per_knowledge_base"] >= 8
-    assert retrieval["max_total_chars"] >= 30000
     assert limits["max_failures_per_run"] == 0
     assert limits["max_prs_per_day"] == 0
     assert limits["max_open_bot_prs"] == 0

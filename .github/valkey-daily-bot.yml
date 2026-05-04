@@ -4,13 +4,6 @@ bedrock:
   max_output_tokens: 65536
   thinking_budget: 128000
 
-retrieval:
-  enabled: true
-  code_knowledge_base_id: "OHQMPN9RCG"
-  docs_knowledge_base_id: "NAKLE24DH9"
-  max_results_per_knowledge_base: 8
-  max_chars_per_result: 3000
-  max_total_chars: 30000
 
 limits:
   max_failures_per_run: 0

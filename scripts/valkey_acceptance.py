@@ -13,16 +13,6 @@ from typing import Any
 import yaml  # type: ignore[import-untyped]
 from github import Auth, Github
 
-try:
-    from scripts.code_reviewer import CodeReviewer, ReviewCoverage
-    from scripts.pr_summarizer import PRSummarizer
-
-    _BEDROCK_REVIEWER_AVAILABLE = True
-except ImportError:
-    _BEDROCK_REVIEWER_AVAILABLE = False
-    CodeReviewer = None  # type: ignore[assignment,misc]
-    ReviewCoverage = None  # type: ignore[assignment,misc]
-    PRSummarizer = None  # type: ignore[assignment,misc]
 from scripts.commit_signoff import (
     CommitSigner,
     load_signer_from_env,
@@ -160,7 +150,7 @@ class ReviewCaseResult:
     expectation_checks: list[ExpectationCheck] = field(default_factory=list)
     summary: SummaryResult | None = None
     findings: list[ReviewFinding] = field(default_factory=list)
-    coverage: ReviewCoverage | None = None
+    coverage: None = None  # ReviewCoverage type removed with code_reviewer.py; field preserved for schema compat
 
     @property
     def model_followups(self) -> list[str]:

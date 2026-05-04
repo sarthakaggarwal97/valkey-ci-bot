@@ -59,15 +59,3 @@ reviewer:
         source_path: "src/{name}.c"
       - test_path: "tests/integration/{name}.tcl"
         source_path: "src/{name}.c"
-  retrieval:
-    enabled: true
-    code_knowledge_base_id: "OHQMPN9RCG"
-    docs_knowledge_base_id: "NAKLE24DH9"
-    max_results_per_knowledge_base: 8
-    max_chars_per_result: 3000
-    max_total_chars: 30000
-  models:
-    light_model_id: "us.anthropic.claude-opus-4-7"
-    heavy_model_id: "us.anthropic.claude-opus-4-7"
-    temperature: 0.05
-    thinking_budget: 128000

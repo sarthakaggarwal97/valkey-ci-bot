@@ -1,18 +1,9 @@
 """Tests for the Valkey acceptance harness helpers."""
-
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
-
-try:
-    from scripts.code_reviewer import ReviewCoverage
-
-    _BEDROCK_REVIEWER_AVAILABLE = True
-except ImportError:
-    _BEDROCK_REVIEWER_AVAILABLE = False
-    ReviewCoverage = None  # type: ignore[assignment,misc]
 
 from scripts.commit_signoff import CommitSigner
 from scripts.models import SummaryResult
@@ -120,111 +111,6 @@ def test_render_backport_command_includes_branch_and_identity() -> None:
     assert "--pr-number 123" in command
     assert "--target-branch 8.1" in command
     assert "CI_BOT_COMMIT_EMAIL='valkey@example.com'" in command
-
-
-@pytest.mark.skipif(
-    not _BEDROCK_REVIEWER_AVAILABLE,
-    reason="Bedrock code reviewer has been removed; ReviewCoverage unavailable",
-)
-def test_review_case_result_blocks_on_incomplete_model_coverage() -> None:
-    result = ReviewCaseResult(
-        name="model-case",
-        pr_number=123,
-        policy=ReviewPolicySignals(
-            missing_dco_commits=[],
-            needs_core_team=False,
-            needs_docs=False,
-            security_sensitive=False,
-            governance_changed=False,
-            changed_files=["src/server.c"],
-        ),
-        summary=SummaryResult(
-            walkthrough="Adds a guarded server path.",
-            file_groups_markdown="",
-            release_notes=None,
-            short_summary="",
-        ),
-        coverage=ReviewCoverage(
-            requested_lgtm=True,
-            unaccounted_files=["src/server.c"],
-        ),
-    )
-
-    assert result.passed is False
-    assert result.model_followups == ["review-coverage-incomplete"]
-
-
-@pytest.mark.skipif(
-    not _BEDROCK_REVIEWER_AVAILABLE,
-    reason="Bedrock code reviewer has been removed; ReviewCoverage unavailable",
-)
-def test_acceptance_scorecard_counts_review_and_replay_cases() -> None:
-    passing = ReviewCaseResult(
-        name="policy-case",
-        pr_number=1,
-        policy=ReviewPolicySignals(
-            missing_dco_commits=[],
-            needs_core_team=False,
-            needs_docs=False,
-            security_sensitive=False,
-            governance_changed=False,
-            changed_files=["src/server.c"],
-        ),
-    )
-    failing = ReviewCaseResult(
-        name="model-case",
-        pr_number=2,
-        policy=ReviewPolicySignals(
-            missing_dco_commits=[],
-            needs_core_team=False,
-            needs_docs=False,
-            security_sensitive=False,
-            governance_changed=False,
-            changed_files=["src/server.c"],
-        ),
-        summary=SummaryResult(
-            walkthrough="Adds a guarded server path.",
-            file_groups_markdown="",
-            release_notes=None,
-            short_summary="",
-        ),
-        coverage=ReviewCoverage(
-            requested_lgtm=True,
-            unaccounted_files=["src/server.c"],
-        ),
-    )
-    manifest = AcceptanceManifest(
-        ci_cases=[CICase(name="daily", workflow_run_id=1)],
-        backport_cases=[
-            BackportCase(name="bp", source_pr_number=2, target_branch="8.1")
-        ],
-        workflow_cases=[WorkflowCase(name="review", workflow_path=".github/workflows/review-pr.yml")],
-    )
-    workflow_results = [
-        WorkflowCaseResult(
-            name="review",
-            workflow_path=".github/workflows/review-pr.yml",
-            checks=[
-                WorkflowCaseCheck(
-                    label="contains:python -m scripts.pr_review_main",
-                    passed=True,
-                    detail="required fragment present",
-                )
-            ],
-        )
-    ]
-
-    scorecard = _build_scorecard(manifest, [passing, failing], workflow_results)
-
-    assert scorecard.review_cases == 2
-    assert scorecard.review_passed == 1
-    assert scorecard.review_failed == 1
-    assert scorecard.workflow_cases == 1
-    assert scorecard.workflow_passed == 1
-    assert scorecard.workflow_failed == 0
-    assert scorecard.ci_replay_cases == 1
-    assert scorecard.backport_replay_cases == 1
-    assert scorecard.readiness == "needs-follow-up"
 
 
 def test_run_workflow_case_checks_required_and_forbidden_fragments(tmp_path: Path) -> None:
