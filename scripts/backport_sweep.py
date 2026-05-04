@@ -316,6 +316,11 @@ def _process_branch(
                 _run_git(tmpdir, "checkout", f"push_target/{backport_branch}")
                 _run_git(tmpdir, "checkout", "-B", backport_branch)
             else:
+                # No open PR. If a stale backport branch still exists on
+                # push_repo (e.g., because a previous PR was closed without
+                # merging), delete it so we start from a clean target branch
+                # state instead of stacking new commits on old history.
+                _delete_stale_backport_branch(gh, push_repo, backport_branch)
                 _run_git(tmpdir, "checkout", "-b", backport_branch)
                 push_url = github_https_url(push_repo)
                 _run_git(tmpdir, "remote", "add", "push_target", push_url)
@@ -548,6 +553,32 @@ def _find_existing_pr(gh: Any, push_repo: str, branch: str) -> Any | None:
         return pulls[0] if pulls else None
     except Exception:
         return None
+
+
+def _delete_stale_backport_branch(gh: Any, push_repo: str, branch: str) -> None:
+    """Delete a backport branch on push_repo if it exists without an open PR.
+
+    Guards against scenario where a prior backport PR was closed without
+    merging and the branch is still sitting there. If we simply created a
+    new PR from that stale branch, we'd carry over whatever bad history was
+    on it. Deleting forces the next sweep to start fresh from target.
+    """
+    try:
+        repo = retry_github_call(lambda: gh.get_repo(push_repo), retries=2, description=f"get {push_repo}")
+        ref = retry_github_call(lambda: repo.get_git_ref(f"heads/{branch}"), retries=1, description=f"check ref {branch}")
+        if ref is None:
+            return
+        logger.info("Deleting stale backport branch %s on %s (no open PR)", branch, push_repo)
+        check_publish_allowed(target_repo=push_repo, action="delete_branch", context=branch)
+        retry_github_call(lambda: ref.delete(), retries=2, description=f"delete ref {branch}")
+    except Exception as exc:
+        # Branch not found is fine — nothing to prune. Any other error
+        # we log but don't abort; the next cherry-pick push will surface
+        # a real problem clearly.
+        msg = str(exc).lower()
+        if "not found" in msg or "404" in msg:
+            return
+        logger.warning("Could not prune stale backport branch %s: %s", branch, exc)
 
 
 def _upsert_pr(gh: Any, push_repo: str, target_branch: str, head_branch: str,
