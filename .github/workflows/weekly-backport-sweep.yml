@@ -51,7 +51,7 @@ on:
         description: "Cap candidates per branch (0 = unlimited)"
         required: false
         type: string
-        default: "0"
+        default: "5"
       test_commands:
         description: "Test commands to run after cherry-pick (newline-separated). Default is build-only; 'make test' is too flaky for batch validation."
         required: false
@@ -105,7 +105,7 @@ jobs:
       PUSH_REPO: ${{ inputs.push_repo || vars.VALKEY_BACKPORT_PUSH_REPO || '' }}
       ONLY_BRANCH: ${{ inputs.only_branch || '' }}
       IMPLICIT_TARGET_BRANCH: ${{ inputs.implicit_target_branch || '' }}
-      MAX_CANDIDATES: ${{ inputs.max_candidates || '0' }}
+      MAX_CANDIDATES: ${{ inputs.max_candidates || '5' }}
       TEST_COMMANDS: ${{ inputs.test_commands || 'make -j$(nproc)' }}
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true && 'true' || 'false' }}
       VALKEY_CI_AGENT_ALLOW_VALKEY_IO_PUBLISH: ${{ vars.VALKEY_CI_AGENT_ALLOW_VALKEY_IO_PUBLISH || '' }}
