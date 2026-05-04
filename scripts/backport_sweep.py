@@ -56,6 +56,17 @@ _DEFAULT_STATUS_FIELD = "Status"
 _DEFAULT_STATUS_VALUE = "To be backported"
 _BRANCH_PREFIX = "agent/backport/weekly"
 
+# Well-known per-release-branch backport project boards on valkey-io.
+# Each project is scoped to exactly one target branch (no per-item branch
+# field), so we can derive the implicit target from the project number alone.
+_VALKEY_IO_PROJECT_TO_BRANCH: dict[int, str] = {
+    1: "7.2",
+    2: "8.0",
+    14: "8.1",
+    18: "9.0",
+    41: "9.1",
+}
+
 
 # ── Data classes ──────────────────────────────────────────────────────
 
@@ -218,6 +229,21 @@ def run_backport_sweep(
     gh = Github(auth=Auth.Token(github_token))
     repo = retry_github_call(lambda: gh.get_repo(repo_full_name), retries=3, description=f"get {repo_full_name}")
     release_branches = discover_release_branches(repo, _DEFAULT_RELEASE_BRANCH_PATTERN)
+
+    # Auto-derive implicit_target_branch for well-known valkey-io per-release
+    # project boards when caller did not pass one explicitly.
+    if (
+        not implicit_target_branch
+        and project_owner == "valkey-io"
+        and project_owner_type == "organization"
+        and project_number in _VALKEY_IO_PROJECT_TO_BRANCH
+    ):
+        implicit_target_branch = _VALKEY_IO_PROJECT_TO_BRANCH[project_number]
+        logger.info(
+            "Derived implicit target branch %s from valkey-io project %d",
+            implicit_target_branch, project_number,
+        )
+
     if only_branch:
         release_branches = [b for b in release_branches if b == only_branch]
     if implicit_target_branch and implicit_target_branch not in release_branches:

@@ -88,7 +88,7 @@ jobs:
       STATUS_VALUE: ${{ inputs.status_value || 'To be backported' }}
       PUSH_REPO: ${{ inputs.push_repo || vars.VALKEY_BACKPORT_PUSH_REPO || '' }}
       ONLY_BRANCH: ${{ inputs.only_branch || '' }}
-      IMPLICIT_TARGET_BRANCH: ${{ inputs.implicit_target_branch || vars.VALKEY_BACKPORT_IMPLICIT_TARGET_BRANCH || '' }}
+      IMPLICIT_TARGET_BRANCH: ${{ inputs.implicit_target_branch || '' }}
       MAX_CANDIDATES: ${{ inputs.max_candidates || '0' }}
       TEST_COMMANDS: ${{ inputs.test_commands || 'make test' }}
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true && 'true' || 'false' }}
